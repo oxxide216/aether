@@ -1,0 +1,14 @@
+whitespace=( |\t|\r|\v)*
+newline=\n
+
+defun=defun
+def=def
+
+number=0-9+
+ident=(a-z|A-Z|_|\-)(a-z|A-Z|_|\-|0-9)*
+
+oparen=\(
+cparen=\)
+obracket=\[
+cbracket=\]
+str="|'
