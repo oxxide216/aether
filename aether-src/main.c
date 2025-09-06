@@ -12,7 +12,7 @@ int main(i32 argc, char **argv) {
 
   Str bytecode = read_file(argv[1]);
   Ir ir = deserialize((u8 *) bytecode.ptr, bytecode.len);
-  execute(&ir);
+  execute(&ir, argc, argv);
 
   return 0;
 }

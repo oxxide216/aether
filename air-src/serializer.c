@@ -19,6 +19,20 @@ static void get_expr_size(IrExpr *expr, u32 *size) {
     get_block_size(&expr->as.func_call.args, size);
   } break;
 
+  case IrExprKindVarDef: {
+    *size += sizeof(u32) + expr->as.var_def.name.len * sizeof(char);
+    get_expr_size(expr->as.var_def.expr, size);
+  } break;
+
+  case IrExprKindIf: {
+    *size += sizeof(bool);
+
+    get_expr_size(expr->as._if.cond, size);
+    get_block_size(&expr->as._if.if_body, size);
+    if (expr->as._if.has_else)
+      get_block_size(&expr->as._if.else_body, size);
+  } break;
+
   case IrExprKindList: {
     get_block_size(&expr->as.list.content, size);
   } break;
@@ -30,11 +44,6 @@ static void get_expr_size(IrExpr *expr, u32 *size) {
 
   case IrExprKindNumber: {
     *size += sizeof(i64);
-  } break;
-
-  case IrExprKindVarDef: {
-    *size += sizeof(u32) + expr->as.var_def.name.len * sizeof(char);
-    get_expr_size(expr->as.var_def.expr, size);
   } break;
   }
 }
@@ -80,6 +89,21 @@ static void save_expr_data(IrExpr *expr, u8 *data, u32 *end) {
     save_block_data(&expr->as.func_call.args, data, end);
   } break;
 
+  case IrExprKindVarDef: {
+    save_str_data(expr->as.var_def.name, data, end);
+    save_expr_data(expr->as.var_def.expr, data, end);
+  } break;
+
+  case IrExprKindIf: {
+    *(bool *) (data + *end) = expr->as._if.has_else;
+    *end += sizeof(bool);
+
+    save_expr_data(expr->as._if.cond, data, end);
+    save_block_data(&expr->as._if.if_body, data, end);
+    if (expr->as._if.has_else)
+      save_block_data(&expr->as._if.else_body, data, end);
+  } break;
+
   case IrExprKindList: {
     save_block_data(&expr->as.list.content, data, end);
   } break;
@@ -95,11 +119,6 @@ static void save_expr_data(IrExpr *expr, u8 *data, u32 *end) {
   case IrExprKindNumber: {
     *(i64 *) (data + *end) = expr->as.number.number;
     *end += sizeof(i64);
-  } break;
-
-  case IrExprKindVarDef: {
-    save_str_data(expr->as.var_def.name, data, end);
-    save_expr_data(expr->as.var_def.expr, data, end);
   } break;
   }
 }

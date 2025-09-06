@@ -11,11 +11,12 @@ typedef Da(IrExpr *) IrBlock;
 typedef enum {
   IrExprKindFuncDef = 0,
   IrExprKindFuncCall,
+  IrExprKindVarDef,
+  IrExprKindIf,
   IrExprKindList,
   IrExprKindIdent,
   IrExprKindStrLit,
   IrExprKindNumber,
-  IrExprKindVarDef,
 } IrExprKind;
 
 typedef Da(Str) IrArgs;
@@ -30,6 +31,18 @@ typedef struct {
   Str     name;
   IrBlock args;
 } IrExprFuncCall;
+
+typedef struct {
+  Str     name;
+  IrExpr *expr;
+} IrExprVarDef;
+
+typedef struct {
+  IrExpr  *cond;
+  IrBlock  if_body;
+  IrBlock  else_body;
+  bool     has_else;
+} IrExprIf;
 
 typedef struct {
   IrBlock content;
@@ -47,19 +60,15 @@ typedef struct {
   i64 number;
 } IrExprNumber;
 
-typedef struct {
-  Str     name;
-  IrExpr *expr;
-} IrExprVarDef;
-
 typedef union {
   IrExprFuncDef  func_def;
   IrExprFuncCall func_call;
+  IrExprVarDef   var_def;
+  IrExprIf       _if;
   IrExprList     list;
   IrExprIdent    ident;
   IrExprStrLit   str_lit;
   IrExprNumber   number;
-  IrExprVarDef   var_def;
 } IrExprAs;
 
 struct IrExpr {

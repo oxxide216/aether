@@ -25,8 +25,11 @@ typedef struct {
 static char *token_names[] = {
   "whitespace",
   "new line",
+  "comment",
   "defun",
   "def",
+  "if",
+  "else",
   "number",
   "identifier",
   "`(`",
@@ -84,6 +87,11 @@ static Tokens lex(Str code) {
     if (new_token.id == TT_NEWLINE) {
       ++row;
       col = 0;
+    } else if (new_token.id == TT_COMMENT) {
+      while (code.len > 0 && code.ptr[0] != '\n') {
+        ++code.ptr;
+        --code.len;
+      }
     } else if (new_token.id != TT_WHITESPACE) {
       DA_APPEND(tokens, new_token);
     }
@@ -141,7 +149,7 @@ static Token *parser_expect_token(Parser *parser, u64 id_mask) {
   exit(1);
 }
 
-static IrBlock parser_parse_block(Parser *parser);
+static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask);
 
 static IrExprFuncDef parser_parse_func_def(Parser *parser) {
   IrExprFuncDef func_def = {0};
@@ -153,14 +161,17 @@ static IrExprFuncDef parser_parse_func_def(Parser *parser) {
 
   parser_expect_token(parser, MASK(TT_OBRACKET));
 
-  while (parser_peek_token(parser)->id != TT_CBRACKET) {
+  Token *next_token = parser_peek_token(parser);
+  while (next_token && next_token->id != TT_CBRACKET) {
     Token *arg_token = parser_expect_token(parser, MASK(TT_IDENT));
     DA_APPEND(func_def.args, arg_token->lexeme);
+
+    next_token = parser_peek_token(parser);
   }
 
-  parser_next_token(parser);
-
-  func_def.body = parser_parse_block(parser);
+  parser_expect_token(parser, MASK(TT_IDENT) | MASK(TT_CBRACKET));
+  func_def.body = parser_parse_block(parser, MASK(TT_CPAREN));
+  parser_expect_token(parser, MASK(TT_CPAREN));
 
   return func_def;
 }
@@ -171,7 +182,8 @@ static IrExprFuncCall parser_parse_func_call(Parser *parser) {
   Token *name_token = parser_expect_token(parser, MASK(TT_IDENT));
   func_call.name = name_token->lexeme;
 
-  func_call.args = parser_parse_block(parser);
+  func_call.args = parser_parse_block(parser, MASK(TT_CPAREN));
+  parser_expect_token(parser, MASK(TT_CPAREN));
 
   return func_call;
 }
@@ -207,7 +219,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
 
   if (token->id == TT_OBRACKET) {
     expr->kind = IrExprKindList;
-    expr->as.list.content = parser_parse_block(parser);
+    expr->as.list.content = parser_parse_block(parser, MASK(TT_CBRACKET));
     parser_expect_token(parser, MASK(TT_CBRACKET));
 
     return expr;
@@ -227,6 +239,24 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     expr->kind = IrExprKindVarDef;
     expr->as.var_def.name = name_token->lexeme;
     expr->as.var_def.expr = parser_parse_expr(parser);
+
+    parser_expect_token(parser, MASK(TT_CPAREN));
+  } break;
+
+  case TT_IF: {
+    parser_next_token(parser);
+
+    expr->kind = IrExprKindIf;
+    expr->as._if.cond = parser_parse_expr(parser);
+
+    expr->as._if.if_body = parser_parse_block(parser, MASK(TT_CPAREN) | MASK(TT_ELSE))
+;
+    Token *next_token = parser_expect_token(parser, MASK(TT_CPAREN) | MASK(TT_ELSE));
+    expr->as._if.has_else = next_token->id == TT_ELSE;
+    if (expr->as._if.has_else) {
+      expr->as._if.else_body = parser_parse_block(parser, MASK(TT_CPAREN));
+      parser_expect_token(parser, MASK(TT_CPAREN));
+    }
   } break;
 
   case TT_IDENT: {
@@ -235,20 +265,19 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   } break;
 
   default: {
-    parser_expect_token(parser, MASK(TT_DEFUN) | MASK(TT_DEF) | MASK(TT_IDENT));
+    parser_expect_token(parser, MASK(TT_DEFUN) | MASK(TT_DEF) |
+                                MASK(TT_IF) | MASK(TT_IDENT));
   } break;
   }
-
-  parser_expect_token(parser, MASK(TT_CPAREN));
 
   return expr;
 }
 
-static IrBlock parser_parse_block(Parser *parser) {
+static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
   IrBlock block = {0};
 
   Token *token = parser_peek_token(parser);
-  while (token && token->id != TT_CPAREN && token->id != TT_CBRACKET) {
+  while (token && !(MASK(token->id) & end_id_mask)) {
     IrExpr *expr = parser_parse_expr(parser);
     DA_APPEND(block, expr);
 
@@ -262,7 +291,7 @@ Ir parse(Str code) {
   Parser parser = {0};
 
   parser.tokens = lex(code);
-  parser.ir = parser_parse_block(&parser);
+  parser.ir = parser_parse_block(&parser, 0);
 
   return parser.ir;
 }

@@ -29,6 +29,21 @@ static void get_expr_data_size(u8 *data, u32 *size) {
     get_block_data_size(data, size);
   } break;
 
+  case IrExprKindVarDef: {
+    get_str_data_size(data, size);
+    get_expr_data_size(data, size);
+  } break;
+
+  case IrExprKindIf: {
+    bool has_else = *(bool *) (data + *size);
+    *size += sizeof(bool);
+
+    get_expr_data_size(data, size);
+    get_expr_data_size(data, size);
+    if (has_else)
+      get_expr_data_size(data, size);
+  } break;
+
   case IrExprKindList: {
     get_block_data_size(data, size);
   } break;
@@ -40,11 +55,6 @@ static void get_expr_data_size(u8 *data, u32 *size) {
 
   case IrExprKindNumber: {
     *size += sizeof(i64);
-  } break;
-
-  case IrExprKindVarDef: {
-    get_str_data_size(data, size);
-    get_expr_data_size(data, size);
   } break;
   }
 }
@@ -96,6 +106,25 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end) {
     load_block_data(&expr->as.func_call.args, data, end);
   } break;
 
+  case IrExprKindVarDef: {
+    expr->as.var_def.expr = aalloc(sizeof(IrExpr));
+
+    load_str_data(&expr->as.str_lit.lit, data, end);
+    load_expr_data(expr->as.var_def.expr, data, end);
+  } break;
+
+  case IrExprKindIf: {
+    expr->as._if.has_else = *(bool *) (data + *end);
+    *end += sizeof(bool);
+
+    expr->as._if.cond = aalloc(sizeof(IrExpr));
+
+    load_expr_data(expr->as._if.cond, data, end);
+    load_block_data(&expr->as._if.if_body, data, end);
+    if (expr->as._if.has_else)
+      load_block_data(&expr->as._if.else_body, data, end);
+  } break;
+
   case IrExprKindList: {
     load_block_data(&expr->as.list.content, data, end);
   } break;
@@ -111,13 +140,6 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end) {
   case IrExprKindNumber: {
     expr->as.number.number = *(i64 *) (data + *end);
     *end += sizeof(i64);
-  } break;
-
-  case IrExprKindVarDef: {
-    expr->as.var_def.expr = aalloc(sizeof(IrExpr));
-
-    load_str_data(&expr->as.str_lit.lit, data, end);
-    load_expr_data(expr->as.var_def.expr, data, end);
   } break;
   }
 }

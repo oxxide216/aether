@@ -4,6 +4,21 @@
 #include "air.h"
 #include "vm.h"
 
-Value print_intrinsic(Vm *vm, IrBlock *args);
+Value print_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
+Value get_args_count_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
+Value get_arg_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
+
+Value add_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
+Value sub_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
+Value mul_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
+Value div_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
+Value mod_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
+
+Value eq_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
+Value ne_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
+Value ls_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
+Value le_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
+Value gt_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
+Value ge_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
 
 #endif // INTRINSICS_H

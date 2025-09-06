@@ -4,13 +4,26 @@
 #include "shl_log.h"
 #include "intrinsics.h"
 
-static Value execute_block(Vm *vm, IrBlock *block);
+static Value execute_block(Vm *vm, IrBlock *block, bool is_inside_of_func);
 
 static Intrinsic intrinsics[] = {
   { STR_LIT("print"), (u32) -1, &print_intrinsic },
+  { STR_LIT("get-args-count"), 0, &get_args_count_intrinsic },
+  { STR_LIT("get-arg"), 1, &get_arg_intrinsic },
+  { STR_LIT("add"), 2, &add_intrinsic },
+  { STR_LIT("sub"), 2, &sub_intrinsic },
+  { STR_LIT("mul"), 2, &mul_intrinsic },
+  { STR_LIT("div"), 2, &div_intrinsic },
+  { STR_LIT("mod"), 2, &mod_intrinsic },
+  { STR_LIT("eq"), 2, &eq_intrinsic },
+  { STR_LIT("ne"), 2, &ne_intrinsic },
+  { STR_LIT("ls"), 2, &ls_intrinsic },
+  { STR_LIT("le"), 2, &le_intrinsic },
+  { STR_LIT("gt"), 2, &gt_intrinsic },
+  { STR_LIT("ge"), 2, &ge_intrinsic },
 };
 
-static Value execute_func(Vm *vm, IrExprFuncCall *func) {
+static Value execute_func(Vm *vm, IrExprFuncCall *func, bool is_inside_of_func) {
   Func *func_def = NULL;
 
   for (u32 i = 0; i < vm->funcs.len; ++i) {
@@ -25,34 +38,37 @@ static Value execute_func(Vm *vm, IrExprFuncCall *func) {
     if (str_eq(intrinsics[i].name, func->name) &&
         (intrinsics[i].args_count == func->args.len ||
          intrinsics[i].args_count == (u32) -1)) {
-      return intrinsics[i].func(vm, &func->args);
+      return intrinsics[i].func(vm, &func->args, is_inside_of_func);
     }
   }
 
   if (!func_def) {
-    ERROR("Function "STR_FMT" was not defined before usage\n",
-          STR_ARG(func->name));
+    ERROR("Function "STR_FMT" with %u arguments was not defined before usage\n",
+          STR_ARG(func->name), func->args.len);
     exit(1);
   }
 
-  u32 prev_vars_len = vm->vars.len;
-
+  Vars new_local_vars = {0};
   for (u32 i = 0; i < func_def->args.len; ++i) {
     Var var = {
       func_def->args.items[i],
-      execute_expr(vm, func->args.items[i]),
+      execute_expr(vm, func->args.items[i], is_inside_of_func),
     };
-    DA_APPEND(vm->vars, var);
+    DA_APPEND(new_local_vars, var);
   }
 
-  Value ret_val = execute_block(vm, &func_def->body);
+  Vars prev_local_vars = vm->local_vars;
+  vm->local_vars = new_local_vars;
 
-  vm->vars.len = prev_vars_len;
+  Value ret_val = execute_block(vm, &func_def->body, true);
+
+  free(vm->local_vars.items);
+  vm->local_vars = prev_local_vars;
 
   return ret_val;
 }
 
-Value execute_expr(Vm *vm, IrExpr *expr) {
+Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func) {
   switch (expr->kind) {
   case IrExprKindFuncDef: {
     for (u32 i = 0; i < vm->funcs.len; ++i) {
@@ -68,14 +84,42 @@ Value execute_expr(Vm *vm, IrExpr *expr) {
   } break;
 
   case IrExprKindFuncCall: {
-    return execute_func(vm, &expr->as.func_call);
+    return execute_func(vm, &expr->as.func_call, is_inside_of_func);
+  } break;
+
+  case IrExprKindVarDef: {
+    Var var = {0};
+    var.name = expr->as.var_def.name;
+    var.value = execute_expr(vm, expr->as.var_def.expr, is_inside_of_func);
+    if (is_inside_of_func)
+      DA_APPEND(vm->local_vars, var);
+    else
+      DA_APPEND(vm->global_vars, var);
+
+    return var.value;
+  } break;
+
+  case IrExprKindIf: {
+    Value cond = execute_expr(vm, expr->as._if.cond, is_inside_of_func);
+    if (cond.kind != ValueKindBool) {
+      ERROR("Only boolean value can be used as a condition\n");
+      exit(1);
+    }
+
+    if (cond.as._bool)
+      return execute_block(vm, &expr->as._if.if_body, is_inside_of_func);
+
+    if (expr->as._if.has_else)
+      return execute_block(vm, &expr->as._if.else_body, is_inside_of_func);
+
+    return (Value) { ValueKindUnit, {} };
   } break;
 
   case IrExprKindList: {
     List list = {0};
 
     for (u32 i = 0; i < expr->as.list.content.len; ++i) {
-      Value value = execute_expr(vm, expr->as.list.content.items[i]);
+      Value value = execute_expr(vm, expr->as.list.content.items[i], is_inside_of_func);
       DA_APPEND(list, value);
     }
 
@@ -86,9 +130,14 @@ Value execute_expr(Vm *vm, IrExpr *expr) {
   } break;
 
   case IrExprKindIdent: {
-    for (u32 i = 0; i < vm->vars.len; ++i) {
-      if (str_eq(vm->vars.items[i].name, expr->as.ident.ident))
-        return vm->vars.items[i].value;
+    for (u32 i = vm->local_vars.len; i > 0; --i) {
+      if (str_eq(vm->local_vars.items[i - 1].name, expr->as.ident.ident))
+        return vm->local_vars.items[i - 1].value;
+    }
+
+    for (u32 i = vm->global_vars.len; i > 0; --i) {
+      if (str_eq(vm->global_vars.items[i - 1].name, expr->as.ident.ident))
+        return vm->global_vars.items[i - 1].value;
     }
 
     ERROR("Variable "STR_FMT" was not defined before usage\n",
@@ -109,30 +158,30 @@ Value execute_expr(Vm *vm, IrExpr *expr) {
       { .number = expr->as.number.number },
     };
   } break;
-
-  case IrExprKindVarDef: {
-    Var var = {0};
-    var.name = expr->as.var_def.name;
-    var.value = execute_expr(vm, expr->as.var_def.expr);
-    DA_APPEND(vm->vars, var);
-
-    return var.value;
-  } break;
   }
 
   return (Value) { ValueKindUnit, {} };
 }
 
-static Value execute_block(Vm *vm, IrBlock *block) {
+static Value execute_block(Vm *vm, IrBlock *block, bool is_inside_of_func) {
   for (u32 i = 0; i + 1 < block->len; ++i)
-    execute_expr(vm, block->items[i]);
+    execute_expr(vm, block->items[i], is_inside_of_func);
 
   if (block->len > 0)
-    return execute_expr(vm, block->items[block->len - 1]);
+    return execute_expr(vm, block->items[block->len - 1], is_inside_of_func);
   return (Value) { ValueKindUnit, {} };
 }
 
-void execute(Ir *ir) {
+void execute(Ir *ir, i32 argc, char **argv) {
   Vm vm = {0};
-  execute_block(&vm, ir);
+
+  for (u32 i = 0; i < (u32) argc; ++i) {
+    Str arg = {
+      argv[i],
+      strlen(argv[i]),
+    };
+    DA_APPEND(vm.args, arg);
+  }
+
+  execute_block(&vm, ir, false);
 }
