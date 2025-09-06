@@ -9,7 +9,7 @@ Str read_file(char *path) {
 
   FILE *file = fopen(path, "r");
   if (!file)
-    return (Str) {0};
+    return (Str) { NULL, (unsigned int) -1 };
 
   fseek(file, 0, SEEK_END);
   content.len = ftell(file);

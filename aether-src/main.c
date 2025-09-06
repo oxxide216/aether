@@ -11,6 +11,11 @@ int main(i32 argc, char **argv) {
   }
 
   Str bytecode = read_file(argv[1]);
+  if (bytecode.len == (u32) -1) {
+    ERROR("File %s was not found\n", argv[1]);
+    exit(1);
+  }
+
   Ir ir = deserialize((u8 *) bytecode.ptr, bytecode.len);
   execute(&ir, argc, argv);
 

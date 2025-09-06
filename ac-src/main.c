@@ -21,6 +21,10 @@ int main(i32 argc, char **argv) {
   char *input_file_name = argv[2];
 
   Str code = read_file(input_file_name);
+  if (code.len == (u32) -1) {
+    ERROR("File %s was not found\n", input_file_name);
+    exit(1);
+  }
 
   Ir ir = parse(code);
 
