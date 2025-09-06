@@ -26,7 +26,7 @@ static char *token_names[] = {
   "whitespace",
   "new line",
   "comment",
-  "defun",
+  "fun",
   "def",
   "if",
   "else",
@@ -154,7 +154,7 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask);
 static IrExprFuncDef parser_parse_func_def(Parser *parser) {
   IrExprFuncDef func_def = {0};
 
-  parser_expect_token(parser, MASK(TT_DEFUN));
+  parser_expect_token(parser, MASK(TT_FUN));
 
   Token *name_token = parser_expect_token(parser, MASK(TT_IDENT));
   func_def.name = name_token->lexeme;
@@ -227,7 +227,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
 
   token = parser_peek_token(parser);
   switch (token->id) {
-  case TT_DEFUN: {
+  case TT_FUN: {
     expr->kind = IrExprKindFuncDef;
     expr->as.func_def = parser_parse_func_def(parser);
   } break;
@@ -249,8 +249,8 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     expr->kind = IrExprKindIf;
     expr->as._if.cond = parser_parse_expr(parser);
 
-    expr->as._if.if_body = parser_parse_block(parser, MASK(TT_CPAREN) | MASK(TT_ELSE))
-;
+    expr->as._if.if_body = parser_parse_block(parser, MASK(TT_CPAREN) | MASK(TT_ELSE));
+
     Token *next_token = parser_expect_token(parser, MASK(TT_CPAREN) | MASK(TT_ELSE));
     expr->as._if.has_else = next_token->id == TT_ELSE;
     if (expr->as._if.has_else) {
@@ -265,7 +265,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   } break;
 
   default: {
-    parser_expect_token(parser, MASK(TT_DEFUN) | MASK(TT_DEF) |
+    parser_expect_token(parser, MASK(TT_FUN) | MASK(TT_DEF) |
                                 MASK(TT_IF) | MASK(TT_IDENT));
   } break;
   }

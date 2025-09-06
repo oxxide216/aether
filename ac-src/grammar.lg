@@ -2,7 +2,7 @@ whitespace=( |\t|\r|\v)*
 newline=\n
 comment=#
 
-defun=defun
+fun=fun
 def=def
 if=if
 else=else
