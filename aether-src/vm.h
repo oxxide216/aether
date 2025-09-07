@@ -55,11 +55,11 @@ typedef Da(Var) Vars;
 typedef IrArgs Args;
 
 struct Vm {
-  Funcs    funcs;
-  Vars     local_vars;
-  Vars     global_vars;
-  Args     args;
-  RcArena *rc_arena;
+  Funcs     funcs;
+  Vars      local_vars;
+  Vars      global_vars;
+  ListNode *args;
+  RcArena  *rc_arena;
 };
 
 Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func);

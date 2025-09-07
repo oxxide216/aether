@@ -17,11 +17,11 @@ static void print_value(Value *value) {
         fputs(", ", stdout);
 
       print_value(&node->value);
+
+      node = node->next;
     }
 
     fputc(']', stdout);
-
-    node = node->next;
   } break;
 
   case ValueKindStrLit: {
@@ -47,34 +47,65 @@ Value print_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
     print_value(&value);
   }
 
+  return (Value) { ValueKindUnit, {} };
+}
+
+Value println_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+  print_intrinsic(vm, args, is_inside_of_func);
   fputc('\n', stdout);
 
   return (Value) { ValueKindUnit, {} };
 }
 
-Value get_args_count_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+Value get_args_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
   (void) args;
   (void) is_inside_of_func;
 
   return (Value) {
-    ValueKindNumber,
-    { .number = vm->args.len },
+    ValueKindList,
+    { .list = vm->args },
   };
 }
 
-Value get_arg_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
-  Value index = execute_expr(vm, args->items[0], is_inside_of_func);
-  if (index.kind != ValueKindNumber) {
-    ERROR("Only numbers can be used for indexing\n");
+Value head_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+  Value value = execute_expr(vm, args->items[0], is_inside_of_func);
+  if (value.kind != ValueKindList) {
+    ERROR("head: wrong argument kind\n");
     exit(1);
   }
 
-  if (index.as.number >= vm->args.len)
+  if (!value.as.list)
     return (Value) { ValueKindUnit, {} };
 
+  return value.as.list->value;
+}
+
+Value tail_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+  Value value = execute_expr(vm, args->items[0], is_inside_of_func);
+  if (value.kind != ValueKindList) {
+    ERROR("tail: wrong argument kind\n");
+    exit(1);
+  }
+
+  if (!value.as.list)
+    return value;
+
   return (Value) {
-    ValueKindStrLit,
-    { .str_lit = vm->args.items[index.as.number] },
+    ValueKindList,
+    { .list = value.as.list->next },
+  };
+}
+
+Value is_empty_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+  Value value = execute_expr(vm, args->items[0], is_inside_of_func);
+  if (value.kind != ValueKindList) {
+    ERROR("is-empty: wrong argument kind");
+    exit(1);
+  }
+
+  return (Value) {
+    ValueKindBool,
+    { ._bool = value.as.list == NULL },
   };
 }
 
@@ -198,4 +229,16 @@ Value ge_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
     ValueKindBool,
     { ._bool = a.as.number >= b.as.number },
   };
+}
+
+Value not_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+  Value value = execute_expr(vm, args->items[0], is_inside_of_func);
+
+  if (value.kind != ValueKindBool) {
+    ERROR("not: wrong argument kind\n");
+    exit(1);
+  }
+
+  value.as._bool = !value.as._bool;
+  return value;
 }

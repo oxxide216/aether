@@ -2,14 +2,18 @@
 #define SHL_STR_IMPLEMENTATION
 #include "shl_str.h"
 #include "shl_log.h"
+#include "shl_arena.h"
 #include "intrinsics.h"
 
 static Value execute_block(Vm *vm, IrBlock *block, bool is_inside_of_func);
 
 static Intrinsic intrinsics[] = {
   { STR_LIT("print"), (u32) -1, &print_intrinsic },
-  { STR_LIT("get-args-count"), 0, &get_args_count_intrinsic },
-  { STR_LIT("get-arg"), 1, &get_arg_intrinsic },
+  { STR_LIT("println"), (u32) -1, &println_intrinsic },
+  { STR_LIT("get-args"), 0, &get_args_intrinsic },
+  { STR_LIT("head"), 1, &head_intrinsic },
+  { STR_LIT("tail"), 1, &tail_intrinsic },
+  { STR_LIT("is-empty"), 1, &is_empty_intrinsic },
   { STR_LIT("add"), 2, &add_intrinsic },
   { STR_LIT("sub"), 2, &sub_intrinsic },
   { STR_LIT("mul"), 2, &mul_intrinsic },
@@ -21,6 +25,7 @@ static Intrinsic intrinsics[] = {
   { STR_LIT("le"), 2, &le_intrinsic },
   { STR_LIT("gt"), 2, &gt_intrinsic },
   { STR_LIT("ge"), 2, &ge_intrinsic },
+  { STR_LIT("not"), 1, &not_intrinsic },
 };
 
 static Value execute_func(Vm *vm, IrExprFuncCall *func, bool is_inside_of_func) {
@@ -173,22 +178,26 @@ Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func) {
   } break;
 
   case IrExprKindList: {
-    ListNode *node = NULL;
+    ListNode *list = NULL;
+    ListNode *list_end = NULL;
 
     for (u32 i = 0; i < expr->as.list.content.len; ++i) {
       ListNode *new_node = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
       new_node->value = execute_expr(vm, expr->as.list.content.items[i], is_inside_of_func);
       new_node->next = NULL;
 
-      if (node)
-        node->next = new_node;
-      else
-        node = new_node;
+      if (list_end) {
+        list_end->next = new_node;
+        list_end = new_node;
+      } else {
+        list = new_node;
+        list_end = new_node;
+      }
     }
 
     return (Value) {
       ValueKindList,
-      { .list = node },
+      { .list = list },
     };
   } break;
 
@@ -242,12 +251,25 @@ void execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena) {
   Vm vm = {0};
   vm.rc_arena = rc_arena;
 
+  ListNode *args_end = NULL;
   for (u32 i = 0; i < (u32) argc; ++i) {
-    Str arg = {
-      argv[i],
-      strlen(argv[i]),
+    u32 len = strlen(argv[i]);
+    char *buffer = rc_arena_alloc(rc_arena, len);
+    memcpy(buffer, argv[i], len);
+
+    ListNode *new_arg = aalloc(sizeof(ListNode));
+    new_arg->value = (Value) {
+      ValueKindStrLit,
+      { .str_lit = { buffer, len } },
     };
-    DA_APPEND(vm.args, arg);
+
+    if (args_end) {
+      args_end->next = new_arg;
+      args_end = new_arg;
+    } else {
+      vm.args = new_arg;
+      args_end = new_arg;
+    }
   }
 
   execute_block(&vm, ir, false);
