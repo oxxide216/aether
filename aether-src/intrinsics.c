@@ -14,7 +14,7 @@ static void print_value(Value *value) {
     ListNode *node = value->as.list;
     while (node) {
       if (node != value->as.list)
-        fputs(", ", stdout);
+        fputc(' ', stdout);
 
       print_value(&node->value);
 
