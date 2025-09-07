@@ -82,6 +82,42 @@ static Var *get_var(Vm *vm, Str name) {
   return NULL;
 }
 
+static bool value_eq(Value *a, Value *b) {
+  if (a->kind != b->kind)
+    return false;
+
+  if (a->kind == ValueKindList &&
+      a->as.list != b->as.list)
+    return false;
+
+  if (a->kind == ValueKindStrLit &&
+      !str_eq(a->as.str_lit, b->as.str_lit))
+    return false;
+
+  if (a->kind == ValueKindNumber &&
+      a->as.number != b->as.number)
+    return false;
+
+  if (a->kind == ValueKindBool &&
+      a->as._bool != b->as._bool)
+    return false;
+
+  return true;
+}
+
+static void free_value(Value *value, RcArena *rc_arena) {
+  if (value->kind == ValueKindList) {
+    ListNode *node = value->as.list;
+    while (node) {
+      ListNode *next_node = node->next;
+      rc_arena_free(rc_arena, node);
+      node = next_node;
+    }
+  } else if (value->kind == ValueKindStrLit) {
+    rc_arena_free(rc_arena, value->as.str_lit.ptr);
+  }
+}
+
 Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func) {
   switch (expr->kind) {
   case IrExprKindFuncDef: {
@@ -107,19 +143,9 @@ Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func) {
     var.value = execute_expr(vm, expr->as.var_def.expr, is_inside_of_func);
 
     Var *prev_var = get_var(vm, var.name);
-    if (prev_var && prev_var->value.kind == var.value.kind) {
-      if (prev_var->value.kind == ValueKindList &&
-          prev_var->value.as.list != var.value.as.list) {
-        ListNode *node = prev_var->value.as.list;
-        while (node) {
-          ListNode *next_node = node->next;
-          rc_arena_free(vm->rc_arena, node);
-          node = next_node;
-        }
-      } else if (prev_var->value.kind == ValueKindStrLit &&
-                 !str_eq(prev_var->value.as.str_lit, var.value.as.str_lit)) {
-        rc_arena_free(vm->rc_arena, prev_var->value.as.str_lit.ptr);
-      }
+    if (prev_var && prev_var->value.kind == var.value.kind &&
+        !value_eq(&prev_var->value, &var.value)) {
+      free_value(&prev_var->value, vm->rc_arena);
     }
 
     if (is_inside_of_func)
