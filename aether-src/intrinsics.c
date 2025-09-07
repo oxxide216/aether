@@ -11,14 +11,17 @@ static void print_value(Value *value) {
   case ValueKindList: {
     fputc('[', stdout);
 
-    for (u32 i = 0; i < value->as.list.len; ++i) {
-      if (i > 0)
+    ListNode *node = value->as.list;
+    while (node) {
+      if (node != value->as.list)
         fputs(", ", stdout);
 
-      print_value(value->as.list.items + i);
+      print_value(&node->value);
     }
 
     fputc(']', stdout);
+
+    node = node->next;
   } break;
 
   case ValueKindStrLit: {

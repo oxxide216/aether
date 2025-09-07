@@ -68,6 +68,20 @@ static Value execute_func(Vm *vm, IrExprFuncCall *func, bool is_inside_of_func) 
   return ret_val;
 }
 
+static Var *get_var(Vm *vm, Str name) {
+  for (u32 i = vm->local_vars.len; i > 0; --i) {
+    if (str_eq(vm->local_vars.items[i - 1].name, name))
+      return vm->local_vars.items + i - 1;
+  }
+
+  for (u32 i = vm->global_vars.len; i > 0; --i) {
+    if (str_eq(vm->global_vars.items[i - 1].name, name))
+      return vm->global_vars.items + i - 1;
+  }
+
+  return NULL;
+}
+
 Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func) {
   switch (expr->kind) {
   case IrExprKindFuncDef: {
@@ -91,6 +105,23 @@ Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func) {
     Var var = {0};
     var.name = expr->as.var_def.name;
     var.value = execute_expr(vm, expr->as.var_def.expr, is_inside_of_func);
+
+    Var *prev_var = get_var(vm, var.name);
+    if (prev_var && prev_var->value.kind == var.value.kind) {
+      if (prev_var->value.kind == ValueKindList &&
+          prev_var->value.as.list != var.value.as.list) {
+        ListNode *node = prev_var->value.as.list;
+        while (node) {
+          ListNode *next_node = node->next;
+          rc_arena_free(vm->rc_arena, node);
+          node = next_node;
+        }
+      } else if (prev_var->value.kind == ValueKindStrLit &&
+                 !str_eq(prev_var->value.as.str_lit, var.value.as.str_lit)) {
+        rc_arena_free(vm->rc_arena, prev_var->value.as.str_lit.ptr);
+      }
+    }
+
     if (is_inside_of_func)
       DA_APPEND(vm->local_vars, var);
     else
@@ -116,16 +147,22 @@ Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func) {
   } break;
 
   case IrExprKindList: {
-    List list = {0};
+    ListNode *node = NULL;
 
     for (u32 i = 0; i < expr->as.list.content.len; ++i) {
-      Value value = execute_expr(vm, expr->as.list.content.items[i], is_inside_of_func);
-      DA_APPEND(list, value);
+      ListNode *new_node = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+      new_node->value = execute_expr(vm, expr->as.list.content.items[i], is_inside_of_func);
+      new_node->next = NULL;
+
+      if (node)
+        node->next = new_node;
+      else
+        node = new_node;
     }
 
     return (Value) {
       ValueKindList,
-      { .list = list },
+      { .list = node },
     };
   } break;
 
@@ -140,9 +177,12 @@ Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func) {
         return vm->global_vars.items[i - 1].value;
     }
 
-    ERROR("Variable "STR_FMT" was not defined before usage\n",
-          STR_ARG(expr->as.ident.ident));
-    exit(1);
+    Var *var = get_var(vm, expr->as.ident.ident);
+    if (!var) {
+      ERROR("Variable "STR_FMT" was not defined before usage\n",
+            STR_ARG(expr->as.ident.ident));
+      exit(1);
+    }
   } break;
 
   case IrExprKindStrLit: {
@@ -172,8 +212,9 @@ static Value execute_block(Vm *vm, IrBlock *block, bool is_inside_of_func) {
   return (Value) { ValueKindUnit, {} };
 }
 
-void execute(Ir *ir, i32 argc, char **argv) {
+void execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena) {
   Vm vm = {0};
+  vm.rc_arena = rc_arena;
 
   for (u32 i = 0; i < (u32) argc; ++i) {
     Str arg = {

@@ -16,8 +16,9 @@ int main(i32 argc, char **argv) {
     exit(1);
   }
 
-  Ir ir = deserialize((u8 *) bytecode.ptr, bytecode.len);
-  execute(&ir, argc, argv);
+  RcArena rc_arena = {0};
+  Ir ir = deserialize((u8 *) bytecode.ptr, bytecode.len, &rc_arena);
+  execute(&ir, argc, argv, &rc_arena);
 
   return 0;
 }

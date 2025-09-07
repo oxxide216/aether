@@ -2,6 +2,7 @@
 #define VM_H
 
 #include "air.h"
+#include "rc-arena.h"
 
 typedef enum {
   ValueKindUnit = 0,
@@ -11,20 +12,23 @@ typedef enum {
   ValueKindBool,
 } ValueKind;
 
-typedef struct Value Value;
-
-typedef Da(Value) List;
+typedef struct ListNode ListNode;
 
 typedef union {
-  List list;
-  Str  str_lit;
-  i64  number;
-  bool _bool;
+  ListNode *list;
+  Str       str_lit;
+  i64       number;
+  bool      _bool;
 } ValueAs;
 
-struct Value {
+typedef struct {
   ValueKind kind;
   ValueAs   as;
+} Value;
+
+struct ListNode {
+  Value     value;
+  ListNode *next;
 };
 
 typedef struct Vm Vm;
@@ -51,13 +55,14 @@ typedef Da(Var) Vars;
 typedef IrArgs Args;
 
 struct Vm {
-  Funcs funcs;
-  Vars  local_vars;
-  Vars  global_vars;
-  Args  args;
+  Funcs    funcs;
+  Vars     local_vars;
+  Vars     global_vars;
+  Args     args;
+  RcArena *rc_arena;
 };
 
 Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func);
-void  execute(Ir *ir, i32 argc, char **argv);
+void  execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena);
 
 #endif // VM_H
