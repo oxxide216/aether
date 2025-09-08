@@ -3,7 +3,7 @@ newline=\n
 comment=#
 
 fun=fun
-def=def
+let=let
 if=if
 else=else
 

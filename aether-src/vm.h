@@ -7,7 +7,7 @@
 typedef enum {
   ValueKindUnit = 0,
   ValueKindList,
-  ValueKindStrLit,
+  ValueKindStr,
   ValueKindNumber,
   ValueKindBool,
 } ValueKind;
@@ -16,7 +16,7 @@ typedef struct ListNode ListNode;
 
 typedef union {
   ListNode *list;
-  Str       str_lit;
+  Str       str;
   i64       number;
   bool      _bool;
 } ValueAs;
@@ -33,7 +33,7 @@ struct ListNode {
 
 typedef struct Vm Vm;
 
-typedef Value (*IntrinsicFunc)(Vm *vm, IrBlock *args, bool is_inside_of_func);
+typedef Value (*IntrinsicFunc)(Vm *vm, IrBlock *args);
 
 typedef struct {
   Str           name;
@@ -60,9 +60,10 @@ struct Vm {
   Vars      global_vars;
   ListNode *args;
   RcArena  *rc_arena;
+  bool      is_inside_of_func;
 };
 
-Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func);
+Value execute_expr(Vm *vm, IrExpr *expr);
 void  execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena);
 
 #endif // VM_H

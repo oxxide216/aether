@@ -27,7 +27,7 @@ static char *token_names[] = {
   "new line",
   "comment",
   "fun",
-  "def",
+  "let",
   "if",
   "else",
   "number",
@@ -232,7 +232,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     expr->as.func_def = parser_parse_func_def(parser);
   } break;
 
-  case TT_DEF: {
+  case TT_LET: {
     parser_next_token(parser);
     Token *name_token = parser_expect_token(parser, MASK(TT_IDENT));
 
@@ -265,7 +265,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   } break;
 
   default: {
-    parser_expect_token(parser, MASK(TT_FUN) | MASK(TT_DEF) |
+    parser_expect_token(parser, MASK(TT_FUN) | MASK(TT_LET) |
                                 MASK(TT_IF) | MASK(TT_IDENT));
   } break;
   }

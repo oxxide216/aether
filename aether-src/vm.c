@@ -5,11 +5,10 @@
 #include "shl_arena.h"
 #include "intrinsics.h"
 
-static Value execute_block(Vm *vm, IrBlock *block, bool is_inside_of_func);
-
 static Intrinsic intrinsics[] = {
   { STR_LIT("print"), (u32) -1, &print_intrinsic },
   { STR_LIT("println"), (u32) -1, &println_intrinsic },
+  { STR_LIT("input"), 0, &input_intrinsic },
   { STR_LIT("get-args"), 0, &get_args_intrinsic },
   { STR_LIT("head"), 1, &head_intrinsic },
   { STR_LIT("tail"), 1, &tail_intrinsic },
@@ -28,7 +27,9 @@ static Intrinsic intrinsics[] = {
   { STR_LIT("not"), 1, &not_intrinsic },
 };
 
-static Value execute_func(Vm *vm, IrExprFuncCall *func, bool is_inside_of_func) {
+static Value execute_block(Vm *vm, IrBlock *block);
+
+static Value execute_func(Vm *vm, IrExprFuncCall *func) {
   Func *func_def = NULL;
 
   for (u32 i = 0; i < vm->funcs.len; ++i) {
@@ -43,7 +44,7 @@ static Value execute_func(Vm *vm, IrExprFuncCall *func, bool is_inside_of_func) 
     if (str_eq(intrinsics[i].name, func->name) &&
         (intrinsics[i].args_count == func->args.len ||
          intrinsics[i].args_count == (u32) -1)) {
-      return intrinsics[i].func(vm, &func->args, is_inside_of_func);
+      return intrinsics[i].func(vm, &func->args);
     }
   }
 
@@ -57,18 +58,21 @@ static Value execute_func(Vm *vm, IrExprFuncCall *func, bool is_inside_of_func) 
   for (u32 i = 0; i < func_def->args.len; ++i) {
     Var var = {
       func_def->args.items[i],
-      execute_expr(vm, func->args.items[i], is_inside_of_func),
+      execute_expr(vm, func->args.items[i]),
     };
     DA_APPEND(new_local_vars, var);
   }
 
   Vars prev_local_vars = vm->local_vars;
+  bool prev_is_inside_of_func = vm->is_inside_of_func;
   vm->local_vars = new_local_vars;
+  vm->is_inside_of_func = true;
 
-  Value ret_val = execute_block(vm, &func_def->body, true);
+  Value ret_val = execute_block(vm, &func_def->body);
 
   free(vm->local_vars.items);
   vm->local_vars = prev_local_vars;
+  vm->is_inside_of_func = prev_is_inside_of_func;
 
   return ret_val;
 }
@@ -95,8 +99,8 @@ static bool value_eq(Value *a, Value *b) {
       a->as.list != b->as.list)
     return false;
 
-  if (a->kind == ValueKindStrLit &&
-      !str_eq(a->as.str_lit, b->as.str_lit))
+  if (a->kind == ValueKindStr &&
+      !str_eq(a->as.str, b->as.str))
     return false;
 
   if (a->kind == ValueKindNumber &&
@@ -118,12 +122,12 @@ static void free_value(Value *value, RcArena *rc_arena) {
       rc_arena_free(rc_arena, node);
       node = next_node;
     }
-  } else if (value->kind == ValueKindStrLit) {
-    rc_arena_free(rc_arena, value->as.str_lit.ptr);
+  } else if (value->kind == ValueKindStr) {
+    rc_arena_free(rc_arena, value->as.str.ptr);
   }
 }
 
-Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func) {
+Value execute_expr(Vm *vm, IrExpr *expr) {
   switch (expr->kind) {
   case IrExprKindFuncDef: {
     for (u32 i = 0; i < vm->funcs.len; ++i) {
@@ -139,13 +143,13 @@ Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func) {
   } break;
 
   case IrExprKindFuncCall: {
-    return execute_func(vm, &expr->as.func_call, is_inside_of_func);
+    return execute_func(vm, &expr->as.func_call);
   } break;
 
   case IrExprKindVarDef: {
     Var var = {0};
     var.name = expr->as.var_def.name;
-    var.value = execute_expr(vm, expr->as.var_def.expr, is_inside_of_func);
+    var.value = execute_expr(vm, expr->as.var_def.expr);
 
     Var *prev_var = get_var(vm, var.name);
     if (prev_var && prev_var->value.kind == var.value.kind &&
@@ -153,7 +157,7 @@ Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func) {
       free_value(&prev_var->value, vm->rc_arena);
     }
 
-    if (is_inside_of_func)
+    if (vm->is_inside_of_func)
       DA_APPEND(vm->local_vars, var);
     else
       DA_APPEND(vm->global_vars, var);
@@ -162,17 +166,17 @@ Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func) {
   } break;
 
   case IrExprKindIf: {
-    Value cond = execute_expr(vm, expr->as._if.cond, is_inside_of_func);
+    Value cond = execute_expr(vm, expr->as._if.cond);
     if (cond.kind != ValueKindBool) {
       ERROR("Only boolean value can be used as a condition\n");
       exit(1);
     }
 
     if (cond.as._bool)
-      return execute_block(vm, &expr->as._if.if_body, is_inside_of_func);
+      return execute_block(vm, &expr->as._if.if_body);
 
     if (expr->as._if.has_else)
-      return execute_block(vm, &expr->as._if.else_body, is_inside_of_func);
+      return execute_block(vm, &expr->as._if.else_body);
 
     return (Value) { ValueKindUnit, {} };
   } break;
@@ -183,7 +187,7 @@ Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func) {
 
     for (u32 i = 0; i < expr->as.list.content.len; ++i) {
       ListNode *new_node = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-      new_node->value = execute_expr(vm, expr->as.list.content.items[i], is_inside_of_func);
+      new_node->value = execute_expr(vm, expr->as.list.content.items[i]);
       new_node->next = NULL;
 
       if (list_end) {
@@ -222,8 +226,8 @@ Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func) {
 
   case IrExprKindStrLit: {
     return (Value) {
-      ValueKindStrLit,
-      { .str_lit = expr->as.str_lit.lit },
+      ValueKindStr,
+      { .str = expr->as.str_lit.lit },
     };
   } break;
 
@@ -238,12 +242,12 @@ Value execute_expr(Vm *vm, IrExpr *expr, bool is_inside_of_func) {
   return (Value) { ValueKindUnit, {} };
 }
 
-static Value execute_block(Vm *vm, IrBlock *block, bool is_inside_of_func) {
+static Value execute_block(Vm *vm, IrBlock *block) {
   for (u32 i = 0; i + 1 < block->len; ++i)
-    execute_expr(vm, block->items[i], is_inside_of_func);
+    execute_expr(vm, block->items[i]);
 
   if (block->len > 0)
-    return execute_expr(vm, block->items[block->len - 1], is_inside_of_func);
+    return execute_expr(vm, block->items[block->len - 1]);
   return (Value) { ValueKindUnit, {} };
 }
 
@@ -259,8 +263,8 @@ void execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena) {
 
     ListNode *new_arg = aalloc(sizeof(ListNode));
     new_arg->value = (Value) {
-      ValueKindStrLit,
-      { .str_lit = { buffer, len } },
+      ValueKindStr,
+      { .str = { buffer, len } },
     };
 
     if (args_end) {
@@ -272,5 +276,5 @@ void execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena) {
     }
   }
 
-  execute_block(&vm, ir, false);
+  execute_block(&vm, ir);
 }

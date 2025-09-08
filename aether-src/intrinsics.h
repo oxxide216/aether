@@ -4,25 +4,26 @@
 #include "air.h"
 #include "vm.h"
 
-Value print_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
-Value println_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
-Value get_args_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
-Value head_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
-Value tail_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
-Value is_empty_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
+Value print_intrinsic(Vm *vm, IrBlock *args);
+Value println_intrinsic(Vm *vm, IrBlock *args);
+Value input_intrinsic(Vm *vm, IrBlock *args);
+Value get_args_intrinsic(Vm *vm, IrBlock *args);
+Value head_intrinsic(Vm *vm, IrBlock *args);
+Value tail_intrinsic(Vm *vm, IrBlock *args);
+Value is_empty_intrinsic(Vm *vm, IrBlock *args);
 
-Value add_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
-Value sub_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
-Value mul_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
-Value div_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
-Value mod_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
+Value add_intrinsic(Vm *vm, IrBlock *args);
+Value sub_intrinsic(Vm *vm, IrBlock *args);
+Value mul_intrinsic(Vm *vm, IrBlock *args);
+Value div_intrinsic(Vm *vm, IrBlock *args);
+Value mod_intrinsic(Vm *vm, IrBlock *args);
 
-Value eq_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
-Value ne_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
-Value ls_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
-Value le_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
-Value gt_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
-Value ge_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
-Value not_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func);
+Value eq_intrinsic(Vm *vm, IrBlock *args);
+Value ne_intrinsic(Vm *vm, IrBlock *args);
+Value ls_intrinsic(Vm *vm, IrBlock *args);
+Value le_intrinsic(Vm *vm, IrBlock *args);
+Value gt_intrinsic(Vm *vm, IrBlock *args);
+Value ge_intrinsic(Vm *vm, IrBlock *args);
+Value not_intrinsic(Vm *vm, IrBlock *args);
 
 #endif // INTRINSICS_H

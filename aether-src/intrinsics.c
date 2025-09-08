@@ -2,6 +2,8 @@
 #include "shl_log.h"
 #include "shl_arena.h"
 
+#define DEFAULT_INPUT_BUFFER_SIZE 64
+
 static void print_value(Value *value) {
   switch (value->kind) {
   case ValueKindUnit: {
@@ -24,8 +26,8 @@ static void print_value(Value *value) {
     fputc(']', stdout);
   } break;
 
-  case ValueKindStrLit: {
-    str_print(value->as.str_lit);
+  case ValueKindStr: {
+    str_print(value->as.str);
   } break;
 
   case ValueKindNumber: {
@@ -41,25 +43,48 @@ static void print_value(Value *value) {
   }
 }
 
-Value print_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+Value print_intrinsic(Vm *vm, IrBlock *args) {
   for (u32 i = 0; i < args->len; ++i) {
-    Value value = execute_expr(vm, args->items[i], is_inside_of_func);
+    Value value = execute_expr(vm, args->items[i]);
     print_value(&value);
   }
 
   return (Value) { ValueKindUnit, {} };
 }
 
-Value println_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
-  print_intrinsic(vm, args, is_inside_of_func);
+Value println_intrinsic(Vm *vm, IrBlock *args) {
+  print_intrinsic(vm, args);
   fputc('\n', stdout);
 
   return (Value) { ValueKindUnit, {} };
 }
 
-Value get_args_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+Value input_intrinsic(Vm *vm, IrBlock *args) {
+  (void) vm;
   (void) args;
-  (void) is_inside_of_func;
+
+  u32 buffer_size = DEFAULT_INPUT_BUFFER_SIZE;
+  char *buffer = malloc(buffer_size);
+  u32 len = 0;
+
+  char ch;
+  while ((ch = getc(stdin)) != EOF && ch != '\n') {
+    if (len >= buffer_size) {
+      buffer_size += DEFAULT_INPUT_BUFFER_SIZE;
+      buffer = realloc(buffer, buffer_size);
+    }
+
+    buffer[len++] = ch;
+  }
+
+  return (Value) {
+    ValueKindStr,
+    { .str = { buffer, len } },
+  };
+}
+
+Value get_args_intrinsic(Vm *vm, IrBlock *args) {
+  (void) args;
 
   return (Value) {
     ValueKindList,
@@ -67,8 +92,8 @@ Value get_args_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
   };
 }
 
-Value head_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
-  Value value = execute_expr(vm, args->items[0], is_inside_of_func);
+Value head_intrinsic(Vm *vm, IrBlock *args) {
+  Value value = execute_expr(vm, args->items[0]);
   if (value.kind != ValueKindList) {
     ERROR("head: wrong argument kind\n");
     exit(1);
@@ -80,8 +105,8 @@ Value head_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
   return value.as.list->value;
 }
 
-Value tail_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
-  Value value = execute_expr(vm, args->items[0], is_inside_of_func);
+Value tail_intrinsic(Vm *vm, IrBlock *args) {
+  Value value = execute_expr(vm, args->items[0]);
   if (value.kind != ValueKindList) {
     ERROR("tail: wrong argument kind\n");
     exit(1);
@@ -96,8 +121,8 @@ Value tail_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
   };
 }
 
-Value is_empty_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
-  Value value = execute_expr(vm, args->items[0], is_inside_of_func);
+Value is_empty_intrinsic(Vm *vm, IrBlock *args) {
+  Value value = execute_expr(vm, args->items[0]);
   if (value.kind != ValueKindList) {
     ERROR("is-empty: wrong argument kind");
     exit(1);
@@ -109,10 +134,10 @@ Value is_empty_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
   };
 }
 
-static void prepare_two_numbers(Value *a, Value *b, char *intrinsic_name, Vm *vm,
-                               IrBlock *args, bool is_inside_of_func) {
-  *a = execute_expr(vm, args->items[0], is_inside_of_func);
-  *b = execute_expr(vm, args->items[1], is_inside_of_func);
+static void prepare_two_numbers(Value *a, Value *b, char *intrinsic_name,
+                                Vm *vm, IrBlock *args) {
+  *a = execute_expr(vm, args->items[0]);
+  *b = execute_expr(vm, args->items[1]);
 
   if (a->kind != ValueKindNumber ||
       b->kind != ValueKindNumber) {
@@ -121,9 +146,9 @@ static void prepare_two_numbers(Value *a, Value *b, char *intrinsic_name, Vm *vm
   }
 }
 
-Value add_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+Value add_intrinsic(Vm *vm, IrBlock *args) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "add", vm, args, is_inside_of_func);
+  prepare_two_numbers(&a, &b, "add", vm, args);
 
   return (Value) {
     ValueKindNumber,
@@ -131,9 +156,9 @@ Value add_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
   };
 }
 
-Value sub_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+Value sub_intrinsic(Vm *vm, IrBlock *args) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "sub", vm, args, is_inside_of_func);
+  prepare_two_numbers(&a, &b, "sub", vm, args);
 
   return (Value) {
     ValueKindNumber,
@@ -141,9 +166,9 @@ Value sub_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
   };
 }
 
-Value mul_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+Value mul_intrinsic(Vm *vm, IrBlock *args) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "mul", vm, args, is_inside_of_func);
+  prepare_two_numbers(&a, &b, "mul", vm, args);
 
   return (Value) {
     ValueKindNumber,
@@ -151,9 +176,9 @@ Value mul_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
   };
 }
 
-Value div_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+Value div_intrinsic(Vm *vm, IrBlock *args) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "div", vm, args, is_inside_of_func);
+  prepare_two_numbers(&a, &b, "div", vm, args);
 
   return (Value) {
     ValueKindNumber,
@@ -161,9 +186,9 @@ Value div_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
   };
 }
 
-Value mod_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+Value mod_intrinsic(Vm *vm, IrBlock *args) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "mod", vm, args, is_inside_of_func);
+  prepare_two_numbers(&a, &b, "mod", vm, args);
 
   return (Value) {
     ValueKindNumber,
@@ -171,9 +196,9 @@ Value mod_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
   };
 }
 
-Value eq_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+Value eq_intrinsic(Vm *vm, IrBlock *args) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "eq", vm, args, is_inside_of_func);
+  prepare_two_numbers(&a, &b, "eq", vm, args);
 
   return (Value) {
     ValueKindBool,
@@ -181,9 +206,9 @@ Value eq_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
   };
 }
 
-Value ne_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+Value ne_intrinsic(Vm *vm, IrBlock *args) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "ne", vm, args, is_inside_of_func);
+  prepare_two_numbers(&a, &b, "ne", vm, args);
 
   return (Value) {
     ValueKindBool,
@@ -191,9 +216,9 @@ Value ne_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
   };
 }
 
-Value ls_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+Value ls_intrinsic(Vm *vm, IrBlock *args) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "ls", vm, args, is_inside_of_func);
+  prepare_two_numbers(&a, &b, "ls", vm, args);
 
   return (Value) {
     ValueKindBool,
@@ -201,9 +226,9 @@ Value ls_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
   };
 }
 
-Value le_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+Value le_intrinsic(Vm *vm, IrBlock *args) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "le", vm, args, is_inside_of_func);
+  prepare_two_numbers(&a, &b, "le", vm, args);
 
   return (Value) {
     ValueKindBool,
@@ -211,9 +236,9 @@ Value le_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
   };
 }
 
-Value gt_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+Value gt_intrinsic(Vm *vm, IrBlock *args) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "gt", vm, args, is_inside_of_func);
+  prepare_two_numbers(&a, &b, "gt", vm, args);
 
   return (Value) {
     ValueKindBool,
@@ -221,9 +246,9 @@ Value gt_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
   };
 }
 
-Value ge_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
+Value ge_intrinsic(Vm *vm, IrBlock *args) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "ge", vm, args, is_inside_of_func);
+  prepare_two_numbers(&a, &b, "ge", vm, args);
 
   return (Value) {
     ValueKindBool,
@@ -231,8 +256,8 @@ Value ge_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
   };
 }
 
-Value not_intrinsic(Vm *vm, IrBlock *args, bool is_inside_of_func) {
-  Value value = execute_expr(vm, args->items[0], is_inside_of_func);
+Value not_intrinsic(Vm *vm, IrBlock *args) {
+  Value value = execute_expr(vm, args->items[0]);
 
   if (value.kind != ValueKindBool) {
     ERROR("not: wrong argument kind\n");
