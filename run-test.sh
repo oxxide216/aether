@@ -1,4 +1,4 @@
-#!/usr/bin
+#!/usr/bin/sh
 
-./build-commpiler && ./aetherc test.abc $1
-./build-vm && ./aether-vm test.abc
+./build-compiler.sh && ./aetherc test.ac $1
+./build-vm.sh && ./aether-vm test.ac

@@ -1,9 +1,5 @@
-aether
-ac
 aetherc
 aether-vm
 libs
-test.abc
 test.ac
-ac-src/grammar.h
 compiler-src/grammar.h
