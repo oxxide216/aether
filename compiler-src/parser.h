@@ -1,7 +1,7 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "air.h"
+#include "ir.h"
 #include "shl_defs.h"
 #include "shl_str.h"
 

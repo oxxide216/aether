@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include "rc-arena.h"
 
 void *rc_arena_alloc(RcArena *arena, u32 size) {

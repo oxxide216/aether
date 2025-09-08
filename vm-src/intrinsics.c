@@ -64,14 +64,18 @@ Value input_intrinsic(Vm *vm, IrBlock *args) {
   (void) args;
 
   u32 buffer_size = DEFAULT_INPUT_BUFFER_SIZE;
-  char *buffer = malloc(buffer_size);
+  char *buffer = rc_arena_alloc(vm->rc_arena, buffer_size);
   u32 len = 0;
 
   char ch;
   while ((ch = getc(stdin)) != EOF && ch != '\n') {
     if (len >= buffer_size) {
       buffer_size += DEFAULT_INPUT_BUFFER_SIZE;
-      buffer = realloc(buffer, buffer_size);
+
+      char *prev_buffer = buffer;
+      buffer = rc_arena_alloc(vm->rc_arena, buffer_size);
+      memcpy(buffer, prev_buffer, len);
+      rc_arena_free(vm->rc_arena, buffer);
     }
 
     buffer[len++] = ch;
@@ -147,13 +151,29 @@ static void prepare_two_numbers(Value *a, Value *b, char *intrinsic_name,
 }
 
 Value add_intrinsic(Vm *vm, IrBlock *args) {
-  Value a, b;
-  prepare_two_numbers(&a, &b, "add", vm, args);
+  Value a = execute_expr(vm, args->items[0]);
+  Value b = execute_expr(vm, args->items[1]);
 
-  return (Value) {
-    ValueKindNumber,
-    { .number = a.as.number + b.as.number },
-  };
+  if (a.kind == ValueKindNumber &&
+      b.kind == ValueKindNumber) {
+    return (Value) {
+      ValueKindNumber,
+      { .number = a.as.number + b.as.number },
+    };
+  } else if (a.kind == ValueKindStr &&
+             b.kind == ValueKindStr) {
+    StringBuilder sb = {0};
+    sb_push_str(&sb, a.as.str);
+    sb_push_str(&sb, b.as.str);
+
+    return (Value) {
+      ValueKindStr,
+      { .str = sb_to_str(sb) },
+    };
+  } else {
+    ERROR("add: wrong argument kinds\n");
+    exit(1);
+  }
 }
 
 Value sub_intrinsic(Vm *vm, IrBlock *args) {

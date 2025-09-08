@@ -152,8 +152,7 @@ Value execute_expr(Vm *vm, IrExpr *expr) {
     var.value = execute_expr(vm, expr->as.var_def.expr);
 
     Var *prev_var = get_var(vm, var.name);
-    if (prev_var && prev_var->value.kind == var.value.kind &&
-        !value_eq(&prev_var->value, &var.value)) {
+    if (prev_var && !value_eq(&prev_var->value, &var.value)) {
       free_value(&prev_var->value, vm->rc_arena);
     }
 

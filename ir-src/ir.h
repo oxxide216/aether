@@ -1,5 +1,5 @@
-#ifndef AIR_H
-#define AIR_H
+#ifndef IR_H
+#define IR_H
 
 #include "shl_defs.h"
 #include "shl_str.h"
@@ -78,4 +78,4 @@ struct IrExpr {
 
 typedef IrBlock Ir;
 
-#endif // AIR_H
+#endif // IR_H

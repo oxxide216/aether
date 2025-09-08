@@ -1,7 +1,7 @@
 #ifndef VM_H
 #define VM_H
 
-#include "air.h"
+#include "ir.h"
 #include "rc-arena.h"
 
 typedef enum {
