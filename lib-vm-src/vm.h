@@ -41,6 +41,8 @@ typedef struct {
   IntrinsicFunc func;
 } Intrinsic;
 
+typedef Da(Intrinsic) Intrinsics;
+
 typedef IrExprFuncDef Func;
 
 typedef Da(Func) Funcs;
@@ -55,15 +57,18 @@ typedef Da(Var) Vars;
 typedef IrArgs Args;
 
 struct Vm {
-  Funcs     funcs;
-  Vars      local_vars;
-  Vars      global_vars;
-  ListNode *args;
-  RcArena  *rc_arena;
-  bool      is_inside_of_func;
+  Funcs       funcs;
+  Vars        local_vars;
+  Vars        global_vars;
+  ListNode   *args;
+  RcArena    *rc_arena;
+  Intrinsics  intrinsics;
+  bool        is_inside_of_func;
 };
 
 Value execute_expr(Vm *vm, IrExpr *expr);
-void  execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena);
+void  execute(Ir *ir, i32 argc, char **argv,
+              RcArena *rc_arena,
+              Intrinsics *intrinsics);
 
 #endif // VM_H

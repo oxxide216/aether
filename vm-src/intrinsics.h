@@ -31,4 +31,7 @@ Value gt_intrinsic(Vm *vm, IrBlock *args);
 Value ge_intrinsic(Vm *vm, IrBlock *args);
 Value not_intrinsic(Vm *vm, IrBlock *args);
 
+extern Intrinsic intrinsics[];
+extern u32 intrinsics_len;
+
 #endif // INTRINSICS_H

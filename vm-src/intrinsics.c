@@ -4,6 +4,34 @@
 
 #define DEFAULT_INPUT_BUFFER_SIZE 64
 
+Intrinsic intrinsics[] = {
+  { STR_LIT("print"), (u32) -1, &print_intrinsic },
+  { STR_LIT("println"), (u32) -1, &println_intrinsic },
+  { STR_LIT("input"), 0, &input_intrinsic },
+  { STR_LIT("get-args"), 0, &get_args_intrinsic },
+  { STR_LIT("head"), 1, &head_intrinsic },
+  { STR_LIT("tail"), 1, &tail_intrinsic },
+  { STR_LIT("is-empty"), 1, &is_empty_intrinsic },
+  { STR_LIT("str-to-num"), 1, &str_to_num_intrinsic },
+  { STR_LIT("num-to-str"), 1, &num_to_str_intrinsic },
+  { STR_LIT("bool-to-str"), 1, &bool_to_str_intrinsic },
+  { STR_LIT("bool-to-num"), 1, &bool_to_num_intrinsic },
+  { STR_LIT("add"), 2, &add_intrinsic },
+  { STR_LIT("sub"), 2, &sub_intrinsic },
+  { STR_LIT("mul"), 2, &mul_intrinsic },
+  { STR_LIT("div"), 2, &div_intrinsic },
+  { STR_LIT("mod"), 2, &mod_intrinsic },
+  { STR_LIT("eq"), 2, &eq_intrinsic },
+  { STR_LIT("ne"), 2, &ne_intrinsic },
+  { STR_LIT("ls"), 2, &ls_intrinsic },
+  { STR_LIT("le"), 2, &le_intrinsic },
+  { STR_LIT("gt"), 2, &gt_intrinsic },
+  { STR_LIT("ge"), 2, &ge_intrinsic },
+  { STR_LIT("not"), 1, &not_intrinsic },
+};
+
+u32 intrinsics_len = ARRAY_LEN(intrinsics);
+
 static void print_value(Value *value) {
   switch (value->kind) {
   case ValueKindUnit: {

@@ -3,6 +3,7 @@
 #include "io.h"
 #include "deserializer.h"
 #include "vm.h"
+#include "intrinsics.h"
 
 int main(i32 argc, char **argv) {
   if (argc < 2) {
@@ -18,7 +19,8 @@ int main(i32 argc, char **argv) {
 
   RcArena rc_arena = {0};
   Ir ir = deserialize((u8 *) bytecode.ptr, bytecode.len, &rc_arena);
-  execute(&ir, argc, argv, &rc_arena);
+  Intrinsics intrinsics_da = { intrinsics, intrinsics_len, intrinsics_len };
+  execute(&ir, argc, argv, &rc_arena, &intrinsics_da);
 
   return 0;
 }

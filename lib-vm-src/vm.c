@@ -5,32 +5,6 @@
 #include "shl_arena.h"
 #include "intrinsics.h"
 
-static Intrinsic intrinsics[] = {
-  { STR_LIT("print"), (u32) -1, &print_intrinsic },
-  { STR_LIT("println"), (u32) -1, &println_intrinsic },
-  { STR_LIT("input"), 0, &input_intrinsic },
-  { STR_LIT("get-args"), 0, &get_args_intrinsic },
-  { STR_LIT("head"), 1, &head_intrinsic },
-  { STR_LIT("tail"), 1, &tail_intrinsic },
-  { STR_LIT("is-empty"), 1, &is_empty_intrinsic },
-  { STR_LIT("str-to-num"), 1, &str_to_num_intrinsic },
-  { STR_LIT("num-to-str"), 1, &num_to_str_intrinsic },
-  { STR_LIT("bool-to-str"), 1, &bool_to_str_intrinsic },
-  { STR_LIT("bool-to-num"), 1, &bool_to_num_intrinsic },
-  { STR_LIT("add"), 2, &add_intrinsic },
-  { STR_LIT("sub"), 2, &sub_intrinsic },
-  { STR_LIT("mul"), 2, &mul_intrinsic },
-  { STR_LIT("div"), 2, &div_intrinsic },
-  { STR_LIT("mod"), 2, &mod_intrinsic },
-  { STR_LIT("eq"), 2, &eq_intrinsic },
-  { STR_LIT("ne"), 2, &ne_intrinsic },
-  { STR_LIT("ls"), 2, &ls_intrinsic },
-  { STR_LIT("le"), 2, &le_intrinsic },
-  { STR_LIT("gt"), 2, &gt_intrinsic },
-  { STR_LIT("ge"), 2, &ge_intrinsic },
-  { STR_LIT("not"), 1, &not_intrinsic },
-};
-
 static Value execute_block(Vm *vm, IrBlock *block);
 
 static Value execute_func(Vm *vm, IrExprFuncCall *func) {
@@ -44,11 +18,11 @@ static Value execute_func(Vm *vm, IrExprFuncCall *func) {
     }
   }
 
-  for (u32 i = 0; i < ARRAY_LEN(intrinsics); ++i) {
-    if (str_eq(intrinsics[i].name, func->name) &&
-        (intrinsics[i].args_count == func->args.len ||
-         intrinsics[i].args_count == (u32) -1)) {
-      return intrinsics[i].func(vm, &func->args);
+  for (u32 i = 0; i < vm->intrinsics.len; ++i) {
+    if (str_eq(vm->intrinsics.items[i].name, func->name) &&
+        (vm->intrinsics.items[i].args_count == func->args.len ||
+         vm->intrinsics.items[i].args_count == (u32) -1)) {
+      return vm->intrinsics.items[i].func(vm, &func->args);
     }
   }
 
@@ -254,9 +228,11 @@ static Value execute_block(Vm *vm, IrBlock *block) {
   return (Value) { ValueKindUnit, {} };
 }
 
-void execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena) {
+void execute(Ir *ir, i32 argc, char **argv,
+             RcArena *rc_arena, Intrinsics *intrinsics) {
   Vm vm = {0};
   vm.rc_arena = rc_arena;
+  vm.intrinsics = *intrinsics;
 
   ListNode *args_end = NULL;
   for (u32 i = 0; i < (u32) argc; ++i) {
