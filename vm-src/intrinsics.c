@@ -138,6 +138,73 @@ Value is_empty_intrinsic(Vm *vm, IrBlock *args) {
   };
 }
 
+Value str_to_num_intrinsic(Vm *vm, IrBlock *args) {
+  Value value = execute_expr(vm, args->items[0]);
+  if (value.kind != ValueKindStr) {
+    ERROR("str-to-num: wrong argument kind");
+    exit(1);
+  }
+
+  return (Value) {
+    ValueKindNumber,
+    { .number = str_to_i64(value.as.str) },
+  };
+}
+
+Value num_to_str_intrinsic(Vm *vm, IrBlock *args) {
+  Value value = execute_expr(vm, args->items[0]);
+  if (value.kind != ValueKindNumber) {
+    ERROR("num-to-str: wrong argument kind");
+    exit(1);
+  }
+
+  StringBuilder sb = {0};
+  sb_push_i64(&sb, value.as.number);
+
+  return (Value) {
+    ValueKindStr,
+    { .str = sb_to_str(sb) },
+  };
+}
+
+Value bool_to_str_intrinsic(Vm *vm, IrBlock *args) {
+  Value value = execute_expr(vm, args->items[0]);
+  if (value.kind != ValueKindBool) {
+    ERROR("bool-to-str: wrong argument kind");
+    exit(1);
+  }
+
+  Str str;
+  char *cstr;
+
+  if (value.as._bool) {
+    str.len = 4;
+    cstr = "true";
+  } else {
+    str.len = 5;
+    cstr = "false";
+  }
+
+  str.ptr = rc_arena_alloc(vm->rc_arena, str.len);
+  memcpy(str.ptr, cstr, str.len);
+
+  return (Value) {
+    ValueKindStr,
+    { .str = str },
+  };
+}
+
+Value bool_to_num_intrinsic(Vm *vm, IrBlock *args) {
+  Value value = execute_expr(vm, args->items[0]);
+  if (value.kind != ValueKindBool) {
+    ERROR("bool-to-num: wrong argument kind");
+    exit(1);
+  }
+
+  value.kind = ValueKindNumber;
+  return value;
+}
+
 static void prepare_two_numbers(Value *a, Value *b, char *intrinsic_name,
                                 Vm *vm, IrBlock *args) {
   *a = execute_expr(vm, args->items[0]);

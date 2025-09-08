@@ -12,6 +12,11 @@ Value head_intrinsic(Vm *vm, IrBlock *args);
 Value tail_intrinsic(Vm *vm, IrBlock *args);
 Value is_empty_intrinsic(Vm *vm, IrBlock *args);
 
+Value str_to_num_intrinsic(Vm *vm, IrBlock *args);
+Value num_to_str_intrinsic(Vm *vm, IrBlock *args);
+Value bool_to_str_intrinsic(Vm *vm, IrBlock *args);
+Value bool_to_num_intrinsic(Vm *vm, IrBlock *args);
+
 Value add_intrinsic(Vm *vm, IrBlock *args);
 Value sub_intrinsic(Vm *vm, IrBlock *args);
 Value mul_intrinsic(Vm *vm, IrBlock *args);

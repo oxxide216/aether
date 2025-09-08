@@ -159,10 +159,15 @@ static void load_block_data(IrBlock *block, u8 *data, u32 *end, RcArena *rc_aren
 Ir deserialize(u8 *data, u32 size, RcArena *rc_arena) {
   Ir ir = {0};
 
-  u32 real_size = *(u32 *) data;
-  if (real_size + sizeof(u32) != size) {
+  if (size < sizeof(u32)) {
+    ERROR("Corrupted bytecode: not enough data\n");
+    exit(1);
+  }
+
+  u32 expected_size = *(u32 *) data;
+  if (size != expected_size) {
     ERROR("Corrupted bytecode: expected %u, but got %u bytes\n",
-          size, real_size);
+          expected_size, size);
     exit(1);
   }
 
