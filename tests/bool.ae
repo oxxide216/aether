@@ -1,0 +1,23 @@
+(let a (str-to-num (input)))
+(let b (str-to-num (input)))
+
+(if (eq a b)
+  (println 'equal'))
+
+(if (ne a b)
+  (println 'not equal'))
+
+(if (ls a b)
+  (println 'less'))
+
+(if (le a b)
+  (println 'less or equal'))
+
+(if (gt a b)
+  (println 'greater'))
+
+(if (ge a b)
+  (println 'greater or equal'))
+
+(println (bool-to-str (not true)))
+

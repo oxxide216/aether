@@ -193,7 +193,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
 
   Token *token = parser_expect_token(parser, MASK(TT_OPAREN) | MASK(TT_OBRACKET) |
                                              MASK(TT_STR) | MASK(TT_IDENT) |
-                                             MASK(TT_NUMBER));
+                                             MASK(TT_NUMBER) | MASK(TT_BOOL));
 
   if (token->id == TT_STR) {
     expr->kind = IrExprKindStrLit;
@@ -213,6 +213,13 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   if (token->id == TT_NUMBER) {
     expr->kind = IrExprKindNumber;
     expr->as.number.number = str_to_i64(token->lexeme);
+
+    return expr;
+  }
+
+  if (token->id == TT_BOOL) {
+    expr->kind = IrExprKindBool;
+    expr->as._bool._bool = str_eq(token->lexeme, STR_LIT("true"));
 
     return expr;
   }
@@ -262,6 +269,11 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   case TT_IDENT: {
     expr->kind = IrExprKindFuncCall;
     expr->as.func_call = parser_parse_func_call(parser);
+  } break;
+
+  case TT_BOOL: {
+    expr->kind = IrExprKindBool;
+    expr->as._bool._bool = str_eq(token->lexeme, STR_LIT("true"));
   } break;
 
   default: {

@@ -7,7 +7,8 @@ let=let
 if=if
 else=else
 
-number=0-9+
+number=\-?0-9+
+bool=true|false
 ident=(a-z|A-Z|_|\-)(a-z|A-Z|_|\-|0-9)*
 
 oparen=\(

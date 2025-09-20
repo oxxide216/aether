@@ -1,8 +1,9 @@
 (fun print-list [list]
   (if (is-empty list)
-    (println)
+    (println '')
    else
-    (print (head list) ' ')
+    (print (head list))
+    (print ' ')
     (print-list (tail list))))
 
 (let list [0 1 2])

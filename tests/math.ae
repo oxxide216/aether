@@ -1,0 +1,8 @@
+(let a (str-to-num (input)))
+(let b (str-to-num (input)))
+
+(println (num-to-str (add a b)))
+(println (num-to-str (sub a b)))
+(println (num-to-str (mul a b)))
+(println (num-to-str (div a b)))
+(println (num-to-str (mod a b)))

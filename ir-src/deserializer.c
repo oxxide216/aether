@@ -56,6 +56,10 @@ static void get_expr_data_size(u8 *data, u32 *size) {
   case IrExprKindNumber: {
     *size += sizeof(i64);
   } break;
+
+  case IrExprKindBool: {
+    *size += sizeof(bool);
+  } break;
   }
 }
 
@@ -140,6 +144,11 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
   case IrExprKindNumber: {
     expr->as.number.number = *(i64 *) (data + *end);
     *end += sizeof(i64);
+  } break;
+
+  case IrExprKindBool: {
+    expr->as._bool._bool = *(bool *) (data + *end);
+    *end += sizeof(bool);
   } break;
   }
 }

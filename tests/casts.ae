@@ -2,9 +2,6 @@
 (let input-num (str-to-num input-str))
 (println (num-to-str input-num))
 
-(let true (eq 0 0))
-(let false (ne 0 0))
-
 (println (bool-to-str true))
 (println (bool-to-str false))
 (println (num-to-str (bool-to-num true)))

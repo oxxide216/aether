@@ -28,16 +28,20 @@ typedef struct {
 
 struct ListNode {
   Value     value;
+  bool      is_static;
   ListNode *next;
 };
 
+typedef Da(Value) ValueStack;
+
 typedef struct Vm Vm;
 
-typedef Value (*IntrinsicFunc)(Vm *vm, IrBlock *args);
+typedef void (*IntrinsicFunc)(Vm *vm);
 
 typedef struct {
   Str           name;
   u32           args_count;
+  bool          has_return_value;
   IntrinsicFunc func;
 } Intrinsic;
 
@@ -48,8 +52,8 @@ typedef IrExprFuncDef Func;
 typedef Da(Func) Funcs;
 
 typedef struct {
-  Str   name;
-  Value value;
+  Str name;
+  u32 value_index;
 } Var;
 
 typedef Da(Var) Vars;
@@ -57,6 +61,7 @@ typedef Da(Var) Vars;
 typedef IrArgs Args;
 
 struct Vm {
+  ValueStack  stack;
   Funcs       funcs;
   Vars        local_vars;
   Vars        global_vars;
@@ -66,9 +71,18 @@ struct Vm {
   bool        is_inside_of_func;
 };
 
-Value execute_expr(Vm *vm, IrExpr *expr);
-void  execute(Ir *ir, i32 argc, char **argv,
-              RcArena *rc_arena,
-              Intrinsics *intrinsics);
+void value_stack_push_unit(ValueStack *stack);
+void value_stack_push_list(ValueStack *stack, ListNode *nodes);
+void value_stack_push_str(ValueStack *stack, Str str);
+void value_stack_push_number(ValueStack *stack, i64 number);
+void value_stack_push_bool(ValueStack *stack, bool _bool);
+
+Value  value_stack_pop(ValueStack *stack);
+Value *value_stack_get(ValueStack *stack, u32 index);
+
+void execute_expr(Vm *vm, IrExpr *expr, bool value_expected);
+void execute(Ir *ir, i32 argc, char **argv,
+             RcArena *rc_arena,
+             Intrinsics *intrinsics);
 
 #endif // VM_H

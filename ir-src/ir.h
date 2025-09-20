@@ -17,6 +17,7 @@ typedef enum {
   IrExprKindIdent,
   IrExprKindStrLit,
   IrExprKindNumber,
+  IrExprKindBool,
 } IrExprKind;
 
 typedef Da(Str) IrArgs;
@@ -60,6 +61,10 @@ typedef struct {
   i64 number;
 } IrExprNumber;
 
+typedef struct {
+  bool _bool;
+} IrExprBool;
+
 typedef union {
   IrExprFuncDef  func_def;
   IrExprFuncCall func_call;
@@ -69,6 +74,7 @@ typedef union {
   IrExprIdent    ident;
   IrExprStrLit   str_lit;
   IrExprNumber   number;
+  IrExprBool     _bool;
 } IrExprAs;
 
 struct IrExpr {

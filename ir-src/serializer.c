@@ -83,6 +83,12 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
     *(i64 *) (*data + *end) = expr->as.number.number;
     *end += sizeof(i64);
   } break;
+
+  case IrExprKindBool: {
+    reserve_space(sizeof(bool), data, data_size, end);
+    *(bool *) (*data + *end) = expr->as._bool._bool;
+    *end += sizeof(bool);
+  } break;
   }
 }
 
