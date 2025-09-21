@@ -1,0 +1,7 @@
+(fun test []
+  (println 'test!'))
+
+(let test-func test)
+
+(test)
+(test-func)

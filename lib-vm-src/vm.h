@@ -4,12 +4,17 @@
 #include "ir.h"
 #include "rc-arena.h"
 
+typedef IrExprFuncDef Func;
+
+typedef Da(Func) Funcs;
+
 typedef enum {
   ValueKindUnit = 0,
   ValueKindList,
   ValueKindStr,
   ValueKindNumber,
   ValueKindBool,
+  ValueKindFunc,
 } ValueKind;
 
 typedef struct ListNode ListNode;
@@ -19,6 +24,7 @@ typedef union {
   Str       str;
   i64       number;
   bool      _bool;
+  Func     *func;
 } ValueAs;
 
 typedef struct {
@@ -46,10 +52,6 @@ typedef struct {
 } Intrinsic;
 
 typedef Da(Intrinsic) Intrinsics;
-
-typedef IrExprFuncDef Func;
-
-typedef Da(Func) Funcs;
 
 typedef struct {
   Str name;

@@ -16,10 +16,20 @@ typedef struct {
 
 typedef Da(Token) Tokens;
 
+typedef Da(Str) Strs;
+
+typedef struct {
+  IrBlock body;
+  Strs    param_names;
+} Macro;
+
+typedef Da(Macro) Macros;
+
 typedef struct {
   Tokens tokens;
   u32    index;
   Ir     ir;
+  Macros macros;
 } Parser;
 
 static char *token_names[] = {

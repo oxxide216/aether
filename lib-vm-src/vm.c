@@ -42,41 +42,69 @@ Value *value_stack_get(ValueStack *stack, u32 index) {
 
 static void execute_block(Vm *vm, IrBlock *block, bool value_expected);
 
-static void execute_func(Vm *vm, IrExprFuncCall *func, bool value_expected) {
-  Func *func_def = NULL;
+static Func *get_func(Vm *vm, Str name, u32 args_count) {
+  for (u32 i = vm->local_vars.len; i > 0; --i) {
+    Var *var = vm->local_vars.items + i - 1;
+    Value *value = vm->stack.items + var->value_index;
+
+    if (str_eq(var->name, name) &&
+        value->kind == ValueKindFunc) {
+      if (value->as.func->args.len == args_count)
+        return value->as.func;
+      else
+        break;
+    }
+  }
+
+  for (u32 i = vm->global_vars.len; i > 0; --i) {
+    Var *var = vm->global_vars.items + i - 1;
+    Value *value = vm->stack.items + var->value_index;
+
+    if (str_eq(var->name, name) &&
+        value->kind == ValueKindFunc) {
+      if (value->as.func->args.len == args_count)
+        return value->as.func;
+      else
+        break;
+    }
+  }
 
   for (u32 i = 0; i < vm->funcs.len; ++i) {
-    if (str_eq(vm->funcs.items[i].name, func->name) &&
-        vm->funcs.items[i].args.len == func->args.len) {
-      func_def = vm->funcs.items + i;
-      break;
-    }
+    Func *func = vm->funcs.items + i;
+
+    if (str_eq(func->name, name) &&
+        func->args.len == args_count)
+      return func;
   }
 
+  return NULL;
+}
 
-  for (u32 i = 0; i < vm->intrinsics.len; ++i) {
-    Intrinsic *intrinsic = vm->intrinsics.items + i;
-
-    if (str_eq(intrinsic->name, func->name) &&
-        (intrinsic->args_count == func->args.len ||
-         intrinsic->args_count == (u32) -1)) {
-      u32 prev_stack_len = vm->stack.len;
-
-      for (u32 i = 0; i < func->args.len; ++i)
-        execute_expr(vm, func->args.items[i], true);
-
-      intrinsic->func(vm);
-
-      if (value_expected && !intrinsic->has_return_value)
-        value_stack_push_unit(&vm->stack);
-
-      vm->stack.len = prev_stack_len + value_expected;
-
-      return;
-    }
-  }
-
+static void execute_func(Vm *vm, IrExprFuncCall *func, bool value_expected) {
+  Func *func_def = get_func(vm, func->name, func->args.len);
   if (!func_def) {
+    for (u32 i = 0; i < vm->intrinsics.len; ++i) {
+      Intrinsic *intrinsic = vm->intrinsics.items + i;
+
+      if (str_eq(intrinsic->name, func->name) &&
+          (intrinsic->args_count == func->args.len ||
+           intrinsic->args_count == (u32) -1)) {
+        u32 prev_stack_len = vm->stack.len;
+
+        for (u32 i = 0; i < func->args.len; ++i)
+          execute_expr(vm, func->args.items[i], true);
+
+        intrinsic->func(vm);
+
+        if (value_expected && !intrinsic->has_return_value)
+          value_stack_push_unit(&vm->stack);
+
+        vm->stack.len = prev_stack_len + value_expected;
+
+        return;
+      }
+    }
+
     ERROR("Function "STR_FMT" with %u arguments was not defined before usage\n",
           STR_ARG(func->name), func->args.len);
     exit(1);
@@ -236,6 +264,16 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       if (str_eq(vm->global_vars.items[i - 1].name, expr->as.ident.ident)) {
         u32 index = vm->global_vars.items[i - 1].value_index;
         DA_APPEND(vm->stack, vm->stack.items[index]);
+      }
+    }
+
+    for (u32 i = 0; i < vm->funcs.len; ++i) {
+      Func *func = vm->funcs.items + i;
+
+      if (str_eq(func->name, expr->as.ident.ident)) {
+        Value func_value = { ValueKindFunc, { .func = func } };
+        DA_APPEND(vm->stack, func_value);
+        return;
       }
     }
 
