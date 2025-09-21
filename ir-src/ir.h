@@ -9,7 +9,8 @@ typedef struct IrExpr IrExpr;
 typedef Da(IrExpr *) IrBlock;
 
 typedef enum {
-  IrExprKindFuncDef = 0,
+  IrExprKindBlock = 0,
+  IrExprKindFuncDef,
   IrExprKindFuncCall,
   IrExprKindVarDef,
   IrExprKindIf,
@@ -66,6 +67,7 @@ typedef struct {
 } IrExprBool;
 
 typedef union {
+  IrBlock        block;
   IrExprFuncDef  func_def;
   IrExprFuncCall func_call;
   IrExprVarDef   var_def;

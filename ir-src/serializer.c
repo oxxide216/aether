@@ -32,6 +32,10 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
   *end += sizeof(IrExprKind);
 
   switch (expr->kind) {
+  case IrExprKindBlock: {
+    save_block_data(&expr->as.block, data, data_size, end);
+  } break;
+
   case IrExprKindFuncDef: {
     save_str_data(expr->as.func_def.name, data, data_size, end);
 

@@ -167,6 +167,10 @@ static void free_value(Value *value, RcArena *rc_arena) {
 
 void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   switch (expr->kind) {
+  case IrExprKindBlock: {
+    execute_block(vm, &expr->as.block, value_expected);
+  } break;
+
   case IrExprKindFuncDef: {
     for (u32 i = 0; i < vm->funcs.len; ++i) {
       if (str_eq(vm->funcs.items[i].name, expr->as.func_def.name) &&

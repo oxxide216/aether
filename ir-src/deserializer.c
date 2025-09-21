@@ -15,6 +15,10 @@ static void get_expr_data_size(u8 *data, u32 *size) {
   *size += sizeof(IrExprKind);
 
   switch (kind) {
+  case IrExprKindBlock: {
+    get_block_data_size(data, size);
+  } break;
+
   case IrExprKindFuncDef: {
     get_str_data_size(data, size);
 
@@ -89,6 +93,10 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
   *end += sizeof(IrExprKind);
 
   switch (expr->kind) {
+  case IrExprKindBlock: {
+    load_block_data(&expr->as.block, data, end, rc_arena);
+  } break;
+
   case IrExprKindFuncDef: {
     load_str_data(&expr->as.func_def.name, data, end, rc_arena);
 
