@@ -70,14 +70,13 @@ static void print_value(ValueStack *stack, Value *value) {
   } break;
 
   case ValueKindFunc: {
-    fputs("(fun ", stdout);
-    str_print(value->as.func->name);
+    fputs("(fun [", stdout);
     fputs(" [", stdout);
 
-    for (u32 i = 0; i < value->as.func->args.len; ++i) {
+    for (u32 i = 0; i < value->as.func.args.len; ++i) {
       if (i > 0)
         fputc(' ', stdout);
-      str_print(value->as.func->args.items[i]);
+      str_print(value->as.func.args.items[i]);
     }
 
     fputs("])", stdout);

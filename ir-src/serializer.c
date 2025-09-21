@@ -93,6 +93,17 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
     *(bool *) (*data + *end) = expr->as._bool._bool;
     *end += sizeof(bool);
   } break;
+
+  case IrExprKindLambda: {
+    reserve_space(sizeof(u32), data, data_size, end);
+    *(u32 *) (*data + *end) = expr->as.lambda.args.len;
+    *end += sizeof(u32);
+
+    for (u32 i = 0; i < expr->as.lambda.args.len; ++i)
+      save_str_data(expr->as.lambda.args.items[i], data, data_size, end);
+
+    save_block_data(&expr->as.lambda.body, data, data_size, end);
+  } break;
   }
 }
 

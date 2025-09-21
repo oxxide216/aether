@@ -3,5 +3,12 @@
 
 (let test-func test)
 
+(let test-lambda
+  \([arg]
+     (print '[')
+     (print arg)
+     (println ']')))
+
 (test)
 (test-func)
+(test-lambda -100200)

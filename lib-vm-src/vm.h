@@ -19,12 +19,17 @@ typedef enum {
 
 typedef struct ListNode ListNode;
 
+typedef struct {
+  IrArgs  args;
+  IrBlock body;
+} ValueFunc;
+
 typedef union {
-  ListNode *list;
-  Str       str;
-  i64       number;
-  bool      _bool;
-  Func     *func;
+  ListNode  *list;
+  Str        str;
+  i64        number;
+  bool       _bool;
+  ValueFunc  func;
 } ValueAs;
 
 typedef struct {
