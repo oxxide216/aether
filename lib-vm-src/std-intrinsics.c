@@ -1,4 +1,5 @@
 #include "std-intrinsics.h"
+#include "io.h"
 #include "shl_log.h"
 #include "shl_arena.h"
 
@@ -90,6 +91,40 @@ void input_intrinsic(Vm *vm) {
   value_stack_push_str(&vm->stack, STR(buffer, len));
 }
 
+void read_file_intrinsic(Vm *vm) {
+  Value path = value_stack_pop(&vm->stack);
+  if (path.kind != ValueKindStr) {
+    ERROR("read-file: wrong argument kind\n");
+    exit(1);
+  }
+
+  char *path_cstr = aalloc(path.as.str.len + 1);
+  memcpy(path_cstr, path.as.str.ptr, path.as.str.len);
+  path_cstr[path.as.str.len] = '\0';
+
+  Str content = read_file(path_cstr);
+  if (content.len == (u32) -1)
+    value_stack_push_unit(&vm->stack);
+  else
+    value_stack_push_str(&vm->stack, content);
+}
+
+void write_file_intrinsic(Vm *vm) {
+  Value path = value_stack_pop(&vm->stack);
+  Value content = value_stack_pop(&vm->stack);
+  if (path.kind != ValueKindStr ||
+      content.kind != ValueKindStr) {
+    ERROR("write-file: wrong argument kinds\n");
+    exit(1);
+  }
+
+  char *path_cstr = aalloc(path.as.str.len + 1);
+  memcpy(path_cstr, path.as.str.ptr, path.as.str.len);
+  path_cstr[path.as.str.len] = '\0';
+
+  write_file(path_cstr, content.as.str);
+}
+
 void get_args_intrinsic(Vm *vm) {
   value_stack_push_list(&vm->stack, vm->args);
 }
@@ -167,6 +202,25 @@ void nth_intrinsic(Vm *vm) {
     value_stack_push_unit(&vm->stack);
   else
     DA_APPEND(vm->stack, prev_node->value);
+}
+
+void len_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  if (value.kind == ValueKindList) {
+    ListNode *node = value.as.list;
+    u32 len = 0;
+    while (node) {
+      node = node->next;
+      ++len;
+    }
+
+    value_stack_push_number(&vm->stack, len);
+  } else if (value.kind == ValueKindStr) {
+    value_stack_push_number(&vm->stack, value.as.str.len);
+  } else {
+    ERROR("len: wrong argument kind");
+    exit(1);
+  }
 }
 
 void is_empty_intrinsic(Vm *vm) {
@@ -336,17 +390,35 @@ void mod_intrinsic(Vm *vm) {
 }
 
 void eq_intrinsic(Vm *vm) {
-  Value a, b;
-  prepare_two_numbers(&a, &b, "eq", vm);
+  Value b = value_stack_pop(&vm->stack);
+  Value a = value_stack_pop(&vm->stack);
 
-  value_stack_push_bool(&vm->stack, a.as.number == b.as.number);
+  if (a.kind == ValueKindNumber &&
+      b.kind == ValueKindNumber) {
+    value_stack_push_bool(&vm->stack, a.as.number == b.as.number);
+  } else if (a.kind == ValueKindStr &&
+             b.kind == ValueKindStr) {
+    value_stack_push_bool(&vm->stack, str_eq(a.as.str, b.as.str));
+  } else {
+    ERROR("eq: wrong argument kinds\n");
+    exit(1);
+  }
 }
 
 void ne_intrinsic(Vm *vm) {
-  Value a, b;
-  prepare_two_numbers(&a, &b, "ne", vm);
+  Value b = value_stack_pop(&vm->stack);
+  Value a = value_stack_pop(&vm->stack);
 
-  value_stack_push_bool(&vm->stack, a.as.number != b.as.number);
+  if (a.kind == ValueKindNumber &&
+      b.kind == ValueKindNumber) {
+    value_stack_push_bool(&vm->stack, a.as.number != b.as.number);
+  } else if (a.kind == ValueKindStr &&
+             b.kind == ValueKindStr) {
+    value_stack_push_bool(&vm->stack, !str_eq(a.as.str, b.as.str));
+  } else {
+    ERROR("ne: wrong argument kinds\n");
+    exit(1);
+  }
 }
 
 void ls_intrinsic(Vm *vm) {
@@ -391,11 +463,14 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("print"), 1, false, &print_intrinsic },
   { STR_LIT("println"), 1, false, &println_intrinsic },
   { STR_LIT("input"), 0, true, &input_intrinsic },
+  { STR_LIT("read-file"), 1, true, &read_file_intrinsic },
+  { STR_LIT("write-file"), 2, false, &write_file_intrinsic },
   { STR_LIT("get-args"), 0, true, &get_args_intrinsic },
   { STR_LIT("head"), 1, true, &head_intrinsic },
   { STR_LIT("tail"), 1, true, &tail_intrinsic },
   { STR_LIT("last"), 1, true, &last_intrinsic },
   { STR_LIT("nth"), 2, true, &nth_intrinsic },
+  { STR_LIT("len"), 1, true, &len_intrinsic },
   { STR_LIT("is-empty"), 1, true, &is_empty_intrinsic },
   { STR_LIT("str-to-num"), 1, true, &str_to_num_intrinsic },
   { STR_LIT("num-to-str"), 1, true, &num_to_str_intrinsic },
