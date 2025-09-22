@@ -10,6 +10,8 @@
   (println ']'))
 
 (let list [0 1 2])
+(add -1 list)
+(add list -2)
 
 (print-list list)
 (println list)

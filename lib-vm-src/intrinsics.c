@@ -11,6 +11,7 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("get-args"), 0, true, &get_args_intrinsic },
   { STR_LIT("head"), 1, true, &head_intrinsic },
   { STR_LIT("tail"), 1, true, &tail_intrinsic },
+  { STR_LIT("last"), 1, true, &last_intrinsic },
   { STR_LIT("is-empty"), 1, true, &is_empty_intrinsic },
   { STR_LIT("str-to-num"), 1, true, &str_to_num_intrinsic },
   { STR_LIT("num-to-str"), 1, true, &num_to_str_intrinsic },
@@ -152,6 +153,25 @@ void tail_intrinsic(Vm *vm) {
   value_stack_push_list(&vm->stack, value.as.list->next);
 }
 
+void last_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  if (value.kind != ValueKindList) {
+    ERROR("head: wrong argument kind\n");
+    exit(1);
+  }
+
+  if (!value.as.list) {
+    value_stack_push_unit(&vm->stack);
+    return;
+  }
+
+  ListNode *node = value.as.list;
+  while (node && node->next)
+    node = node->next;
+
+  DA_APPEND(vm->stack, node->value);
+}
+
 void is_empty_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind != ValueKindList) {
@@ -233,6 +253,46 @@ void add_intrinsic(Vm *vm) {
     sb_push_str(&sb, b.as.str);
 
     value_stack_push_str(&vm->stack, sb_to_str(sb));
+  } else if (a.kind == ValueKindList &&
+             b.kind == ValueKindList) {
+    ListNode *a_node = a.as.list;
+    while (a_node && a_node->next)
+      a_node = a_node->next;
+
+    if (a_node)
+      a_node->next = b.as.list;
+
+    value_stack_push_list(&vm->stack, a.as.list);
+  } else if (a.kind == ValueKindList) {
+    ListNode *a_node = a.as.list;
+    while (a_node && a_node->next)
+      a_node = a_node->next;
+
+    if (a_node) {
+      a_node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+      a_node->next->value = b;
+    }
+  } else if (b.kind == ValueKindList) {
+    if (!b.as.list) {
+      ListNode *new_node = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+      new_node->value = a;
+    } else {
+      Value prev_value = a;
+      ListNode *node = b.as.list;
+      ListNode *prev_node = b.as.list;
+      while (node) {
+        Value new_value = node->value;
+        node->value = prev_value;
+        prev_value = new_value;
+
+        node = node->next;
+        if (prev_node->next)
+          prev_node = prev_node->next;
+      }
+
+      prev_node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+      prev_node->next->value = prev_value;
+    }
   } else {
     ERROR("add: wrong argument kinds\n");
     exit(1);

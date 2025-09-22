@@ -10,6 +10,7 @@ void input_intrinsic(Vm *vm);
 void get_args_intrinsic(Vm *vm);
 void head_intrinsic(Vm *vm);
 void tail_intrinsic(Vm *vm);
+void last_intrinsic(Vm *vm);
 void is_empty_intrinsic(Vm *vm);
 
 void str_to_num_intrinsic(Vm *vm);
