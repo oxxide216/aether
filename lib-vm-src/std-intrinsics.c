@@ -1,37 +1,8 @@
-#include "intrinsics.h"
+#include "std-intrinsics.h"
 #include "shl_log.h"
 #include "shl_arena.h"
 
 #define DEFAULT_INPUT_BUFFER_SIZE 64
-
-Intrinsic std_intrinsics[] = {
-  { STR_LIT("print"), 1, false, &print_intrinsic },
-  { STR_LIT("println"), 1, false, &println_intrinsic },
-  { STR_LIT("input"), 0, true, &input_intrinsic },
-  { STR_LIT("get-args"), 0, true, &get_args_intrinsic },
-  { STR_LIT("head"), 1, true, &head_intrinsic },
-  { STR_LIT("tail"), 1, true, &tail_intrinsic },
-  { STR_LIT("last"), 1, true, &last_intrinsic },
-  { STR_LIT("is-empty"), 1, true, &is_empty_intrinsic },
-  { STR_LIT("str-to-num"), 1, true, &str_to_num_intrinsic },
-  { STR_LIT("num-to-str"), 1, true, &num_to_str_intrinsic },
-  { STR_LIT("bool-to-str"), 1, true, &bool_to_str_intrinsic },
-  { STR_LIT("bool-to-num"), 1, true, &bool_to_num_intrinsic },
-  { STR_LIT("add"), 2, true, &add_intrinsic },
-  { STR_LIT("sub"), 2, true, &sub_intrinsic },
-  { STR_LIT("mul"), 2, true, &mul_intrinsic },
-  { STR_LIT("div"), 2, true, &div_intrinsic },
-  { STR_LIT("mod"), 2, true, &mod_intrinsic },
-  { STR_LIT("eq"), 2, true, &eq_intrinsic },
-  { STR_LIT("ne"), 2, true, &ne_intrinsic },
-  { STR_LIT("ls"), 2, true, &ls_intrinsic },
-  { STR_LIT("le"), 2, true, &le_intrinsic },
-  { STR_LIT("gt"), 2, true, &gt_intrinsic },
-  { STR_LIT("ge"), 2, true, &ge_intrinsic },
-  { STR_LIT("not"), 1, true, &not_intrinsic },
-};
-
-u32 std_intrinsics_len = ARRAY_LEN(std_intrinsics);
 
 static void print_value(ValueStack *stack, Value *value) {
   switch (value->kind) {
@@ -156,7 +127,7 @@ void tail_intrinsic(Vm *vm) {
 void last_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind != ValueKindList) {
-    ERROR("head: wrong argument kind\n");
+    ERROR("last: wrong argument kind\n");
     exit(1);
   }
 
@@ -170,6 +141,32 @@ void last_intrinsic(Vm *vm) {
     node = node->next;
 
   DA_APPEND(vm->stack, node->value);
+}
+
+void nth_intrinsic(Vm *vm) {
+  Value index = value_stack_pop(&vm->stack);
+  Value list = value_stack_pop(&vm->stack);
+
+  if (list.kind != ValueKindList ||
+      index.kind != ValueKindNumber) {
+    ERROR("nth: wrong argument kinds\n");
+    exit(1);
+  }
+
+  ListNode *node = list.as.list;
+  ListNode *prev_node = list.as.list;
+  u32 i = 0;
+  while (node && i < index.as.number) {
+    node = node->next;
+    if (prev_node->next)
+      prev_node = prev_node->next;
+    ++i;
+  }
+
+  if (i < index.as.number)
+    value_stack_push_unit(&vm->stack);
+  else
+    DA_APPEND(vm->stack, prev_node->value);
 }
 
 void is_empty_intrinsic(Vm *vm) {
@@ -389,3 +386,33 @@ void not_intrinsic(Vm *vm) {
 
   value_stack_push_bool(&vm->stack, !value.as._bool);
 }
+
+Intrinsic std_intrinsics[] = {
+  { STR_LIT("print"), 1, false, &print_intrinsic },
+  { STR_LIT("println"), 1, false, &println_intrinsic },
+  { STR_LIT("input"), 0, true, &input_intrinsic },
+  { STR_LIT("get-args"), 0, true, &get_args_intrinsic },
+  { STR_LIT("head"), 1, true, &head_intrinsic },
+  { STR_LIT("tail"), 1, true, &tail_intrinsic },
+  { STR_LIT("last"), 1, true, &last_intrinsic },
+  { STR_LIT("nth"), 2, true, &nth_intrinsic },
+  { STR_LIT("is-empty"), 1, true, &is_empty_intrinsic },
+  { STR_LIT("str-to-num"), 1, true, &str_to_num_intrinsic },
+  { STR_LIT("num-to-str"), 1, true, &num_to_str_intrinsic },
+  { STR_LIT("bool-to-str"), 1, true, &bool_to_str_intrinsic },
+  { STR_LIT("bool-to-num"), 1, true, &bool_to_num_intrinsic },
+  { STR_LIT("add"), 2, true, &add_intrinsic },
+  { STR_LIT("sub"), 2, true, &sub_intrinsic },
+  { STR_LIT("mul"), 2, true, &mul_intrinsic },
+  { STR_LIT("div"), 2, true, &div_intrinsic },
+  { STR_LIT("mod"), 2, true, &mod_intrinsic },
+  { STR_LIT("eq"), 2, true, &eq_intrinsic },
+  { STR_LIT("ne"), 2, true, &ne_intrinsic },
+  { STR_LIT("ls"), 2, true, &ls_intrinsic },
+  { STR_LIT("le"), 2, true, &le_intrinsic },
+  { STR_LIT("gt"), 2, true, &gt_intrinsic },
+  { STR_LIT("ge"), 2, true, &ge_intrinsic },
+  { STR_LIT("not"), 1, true, &not_intrinsic },
+};
+
+u32 std_intrinsics_len = ARRAY_LEN(std_intrinsics);

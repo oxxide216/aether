@@ -3,7 +3,7 @@
 #include "shl_str.h"
 #include "shl_log.h"
 #include "shl_arena.h"
-#include "intrinsics.h"
+#include "std-intrinsics.h"
 
 void value_stack_push_unit(ValueStack *stack) {
   Value value = { ValueKindUnit, {} };
