@@ -3,7 +3,6 @@
 #include "io.h"
 #include "deserializer.h"
 #include "vm.h"
-#include "intrinsics.h"
 
 int main(i32 argc, char **argv) {
   if (argc < 2) {
