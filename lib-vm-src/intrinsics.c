@@ -4,7 +4,7 @@
 
 #define DEFAULT_INPUT_BUFFER_SIZE 64
 
-Intrinsic intrinsics[] = {
+Intrinsic std_intrinsics[] = {
   { STR_LIT("print"), 1, false, &print_intrinsic },
   { STR_LIT("println"), 1, false, &println_intrinsic },
   { STR_LIT("input"), 0, true, &input_intrinsic },
@@ -30,7 +30,7 @@ Intrinsic intrinsics[] = {
   { STR_LIT("not"), 1, true, &not_intrinsic },
 };
 
-u32 intrinsics_len = ARRAY_LEN(intrinsics);
+u32 std_intrinsics_len = ARRAY_LEN(std_intrinsics);
 
 static void print_value(ValueStack *stack, Value *value) {
   switch (value->kind) {

@@ -89,7 +89,6 @@ Value *value_stack_get(ValueStack *stack, u32 index);
 
 void execute_expr(Vm *vm, IrExpr *expr, bool value_expected);
 void execute(Ir *ir, i32 argc, char **argv,
-             RcArena *rc_arena,
-             Intrinsics *intrinsics);
+             RcArena *rc_arena, Intrinsics *intrinsics);
 
 #endif // VM_H

@@ -344,6 +344,12 @@ void execute(Ir *ir, i32 argc, char **argv,
   vm.rc_arena = rc_arena;
   vm.intrinsics = *intrinsics;
 
+  vm.intrinsics.cap += std_intrinsics_len;
+  vm.intrinsics.items = realloc(vm.intrinsics.items, vm.intrinsics.cap * sizeof(Intrinsic));
+  memcpy(vm.intrinsics.items + vm.intrinsics.len, std_intrinsics,
+         std_intrinsics_len * sizeof(Intrinsic));
+  vm.intrinsics.len += std_intrinsics_len;
+
   ListNode *args_end = NULL;
   for (u32 i = 0; i < (u32) argc; ++i) {
     u32 len = strlen(argv[i]);

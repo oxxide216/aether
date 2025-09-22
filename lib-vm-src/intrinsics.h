@@ -31,7 +31,7 @@ void gt_intrinsic(Vm *vm);
 void ge_intrinsic(Vm *vm);
 void not_intrinsic(Vm *vm);
 
-extern Intrinsic intrinsics[];
-extern u32 intrinsics_len;
+extern Intrinsic std_intrinsics[];
+extern u32 std_intrinsics_len;
 
 #endif // INTRINSICS_H
