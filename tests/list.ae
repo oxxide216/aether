@@ -1,10 +1,13 @@
 (fun print-list [list]
-  (if (is-empty list)
-    (println '')
-   else
-    (print (head list))
-    (print ' ')
-    (print-list (tail list))))
+  (fun print-list-rec [list]
+    (if (not (is-empty list))
+      (print (head list))
+      (if (not (is-empty (tail list)))
+        (print ' '))
+      (print-list-rec (tail list))))
+  (print '[')
+  (print-list-rec list)
+  (println ']'))
 
 (let list [0 1 2])
 
