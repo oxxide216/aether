@@ -16,5 +16,6 @@
 (println (nth list 2))
 (println (nth list 10))
 (println (len list))
+(println (get-range list 1 4))
 (print-list list)
 (println list)

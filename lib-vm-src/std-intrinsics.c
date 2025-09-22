@@ -218,7 +218,7 @@ void len_intrinsic(Vm *vm) {
   } else if (value.kind == ValueKindStr) {
     value_stack_push_number(&vm->stack, value.as.str.len);
   } else {
-    ERROR("len: wrong argument kind");
+    ERROR("len: wrong argument kind\n");
     exit(1);
   }
 }
@@ -231,6 +231,55 @@ void is_empty_intrinsic(Vm *vm) {
   }
 
   value_stack_push_bool(&vm->stack, value.as.list == NULL);
+}
+
+void get_range_intrinsic(Vm *vm) {
+  Value end = value_stack_pop(&vm->stack);
+  Value begin = value_stack_pop(&vm->stack);
+  Value value = value_stack_pop(&vm->stack);
+  if (begin.kind != ValueKindNumber ||
+      end.kind != ValueKindNumber ||
+      (value.kind != ValueKindList &&
+       value.kind != ValueKindStr)) {
+    ERROR("get-range: wrong argument kinds\n");
+    exit(1);
+  }
+
+  DA_APPEND(vm->stack, value);
+  len_intrinsic(vm);
+  Value len = value_stack_pop(&vm->stack);
+
+  if (begin.as.number < 0 || begin.as.number >= len.as.number ||
+      end.as.number <= 0 || end.as.number >= len.as.number ||
+      begin.as.number >= end.as.number) {
+    value_stack_push_unit(&vm->stack);
+    return;
+  }
+
+  if (value.kind == ValueKindList) {
+    ListNode *node = value.as.list;
+
+    for (u32 i = 0; i < begin.as.number; ++i)
+      node = node->next;
+
+    ListNode *sub_list = NULL;
+    ListNode **sub_list_next = &sub_list;
+    for (u32 i = 0; i < end.as.number - begin.as.number; ++i) {
+      *sub_list_next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+      (*sub_list_next)->value = node->value;
+      sub_list_next = &(*sub_list_next)->next;
+      node = node->next;
+    }
+
+    value_stack_push_list(&vm->stack, sub_list);
+  } else {
+    Str sub_str = {
+      value.as.str.ptr + begin.as.number,
+      value.as.str.len - begin.as.number - end.as.number,
+    };
+
+    value_stack_push_str(&vm->stack, sub_str);
+  }
 }
 
 void str_to_num_intrinsic(Vm *vm) {
@@ -472,6 +521,7 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("nth"), 2, true, &nth_intrinsic },
   { STR_LIT("len"), 1, true, &len_intrinsic },
   { STR_LIT("is-empty"), 1, true, &is_empty_intrinsic },
+  { STR_LIT("get-range"), 3, true, &get_range_intrinsic },
   { STR_LIT("str-to-num"), 1, true, &str_to_num_intrinsic },
   { STR_LIT("num-to-str"), 1, true, &num_to_str_intrinsic },
   { STR_LIT("bool-to-str"), 1, true, &bool_to_str_intrinsic },
