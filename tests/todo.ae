@@ -1,0 +1,24 @@
+(let todos [])
+
+(fun add-todo [todo]
+  (add todos todo))
+
+(fun remove-todo [todo-to-remove]
+  (filter (fun [todo] (ne todo todo-to-remove)) todos))
+
+(fun print-todos [left]
+  (if (not (is-empty left))
+    (println (head left))
+    (print-todos (tail left))))
+
+(while true
+  (print '>> ')
+
+  (let command (split (input) ' '))
+
+  (if (eq (head command) 'add')
+    (add-todo (head (tail command))))
+  (if (eq (head command) 'remove')
+    (remove-todo (head (tail command))))
+  (if (eq (head command) 'list')
+    (print-todos todos)))

@@ -41,14 +41,17 @@ static char *token_names[] = {
   "let",
   "if",
   "else",
+  "macro",
+  "while",
   "number",
+  "bool",
   "identifier",
+  "macro_name",
   "`(`",
   "`)`",
   "`[`",
   "`]`",
   "string literal",
-  "`\\`",
 };
 
 static Tokens lex(Str code) {
@@ -124,17 +127,11 @@ static Token *parser_next_token(Parser *parser) {
   return parser->tokens.items + parser->index++;
 }
 
-static Token *parser_expect_token(Parser *parser, u64 id_mask) {
-  Token *token = parser_next_token(parser);
-  if (!token || MASK(token->id) & id_mask)
-    return token;
-
+static void print_id_mask(u64 id_mask) {
   u32 ids_count = 0;
   for (u32 i = 0; i < ARRAY_LEN(token_names); ++i)
     if (MASK(i) & id_mask)
       ++ids_count;
-
-  ERROR("Expected ");
 
   for (u32 i = 0, j = 0; i < 64 && j < ids_count; ++i) {
     if ((1 << i) & id_mask) {
@@ -150,14 +147,25 @@ static Token *parser_expect_token(Parser *parser, u64 id_mask) {
       ++j;
     }
   }
+}
 
-  if (token)
-    fprintf(stderr, ", but got `"STR_FMT"` at %u:%u\n",
-            STR_ARG(token->lexeme),
-            token->row + 1, token->col + 1);
-  else
+static Token *parser_expect_token(Parser *parser, u64 id_mask) {
+  Token *token = parser_next_token(parser);
+  if (!token) {
+    ERROR("Expected ");
+    print_id_mask(id_mask);
     fprintf(stderr, ", but got EOF\n");
+    exit(1);
+  }
 
+  if (MASK(token->id) & id_mask)
+    return token;
+
+  ERROR("Expected ");
+  print_id_mask(id_mask);
+  fprintf(stderr, ", but got `"STR_FMT"` at %u:%u\n",
+          STR_ARG(token->lexeme),
+          token->row + 1, token->col + 1);
   exit(1);
 }
 
@@ -168,8 +176,10 @@ static IrExprFuncDef parser_parse_func_def(Parser *parser) {
 
   parser_expect_token(parser, MASK(TT_FUN));
 
-  Token *name_token = parser_expect_token(parser, MASK(TT_IDENT));
-  func_def.name = name_token->lexeme;
+  if (parser_peek_token(parser)->id == TT_IDENT) {
+    Token *name_token = parser_next_token(parser);
+    func_def.name = name_token->lexeme;
+  }
 
   parser_expect_token(parser, MASK(TT_OBRACKET));
 
@@ -186,27 +196,6 @@ static IrExprFuncDef parser_parse_func_def(Parser *parser) {
   parser_expect_token(parser, MASK(TT_CPAREN));
 
   return func_def;
-}
-
-static IrExprLambda parser_parse_lambda(Parser *parser) {
-  IrExprLambda lambda = {0};
-
-  parser_expect_token(parser, MASK(TT_OPAREN));
-  parser_expect_token(parser, MASK(TT_OBRACKET));
-
-  Token *next_token = parser_peek_token(parser);
-  while (next_token && next_token->id != TT_CBRACKET) {
-    Token *arg_token = parser_expect_token(parser, MASK(TT_IDENT));
-    DA_APPEND(lambda.args, arg_token->lexeme);
-
-    next_token = parser_peek_token(parser);
-  }
-
-  parser_expect_token(parser, MASK(TT_IDENT) | MASK(TT_CBRACKET));
-  lambda.body = parser_parse_block(parser, MASK(TT_CPAREN));
-  parser_expect_token(parser, MASK(TT_CPAREN));
-
-  return lambda;
 }
 
 static IrExprFuncCall parser_parse_func_call(Parser *parser) {
@@ -274,6 +263,10 @@ static void macro_body_expand(IrExpr **expr, IrBlock *args, Strs arg_names) {
     macro_body_expand_block(&new_expr->as._if.if_body, args, arg_names);
     if (new_expr->as._if.has_else)
       macro_body_expand_block(&new_expr->as._if.else_body, args, arg_names);
+  } break;
+
+  case IrExprKindWhile: {
+    macro_body_expand_block(&new_expr->as._while.body, args, arg_names);
   } break;
 
   case IrExprKindList: {
@@ -344,8 +337,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
 
   Token *token = parser_expect_token(parser, MASK(TT_OPAREN) | MASK(TT_OBRACKET) |
                                              MASK(TT_STR) | MASK(TT_IDENT) |
-                                             MASK(TT_NUMBER) | MASK(TT_BOOL) |
-                                             MASK(TT_SLASH));
+                                             MASK(TT_NUMBER) | MASK(TT_BOOL));
 
   if (token->id == TT_STR) {
     expr->kind = IrExprKindStrLit;
@@ -384,18 +376,18 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     return expr;
   }
 
-  if (token->id == TT_SLASH) {
-    expr->kind = IrExprKindLambda;
-    expr->as.lambda = parser_parse_lambda(parser);
-
-    return expr;
-  }
-
   token = parser_peek_token(parser);
   switch (token->id) {
   case TT_FUN: {
-    expr->kind = IrExprKindFuncDef;
-    expr->as.func_def = parser_parse_func_def(parser);
+    IrExprFuncDef func_def = parser_parse_func_def(parser);
+
+    if (func_def.name.len > 0) {
+      expr->kind = IrExprKindFuncDef;
+      expr->as.func_def = func_def;
+    } else {
+      expr->kind = IrExprKindLambda;
+      expr->as.lambda = (IrExprLambda) { func_def.args, func_def.body };
+    }
   } break;
 
   case TT_LET: {
@@ -446,11 +438,21 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     return NULL;
   } break;
 
+  case TT_WHILE: {
+    parser_next_token(parser);
+
+    expr->kind = IrExprKindWhile;
+    expr->as._while.cond = parser_parse_expr(parser);
+    expr->as._while.body = parser_parse_block(parser, MASK(TT_CPAREN));
+
+    parser_expect_token(parser, MASK(TT_CPAREN));
+  } break;
+
   default: {
     parser_expect_token(parser, MASK(TT_FUN) | MASK(TT_LET) |
                                 MASK(TT_IF) | MASK(TT_IDENT) |
                                 MASK(TT_MACRO_NAME) | MASK(TT_BOOL) |
-                                MASK(TT_MACRO));
+                                MASK(TT_MACRO) | MASK(TT_WHILE));
   } break;
   }
 

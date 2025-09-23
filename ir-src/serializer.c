@@ -70,6 +70,11 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
       save_block_data(&expr->as._if.else_body, data, data_size, end);
   } break;
 
+  case IrExprKindWhile: {
+    save_expr_data(expr->as._while.cond, data, data_size, end);
+    save_block_data(&expr->as._while.body, data, data_size, end);
+  } break;
+
   case IrExprKindList: {
     save_block_data(&expr->as.list.content, data, data_size, end);
   } break;

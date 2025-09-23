@@ -152,11 +152,14 @@ void tail_intrinsic(Vm *vm) {
   }
 
   if (!value.as.list->next) {
-    DA_APPEND(vm->stack, value);
+    value_stack_push_unit(&vm->stack);
     return;
   }
 
-  value_stack_push_list(&vm->stack, value.as.list->next->next);
+  ListNode *new_node = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  new_node->next = value.as.list->next->next;
+
+  value_stack_push_list(&vm->stack, new_node);
 }
 
 void last_intrinsic(Vm *vm) {
@@ -371,6 +374,51 @@ void reduce_intrinsic(Vm *vm) {
   DA_APPEND(vm->stack, accumulator);
 }
 
+void split_intrinsic(Vm *vm) {
+  Value delimeter = value_stack_pop(&vm->stack);
+  Value str = value_stack_pop(&vm->stack);
+  if (str.kind != ValueKindStr ||
+      delimeter.kind != ValueKindStr) {
+    ERROR("split: wrong argument kinds\n");
+    exit(1);
+  }
+
+  ListNode *list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  ListNode *node = list;
+
+  u32 index = 0, i = 0;
+  for (; i < str.as.str.len; ++i) {
+    u32 found = true;
+    for (u32 j = 0; j + i < str.as.str.len && j < delimeter.as.str.len; ++j) {
+      if (str.as.str.ptr[j + i] != delimeter.as.str.ptr[j]) {
+        found = false;
+        break;
+      }
+    }
+
+    if (found) {
+      node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+      node->next->value = (Value) {
+        ValueKindStr,
+        { .str = STR(str.as.str.ptr + index, i - index) },
+      };
+
+      index = i + 1;
+      node = node->next;
+    }
+  }
+
+  if (i > 0) {
+    node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+    node->next->value = (Value) {
+      ValueKindStr,
+      { .str = STR(str.as.str.ptr + index, i - index) },
+    };
+  }
+
+  value_stack_push_list(&vm->stack, list);
+}
+
 void str_to_num_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind != ValueKindStr) {
@@ -453,7 +501,7 @@ void add_intrinsic(Vm *vm) {
 
     value_stack_push_list(&vm->stack, rc_arena_clone(vm->rc_arena, a.as.list));
   } else if (a.kind == ValueKindList) {
-    ListNode *a_node = a.as.list->next;
+    ListNode *a_node = a.as.list;
     while (a_node && a_node->next)
       a_node = a_node->next;
 
@@ -573,7 +621,7 @@ void eq_intrinsic(Vm *vm) {
              b.kind == ValueKindStr) {
     value_stack_push_bool(&vm->stack, str_eq(a.as.str, b.as.str));
   } else {
-    ERROR("eq: wrong argument kinds\n");
+    ERROR("eq: wrong argument kinds: %u:%u\n", a.kind, b.kind);
     exit(1);
   }
 }
@@ -724,6 +772,8 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("map"), 2, true, &map_intrinsic },
   { STR_LIT("filter"), 2, true, &filter_intrinsic },
   { STR_LIT("reduce"), 3, true, &reduce_intrinsic },
+  // String operations
+  { STR_LIT("split"), 2, true, &split_intrinsic },
   // Conversions
   { STR_LIT("str-to-num"), 1, true, &str_to_num_intrinsic },
   { STR_LIT("num-to-str"), 1, true, &num_to_str_intrinsic },

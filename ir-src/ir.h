@@ -14,6 +14,7 @@ typedef enum {
   IrExprKindFuncCall,
   IrExprKindVarDef,
   IrExprKindIf,
+  IrExprKindWhile,
   IrExprKindList,
   IrExprKindIdent,
   IrExprKindStrLit,
@@ -48,6 +49,11 @@ typedef struct {
 } IrExprIf;
 
 typedef struct {
+  IrExpr  *cond;
+  IrBlock  body;
+} IrExprWhile;
+
+typedef struct {
   IrBlock content;
 } IrExprList;
 
@@ -78,6 +84,7 @@ typedef union {
   IrExprFuncCall func_call;
   IrExprVarDef   var_def;
   IrExprIf       _if;
+  IrExprWhile    _while;
   IrExprList     list;
   IrExprIdent    ident;
   IrExprStrLit   str_lit;

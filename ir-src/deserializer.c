@@ -48,6 +48,11 @@ static void get_expr_data_size(u8 *data, u32 *size) {
       get_expr_data_size(data, size);
   } break;
 
+  case IrExprKindWhile: {
+    get_expr_data_size(data, size);
+    get_expr_data_size(data, size);
+  } break;
+
   case IrExprKindList: {
     get_block_data_size(data, size);
   } break;
@@ -142,6 +147,13 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
     load_block_data(&expr->as._if.if_body, data, end, rc_arena);
     if (expr->as._if.has_else)
       load_block_data(&expr->as._if.else_body, data, end, rc_arena);
+  } break;
+
+  case IrExprKindWhile: {
+    expr->as._while.cond = aalloc(sizeof(IrExpr));
+
+    load_expr_data(expr->as._while.cond, data, end, rc_arena);
+    load_block_data(&expr->as._while.body, data, end, rc_arena);
   } break;
 
   case IrExprKindList: {

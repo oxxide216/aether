@@ -40,6 +40,19 @@ Value *value_stack_get(ValueStack *stack, u32 index) {
   return stack->items + index;
 }
 
+static void free_value(Value *value, RcArena *rc_arena) {
+  if (value->kind == ValueKindList) {
+    ListNode *node = value->as.list;
+    while (node && !node->is_static) {
+      ListNode *next_node = node->next;
+      rc_arena_free(rc_arena, node);
+      node = next_node;
+    }
+  } else if (value->kind == ValueKindStr) {
+    rc_arena_free(rc_arena, value->as.str.ptr);
+  }
+}
+
 static void execute_block(Vm *vm, IrBlock *block, bool value_expected);
 
 static bool get_func(Vm *vm, Str name, u32 args_count,
@@ -103,8 +116,6 @@ void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected) {
       if (str_eq(intrinsic->name, name) &&
           (intrinsic->args_count == args->len ||
            intrinsic->args_count == (u32) -1)) {
-        u32 prev_stack_len = vm->stack.len;
-
         for (u32 i = 0; i < args->len; ++i)
           DA_APPEND(vm->stack, args->items[i]);
 
@@ -112,8 +123,8 @@ void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected) {
 
         if (value_expected && !intrinsic->has_return_value)
           value_stack_push_unit(&vm->stack);
-
-        vm->stack.len = prev_stack_len + value_expected;
+        else if (!value_expected && intrinsic->has_return_value)
+          --vm->stack.len;
 
         return;
       }
@@ -165,19 +176,6 @@ static Var *get_var(Vm *vm, Str name) {
   }
 
   return NULL;
-}
-
-static void free_value(Value *value, RcArena *rc_arena) {
-  if (value->kind == ValueKindList) {
-    ListNode *node = value->as.list;
-    while (node && !node->is_static) {
-      ListNode *next_node = node->next;
-      rc_arena_free(rc_arena, node);
-      node = next_node;
-    }
-  } else if (value->kind == ValueKindStr) {
-    rc_arena_free(rc_arena, value->as.str.ptr);
-  }
 }
 
 void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
@@ -249,12 +247,29 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       execute_block(vm, &expr->as._if.else_body, value_expected);
   } break;
 
+  case IrExprKindWhile: {
+    while (true) {
+      execute_expr(vm, expr->as._while.cond, true);
+
+      Value cond = value_stack_pop(&vm->stack);
+      if (cond.kind != ValueKindBool) {
+        ERROR("Only boolean value can be used as a condition\n");
+        exit(1);
+      }
+
+      if (!cond.as._bool)
+        break;
+
+      execute_block(vm, &expr->as._while.body, value_expected);
+    }
+  } break;
+
   case IrExprKindList: {
     if (!value_expected)
       break;
 
-    ListNode *list = NULL;
-    ListNode *list_end = NULL;
+    ListNode *list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+    ListNode *list_end = list;
 
     for (u32 i = 0; i < expr->as.list.content.len; ++i) {
       execute_expr(vm, expr->as.list.content.items[i], true);
