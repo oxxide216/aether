@@ -18,6 +18,7 @@ typedef struct {
 } RcArena;
 
 void *rc_arena_alloc(RcArena *arena, u32 size);
-void  rc_arena_free(RcArena *arena, void *ptr);
+void *rc_arena_clone(RcArena *arena, void *data);
+void  rc_arena_free(RcArena *arena, void *data);
 
 #endif // RC_ARENA_H

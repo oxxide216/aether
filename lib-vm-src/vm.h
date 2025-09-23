@@ -20,6 +20,7 @@ typedef enum {
 typedef struct ListNode ListNode;
 
 typedef struct {
+  Str     name;
   IrArgs  args;
   IrBlock body;
 } ValueFunc;
@@ -87,6 +88,7 @@ void value_stack_push_bool(ValueStack *stack, bool _bool);
 Value  value_stack_pop(ValueStack *stack);
 Value *value_stack_get(ValueStack *stack, u32 index);
 
+void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected);
 void execute_expr(Vm *vm, IrExpr *expr, bool value_expected);
 void execute(Ir *ir, i32 argc, char **argv,
              RcArena *rc_arena, Intrinsics *intrinsics);

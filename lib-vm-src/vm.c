@@ -53,6 +53,7 @@ static bool get_func(Vm *vm, Str name, u32 args_count,
       if (value->as.func.args.len == args_count) {
         *args = value->as.func.args;
         *block = value->as.func.body;
+
         return true;
       } else {
         break;
@@ -69,6 +70,7 @@ static bool get_func(Vm *vm, Str name, u32 args_count,
       if (value->as.func.args.len == args_count) {
         *args = value->as.func.args;
         *block = value->as.func.body;
+
         return true;
       } else {
         break;
@@ -76,13 +78,14 @@ static bool get_func(Vm *vm, Str name, u32 args_count,
     }
   }
 
-  for (u32 i = 0; i < vm->funcs.len; ++i) {
-    Func *func = vm->funcs.items + i;
+  for (u32 i = vm->funcs.len; i > 0; --i) {
+    Func *func = vm->funcs.items + i - 1;
 
     if (str_eq(func->name, name) &&
         func->args.len == args_count) {
       *args = func->args;
       *block = func->body;
+
       return true;
     }
   }
@@ -90,20 +93,20 @@ static bool get_func(Vm *vm, Str name, u32 args_count,
   return false;
 }
 
-static void execute_func(Vm *vm, IrExprFuncCall *func, bool value_expected) {
-  IrArgs args;
-  IrBlock body;
-  if (!get_func(vm, func->name, func->args.len, &args, &body)) {
+void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected) {
+  IrArgs func_args;
+  IrBlock func_body;
+  if (!get_func(vm, name, args->len, &func_args, &func_body)) {
     for (u32 i = 0; i < vm->intrinsics.len; ++i) {
       Intrinsic *intrinsic = vm->intrinsics.items + i;
 
-      if (str_eq(intrinsic->name, func->name) &&
-          (intrinsic->args_count == func->args.len ||
+      if (str_eq(intrinsic->name, name) &&
+          (intrinsic->args_count == args->len ||
            intrinsic->args_count == (u32) -1)) {
         u32 prev_stack_len = vm->stack.len;
 
-        for (u32 i = 0; i < func->args.len; ++i)
-          execute_expr(vm, func->args.items[i], true);
+        for (u32 i = 0; i < args->len; ++i)
+          DA_APPEND(vm->stack, args->items[i]);
 
         intrinsic->func(vm);
 
@@ -117,21 +120,20 @@ static void execute_func(Vm *vm, IrExprFuncCall *func, bool value_expected) {
     }
 
     ERROR("Function "STR_FMT" with %u arguments was not defined before usage\n",
-          STR_ARG(func->name), func->args.len);
+          STR_ARG(name), args->len);
     exit(1);
   }
 
   u32 prev_stack_len = vm->stack.len;
 
   Vars new_local_vars = {0};
-  for (u32 i = 0; i < args.len; ++i) {
+  for (u32 i = 0; i < func_args.len; ++i) {
     Var var = {
-      args.items[i],
+      func_args.items[i],
       vm->stack.len,
     };
 
-    execute_expr(vm, func->args.items[i], true);
-
+    DA_APPEND(vm->stack, args->items[i]);
     DA_APPEND(new_local_vars, var);
   }
 
@@ -140,7 +142,7 @@ static void execute_func(Vm *vm, IrExprFuncCall *func, bool value_expected) {
   vm->local_vars = new_local_vars;
   vm->is_inside_of_func = true;
 
-  execute_block(vm, &body, value_expected);
+  execute_block(vm, &func_body, value_expected);
 
   free(vm->local_vars.items);
   vm->local_vars = prev_local_vars;
@@ -201,7 +203,15 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   } break;
 
   case IrExprKindFuncCall: {
-    execute_func(vm, &expr->as.func_call, value_expected);
+    ValueStack args = {0};
+
+    for (u32 i = 0; i < expr->as.func_call.args.len; ++i) {
+      execute_expr(vm, expr->as.func_call.args.items[i], true);
+      Value arg = value_stack_pop(&vm->stack);
+      DA_APPEND(args, arg);
+    }
+
+    execute_func(vm, expr->as.func_call.name, &args, value_expected);
   } break;
 
   case IrExprKindVarDef: {
@@ -290,7 +300,7 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       if (str_eq(func->name, expr->as.ident.ident)) {
         Value func_value = {
           ValueKindFunc,
-          { .func = { func->args, func->body } },
+          { .func = { func->name, func->args, func->body } },
         };
         DA_APPEND(vm->stack, func_value);
         return;
@@ -323,9 +333,16 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   case IrExprKindLambda: {
     Value func_value = {
       ValueKindFunc,
-      { .func = { expr->as.lambda.args, expr->as.lambda.body } },
+      { .func = { (Str) {0}, expr->as.lambda.args, expr->as.lambda.body } },
     };
     DA_APPEND(vm->stack, func_value);
+
+    IrExprFuncDef func_def = {
+      (Str) {0},
+      expr->as.lambda.args,
+      expr->as.lambda.body,
+    };
+    DA_APPEND(vm->funcs, func_def);
   } break;
   }
 }
@@ -350,7 +367,8 @@ void execute(Ir *ir, i32 argc, char **argv,
          std_intrinsics_len * sizeof(Intrinsic));
   vm.intrinsics.len += std_intrinsics_len;
 
-  ListNode *args_end = NULL;
+  vm.args = rc_arena_alloc(rc_arena, sizeof(ListNode));
+  ListNode *args_end = vm.args;
   for (u32 i = 0; i < (u32) argc; ++i) {
     u32 len = strlen(argv[i]);
     char *buffer = rc_arena_alloc(rc_arena, len);

@@ -14,9 +14,9 @@ static void print_value(ValueStack *stack, Value *value) {
   case ValueKindList: {
     fputc('[', stdout);
 
-    ListNode *node = value->as.list;
+    ListNode *node = value->as.list->next;
     while (node) {
-      if (node != value->as.list)
+      if (node != value->as.list->next)
         fputc(' ', stdout);
 
       print_value(stack, &node->value);
@@ -82,7 +82,7 @@ void input_intrinsic(Vm *vm) {
       char *prev_buffer = buffer;
       buffer = rc_arena_alloc(vm->rc_arena, buffer_size);
       memcpy(buffer, prev_buffer, len);
-      rc_arena_free(vm->rc_arena, buffer);
+      rc_arena_free(vm->rc_arena, prev_buffer);
     }
 
     buffer[len++] = ch;
@@ -136,12 +136,12 @@ void head_intrinsic(Vm *vm) {
     exit(1);
   }
 
-  if (!value.as.list) {
+  if (!value.as.list->next) {
     value_stack_push_unit(&vm->stack);
     return;
   }
 
-  DA_APPEND(vm->stack, value.as.list->value);
+  DA_APPEND(vm->stack, value.as.list->next->value);
 }
 
 void tail_intrinsic(Vm *vm) {
@@ -151,12 +151,12 @@ void tail_intrinsic(Vm *vm) {
     exit(1);
   }
 
-  if (!value.as.list) {
+  if (!value.as.list->next) {
     DA_APPEND(vm->stack, value);
     return;
   }
 
-  value_stack_push_list(&vm->stack, value.as.list->next);
+  value_stack_push_list(&vm->stack, value.as.list->next->next);
 }
 
 void last_intrinsic(Vm *vm) {
@@ -166,12 +166,12 @@ void last_intrinsic(Vm *vm) {
     exit(1);
   }
 
-  if (!value.as.list) {
+  if (!value.as.list->next) {
     value_stack_push_unit(&vm->stack);
     return;
   }
 
-  ListNode *node = value.as.list;
+  ListNode *node = value.as.list->next;
   while (node && node->next)
     node = node->next;
 
@@ -188,8 +188,8 @@ void nth_intrinsic(Vm *vm) {
     exit(1);
   }
 
-  ListNode *node = list.as.list;
-  ListNode *prev_node = list.as.list;
+  ListNode *node = list.as.list->next;
+  ListNode *prev_node = list.as.list->next;
   u32 i = 0;
   while (node && i < index.as.number) {
     node = node->next;
@@ -207,7 +207,7 @@ void nth_intrinsic(Vm *vm) {
 void len_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind == ValueKindList) {
-    ListNode *node = value.as.list;
+    ListNode *node = value.as.list->next;
     u32 len = 0;
     while (node) {
       node = node->next;
@@ -230,7 +230,7 @@ void is_empty_intrinsic(Vm *vm) {
     exit(1);
   }
 
-  value_stack_push_bool(&vm->stack, value.as.list == NULL);
+  value_stack_push_bool(&vm->stack, value.as.list->next == NULL);
 }
 
 void get_range_intrinsic(Vm *vm) {
@@ -257,7 +257,7 @@ void get_range_intrinsic(Vm *vm) {
   }
 
   if (value.kind == ValueKindList) {
-    ListNode *node = value.as.list;
+    ListNode *node = value.as.list->next;
 
     for (u32 i = 0; i < begin.as.number; ++i)
       node = node->next;
@@ -280,6 +280,95 @@ void get_range_intrinsic(Vm *vm) {
 
     value_stack_push_str(&vm->stack, sub_str);
   }
+}
+
+void map_intrinsic(Vm *vm) {
+  Value list = value_stack_pop(&vm->stack);
+  Value func = value_stack_pop(&vm->stack);
+  if (func.kind != ValueKindFunc ||
+      list.kind != ValueKindList) {
+    ERROR("map: wrong argument kinds\n");
+    exit(1);
+  }
+
+  ListNode *node = list.as.list->next;
+  while (node) {
+    ValueStack args = {0};
+    DA_APPEND(args, node->value);
+    execute_func(vm, func.as.func.name, &args, true);
+
+    node->value = value_stack_pop(&vm->stack);
+
+    free(args.items);
+
+    node = node->next;
+  }
+
+  value_stack_push_list(&vm->stack, rc_arena_clone(vm->rc_arena, list.as.list));
+}
+
+void filter_intrinsic(Vm *vm) {
+  Value list = value_stack_pop(&vm->stack);
+  Value func = value_stack_pop(&vm->stack);
+  if (func.kind != ValueKindFunc ||
+      list.kind != ValueKindList) {
+    ERROR("filter: wrong argument kinds\n");
+    exit(1);
+  }
+
+  ListNode **node_next = &list.as.list->next;
+  ListNode *node = list.as.list->next;
+  while (node) {
+    ValueStack args = {0};
+    DA_APPEND(args, node->value);
+    execute_func(vm, func.as.func.name, &args, true);
+
+    Value is_ok = value_stack_pop(&vm->stack);
+    if (is_ok.kind != ValueKindBool) {
+      ERROR("filter: function should return boolean value\n");
+      exit(1);
+    }
+
+    free(args.items);
+
+    if (!is_ok.as._bool)
+      *node_next = node->next;
+
+    node_next = &node->next;
+    node = node->next;
+  }
+
+  value_stack_push_list(&vm->stack, rc_arena_clone(vm->rc_arena, list.as.list));
+}
+
+void reduce_intrinsic(Vm *vm) {
+  Value list = value_stack_pop(&vm->stack);
+  Value initial_value = value_stack_pop(&vm->stack);
+  Value func = value_stack_pop(&vm->stack);
+  if (func.kind != ValueKindFunc ||
+      list.kind != ValueKindList) {
+    ERROR("filter: wrong argument kinds\n");
+    exit(1);
+  }
+
+  Value accumulator = initial_value;
+  ListNode *node = list.as.list->next;
+  while (node) {
+    ValueStack args = {0};
+    DA_APPEND(args, accumulator);
+    DA_APPEND(args, node->value);
+    execute_func(vm, func.as.func.name, &args, true);
+
+    accumulator = value_stack_pop(&vm->stack);
+    if (accumulator.kind != initial_value.kind) {
+      ERROR("reduce: return value's and accumulator's types should be equal\n");
+      exit(1);
+    }
+
+    node = node->next;
+  }
+
+  DA_APPEND(vm->stack, accumulator);
 }
 
 void str_to_num_intrinsic(Vm *vm) {
@@ -355,16 +444,16 @@ void add_intrinsic(Vm *vm) {
     value_stack_push_str(&vm->stack, sb_to_str(sb));
   } else if (a.kind == ValueKindList &&
              b.kind == ValueKindList) {
-    ListNode *a_node = a.as.list;
+    ListNode *a_node = a.as.list->next;
     while (a_node && a_node->next)
       a_node = a_node->next;
 
     if (a_node)
-      a_node->next = b.as.list;
+      a_node->next = b.as.list->next;
 
-    value_stack_push_list(&vm->stack, a.as.list);
+    value_stack_push_list(&vm->stack, rc_arena_clone(vm->rc_arena, a.as.list));
   } else if (a.kind == ValueKindList) {
-    ListNode *a_node = a.as.list;
+    ListNode *a_node = a.as.list->next;
     while (a_node && a_node->next)
       a_node = a_node->next;
 
@@ -372,14 +461,16 @@ void add_intrinsic(Vm *vm) {
       a_node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
       a_node->next->value = b;
     }
+
+    value_stack_push_list(&vm->stack, rc_arena_clone(vm->rc_arena, a.as.list));
   } else if (b.kind == ValueKindList) {
     if (!b.as.list) {
-      ListNode *new_node = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-      new_node->value = a;
+      b.as.list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+      b.as.list->value = a;
     } else {
       Value prev_value = a;
-      ListNode *node = b.as.list;
-      ListNode *prev_node = b.as.list;
+      ListNode *node = b.as.list->next;
+      ListNode *prev_node = b.as.list->next;
       while (node) {
         Value new_value = node->value;
         node->value = prev_value;
@@ -393,6 +484,8 @@ void add_intrinsic(Vm *vm) {
       prev_node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
       prev_node->next->value = prev_value;
     }
+
+    value_stack_push_list(&vm->stack, rc_arena_clone(vm->rc_arena, b.as.list));
   } else {
     ERROR("add: wrong argument kinds\n");
     exit(1);
@@ -436,6 +529,37 @@ void mod_intrinsic(Vm *vm) {
   prepare_two_numbers(&a, &b, "mod", vm);
 
   value_stack_push_number(&vm->stack, a.as.number % b.as.number);
+}
+
+void abs_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  if (value.kind != ValueKindNumber) {
+    ERROR("abs: wrong argument kind\n");
+    exit(1);
+  }
+
+  if (value.as.number < 0)
+    value.as.number = -value.as.number;
+
+  DA_APPEND(vm->stack, value);
+}
+
+void min_intrinsic(Vm *vm) {
+  Value a, b;
+  prepare_two_numbers(&a, &b, "min", vm);
+
+  value_stack_push_number(&vm->stack, a.as.number <= b.as.number ?
+                                      a.as.number :
+                                      b.as.number);
+}
+
+void max_intrinsic(Vm *vm) {
+  Value a, b;
+  prepare_two_numbers(&a, &b, "max", vm);
+
+  value_stack_push_number(&vm->stack, a.as.number >= b.as.number ?
+                                      a.as.number :
+                                      b.as.number);
 }
 
 void eq_intrinsic(Vm *vm) {
@@ -498,6 +622,27 @@ void ge_intrinsic(Vm *vm) {
   value_stack_push_bool(&vm->stack, a.as.number >= b.as.number);
 }
 
+void and_intrinsic(Vm *vm) {
+  Value a, b;
+  prepare_two_numbers(&a, &b, "gt", vm);
+
+  value_stack_push_number(&vm->stack, a.as.number & b.as.number);
+}
+
+void or_intrinsic(Vm *vm) {
+  Value a, b;
+  prepare_two_numbers(&a, &b, "gt", vm);
+
+  value_stack_push_number(&vm->stack, a.as.number | b.as.number);
+}
+
+void xor_intrinsic(Vm *vm) {
+  Value a, b;
+  prepare_two_numbers(&a, &b, "gt", vm);
+
+  value_stack_push_number(&vm->stack, a.as.number ^ b.as.number);
+}
+
 void not_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind != ValueKindBool) {
@@ -508,13 +653,66 @@ void not_intrinsic(Vm *vm) {
   value_stack_push_bool(&vm->stack, !value.as._bool);
 }
 
+void is_unit_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindUnit);
+}
+
+void is_list_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindList);
+}
+
+void is_str_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindStr);
+}
+
+void is_number_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindNumber);
+}
+
+void is_bool_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindBool);
+}
+
+void is_fun_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindFunc);
+}
+
+void type_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+
+  if (value.kind == ValueKindUnit) {
+    value_stack_push_str(&vm->stack, STR_LIT("unit"));
+  } else if (value.kind == ValueKindList) {
+    value_stack_push_str(&vm->stack, STR_LIT("list"));
+  } else if (value.kind == ValueKindStr) {
+    value_stack_push_str(&vm->stack, STR_LIT("str"));
+  } else if (value.kind == ValueKindNumber) {
+    value_stack_push_str(&vm->stack, STR_LIT("number"));
+  } else if (value.kind == ValueKindBool) {
+    value_stack_push_str(&vm->stack, STR_LIT("bool"));
+  } else if (value.kind == ValueKindFunc) {
+    value_stack_push_str(&vm->stack, STR_LIT("fun"));
+  } else {
+    ERROR("Unknown type\n");
+    exit(1);
+  }
+}
+
 Intrinsic std_intrinsics[] = {
+  // Io
   { STR_LIT("print"), 1, false, &print_intrinsic },
   { STR_LIT("println"), 1, false, &println_intrinsic },
   { STR_LIT("input"), 0, true, &input_intrinsic },
   { STR_LIT("read-file"), 1, true, &read_file_intrinsic },
   { STR_LIT("write-file"), 2, false, &write_file_intrinsic },
   { STR_LIT("get-args"), 0, true, &get_args_intrinsic },
+  // Base
   { STR_LIT("head"), 1, true, &head_intrinsic },
   { STR_LIT("tail"), 1, true, &tail_intrinsic },
   { STR_LIT("last"), 1, true, &last_intrinsic },
@@ -522,22 +720,49 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("len"), 1, true, &len_intrinsic },
   { STR_LIT("is-empty"), 1, true, &is_empty_intrinsic },
   { STR_LIT("get-range"), 3, true, &get_range_intrinsic },
+  // Functional stuff
+  { STR_LIT("map"), 2, true, &map_intrinsic },
+  { STR_LIT("filter"), 2, true, &filter_intrinsic },
+  { STR_LIT("reduce"), 3, true, &reduce_intrinsic },
+  // Conversions
   { STR_LIT("str-to-num"), 1, true, &str_to_num_intrinsic },
   { STR_LIT("num-to-str"), 1, true, &num_to_str_intrinsic },
   { STR_LIT("bool-to-str"), 1, true, &bool_to_str_intrinsic },
   { STR_LIT("bool-to-num"), 1, true, &bool_to_num_intrinsic },
+  // Math
   { STR_LIT("add"), 2, true, &add_intrinsic },
   { STR_LIT("sub"), 2, true, &sub_intrinsic },
   { STR_LIT("mul"), 2, true, &mul_intrinsic },
   { STR_LIT("div"), 2, true, &div_intrinsic },
   { STR_LIT("mod"), 2, true, &mod_intrinsic },
+  // Advanced math
+  { STR_LIT("abs"), 1, true, &abs_intrinsic },
+  { STR_LIT("min"), 2, true, &min_intrinsic },
+  { STR_LIT("max"), 2, true, &max_intrinsic },
+  // TODO: floating point numbers
+  // { STR_LIT("sqrt"), 1, true, &sqrt_intrinsic },
+  // { STR_LIT("pow"), 2, true, &pow_intrinsic },
+  // { STR_LIT("round"), 1, true, &round_intrinsic },
+  // Comparisons
   { STR_LIT("eq"), 2, true, &eq_intrinsic },
   { STR_LIT("ne"), 2, true, &ne_intrinsic },
   { STR_LIT("ls"), 2, true, &ls_intrinsic },
   { STR_LIT("le"), 2, true, &le_intrinsic },
   { STR_LIT("gt"), 2, true, &gt_intrinsic },
   { STR_LIT("ge"), 2, true, &ge_intrinsic },
+  // Boolean
+  { STR_LIT("and"), 2, true, &and_intrinsic },
+  { STR_LIT("or"), 2, true, &or_intrinsic },
+  { STR_LIT("xor"), 2, true, &xor_intrinsic },
   { STR_LIT("not"), 1, true, &not_intrinsic },
+  // Types
+  { STR_LIT("unit?"), 1, true, &is_unit_intrinsic },
+  { STR_LIT("list?"), 1, true, &is_list_intrinsic },
+  { STR_LIT("str?"), 1, true, &is_str_intrinsic },
+  { STR_LIT("number?"), 1, true, &is_number_intrinsic },
+  { STR_LIT("bool?"), 1, true, &is_bool_intrinsic },
+  { STR_LIT("fun?"), 1, true, &is_fun_intrinsic },
+  { STR_LIT("type"), 1, true, &type_intrinsic },
 };
 
 u32 std_intrinsics_len = ARRAY_LEN(std_intrinsics);

@@ -1,0 +1,7 @@
+(let list [0 1 2 3])
+(map \([num] (add num 1)) list)
+(println list)
+(filter \([num] (eq (mod num 2) 0)) list)
+(println list)
+(let sum (reduce \([acc num] (add acc num)) 0 list))
+(println sum)
