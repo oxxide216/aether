@@ -58,6 +58,16 @@ static char *token_names[] = {
   "string literal",
 };
 
+static char escape_char(char _char) {
+  switch (_char) {
+  case 'n': return '\n';
+  case 'r': return '\r';
+  case 't': return '\t';
+  case 'v': return '\v';
+  default:  return _char;
+  }
+}
+
 static Tokens lex(Str code, char *file_path) {
   Tokens tokens = {0};
   TransitionTable *table = get_transition_table();
@@ -76,17 +86,26 @@ static Tokens lex(Str code, char *file_path) {
     }
 
     if (new_token.id == TT_STR) {
+      StringBuilder sb = {0};
+      sb_push_char(&sb, code.ptr[0]);
+
       bool is_escaped = false;
       while (code.len > 0 &&
              ((code.ptr[0] != '"' &&
                code.ptr[0] != '\'') ||
               is_escaped)) {
+
+        if (is_escaped || code.ptr[0] != '\\') {
+          if (is_escaped)
+            code.ptr[0] = escape_char(code.ptr[0]);
+          sb_push_char(&sb, code.ptr[0]);
+        }
+
         if (is_escaped)
           is_escaped = false;
         else if (code.ptr[0] == '\\')
           is_escaped = true;
 
-        ++new_token.lexeme.len;
         ++code.ptr;
         --code.len;
       }
@@ -97,9 +116,12 @@ static Tokens lex(Str code, char *file_path) {
         exit(1);
       }
 
-      ++new_token.lexeme.len;
       ++code.ptr;
       --code.len;
+
+      sb_push_char(&sb, code.ptr[0]);
+
+      new_token.lexeme = sb_to_str(sb);
     }
 
     col += new_token.lexeme.len;
