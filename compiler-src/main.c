@@ -26,7 +26,7 @@ int main(i32 argc, char **argv) {
     exit(1);
   }
 
-  Ir ir = parse(code);
+  Ir ir = parse(code, input_file_name);
   Str serialized = {0};
   serialized.ptr = (char *) serialize(&ir, &serialized.len);
   write_file(output_file_name, serialized);

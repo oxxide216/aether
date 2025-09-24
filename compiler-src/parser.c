@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "io.h"
 #include "lexgen/runtime-src/runtime.h"
 #define LEXGEN_TRANSITION_TABLE_IMPLEMENTATION
 #include "grammar.h"
@@ -9,9 +10,10 @@
 #define MASK(id) (1 << (id))
 
 typedef struct {
-  u64 id;
-  Str lexeme;
-  u32 row, col;
+  u64   id;
+  Str   lexeme;
+  u32   row, col;
+  char *file_path;
 } Token;
 
 typedef Da(Token) Tokens;
@@ -56,17 +58,17 @@ static char *token_names[] = {
   "string literal",
 };
 
-static Tokens lex(Str code) {
+static Tokens lex(Str code, char *file_path) {
   Tokens tokens = {0};
   TransitionTable *table = get_transition_table();
   u32 row = 0, col = 0;
 
   while (code.len > 0) {
     Token new_token = {0};
-
     new_token.lexeme = table_matches(table, &code, &new_token.id);
     new_token.row = row;
     new_token.col = col;
+    new_token.file_path = file_path;
 
     if (new_token.id == (u64) -1) {
       ERROR("Unexpected `%c` at %u:%u\n", code.ptr[0], row + 1, col + 1);
@@ -338,6 +340,22 @@ static IrBlock parser_parse_macro_expand(Parser *parser) {
   return body;
 }
 
+static char *str_to_cstr(Str str) {
+  char *result = malloc((str.len + 1) * sizeof(char));
+  memcpy(result, str.ptr, str.len * sizeof(char));
+  result[str.len] = 0;
+
+  return result;
+}
+
+static Str get_file_dir(Str path) {
+  for (u32 i = path.len; i > 0; --i)
+    if (path.ptr[i - 1] == '/')
+      return (Str) { path.ptr, i };
+
+  return (Str) {0};
+}
+
 static IrExpr *parser_parse_expr(Parser *parser) {
   IrExpr *expr = aalloc(sizeof(IrExpr));
 
@@ -482,12 +500,43 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     parser_expect_token(parser, MASK(TT_CPAREN));
   } break;
 
+  case TT_USE: {
+    parser_next_token(parser);
+
+    Str current_file_path = {
+      token->file_path,
+      strlen(token->file_path),
+    };
+
+    Str new_file_path = parser_expect_token(parser, MASK(TT_STR))->lexeme;
+    new_file_path.ptr += 1;
+    new_file_path.len -= 2;
+
+    StringBuilder path_sb = {0};
+    sb_push_str(&path_sb, get_file_dir(current_file_path));
+    sb_push_str(&path_sb, new_file_path);
+    char *path = str_to_cstr(sb_to_str(path_sb));
+
+    Str code = read_file(path);
+    if (code.len == (u32) -1) {
+      ERROR("File %s was not found\n", path);
+      exit(1);
+    }
+
+    expr->kind = IrExprKindBlock;
+    expr->as.block = parse(code, path);
+
+    parser_expect_token(parser, MASK(TT_CPAREN));
+
+    free(path_sb.buffer);
+  } break;
+
   default: {
     parser_expect_token(parser, MASK(TT_FUN) | MASK(TT_LET) |
                                 MASK(TT_IF) | MASK(TT_IDENT) |
                                 MASK(TT_MACRO_NAME) | MASK(TT_BOOL) |
                                 MASK(TT_MACRO) | MASK(TT_WHILE) |
-                                MASK(TT_SET));
+                                MASK(TT_SET) | MASK(TT_USE));
   } break;
   }
 
@@ -509,10 +558,10 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
   return block;
 }
 
-Ir parse(Str code) {
+Ir parse(Str code, char *file_path) {
   Parser parser = {0};
 
-  parser.tokens = lex(code);
+  parser.tokens = lex(code, file_path);
   parser.ir = parser_parse_block(&parser, 0);
 
   return parser.ir;
