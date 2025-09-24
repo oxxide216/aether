@@ -380,6 +380,7 @@ static Str get_file_dir(Str path) {
 
 static IrExpr *parser_parse_expr(Parser *parser) {
   IrExpr *expr = aalloc(sizeof(IrExpr));
+  *expr = (IrExpr) {0};
 
   Token *token = parser_expect_token(parser, MASK(TT_OPAREN) | MASK(TT_OBRACKET) |
                                              MASK(TT_STR) | MASK(TT_IDENT) |
