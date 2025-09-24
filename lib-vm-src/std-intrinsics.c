@@ -151,15 +151,11 @@ void tail_intrinsic(Vm *vm) {
     exit(1);
   }
 
-  if (!value.as.list->next) {
-    value_stack_push_unit(&vm->stack);
-    return;
-  }
+  ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  if (value.as.list->next)
+    new_list->next = list_clone(vm->rc_arena, value.as.list->next->next);
 
-  ListNode *new_node = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-  new_node->next = value.as.list->next->next;
-
-  value_stack_push_list(&vm->stack, new_node);
+  value_stack_push_list(&vm->stack, new_list);
 }
 
 void last_intrinsic(Vm *vm) {
@@ -261,17 +257,18 @@ void get_range_intrinsic(Vm *vm) {
 
   if (value.kind == ValueKindList) {
     ListNode *node = value.as.list->next;
+    ListNode *sub_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+    ListNode *sub_list_node = sub_list;
 
     for (u32 i = 0; i < begin.as.number; ++i)
       node = node->next;
 
-    ListNode *sub_list = NULL;
-    ListNode **sub_list_next = &sub_list;
     for (u32 i = 0; i < end.as.number - begin.as.number; ++i) {
-      *sub_list_next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-      (*sub_list_next)->value = node->value;
-      sub_list_next = &(*sub_list_next)->next;
+      sub_list_node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+      sub_list_node->next->value = node->value;
+
       node = node->next;
+      sub_list_node = sub_list_node->next;
     }
 
     value_stack_push_list(&vm->stack, sub_list);
@@ -323,8 +320,8 @@ void filter_intrinsic(Vm *vm) {
     exit(1);
   }
 
-  ListNode *new_list = NULL;
-  ListNode **new_list_next = &new_list;
+  ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  ListNode **new_list_next = &new_list->next;
   ListNode *node = list.as.list->next;
   while (node) {
     ValueStack args = {0};
@@ -392,7 +389,6 @@ void split_intrinsic(Vm *vm) {
 
   ListNode *list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
   ListNode *node = list;
-
   u32 index = 0, i = 0;
   for (; i < str.as.str.len; ++i) {
     u32 found = true;
@@ -499,48 +495,38 @@ void add_intrinsic(Vm *vm) {
     value_stack_push_str(&vm->stack, sb_to_str(sb));
   } else if (a.kind == ValueKindList &&
              b.kind == ValueKindList) {
-    ListNode *a_node = a.as.list->next;
-    while (a_node && a_node->next)
-      a_node = a_node->next;
+    ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+    new_list->next = list_clone(vm->rc_arena, a.as.list->next);
 
-    if (a_node)
-      a_node->next = b.as.list->next;
+    ListNode *node = new_list;
+    while (node && node->next)
+      node = node->next;
 
-    value_stack_push_list(&vm->stack, rc_arena_clone(vm->rc_arena, a.as.list));
+    if (node)
+      node->next = list_clone(vm->rc_arena, b.as.list->next);
+
+    value_stack_push_list(&vm->stack, new_list);
   } else if (a.kind == ValueKindList) {
-    ListNode *a_node = a.as.list;
-    while (a_node && a_node->next)
-      a_node = a_node->next;
+    ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+    new_list->next = list_clone(vm->rc_arena, a.as.list->next);
 
-    if (a_node) {
-      a_node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-      a_node->next->value = b;
+    ListNode *node = new_list;
+    while (node && node->next)
+      node = node->next;
+
+    if (node) {
+      node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+      node->next->value = b;
     }
 
-    value_stack_push_list(&vm->stack, rc_arena_clone(vm->rc_arena, a.as.list));
+    value_stack_push_list(&vm->stack, new_list);
   } else if (b.kind == ValueKindList) {
-    if (!b.as.list) {
-      b.as.list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-      b.as.list->value = a;
-    } else {
-      Value prev_value = a;
-      ListNode *node = b.as.list->next;
-      ListNode *prev_node = b.as.list->next;
-      while (node) {
-        Value new_value = node->value;
-        node->value = prev_value;
-        prev_value = new_value;
+    ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+    new_list->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+    new_list->next->value = a;
+    new_list->next->next = list_clone(vm->rc_arena, b.as.list->next);
 
-        node = node->next;
-        if (prev_node->next)
-          prev_node = prev_node->next;
-      }
-
-      prev_node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-      prev_node->next->value = prev_value;
-    }
-
-    value_stack_push_list(&vm->stack, rc_arena_clone(vm->rc_arena, b.as.list));
+    value_stack_push_list(&vm->stack, new_list);
   } else {
     ERROR("add: wrong argument kinds\n");
     exit(1);

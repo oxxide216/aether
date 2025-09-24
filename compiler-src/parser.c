@@ -40,6 +40,7 @@ static char *token_names[] = {
   "fun",
   "let",
   "if",
+  "elif",
   "else",
   "macro",
   "while",
@@ -412,9 +413,27 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     expr->kind = IrExprKindIf;
     expr->as._if.cond = parser_parse_expr(parser);
 
-    expr->as._if.if_body = parser_parse_block(parser, MASK(TT_CPAREN) | MASK(TT_ELSE));
+    expr->as._if.if_body = parser_parse_block(parser, MASK(TT_CPAREN) |
+                                                      MASK(TT_ELIF) |
+                                                      MASK(TT_ELSE));
 
-    Token *next_token = parser_expect_token(parser, MASK(TT_CPAREN) | MASK(TT_ELSE));
+    Token *next_token = parser_expect_token(parser, MASK(TT_CPAREN) |
+                                                    MASK(TT_ELIF) |
+                                                    MASK(TT_ELSE));
+
+    while (next_token->id == TT_ELIF) {
+      IrElif elif;
+      elif.cond = parser_parse_expr(parser);
+      elif.body = parser_parse_block(parser, MASK(TT_CPAREN) |
+                                             MASK(TT_ELIF) |
+                                             MASK(TT_ELSE));
+      DA_APPEND(expr->as._if.elifs, elif);
+
+      next_token = parser_expect_token(parser, MASK(TT_CPAREN) |
+                                               MASK(TT_ELIF) |
+                                               MASK(TT_ELSE));
+    }
+
     expr->as._if.has_else = next_token->id == TT_ELSE;
     if (expr->as._if.has_else) {
       expr->as._if.else_body = parser_parse_block(parser, MASK(TT_CPAREN));

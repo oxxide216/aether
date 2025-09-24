@@ -1,7 +1,9 @@
-(fun add-todo [todos todo]
-  (add todos todo))
+(let todos [])
 
-(fun remove-todo [todos todo-to-remove]
+(fun add-todo [todo]
+  (set todos (add todos todo)))
+
+(fun remove-todo [todo-to-remove]
   (set todos (filter (fun [todo] (ne todo todo-to-remove)) todos)))
 
 (fun print-todos [left]
@@ -9,16 +11,20 @@
     (println (head left))
     (print-todos (tail left))))
 
-(let todos [])
-
-(while true
+(let is_running true)
+(while is_running
   (print '>> ')
 
   (let command (split (input) ' '))
 
   (if (eq (head command) 'add')
-    (add-todo todos (head (tail command))))
-  (if (eq (head command) 'remove')
-    (remove-todo todos (head (tail command))))
-  (if (eq (head command) 'list')
-    (print-todos todos)))
+    (add-todo (head (tail command)))
+   elif (eq (head command) 'remove')
+    (remove-todo (head (tail command)))
+   elif (eq (head command) 'list')
+    (print-todos todos)
+   else
+    (print 'ERROR: `')
+    (print (head command))
+    (println '`: unknown command')
+    (set is_running false)))

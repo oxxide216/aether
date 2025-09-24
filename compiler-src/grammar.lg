@@ -5,6 +5,7 @@ comment=#
 fun=fun
 let=let
 if=if
+elif=elif
 else=else
 macro=macro
 while=while

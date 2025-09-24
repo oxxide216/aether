@@ -44,9 +44,17 @@ typedef struct {
 
 typedef struct {
   IrExpr  *cond;
+  IrBlock  body;
+} IrElif;
+
+typedef Da(IrElif) IrElifs;
+
+typedef struct {
+  IrExpr  *cond;
   IrBlock  if_body;
-  IrBlock  else_body;
+  IrElifs  elifs;
   bool     has_else;
+  IrBlock  else_body;
 } IrExprIf;
 
 typedef struct {

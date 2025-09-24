@@ -39,21 +39,31 @@ static void get_expr_data_size(u8 *data, u32 *size) {
   } break;
 
   case IrExprKindIf: {
+    get_expr_data_size(data, size);
+    get_block_data_size(data, size);
+
+    u32 elifs_len = *(u32 *) (data + *size);
+    *size += sizeof(u32);
+
+    for (u32 i = 0; i < elifs_len; ++i) {
+      get_expr_data_size(data, size);
+      get_block_data_size(data, size);
+    }
+
     bool has_else = *(bool *) (data + *size);
     *size += sizeof(bool);
 
-    get_expr_data_size(data, size);
-    get_expr_data_size(data, size);
     if (has_else)
-      get_expr_data_size(data, size);
+      get_block_data_size(data, size);
   } break;
 
   case IrExprKindWhile: {
     get_expr_data_size(data, size);
-    get_expr_data_size(data, size);
+    get_block_data_size(data, size);
   } break;
 
   case IrExprKindSet: {
+    get_str_data_size(data, size);
     get_expr_data_size(data, size);
   } break;
 
@@ -142,13 +152,27 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
   } break;
 
   case IrExprKindIf: {
-    expr->as._if.has_else = *(bool *) (data + *end);
-    *end += sizeof(bool);
-
     expr->as._if.cond = aalloc(sizeof(IrExpr));
 
     load_expr_data(expr->as._if.cond, data, end, rc_arena);
     load_block_data(&expr->as._if.if_body, data, end, rc_arena);
+
+    u32 elifs_len = *(u32 *) (data + *end);
+    *end += sizeof(u32);
+
+    for (u32 i = 0; i < elifs_len; ++i) {
+      IrElif elif = {0};
+      elif.cond = aalloc(sizeof(IrExpr));
+
+      load_expr_data(elif.cond, data, end, rc_arena);
+      load_block_data(&elif.body, data, end, rc_arena);
+
+      DA_APPEND(expr->as._if.elifs, elif);
+    }
+
+    expr->as._if.has_else = *(bool *) (data + *end);
+    *end += sizeof(bool);
+
     if (expr->as._if.has_else)
       load_block_data(&expr->as._if.else_body, data, end, rc_arena);
   } break;

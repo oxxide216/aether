@@ -5,6 +5,32 @@
 #include "shl_arena.h"
 #include "std-intrinsics.h"
 
+void list_use(RcArena *rc_arena, ListNode *list) {
+  while (list) {
+    rc_arena_clone(rc_arena, list);
+
+    list = list->next;
+  }
+}
+
+ListNode *list_clone(RcArena *rc_arena, ListNode *list) {
+  if (!list)
+    return NULL;
+
+  ListNode *new_list = NULL;
+  ListNode **new_list_next = &new_list;
+  ListNode *node = list;
+  while (node) {
+    *new_list_next = rc_arena_alloc(rc_arena, sizeof(ListNode));
+    (*new_list_next)->value = node->value;
+    new_list_next = &(*new_list_next)->next;
+
+    node = node->next;
+  }
+
+  return new_list;
+}
+
 void value_stack_push_unit(ValueStack *stack) {
   Value value = { ValueKindUnit, {} };
   DA_APPEND(*stack, value);
@@ -53,42 +79,36 @@ static void free_value(Value *value, RcArena *rc_arena) {
   }
 }
 
+static Var *get_var(Vm *vm, Str name) {
+  for (u32 i = vm->local_vars.len; i > 0; --i) {
+    if (str_eq(vm->local_vars.items[i - 1].name, name))
+      return vm->local_vars.items + i - 1;
+  }
+
+  for (u32 i = vm->global_vars.len; i > 0; --i) {
+    if (str_eq(vm->global_vars.items[i - 1].name, name))
+      return vm->global_vars.items + i - 1;
+  }
+
+  return NULL;
+}
+
 static void execute_block(Vm *vm, IrBlock *block, bool value_expected);
 
 static bool get_func(Vm *vm, Str name, u32 args_count,
                      IrArgs *args, IrBlock *block) {
-  for (u32 i = vm->local_vars.len; i > 0; --i) {
-    Var *var = vm->local_vars.items + i - 1;
+  Var *var = get_var(vm, name);
+  if (var) {
     Value *value = vm->stack.items + var->value_index;
+    if (value->kind == ValueKindFunc &&
+        value->as.func.args.len == args_count) {
+      *args = value->as.func.args;
+      *block = value->as.func.body;
 
-    if (str_eq(var->name, name) &&
-        value->kind == ValueKindFunc) {
-      if (value->as.func.args.len == args_count) {
-        *args = value->as.func.args;
-        *block = value->as.func.body;
-
-        return true;
-      } else {
-        break;
-      }
+      return true;
     }
-  }
 
-  for (u32 i = vm->global_vars.len; i > 0; --i) {
-    Var *var = vm->global_vars.items + i - 1;
-    Value *value = vm->stack.items + var->value_index;
-
-    if (str_eq(var->name, name) &&
-        value->kind == ValueKindFunc) {
-      if (value->as.func.args.len == args_count) {
-        *args = value->as.func.args;
-        *block = value->as.func.body;
-
-        return true;
-      } else {
-        break;
-      }
-    }
+    return false;
   }
 
   for (u32 i = vm->funcs.len; i > 0; --i) {
@@ -164,20 +184,6 @@ void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected) {
   vm->stack.len = prev_stack_len + value_expected;
 }
 
-static Var *get_var(Vm *vm, Str name) {
-  for (u32 i = vm->local_vars.len; i > 0; --i) {
-    if (str_eq(vm->local_vars.items[i - 1].name, name))
-      return vm->local_vars.items + i - 1;
-  }
-
-  for (u32 i = vm->global_vars.len; i > 0; --i) {
-    if (str_eq(vm->global_vars.items[i - 1].name, name))
-      return vm->global_vars.items + i - 1;
-  }
-
-  return NULL;
-}
-
 void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   switch (expr->kind) {
   case IrExprKindBlock: {
@@ -213,23 +219,31 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   } break;
 
   case IrExprKindVarDef: {
-    Var var = {0};
-    var.name = expr->as.var_def.name;
-    var.value_index = vm->stack.len;
-
     execute_expr(vm, expr->as.var_def.expr, true);
 
-    Var *prev_var = get_var(vm, var.name);
+    Var *prev_var = get_var(vm, expr->as.var_def.name);
     if (prev_var) {
       Value *prev_value = vm->stack.items + prev_var->value_index;
       free_value(prev_value, vm->rc_arena);
-      *prev_value = vm->stack.items[--vm->stack.len];
+      *prev_value = value_stack_pop(&vm->stack);
+
+      if (value_expected)
+        value_stack_push_unit(&vm->stack);
+
+      break;
     }
+
+    Var var = {0};
+    var.name = expr->as.var_def.name;
+    var.value_index = vm->stack.len - 1;
 
     if (vm->is_inside_of_func)
       DA_APPEND(vm->local_vars, var);
     else
       DA_APPEND(vm->global_vars, var);
+
+    if (value_expected)
+      value_stack_push_unit(&vm->stack);
   } break;
 
   case IrExprKindIf: {
@@ -241,14 +255,41 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       exit(1);
     }
 
-    if (cond.as._bool)
+    if (cond.as._bool) {
       execute_block(vm, &expr->as._if.if_body, value_expected);
-    else if (expr->as._if.has_else)
+      break;
+    }
+
+    bool executed_elif = false;
+
+    for (u32 i = 0; i < expr->as._if.elifs.len; ++i) {
+      execute_expr(vm, expr->as._if.elifs.items[i].cond, true);
+
+      cond = value_stack_pop(&vm->stack);
+      if (cond.kind != ValueKindBool) {
+        ERROR("Only boolean value can be used as a condition\n");
+        exit(1);
+      }
+
+      if (cond.as._bool) {
+        execute_block(vm, &expr->as._if.elifs.items[i].body, value_expected);
+        executed_elif = true;
+        break;
+      }
+    }
+
+    if (expr->as._if.has_else && !executed_elif)
       execute_block(vm, &expr->as._if.else_body, value_expected);
+    else if (value_expected)
+      value_stack_push_unit(&vm->stack);
   } break;
 
   case IrExprKindWhile: {
+    bool is_first_iter = true;
     while (true) {
+      if (!is_first_iter && value_expected)
+        --vm->stack.len;
+
       execute_expr(vm, expr->as._while.cond, true);
 
       Value cond = value_stack_pop(&vm->stack);
@@ -260,8 +301,13 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       if (!cond.as._bool)
         break;
 
+      is_first_iter = false;
+
       execute_block(vm, &expr->as._while.body, value_expected);
     }
+
+    if (is_first_iter && value_expected)
+      value_stack_push_unit(&vm->stack);
   } break;
 
   case IrExprKindSet: {
@@ -272,9 +318,12 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       exit(1);
     }
 
-    execute_expr(vm, expr->as._while.cond, true);
+    execute_expr(vm, expr->as.set.src, true);
     Value value = value_stack_pop(&vm->stack);
     vm->stack.items[var->value_index] = value;
+
+    if (value_expected)
+      value_stack_push_unit(&vm->stack);
   } break;
 
   case IrExprKindList: {

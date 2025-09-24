@@ -79,6 +79,9 @@ struct Vm {
   bool        is_inside_of_func;
 };
 
+void      list_use(RcArena *rc_arena, ListNode *list);
+ListNode *list_clone(RcArena *rc_arena, ListNode *list);
+
 void value_stack_push_unit(ValueStack *stack);
 void value_stack_push_list(ValueStack *stack, ListNode *nodes);
 void value_stack_push_str(ValueStack *stack, Str str);

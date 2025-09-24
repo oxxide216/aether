@@ -60,12 +60,22 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
   } break;
 
   case IrExprKindIf: {
+    save_expr_data(expr->as._if.cond, data, data_size, end);
+    save_block_data(&expr->as._if.if_body, data, data_size, end);
+
+    reserve_space(sizeof(u32), data, data_size, end);
+    *(u32 *) (*data + *end) = expr->as._if.elifs.len;
+    *end += sizeof(u32);
+
+    for (u32 i = 0; i < expr->as._if.elifs.len; ++i) {
+      save_expr_data(expr->as._if.elifs.items[i].cond, data, data_size, end);
+      save_block_data(&expr->as._if.elifs.items[i].body, data, data_size, end);
+    }
+
     reserve_space(sizeof(bool), data, data_size, end);
     *(bool *) (*data + *end) = expr->as._if.has_else;
     *end += sizeof(bool);
 
-    save_expr_data(expr->as._if.cond, data, data_size, end);
-    save_block_data(&expr->as._if.if_body, data, data_size, end);
     if (expr->as._if.has_else)
       save_block_data(&expr->as._if.else_body, data, data_size, end);
   } break;
