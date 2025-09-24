@@ -43,6 +43,7 @@ static char *token_names[] = {
   "else",
   "macro",
   "while",
+  "set",
   "number",
   "bool",
   "identifier",
@@ -235,9 +236,9 @@ static void parser_parse_macro_def(Parser *parser) {
   DA_APPEND(parser->macros, macro);
 }
 
-static void macro_body_expand_block(IrBlock *block, IrBlock *args, Strs arg_names);
+static void macro_body_expand_block(IrBlock *block, IrBlock *args, Strs *arg_names);
 
-static void macro_body_expand(IrExpr **expr, IrBlock *args, Strs arg_names) {
+static void macro_body_expand(IrExpr **expr, IrBlock *args, Strs *arg_names) {
   IrExpr *new_expr = aalloc(sizeof(IrExpr));
   *new_expr = **expr;
   *expr = new_expr;
@@ -269,14 +270,18 @@ static void macro_body_expand(IrExpr **expr, IrBlock *args, Strs arg_names) {
     macro_body_expand_block(&new_expr->as._while.body, args, arg_names);
   } break;
 
+  case IrExprKindSet: {
+    macro_body_expand(&new_expr->as.set.src, args, arg_names);
+  } break;
+
   case IrExprKindList: {
     macro_body_expand_block(&new_expr->as.list.content, args, arg_names);
   } break;
 
   case IrExprKindIdent: {
     u32 index = (u32) -1;
-    for (u32 i = 0; i < arg_names.len; ++i) {
-      if (str_eq(new_expr->as.ident.ident, arg_names.items[i])) {
+    for (u32 i = 0; i < arg_names->len; ++i) {
+      if (str_eq(new_expr->as.ident.ident, arg_names->items[i])) {
         index = i;
         break;
       }
@@ -296,7 +301,7 @@ static void macro_body_expand(IrExpr **expr, IrBlock *args, Strs arg_names) {
   }
 }
 
-static void macro_body_expand_block(IrBlock *block, IrBlock *args, Strs arg_names) {
+static void macro_body_expand_block(IrBlock *block, IrBlock *args, Strs *arg_names) {
   for (u32 i = 0; i < block->len; ++i)
     macro_body_expand(block->items + i, args, arg_names);
 }
@@ -328,7 +333,7 @@ static IrBlock parser_parse_macro_expand(Parser *parser) {
   }
 
   IrBlock body = macro->body;
-  macro_body_expand_block(&body, &args, macro->args);
+  macro_body_expand_block(&body, &args, &macro->args);
   return body;
 }
 
@@ -448,11 +453,22 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     parser_expect_token(parser, MASK(TT_CPAREN));
   } break;
 
+  case TT_SET: {
+    parser_next_token(parser);
+
+    expr->kind = IrExprKindSet;
+    expr->as.set.dest = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
+    expr->as.set.src = parser_parse_expr(parser);
+
+    parser_expect_token(parser, MASK(TT_CPAREN));
+  } break;
+
   default: {
     parser_expect_token(parser, MASK(TT_FUN) | MASK(TT_LET) |
                                 MASK(TT_IF) | MASK(TT_IDENT) |
                                 MASK(TT_MACRO_NAME) | MASK(TT_BOOL) |
-                                MASK(TT_MACRO) | MASK(TT_WHILE));
+                                MASK(TT_MACRO) | MASK(TT_WHILE) |
+                                MASK(TT_SET));
   } break;
   }
 

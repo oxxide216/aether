@@ -8,6 +8,7 @@ if=if
 else=else
 macro=macro
 while=while
+set=set
 
 number=\-?0-9+
 bool=true|false

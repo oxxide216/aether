@@ -264,6 +264,19 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     }
   } break;
 
+  case IrExprKindSet: {
+    Var *var = get_var(vm, expr->as.set.dest);
+    if (!var) {
+      ERROR("Variable "STR_FMT" was not defined before usage\n",
+            STR_ARG(expr->as.set.dest));
+      exit(1);
+    }
+
+    execute_expr(vm, expr->as._while.cond, true);
+    Value value = value_stack_pop(&vm->stack);
+    vm->stack.items[var->value_index] = value;
+  } break;
+
   case IrExprKindList: {
     if (!value_expected)
       break;

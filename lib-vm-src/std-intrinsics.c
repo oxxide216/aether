@@ -294,20 +294,24 @@ void map_intrinsic(Vm *vm) {
     exit(1);
   }
 
+  ListNode *new_list = NULL;
+  ListNode **new_list_next = &new_list;
   ListNode *node = list.as.list->next;
   while (node) {
     ValueStack args = {0};
     DA_APPEND(args, node->value);
     execute_func(vm, func.as.func.name, &args, true);
 
-    node->value = value_stack_pop(&vm->stack);
+    *new_list_next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+    (*new_list_next)->value = value_stack_pop(&vm->stack);
+    *new_list_next = (*new_list_next)->next;
 
     free(args.items);
 
     node = node->next;
   }
 
-  value_stack_push_list(&vm->stack, rc_arena_clone(vm->rc_arena, list.as.list));
+  value_stack_push_list(&vm->stack, new_list);
 }
 
 void filter_intrinsic(Vm *vm) {
@@ -319,7 +323,8 @@ void filter_intrinsic(Vm *vm) {
     exit(1);
   }
 
-  ListNode **node_next = &list.as.list->next;
+  ListNode *new_list = NULL;
+  ListNode **new_list_next = &new_list;
   ListNode *node = list.as.list->next;
   while (node) {
     ValueStack args = {0};
@@ -332,16 +337,18 @@ void filter_intrinsic(Vm *vm) {
       exit(1);
     }
 
+    if (is_ok.as._bool) {
+      *new_list_next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+      (*new_list_next)->value = value_stack_pop(&vm->stack);
+      *new_list_next = (*new_list_next)->next;
+    }
+
     free(args.items);
 
-    if (!is_ok.as._bool)
-      *node_next = node->next;
-
-    node_next = &node->next;
     node = node->next;
   }
 
-  value_stack_push_list(&vm->stack, rc_arena_clone(vm->rc_arena, list.as.list));
+  value_stack_push_list(&vm->stack, new_list);
 }
 
 void reduce_intrinsic(Vm *vm) {
