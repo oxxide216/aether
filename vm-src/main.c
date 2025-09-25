@@ -5,6 +5,8 @@
 #include "shl_log.h"
 #define SHL_ARENA_IMPLEMENTATION
 #include "shl_arena.h"
+#define SHL_STR_IMPLEMENTATION
+#include "shl_str.h"
 
 int main(i32 argc, char **argv) {
   if (argc < 2) {
