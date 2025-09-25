@@ -1,0 +1,11 @@
+(use '../std/lib.ae')
+
+(fun fmt [args]
+  (if (is-empty (tail args))
+    (head args)
+   else
+    (+ (head args) (fmt (tail args)))))
+
+(let title 'Hello world')
+(println (fmt ['<title>' title '</title>']))
+(println (fmt []))
