@@ -1,3 +1,5 @@
+(use '../std/lib.ae')
+
 (let a (input))
 (let b (input))
 (let c (add a b))

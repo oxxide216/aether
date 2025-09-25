@@ -1,0 +1,15 @@
+(fun println [message]
+  (print message)
+  (print '\n'))
+
+(fun last [list]
+  (if (is-empty (tail list))
+    (head list)
+   else
+    (last (tail list))))
+
+(fun nth [list index]
+  (if (le index 0)
+    (head list)
+   else
+    (nth (tail list) (sub index 1))))

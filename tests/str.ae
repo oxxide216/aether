@@ -1,3 +1,5 @@
+(use '../std/lib.ae')
+
 (let str 'Hello, World!')
 (print str)
 (print ':')

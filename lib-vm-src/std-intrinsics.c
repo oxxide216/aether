@@ -62,11 +62,6 @@ void print_intrinsic(Vm *vm) {
   print_value(&vm->stack, &value);
 }
 
-void println_intrinsic(Vm *vm) {
-  print_intrinsic(vm);
-  fputc('\n', stdout);
-}
-
 void input_intrinsic(Vm *vm) {
   (void) vm;
 
@@ -158,51 +153,6 @@ void tail_intrinsic(Vm *vm) {
   value_stack_push_list(&vm->stack, new_list);
 }
 
-void last_intrinsic(Vm *vm) {
-  Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindList) {
-    ERROR("last: wrong argument kind\n");
-    exit(1);
-  }
-
-  if (!value.as.list->next) {
-    value_stack_push_unit(&vm->stack);
-    return;
-  }
-
-  ListNode *node = value.as.list->next;
-  while (node && node->next)
-    node = node->next;
-
-  DA_APPEND(vm->stack, node->value);
-}
-
-void nth_intrinsic(Vm *vm) {
-  Value index = value_stack_pop(&vm->stack);
-  Value list = value_stack_pop(&vm->stack);
-
-  if (list.kind != ValueKindList ||
-      index.kind != ValueKindNumber) {
-    ERROR("nth: wrong argument kinds\n");
-    exit(1);
-  }
-
-  ListNode *node = list.as.list->next;
-  ListNode *prev_node = list.as.list->next;
-  u32 i = 0;
-  while (node && i < index.as.number) {
-    node = node->next;
-    if (prev_node->next)
-      prev_node = prev_node->next;
-    ++i;
-  }
-
-  if (i < index.as.number)
-    value_stack_push_unit(&vm->stack);
-  else
-    DA_APPEND(vm->stack, prev_node->value);
-}
-
 void len_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind == ValueKindList) {
@@ -224,12 +174,16 @@ void len_intrinsic(Vm *vm) {
 
 void is_empty_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindList) {
-    ERROR("is-empty: wrong argument kind: %u\n", value.kind);
+  if (value.kind != ValueKindList &&
+      value.kind != ValueKindStr) {
+    ERROR("is-empty: wrong argument kind\n");
     exit(1);
   }
 
-  value_stack_push_bool(&vm->stack, value.as.list->next == NULL);
+  if (value.kind == ValueKindList)
+    value_stack_push_bool(&vm->stack, value.as.list->next == NULL);
+  else
+    value_stack_push_bool(&vm->stack, value.as.str.len == 0);
 }
 
 void get_range_intrinsic(Vm *vm) {
@@ -354,7 +308,7 @@ void reduce_intrinsic(Vm *vm) {
   Value func = value_stack_pop(&vm->stack);
   if (func.kind != ValueKindFunc ||
       list.kind != ValueKindList) {
-    ERROR("filter: wrong argument kinds\n");
+    ERROR("reduce: wrong argument kinds\n");
     exit(1);
   }
 
@@ -748,7 +702,6 @@ void type_intrinsic(Vm *vm) {
 Intrinsic std_intrinsics[] = {
   // Io
   { STR_LIT("print"), 1, false, &print_intrinsic },
-  { STR_LIT("println"), 1, false, &println_intrinsic },
   { STR_LIT("input"), 0, true, &input_intrinsic },
   { STR_LIT("read-file"), 1, true, &read_file_intrinsic },
   { STR_LIT("write-file"), 2, false, &write_file_intrinsic },
@@ -756,8 +709,6 @@ Intrinsic std_intrinsics[] = {
   // Base
   { STR_LIT("head"), 1, true, &head_intrinsic },
   { STR_LIT("tail"), 1, true, &tail_intrinsic },
-  { STR_LIT("last"), 1, true, &last_intrinsic },
-  { STR_LIT("nth"), 2, true, &nth_intrinsic },
   { STR_LIT("len"), 1, true, &len_intrinsic },
   { STR_LIT("is-empty"), 1, true, &is_empty_intrinsic },
   { STR_LIT("get-range"), 3, true, &get_range_intrinsic },
