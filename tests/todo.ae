@@ -1,5 +1,3 @@
-(use '../std/lib.ae')
-
 (let todos [])
 
 (fun add-todo [todo]

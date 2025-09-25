@@ -1,5 +1,3 @@
-(use '../std/lib.ae')
-
 (fun fmt [args]
   (if (is-empty (tail args))
     (head args)

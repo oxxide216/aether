@@ -1,5 +1,3 @@
-(use '../std/lib.ae')
-
 (if (unit? (head (tail (tail (get-args)))))
   (println 'ERROR: input file was not provided')
  else

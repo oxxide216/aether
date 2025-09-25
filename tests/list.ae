@@ -1,5 +1,3 @@
-(use '../std/lib.ae')
-
 (fun print-list [list]
   (fun print-list-rec [list]
     (if (! (is-empty list))

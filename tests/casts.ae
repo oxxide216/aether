@@ -1,5 +1,3 @@
-(use '../std/lib.ae')
-
 (let input-str (input))
 (let input-num (str-to-num input-str))
 (println (num-to-str input-num))
