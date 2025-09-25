@@ -1,5 +1,4 @@
 #include "vm.h"
-#define SHL_STR_IMPLEMENTATION
 #include "shl_str.h"
 #include "shl_log.h"
 #include "shl_arena.h"

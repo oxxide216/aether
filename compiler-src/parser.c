@@ -4,7 +4,6 @@
 #define LEXGEN_TRANSITION_TABLE_IMPLEMENTATION
 #include "grammar.h"
 #include "shl_log.h"
-#define SHL_ARENA_IMPLEMENTATION
 #include "shl_arena.h"
 
 #define MASK(id) (1 << (id))

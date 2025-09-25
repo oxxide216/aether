@@ -1,6 +1,5 @@
 #include "deserializer.h"
 #include "shl_log.h"
-#define SHL_ARENA_IMPLEMENTATION
 #include "shl_arena.h"
 
 static void get_block_data_size(u8 *data, u32 *size);

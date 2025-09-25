@@ -1,8 +1,10 @@
-#include "shl_defs.h"
-#include "shl_log.h"
 #include "io.h"
 #include "deserializer.h"
 #include "vm.h"
+#include "shl_defs.h"
+#include "shl_log.h"
+#define SHL_ARENA_IMPLEMENTATION
+#include "shl_arena.h"
 
 int main(i32 argc, char **argv) {
   if (argc < 2) {
