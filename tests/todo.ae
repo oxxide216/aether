@@ -13,8 +13,7 @@
     (println (head left))
     (print-todos (tail left))))
 
-(let is_running true)
-(while is_running
+(while true
   (print '>> ')
 
   (let command (split (input) ' '))
@@ -28,5 +27,4 @@
    else
     (print 'ERROR: `')
     (print (head command))
-    (println '`: unknown command')
-    (set is_running false)))
+    (println '`: unknown command')))

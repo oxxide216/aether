@@ -290,7 +290,7 @@ void filter_intrinsic(Vm *vm) {
 
     if (is_ok.as._bool) {
       *new_list_next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-      (*new_list_next)->value = value_stack_pop(&vm->stack);
+      (*new_list_next)->value = node->value;
       new_list_next = &(*new_list_next)->next;
     }
 
