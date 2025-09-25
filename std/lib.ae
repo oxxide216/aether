@@ -9,7 +9,7 @@
     (last (tail list))))
 
 (fun nth [list index]
-  (if (le index 0)
+  (if (<= index 0)
     (head list)
    else
-    (nth (tail list) (sub index 1))))
+    (nth (tail list) (- index 1))))

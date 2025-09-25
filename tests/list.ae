@@ -2,9 +2,9 @@
 
 (fun print-list [list]
   (fun print-list-rec [list]
-    (if (not (is-empty list))
+    (if (! (is-empty list))
       (print (head list))
-      (if (not (is-empty (tail list)))
+      (if (! (is-empty (tail list)))
         (print ' '))
       (print-list-rec (tail list))))
   (print '[')
@@ -12,8 +12,8 @@
   (println ']'))
 
 (let list [0 1 2])
-(add -1 list)
-(add list -2)
+(+ -1 list)
+(+ list -2)
 
 (println (nth list 2))
 (println (nth list 10))

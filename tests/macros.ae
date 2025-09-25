@@ -4,4 +4,4 @@
   (println arg0)
   (println arg1))
 
-(println2! 'hello' 'world')
+(@println2 'hello' 'world')

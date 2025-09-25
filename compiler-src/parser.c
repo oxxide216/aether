@@ -334,6 +334,7 @@ static void macro_body_expand_block(IrBlock *block, IrBlock *args, Strs *arg_nam
 static IrBlock parser_parse_macro_expand(Parser *parser) {
   Token *name_token = parser_expect_token(parser, MASK(TT_MACRO_NAME));
   Str name = name_token->lexeme;
+  ++name.ptr;
   --name.len;
 
   IrBlock args = parser_parse_block(parser, MASK(TT_CPAREN));

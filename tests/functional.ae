@@ -1,9 +1,9 @@
 (use '../std/lib.ae')
 
 (let list [0 1 2 3])
-(map (fun [num] (add num 1)) list)
+(map (fun [num] (+ num 1)) list)
 (println list)
-(filter (fun [num] (eq (mod num 2) 0)) list)
+(filter (fun [num] (! (& num 1))) list)
 (println list)
-(let sum (reduce (fun [acc num] (add acc num)) 0 list))
+(let sum (reduce (fun [acc num] (+ acc num)) 0 list))
 (println sum)
