@@ -4,7 +4,17 @@
 #include "ir.h"
 #include "rc-arena.h"
 
-typedef IrExprFuncDef Func;
+typedef struct {
+  Str name;
+  u32 value_index;
+} Var;
+
+typedef Da(Var) Vars;
+
+typedef struct {
+  IrExprFuncDef def;
+  Vars          catched_vars;
+} Func;
 
 typedef Da(Func) Funcs;
 
@@ -23,6 +33,7 @@ typedef struct {
   Str     name;
   IrArgs  args;
   IrBlock body;
+  Vars    catched_vars;
 } ValueFunc;
 
 typedef union {
@@ -58,13 +69,6 @@ typedef struct {
 } Intrinsic;
 
 typedef Da(Intrinsic) Intrinsics;
-
-typedef struct {
-  Str name;
-  u32 value_index;
-} Var;
-
-typedef Da(Var) Vars;
 
 typedef IrArgs Args;
 

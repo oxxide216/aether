@@ -5,6 +5,8 @@
 #include "shl_arena.h"
 #include "std-intrinsics.h"
 
+typedef Da(Str) Strs;
+
 void list_use(RcArena *rc_arena, ListNode *list) {
   while (list) {
     rc_arena_clone(rc_arena, list);
@@ -93,17 +95,85 @@ static Var *get_var(Vm *vm, Str name) {
   return NULL;
 }
 
+static void catch_vars_block(Vm *vm, Strs *local_names, Vars *catched_vars, IrBlock *block);
+
+static void catch_vars(Vm *vm, Strs *local_names, Vars *catched_vars, IrExpr *expr) {
+  switch (expr->kind) {
+  case IrExprKindBlock: {
+    catch_vars_block(vm, local_names, catched_vars, &expr->as.block);
+  } break;
+
+  case IrExprKindFuncDef: break;
+
+  case IrExprKindFuncCall: {
+    catch_vars_block(vm, local_names, catched_vars, &expr->as.func_call.args);
+  } break;
+
+  case IrExprKindVarDef: {
+    DA_APPEND(*local_names, expr->as.var_def.name);
+  } break;
+
+  case IrExprKindIf: {
+    catch_vars_block(vm, local_names, catched_vars, &expr->as._if.if_body);
+
+    for (u32 i = 0; i < expr->as._if.elifs.len; ++i)
+      catch_vars_block(vm, local_names, catched_vars, &expr->as._if.elifs.items[i].body);
+
+    if (expr->as._if.has_else)
+      catch_vars_block(vm, local_names, catched_vars, &expr->as._if.else_body);
+  } break;
+
+  case IrExprKindWhile: {
+    catch_vars_block(vm, local_names, catched_vars, &expr->as._while.body);
+  } break;
+
+  case IrExprKindSet: {
+    catch_vars(vm, local_names, catched_vars, expr->as.set.src);
+  } break;
+
+  case IrExprKindList: {
+    catch_vars_block(vm, local_names, catched_vars, &expr->as.list.content);
+  } break;
+
+  case IrExprKindIdent: {
+    for (u32 i = 0; i < local_names->len; ++i)
+      if (str_eq(expr->as.ident.ident, local_names->items[i]))
+        return;
+
+    Var *var = get_var(vm, expr->as.ident.ident);
+    if (!var) {
+      ERROR("Variable "STR_FMT" was not defined before usage\n",
+            STR_ARG(expr->as.ident.ident));
+      exit(1);
+    }
+
+    DA_APPEND(*catched_vars, *var);
+  } break;
+
+  case IrExprKindStrLit: break;
+  case IrExprKindNumber: break;
+  case IrExprKindBool: break;
+  case IrExprKindLambda: break;
+  }
+}
+
+static void catch_vars_block(Vm *vm, Strs *local_names, Vars *catched_vars, IrBlock *block) {
+  for (u32 i = 0; i < block->len; ++i)
+    catch_vars(vm, local_names, catched_vars, block->items[i]);
+}
+
 static void execute_block(Vm *vm, IrBlock *block, bool value_expected);
 
 static bool get_func(Vm *vm, Str name, u32 args_count,
-                     IrArgs *args, IrBlock *block) {
+                     IrArgs *args, IrBlock *body, Vars *catched_vars) {
   Var *var = get_var(vm, name);
   if (var) {
     Value *value = vm->stack.items + var->value_index;
     if (value->kind == ValueKindFunc &&
         value->as.func.args.len == args_count) {
       *args = value->as.func.args;
-      *block = value->as.func.body;
+      *body = value->as.func.body;
+      *catched_vars = value->as.func.catched_vars;
 
       return true;
     }
@@ -114,10 +184,11 @@ static bool get_func(Vm *vm, Str name, u32 args_count,
   for (u32 i = vm->funcs.len; i > 0; --i) {
     Func *func = vm->funcs.items + i - 1;
 
-    if (str_eq(func->name, name) &&
-        func->args.len == args_count) {
-      *args = func->args;
-      *block = func->body;
+    if (str_eq(func->def.name, name) &&
+        func->def.args.len == args_count) {
+      *args = func->def.args;
+      *body = func->def.body;
+      *catched_vars = func->catched_vars;
 
       return true;
     }
@@ -127,9 +198,10 @@ static bool get_func(Vm *vm, Str name, u32 args_count,
 }
 
 void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected) {
-  IrArgs func_args;
-  IrBlock func_body;
-  if (!get_func(vm, name, args->len, &func_args, &func_body)) {
+  IrArgs func_args = {0};
+  IrBlock func_body = {0};
+  Vars catched_vars = {0};
+  if (!get_func(vm, name, args->len, &func_args, &func_body, &catched_vars)) {
     for (u32 i = 0; i < vm->intrinsics.len; ++i) {
       Intrinsic *intrinsic = vm->intrinsics.items + i;
 
@@ -156,8 +228,12 @@ void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected) {
   }
 
   u32 prev_stack_len = vm->stack.len;
+  Vars prev_local_vars = vm->local_vars;
+  bool prev_is_inside_of_func = vm->is_inside_of_func;
 
-  Vars new_local_vars = {0};
+  vm->local_vars = (Vars) {0};
+  vm->is_inside_of_func = true;
+
   for (u32 i = 0; i < func_args.len; ++i) {
     Var var = {
       func_args.items[i],
@@ -165,13 +241,11 @@ void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected) {
     };
 
     DA_APPEND(vm->stack, args->items[i]);
-    DA_APPEND(new_local_vars, var);
+    DA_APPEND(vm->local_vars, var);
   }
 
-  Vars prev_local_vars = vm->local_vars;
-  bool prev_is_inside_of_func = vm->is_inside_of_func;
-  vm->local_vars = new_local_vars;
-  vm->is_inside_of_func = true;
+  for (u32 i = 0; i < catched_vars.len; ++i)
+    DA_APPEND(vm->local_vars, catched_vars.items[i]);
 
   execute_block(vm, &func_body, value_expected);
 
@@ -192,15 +266,16 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
   case IrExprKindFuncDef: {
     for (u32 i = 0; i < vm->funcs.len; ++i) {
-      if (str_eq(vm->funcs.items[i].name, expr->as.func_def.name) &&
-          vm->funcs.items[i].args.len == expr->as.func_def.args.len) {
-        ERROR("Function "STR_FMT" was redefined\n",
-              STR_ARG(expr->as.func_def.name));
+      if (str_eq(vm->funcs.items[i].def.name, expr->as.func_def.name) &&
+          vm->funcs.items[i].def.args.len == expr->as.func_def.args.len) {
+        ERROR("Function "STR_FMT" with %u args was redefined\n",
+              STR_ARG(expr->as.func_def.name), expr->as.func_def.args.len);
         exit(1);
       }
     }
 
-    DA_APPEND(vm->funcs, expr->as.func_def);
+    Func func = { expr->as.func_def, {} };
+    DA_APPEND(vm->funcs, func);
 
     if (value_expected)
       value_stack_push_unit(&vm->stack);
@@ -356,40 +431,28 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     if (!value_expected)
       break;
 
-    for (u32 i = vm->local_vars.len; i > 0; --i) {
-      if (str_eq(vm->local_vars.items[i - 1].name, expr->as.ident.ident)) {
-        u32 index = vm->local_vars.items[i - 1].value_index;
-        DA_APPEND(vm->stack, vm->stack.items[index]);
-        return;
-      }
-    }
-
-    for (u32 i = vm->global_vars.len; i > 0; --i) {
-      if (str_eq(vm->global_vars.items[i - 1].name, expr->as.ident.ident)) {
-        u32 index = vm->global_vars.items[i - 1].value_index;
-        DA_APPEND(vm->stack, vm->stack.items[index]);
-      }
+    Var *var = get_var(vm, expr->as.ident.ident);
+    if (var) {
+      DA_APPEND(vm->stack, vm->stack.items[var->value_index]);
+      return;
     }
 
     for (u32 i = 0; i < vm->funcs.len; ++i) {
       Func *func = vm->funcs.items + i;
 
-      if (str_eq(func->name, expr->as.ident.ident)) {
+      if (str_eq(func->def.name, expr->as.ident.ident)) {
         Value func_value = {
           ValueKindFunc,
-          { .func = { func->name, func->args, func->body } },
+          { .func = { func->def.name, func->def.args, func->def.body, {} } },
         };
         DA_APPEND(vm->stack, func_value);
         return;
       }
     }
 
-    Var *var = get_var(vm, expr->as.ident.ident);
-    if (!var) {
-      ERROR("Variable "STR_FMT" was not defined before usage\n",
-            STR_ARG(expr->as.ident.ident));
-      exit(1);
-    }
+    ERROR("Variable "STR_FMT" was not defined before usage\n",
+          STR_ARG(expr->as.ident.ident));
+    exit(1);
   } break;
 
   case IrExprKindStrLit: {
@@ -408,18 +471,36 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   } break;
 
   case IrExprKindLambda: {
+    Strs local_names = {0};
+    Vars catched_vars = {0};
+
+    for (u32 i = 0; i < expr->as.lambda.args.len; ++i)
+      DA_APPEND(local_names, expr->as.lambda.args.items[i]);
+
+    catch_vars_block(vm, &local_names, &catched_vars, &expr->as.lambda.body);
+
     Value func_value = {
       ValueKindFunc,
-      { .func = { (Str) {0}, expr->as.lambda.args, expr->as.lambda.body } },
+      {
+        .func = {
+          (Str) {0},
+          expr->as.lambda.args,
+          expr->as.lambda.body,
+          catched_vars,
+        },
+      },
     };
     DA_APPEND(vm->stack, func_value);
 
-    IrExprFuncDef func_def = {
-      (Str) {0},
-      expr->as.lambda.args,
-      expr->as.lambda.body,
+    Func func = {
+      {
+        (Str) {0},
+        expr->as.lambda.args,
+        expr->as.lambda.body,
+      },
+      catched_vars,
     };
-    DA_APPEND(vm->funcs, func_def);
+    DA_APPEND(vm->funcs, func);
   } break;
   }
 }
