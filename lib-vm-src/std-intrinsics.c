@@ -618,24 +618,51 @@ void ge_intrinsic(Vm *vm) {
 }
 
 void and_intrinsic(Vm *vm) {
-  Value a, b;
-  prepare_two_numbers(&a, &b, "gt", vm);
+  Value b = value_stack_pop(&vm->stack);
+  Value a = value_stack_pop(&vm->stack);
 
-  value_stack_push_number(&vm->stack, a.as.number & b.as.number);
+  if (a.kind == ValueKindNumber &&
+      b.kind == ValueKindNumber) {
+    value_stack_push_bool(&vm->stack, a.as.number & b.as.number);
+  } else if (a.kind == ValueKindBool &&
+             b.kind == ValueKindBool) {
+    value_stack_push_bool(&vm->stack, a.as._bool & b.as._bool);
+  } else {
+    ERROR("and: wrong argument kinds\n");
+    exit(1);
+  }
 }
 
 void or_intrinsic(Vm *vm) {
-  Value a, b;
-  prepare_two_numbers(&a, &b, "gt", vm);
+  Value b = value_stack_pop(&vm->stack);
+  Value a = value_stack_pop(&vm->stack);
 
-  value_stack_push_number(&vm->stack, a.as.number | b.as.number);
+  if (a.kind == ValueKindNumber &&
+      b.kind == ValueKindNumber) {
+    value_stack_push_bool(&vm->stack, a.as.number | b.as.number);
+  } else if (a.kind == ValueKindBool &&
+             b.kind == ValueKindBool) {
+    value_stack_push_bool(&vm->stack, a.as._bool | b.as._bool);
+  } else {
+    ERROR("or: wrong argument kinds\n");
+    exit(1);
+  }
 }
 
 void xor_intrinsic(Vm *vm) {
-  Value a, b;
-  prepare_two_numbers(&a, &b, "gt", vm);
+  Value b = value_stack_pop(&vm->stack);
+  Value a = value_stack_pop(&vm->stack);
 
-  value_stack_push_number(&vm->stack, a.as.number ^ b.as.number);
+  if (a.kind == ValueKindNumber &&
+      b.kind == ValueKindNumber) {
+    value_stack_push_bool(&vm->stack, a.as.number ^ b.as.number);
+  } else if (a.kind == ValueKindBool &&
+             b.kind == ValueKindBool) {
+    value_stack_push_bool(&vm->stack, a.as._bool ^ b.as._bool);
+  } else {
+    ERROR("xor: wrong argument kinds\n");
+    exit(1);
+  }
 }
 
 void not_intrinsic(Vm *vm) {

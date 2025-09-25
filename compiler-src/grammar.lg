@@ -1,6 +1,6 @@
 whitespace=( |\t|\r|\v)*
 newline=\n
-comment=#
+comment=;;
 
 fun=fun
 let=let

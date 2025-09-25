@@ -18,9 +18,9 @@
 
   (let command (split (input) ' '))
 
-  (if (eq (head command) 'add')
+  (if (and (eq (head command) 'add') (not (is-empty (tail command))))
     (add-todo (head (tail command)))
-   elif (eq (head command) 'remove')
+   elif (and (eq (head command) 'remove') (not (is-empty (tail command))))
     (remove-todo (head (tail command)))
    elif (eq (head command) 'list')
     (print-todos todos)
