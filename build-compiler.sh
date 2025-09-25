@@ -1,6 +1,6 @@
 #!/usr/bin/sh
 
-CFLAGS="-Wall -Wextra -Icompiler-src -Iir-src -Ilibs"
+CFLAGS="-Wall -Wextra -Icompiler-src -Iir-include -Ilibs"
 LDFLAGS="-z execstack"
 BUILD_FLAGS="${@:1}"
 SRC="$(find compiler-src -name "*.c")"

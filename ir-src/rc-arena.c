@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "rc-arena.h"
+#include "aether-ir/rc-arena.h"
 
 void *rc_arena_alloc(RcArena *arena, u32 size) {
   if (size > RC_ARENA_REGION_CAP)

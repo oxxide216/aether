@@ -1,5 +1,5 @@
 #include "io.h"
-#include "deserializer.h"
+#include "aether-ir/deserializer.h"
 #include "aether-vm/vm.h"
 #include "shl_defs.h"
 #include "shl_log.h"

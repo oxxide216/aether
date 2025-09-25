@@ -1,6 +1,6 @@
 #!/usr/bin/sh
 
-CFLAGS="-Wall -Wextra -Ilib-vm-include -Iir-src"
+CFLAGS="-Wall -Wextra -Ilib-vm-include -Iir-include"
 LDFLAGS="-z execstack -lX11 -lGL -lGLEW"
 BUILD_FLAGS="${@:1}"
 SRC="$(find vm-src -name "*.c")"

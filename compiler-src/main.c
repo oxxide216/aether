@@ -1,6 +1,6 @@
 #include "io.h"
 #include "parser.h"
-#include "serializer.h"
+#include "aether-ir/serializer.h"
 #include "shl_defs.h"
 #include "shl_log.h"
 #define SHL_STR_IMPLEMENTATION

@@ -1,8 +1,8 @@
 #ifndef IR_H
 #define IR_H
 
-#include "shl_defs.h"
-#include "shl_str.h"
+#include "../../ir-src/shl_defs.h"
+#include "../../ir-src/shl_str.h"
 
 typedef struct IrExpr IrExpr;
 
