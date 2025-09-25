@@ -1,4 +1,4 @@
-#include "vm.h"
+#include "../lib-vm-include/aether-vm/vm.h"
 #include "shl_str.h"
 #include "shl_log.h"
 #include "shl_arena.h"

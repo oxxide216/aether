@@ -1,6 +1,6 @@
 #include "io.h"
 #include "deserializer.h"
-#include "vm.h"
+#include "aether-vm/vm.h"
 #include "shl_defs.h"
 #include "shl_log.h"
 #define SHL_ARENA_IMPLEMENTATION
