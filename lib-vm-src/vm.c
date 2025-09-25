@@ -95,18 +95,18 @@ static Var *get_var(Vm *vm, Str name) {
   return NULL;
 }
 
-static void catch_vars_block(Vm *vm, Strs *local_names, Vars *catched_vars, IrBlock *block);
+static void catch_vars_block(Vm *vm, Strs *local_names, NamedValues *catched_values, IrBlock *block);
 
-static void catch_vars(Vm *vm, Strs *local_names, Vars *catched_vars, IrExpr *expr) {
+static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values, IrExpr *expr) {
   switch (expr->kind) {
   case IrExprKindBlock: {
-    catch_vars_block(vm, local_names, catched_vars, &expr->as.block);
+    catch_vars_block(vm, local_names, catched_values, &expr->as.block);
   } break;
 
   case IrExprKindFuncDef: break;
 
   case IrExprKindFuncCall: {
-    catch_vars_block(vm, local_names, catched_vars, &expr->as.func_call.args);
+    catch_vars_block(vm, local_names, catched_values, &expr->as.func_call.args);
   } break;
 
   case IrExprKindVarDef: {
@@ -114,25 +114,25 @@ static void catch_vars(Vm *vm, Strs *local_names, Vars *catched_vars, IrExpr *ex
   } break;
 
   case IrExprKindIf: {
-    catch_vars_block(vm, local_names, catched_vars, &expr->as._if.if_body);
+    catch_vars_block(vm, local_names, catched_values, &expr->as._if.if_body);
 
     for (u32 i = 0; i < expr->as._if.elifs.len; ++i)
-      catch_vars_block(vm, local_names, catched_vars, &expr->as._if.elifs.items[i].body);
+      catch_vars_block(vm, local_names, catched_values, &expr->as._if.elifs.items[i].body);
 
     if (expr->as._if.has_else)
-      catch_vars_block(vm, local_names, catched_vars, &expr->as._if.else_body);
+      catch_vars_block(vm, local_names, catched_values, &expr->as._if.else_body);
   } break;
 
   case IrExprKindWhile: {
-    catch_vars_block(vm, local_names, catched_vars, &expr->as._while.body);
+    catch_vars_block(vm, local_names, catched_values, &expr->as._while.body);
   } break;
 
   case IrExprKindSet: {
-    catch_vars(vm, local_names, catched_vars, expr->as.set.src);
+    catch_vars(vm, local_names, catched_values, expr->as.set.src);
   } break;
 
   case IrExprKindList: {
-    catch_vars_block(vm, local_names, catched_vars, &expr->as.list.content);
+    catch_vars_block(vm, local_names, catched_values, &expr->as.list.content);
   } break;
 
   case IrExprKindIdent: {
@@ -147,7 +147,11 @@ static void catch_vars(Vm *vm, Strs *local_names, Vars *catched_vars, IrExpr *ex
       exit(1);
     }
 
-    DA_APPEND(*catched_vars, *var);
+    NamedValue value = {
+      var->name,
+      vm->stack.items[var->value_index],
+    };
+    DA_APPEND(*catched_values, value);
   } break;
 
   case IrExprKindStrLit: break;
@@ -157,15 +161,15 @@ static void catch_vars(Vm *vm, Strs *local_names, Vars *catched_vars, IrExpr *ex
   }
 }
 
-static void catch_vars_block(Vm *vm, Strs *local_names, Vars *catched_vars, IrBlock *block) {
+static void catch_vars_block(Vm *vm, Strs *local_names, NamedValues *catched_values, IrBlock *block) {
   for (u32 i = 0; i < block->len; ++i)
-    catch_vars(vm, local_names, catched_vars, block->items[i]);
+    catch_vars(vm, local_names, catched_values, block->items[i]);
 }
 
 static void execute_block(Vm *vm, IrBlock *block, bool value_expected);
 
-static bool get_func(Vm *vm, Str name, u32 args_count,
-                     IrArgs *args, IrBlock *body, Vars *catched_vars) {
+static bool get_func(Vm *vm, Str name, u32 args_count, IrArgs *args,
+                     IrBlock *body, NamedValues *catched_values) {
   Var *var = get_var(vm, name);
   if (var) {
     Value *value = vm->stack.items + var->value_index;
@@ -173,7 +177,7 @@ static bool get_func(Vm *vm, Str name, u32 args_count,
         value->as.func.args.len == args_count) {
       *args = value->as.func.args;
       *body = value->as.func.body;
-      *catched_vars = value->as.func.catched_vars;
+      *catched_values = value->as.func.catched_values;
 
       return true;
     }
@@ -188,7 +192,7 @@ static bool get_func(Vm *vm, Str name, u32 args_count,
         func->def.args.len == args_count) {
       *args = func->def.args;
       *body = func->def.body;
-      *catched_vars = func->catched_vars;
+      *catched_values = func->catched_values;
 
       return true;
     }
@@ -200,8 +204,8 @@ static bool get_func(Vm *vm, Str name, u32 args_count,
 void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected) {
   IrArgs func_args = {0};
   IrBlock func_body = {0};
-  Vars catched_vars = {0};
-  if (!get_func(vm, name, args->len, &func_args, &func_body, &catched_vars)) {
+  NamedValues catched_values = {0};
+  if (!get_func(vm, name, args->len, &func_args, &func_body, &catched_values)) {
     for (u32 i = 0; i < vm->intrinsics.len; ++i) {
       Intrinsic *intrinsic = vm->intrinsics.items + i;
 
@@ -244,8 +248,15 @@ void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected) {
     DA_APPEND(vm->local_vars, var);
   }
 
-  for (u32 i = 0; i < catched_vars.len; ++i)
-    DA_APPEND(vm->local_vars, catched_vars.items[i]);
+  for (u32 i = 0; i < catched_values.len; ++i) {
+    Var var = {
+      catched_values.items[i].name,
+      vm->stack.len,
+    };
+
+    DA_APPEND(vm->stack, catched_values.items[i].value);
+    DA_APPEND(vm->local_vars, var);
+  }
 
   execute_block(vm, &func_body, value_expected);
 
@@ -472,12 +483,12 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
   case IrExprKindLambda: {
     Strs local_names = {0};
-    Vars catched_vars = {0};
+    NamedValues catched_values = {0};
 
     for (u32 i = 0; i < expr->as.lambda.args.len; ++i)
       DA_APPEND(local_names, expr->as.lambda.args.items[i]);
 
-    catch_vars_block(vm, &local_names, &catched_vars, &expr->as.lambda.body);
+    catch_vars_block(vm, &local_names, &catched_values, &expr->as.lambda.body);
 
     Value func_value = {
       ValueKindFunc,
@@ -486,7 +497,7 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
           (Str) {0},
           expr->as.lambda.args,
           expr->as.lambda.body,
-          catched_vars,
+          catched_values,
         },
       },
     };
@@ -498,7 +509,7 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         expr->as.lambda.args,
         expr->as.lambda.body,
       },
-      catched_vars,
+      catched_values,
     };
     DA_APPEND(vm->funcs, func);
   } break;

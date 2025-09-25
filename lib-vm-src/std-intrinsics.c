@@ -284,14 +284,14 @@ void filter_intrinsic(Vm *vm) {
 
     Value is_ok = value_stack_pop(&vm->stack);
     if (is_ok.kind != ValueKindBool) {
-      ERROR("filter: function should return boolean value\n");
+      ERROR("filter: wrong argument kinds\n");
       exit(1);
     }
 
     if (is_ok.as._bool) {
       *new_list_next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
       (*new_list_next)->value = value_stack_pop(&vm->stack);
-      *new_list_next = (*new_list_next)->next;
+      new_list_next = &(*new_list_next)->next;
     }
 
     free(args.items);

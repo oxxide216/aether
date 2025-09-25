@@ -4,16 +4,13 @@
 #include "ir.h"
 #include "rc-arena.h"
 
-typedef struct {
-  Str name;
-  u32 value_index;
-} Var;
+typedef struct NamedValue  NamedValue;
 
-typedef Da(Var) Vars;
+typedef Da(NamedValue) NamedValues;
 
 typedef struct {
   IrExprFuncDef def;
-  Vars          catched_vars;
+  NamedValues   catched_values;
 } Func;
 
 typedef Da(Func) Funcs;
@@ -30,10 +27,10 @@ typedef enum {
 typedef struct ListNode ListNode;
 
 typedef struct {
-  Str     name;
-  IrArgs  args;
-  IrBlock body;
-  Vars    catched_vars;
+  Str         name;
+  IrArgs      args;
+  IrBlock     body;
+  NamedValues catched_values;
 } ValueFunc;
 
 typedef union {
@@ -55,6 +52,11 @@ struct ListNode {
   ListNode *next;
 };
 
+struct NamedValue {
+  Str   name;
+  Value value;
+};
+
 typedef Da(Value) ValueStack;
 
 typedef struct Vm Vm;
@@ -71,6 +73,13 @@ typedef struct {
 typedef Da(Intrinsic) Intrinsics;
 
 typedef IrArgs Args;
+
+typedef struct {
+  Str name;
+  u32 value_index;
+} Var;
+
+typedef Da(Var) Vars;
 
 struct Vm {
   ValueStack  stack;
