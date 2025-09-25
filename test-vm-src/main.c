@@ -20,8 +20,8 @@ int main(i32 argc, char **argv) {
     exit(1);
   }
 
-  Ir ir = deserialize((u8 *) bytecode.ptr, bytecode.len, &rc_arena);
   RcArena rc_arena = {0};
+  Ir ir = deserialize((u8 *) bytecode.ptr, bytecode.len, &rc_arena);
   Intrinsics intrinsics = {0};
   execute(&ir, argc, argv, &rc_arena, &intrinsics);
 
