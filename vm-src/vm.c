@@ -205,14 +205,14 @@ void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected) {
   IrBlock func_body = {0};
   NamedValues catched_values = {0};
   if (!get_func(vm, name, args->len, &func_args, &func_body, &catched_values)) {
-    for (u32 i = 0; i < vm->intrinsics.len; ++i) {
-      Intrinsic *intrinsic = vm->intrinsics.items + i;
+    for (u32 i = vm->intrinsics.len; i > 0; --i) {
+      Intrinsic *intrinsic = vm->intrinsics.items + i - 1;
 
       if (str_eq(intrinsic->name, name) &&
           (intrinsic->args_count == args->len ||
            intrinsic->args_count == (u32) -1)) {
-        for (u32 i = 0; i < args->len; ++i)
-          DA_APPEND(vm->stack, args->items[i]);
+        for (u32 j = 0; j < args->len; ++j)
+          DA_APPEND(vm->stack, args->items[j]);
 
         intrinsic->func(vm);
 
