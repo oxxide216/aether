@@ -1,3 +1,7 @@
+#include <netinet/in.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
 #include "std-intrinsics.h"
 #include "io.h"
 #include "shl_log.h"
@@ -127,6 +131,146 @@ void write_file_intrinsic(Vm *vm) {
 
 void get_args_intrinsic(Vm *vm) {
   value_stack_push_list(&vm->stack, vm->args);
+}
+
+void create_server_intrinsic(Vm *vm) {
+  Value port = value_stack_pop(&vm->stack);
+  if (port.kind != ValueKindNumber) {
+    ERROR("create-server: wrong argument kind\n");
+    exit(1);
+  }
+
+  i32 server_socket = socket(AF_INET, SOCK_STREAM, 0);
+  if (server_socket < 0) {
+    value_stack_push_unit(&vm->stack);
+    return;
+  }
+
+  struct sockaddr_in address;
+  address.sin_family = AF_INET;
+  address.sin_addr.s_addr = INADDR_ANY;
+  address.sin_port = htons(port.as.number);
+
+  if (bind(server_socket, (struct sockaddr*) &address,
+           sizeof(address)) < 0) {
+    value_stack_push_unit(&vm->stack);
+    return;
+  }
+
+  if (listen(server_socket, 3) < 0) {
+    value_stack_push_unit(&vm->stack);
+    return;
+  }
+
+  value_stack_push_number(&vm->stack, server_socket);
+}
+
+void create_client_intrinsic(Vm *vm) {
+  Value port = value_stack_pop(&vm->stack);
+  Value server_ip_address = value_stack_pop(&vm->stack);
+  if (server_ip_address.kind != ValueKindStr ||
+      port.kind != ValueKindNumber) {
+    ERROR("create-client: wrong argument kind\n");
+    exit(1);
+  }
+
+  i32 client_socket = socket(AF_INET, SOCK_STREAM, 0);
+  if (client_socket < 0) {
+    value_stack_push_unit(&vm->stack);
+    return;
+  }
+
+  struct sockaddr_in server_address;
+  server_address.sin_family = AF_INET;
+  server_address.sin_port = htons(port.as.number);
+
+  char *server_ip_address_cstr = malloc(server_ip_address.as.str.len + 1);
+  memcpy(server_ip_address_cstr,
+         server_ip_address.as.str.ptr,
+         server_ip_address.as.str.len);
+  server_ip_address_cstr[server_ip_address.as.str.len] = '\0';
+
+  if (inet_pton(AF_INET,
+                server_ip_address_cstr,
+                &server_address.sin_addr) < 0) {
+    value_stack_push_unit(&vm->stack);
+    return;
+  }
+
+  if (connect(client_socket,
+              (struct sockaddr*) &server_address,
+              sizeof(server_address)) < 0) {
+    value_stack_push_unit(&vm->stack);
+    return;
+  }
+
+  value_stack_push_number(&vm->stack, client_socket);
+}
+
+void accept_connection_intrinsic(Vm *vm) {
+  Value port = value_stack_pop(&vm->stack);
+  Value server_socket = value_stack_pop(&vm->stack);
+  if (server_socket.kind != ValueKindNumber ||
+      port.kind != ValueKindNumber) {
+    ERROR("accept-connection: wrong argument kind\n");
+    exit(1);
+  }
+
+  struct sockaddr_in address;
+  address.sin_family = AF_INET;
+  address.sin_addr.s_addr = INADDR_ANY;
+  address.sin_port = htons(port.as.number);
+
+  u32 address_size;
+  i32 client_socket = accept(server_socket.as.number,
+                             (struct sockaddr*) &address,
+                             &address_size);
+  if (client_socket < 0) {
+    value_stack_push_unit(&vm->stack);
+    return;
+  }
+
+  value_stack_push_number(&vm->stack, client_socket);
+}
+
+void close_connection_intrinsic(Vm *vm) {
+  Value client_socket = value_stack_pop(&vm->stack);
+  if (client_socket.kind != ValueKindNumber) {
+    ERROR("close-connection: wrong argument kind\n");
+    exit(1);
+  }
+
+  close(client_socket.as.number);
+}
+
+void send_intrinsic(Vm *vm) {
+  Value message = value_stack_pop(&vm->stack);
+  Value receiver = value_stack_pop(&vm->stack);
+  if (receiver.kind != ValueKindNumber ||
+      message.kind != ValueKindStr) {
+    ERROR("send: wrong argument kind\n");
+    exit(1);
+  }
+
+  send(receiver.as.number, message.as.str.ptr, message.as.str.len, 0);
+}
+
+void receive_intrinsic(Vm *vm) {
+  Value size = value_stack_pop(&vm->stack);
+  Value receiver = value_stack_pop(&vm->stack);
+  if (receiver.kind != ValueKindNumber ||
+      size.kind != ValueKindNumber) {
+    ERROR("receive: wrong argument kind\n");
+    exit(1);
+  }
+
+  Str buffer;
+  buffer.len = size.as.number;
+  buffer.ptr = rc_arena_alloc(vm->rc_arena, buffer.len);
+
+  read(receiver.as.number, buffer.ptr, buffer.len);
+
+  value_stack_push_str(&vm->stack, buffer);
 }
 
 void head_intrinsic(Vm *vm) {
@@ -783,6 +927,12 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("read-file"), 1, true, &read_file_intrinsic },
   { STR_LIT("write-file"), 2, false, &write_file_intrinsic },
   { STR_LIT("get-args"), 0, true, &get_args_intrinsic },
+  { STR_LIT("create-server"), 1, true, &create_server_intrinsic },
+  { STR_LIT("create-client"), 2, true, &create_client_intrinsic },
+  { STR_LIT("accept-connection"), 0, true, &accept_connection_intrinsic },
+  { STR_LIT("close-connection"), 1, false, &close_connection_intrinsic },
+  { STR_LIT("send"), 2, false, &send_intrinsic },
+  { STR_LIT("receive"), 2, true, &receive_intrinsic },
   // Base
   { STR_LIT("head"), 1, true, &head_intrinsic },
   { STR_LIT("tail"), 1, true, &tail_intrinsic },
