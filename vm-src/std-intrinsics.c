@@ -929,7 +929,7 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("get-args"), 0, true, &get_args_intrinsic },
   { STR_LIT("create-server"), 1, true, &create_server_intrinsic },
   { STR_LIT("create-client"), 2, true, &create_client_intrinsic },
-  { STR_LIT("accept-connection"), 0, true, &accept_connection_intrinsic },
+  { STR_LIT("accept-connection"), 2, true, &accept_connection_intrinsic },
   { STR_LIT("close-connection"), 1, false, &close_connection_intrinsic },
   { STR_LIT("send"), 2, false, &send_intrinsic },
   { STR_LIT("receive"), 2, true, &receive_intrinsic },
