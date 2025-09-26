@@ -18,7 +18,7 @@ typedef Da(Func) Funcs;
 typedef enum {
   ValueKindUnit = 0,
   ValueKindList,
-  ValueKindStr,
+  ValueKindString,
   ValueKindNumber,
   ValueKindBool,
   ValueKindFunc,
@@ -38,7 +38,7 @@ typedef NamedValues Record;
 
 typedef union {
   ListNode  *list;
-  Str        str;
+  Str        string;
   i64        number;
   bool       _bool;
   ValueFunc  func;
@@ -101,7 +101,7 @@ ListNode *list_clone(RcArena *rc_arena, ListNode *list);
 
 void value_stack_push_unit(ValueStack *stack);
 void value_stack_push_list(ValueStack *stack, ListNode *nodes);
-void value_stack_push_str(ValueStack *stack, Str str);
+void value_stack_push_string(ValueStack *stack, Str string);
 void value_stack_push_number(ValueStack *stack, i64 number);
 void value_stack_push_bool(ValueStack *stack, bool _bool);
 void value_stack_push_record(ValueStack *stack, Record record);

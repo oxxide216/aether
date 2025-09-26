@@ -7,5 +7,6 @@
 (println user)
 (println (field user name))
 (field user name 'Paul')
+(field user age (+ 1 (field user age)))
 (println (field user name))
 (println user)

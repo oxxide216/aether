@@ -110,8 +110,8 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
     save_str_data(expr->as.ident.ident, data, data_size, end);
   } break;
 
-  case IrExprKindStrLit: {
-    save_str_data(expr->as.str_lit.lit, data, data_size, end);
+  case IrExprKindString: {
+    save_str_data(expr->as.string.lit, data, data_size, end);
   } break;
 
   case IrExprKindNumber: {

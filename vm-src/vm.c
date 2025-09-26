@@ -42,8 +42,8 @@ void value_stack_push_list(ValueStack *stack, ListNode *nodes) {
   DA_APPEND(*stack, value);
 }
 
-void value_stack_push_str(ValueStack *stack, Str str) {
-  Value value = { ValueKindStr, { .str = str } };
+void value_stack_push_string(ValueStack *stack, Str string) {
+  Value value = { ValueKindString, { .string = string } };
   DA_APPEND(*stack, value);
 }
 
@@ -80,8 +80,8 @@ static void free_value(Value *value, RcArena *rc_arena) {
       rc_arena_free(rc_arena, node);
       node = next_node;
     }
-  } else if (value->kind == ValueKindStr) {
-    rc_arena_free(rc_arena, value->as.str.ptr);
+  } else if (value->kind == ValueKindString) {
+    rc_arena_free(rc_arena, value->as.string.ptr);
   }
 }
 
@@ -163,7 +163,7 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values, I
     DA_APPEND(*catched_values, value);
   } break;
 
-  case IrExprKindStrLit: break;
+  case IrExprKindString: break;
   case IrExprKindNumber: break;
   case IrExprKindBool: break;
   case IrExprKindLambda: break;
@@ -525,9 +525,9 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     exit(1);
   } break;
 
-  case IrExprKindStrLit: {
+  case IrExprKindString: {
     if (value_expected)
-      value_stack_push_str(&vm->stack, expr->as.str_lit.lit);
+      value_stack_push_string(&vm->stack, expr->as.string.lit);
   } break;
 
   case IrExprKindNumber: {
@@ -623,8 +623,8 @@ void execute(Ir *ir, i32 argc, char **argv,
 
     ListNode *new_arg = rc_arena_alloc(rc_arena, sizeof(ListNode));
     new_arg->value = (Value) {
-      ValueKindStr,
-      { .str = { buffer, len } },
+      ValueKindString,
+      { .string = { buffer, len } },
     };
     new_arg->is_static = true;
 

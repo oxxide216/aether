@@ -82,7 +82,7 @@ static void get_expr_data_size(u8 *data, u32 *size) {
   } break;
 
   case IrExprKindIdent:
-  case IrExprKindStrLit: {
+  case IrExprKindString: {
     get_str_data_size(data, size);
   } break;
 
@@ -167,7 +167,7 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
   case IrExprKindVarDef: {
     expr->as.var_def.expr = aalloc(sizeof(IrExpr));
 
-    load_str_data(&expr->as.str_lit.lit, data, end, rc_arena);
+    load_str_data(&expr->as.string.lit, data, end, rc_arena);
     load_expr_data(expr->as.var_def.expr, data, end, rc_arena);
   } break;
 
@@ -233,8 +233,8 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
     load_str_data(&expr->as.ident.ident, data, end, rc_arena);
   } break;
 
-  case IrExprKindStrLit: {
-    load_str_data(&expr->as.str_lit.lit, data, end, rc_arena);
+  case IrExprKindString: {
+    load_str_data(&expr->as.string.lit, data, end, rc_arena);
   } break;
 
   case IrExprKindNumber: {

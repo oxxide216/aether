@@ -323,7 +323,7 @@ static void macro_body_expand(IrExpr **expr, IrBlock *args, Strs *arg_names) {
       *new_expr = *args->items[index];
   } break;
 
-  case IrExprKindStrLit: break;
+  case IrExprKindString: break;
   case IrExprKindNumber: break;
   case IrExprKindBool:   break;
 
@@ -423,9 +423,9 @@ static IrExpr *parser_parse_expr(Parser *parser) {
                                              MASK(TT_OCURLY));
 
   if (token->id == TT_STR) {
-    expr->kind = IrExprKindStrLit;
-    expr->as.str_lit.lit = STR(token->lexeme.ptr + 1,
-                               token->lexeme.len - 2);
+    expr->kind = IrExprKindString;
+    expr->as.string.lit = STR(token->lexeme.ptr + 1,
+                              token->lexeme.len - 2);
 
     return expr;
   }
