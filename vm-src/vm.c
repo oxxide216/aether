@@ -259,6 +259,9 @@ void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected) {
 
   execute_block(vm, &func_body, value_expected);
 
+  for (u32 i = prev_stack_len; i < vm->stack.len - value_expected; ++i)
+    free_value(vm->stack.items + i, vm->rc_arena);
+
   free(vm->local_vars.items);
   vm->local_vars = prev_local_vars;
   vm->is_inside_of_func = prev_is_inside_of_func;
