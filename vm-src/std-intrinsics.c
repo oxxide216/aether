@@ -294,8 +294,8 @@ void map_intrinsic(Vm *vm) {
     exit(1);
   }
 
-  ListNode *new_list = NULL;
-  ListNode **new_list_next = &new_list;
+  ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  ListNode **new_list_next = &new_list->next;
   ListNode *node = list.as.list->next;
   while (node) {
     ValueStack args = {0};
@@ -304,7 +304,7 @@ void map_intrinsic(Vm *vm) {
 
     *new_list_next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
     (*new_list_next)->value = value_stack_pop(&vm->stack);
-    *new_list_next = (*new_list_next)->next;
+    new_list_next = &(*new_list_next)->next;
 
     free(args.items);
 
