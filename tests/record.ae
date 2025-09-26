@@ -1,0 +1,11 @@
+(let user {
+  name: 'John'
+  surname: 'Doe'
+  age: 18
+})
+
+(println user)
+(println (field user name))
+(field user name 'Paul')
+(println (field user name))
+(println user)

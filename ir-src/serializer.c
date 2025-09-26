@@ -90,6 +90,18 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
     save_expr_data(expr->as.set.src, data, data_size, end);
   } break;
 
+  case IrExprKindField: {
+    save_str_data(expr->as.field.record, data, data_size, end);
+    save_str_data(expr->as.field.field, data, data_size, end);
+
+    reserve_space(sizeof(bool), data, data_size, end);
+    *(bool *) (*data + *end) = expr->as.field.is_set;
+    *end += sizeof(bool);
+
+    if (expr->as.field.is_set)
+      save_expr_data(expr->as.field.expr, data, data_size, end);
+  } break;
+
   case IrExprKindList: {
     save_block_data(&expr->as.list.content, data, data_size, end);
   } break;
@@ -123,6 +135,17 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
       save_str_data(expr->as.lambda.args.items[i], data, data_size, end);
 
     save_block_data(&expr->as.lambda.body, data, data_size, end);
+  } break;
+
+  case IrExprKindRecord: {
+    reserve_space(sizeof(u32), data, data_size, end);
+    *(u32 *) (*data + *end) = expr->as.record.len;
+    *end += sizeof(u32);
+
+    for (u32 i = 0; i < expr->as.record.len; ++i) {
+      save_str_data(expr->as.record.items[i].name, data, data_size, end);
+      save_expr_data(expr->as.record.items[i].expr, data, data_size, end);
+    }
   } break;
   }
 }

@@ -66,6 +66,17 @@ static void get_expr_data_size(u8 *data, u32 *size) {
     get_expr_data_size(data, size);
   } break;
 
+  case IrExprKindField: {
+    get_str_data_size(data, size);
+    get_str_data_size(data, size);
+
+    bool is_set = *(bool *) (data + *size);
+    *size += sizeof(bool);
+
+    if (is_set)
+      get_expr_data_size(data, size);
+  } break;
+
   case IrExprKindList: {
     get_block_data_size(data, size);
   } break;
@@ -88,6 +99,16 @@ static void get_expr_data_size(u8 *data, u32 *size) {
     *size += sizeof(u32) + len * sizeof(Str);
 
     get_block_data_size(data, size);
+  } break;
+
+  case IrExprKindRecord: {
+    u32 len = *(u32 *) (data + *size);
+    *size += sizeof(u32);
+
+    for (u32 i = 0; i < len; ++i) {
+      get_str_data_size(data, size);
+      get_expr_data_size(data, size);
+    }
   } break;
   }
 }
@@ -190,6 +211,20 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
     load_expr_data(expr->as.set.src, data, end, rc_arena);
   } break;
 
+  case IrExprKindField: {
+    load_str_data(&expr->as.field.record, data, end, rc_arena);
+    load_str_data(&expr->as.field.field, data, end, rc_arena);
+
+    expr->as.field.is_set = *(bool *) (data + *end);
+    *end += sizeof(bool);
+
+    if (expr->as.field.is_set) {
+      expr->as.field.expr = aalloc(sizeof(IrExpr));
+
+      load_expr_data(expr->as.field.expr, data, end, rc_arena);
+    }
+  } break;
+
   case IrExprKindList: {
     load_block_data(&expr->as.list.content, data, end, rc_arena);
   } break;
@@ -224,6 +259,19 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
       load_str_data(args->items + i, data, end, rc_arena);
 
     load_block_data(&expr->as.lambda.body, data, end, rc_arena);
+  } break;
+
+  case IrExprKindRecord: {
+    expr->as.record.len = *(u32 *) (data + *end);
+    *end += sizeof(u32);
+
+    expr->as.record.items = malloc(expr->as.record.len * sizeof(IrField));
+    for (u32 i = 0; i < expr->as.record.len; ++i) {
+      expr->as.record.items[i].expr = aalloc(sizeof(IrExpr));
+
+      load_str_data(&expr->as.record.items[i].name, data, end, rc_arena);
+      load_expr_data(expr->as.record.items[i].expr, data, end, rc_arena);
+    }
   } break;
   }
 }

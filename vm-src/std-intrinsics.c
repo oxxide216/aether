@@ -9,7 +9,7 @@
 
 #define DEFAULT_INPUT_BUFFER_SIZE 64
 
-static void print_value(ValueStack *stack, Value *value) {
+static void print_value(ValueStack *stack, Value *value, u32 level) {
   switch (value->kind) {
   case ValueKindUnit: {
     fputs("unit", stdout);
@@ -23,7 +23,7 @@ static void print_value(ValueStack *stack, Value *value) {
       if (node != value->as.list->next)
         fputc(' ', stdout);
 
-      print_value(stack, &node->value);
+      print_value(stack, &node->value, level);
 
       node = node->next;
     }
@@ -58,12 +58,31 @@ static void print_value(ValueStack *stack, Value *value) {
 
     fputs("])", stdout);
   } break;
+
+  case ValueKindRecord: {
+    fputs("{\n", stdout);
+
+    for (u32 i = 0; i < value->as.record.len; ++i) {
+      for (u32 j = 0; j < level + 1; ++j)
+        fputs("  ", stdout);
+
+      str_print(value->as.record.items[i].name);
+      fputs(": ", stdout);
+      print_value(stack, &value->as.record.items[i].value, level + 1);
+
+      fputc('\n', stdout);
+    }
+
+    for (u32 j = 0; j < level; ++j)
+      fputs("  ", stdout);
+    fputc('}', stdout);
+  } break;
   }
 }
 
 void print_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
-  print_value(&vm->stack, &value);
+  print_value(&vm->stack, &value, 0);
 }
 
 void println_intrinsic(Vm *vm) {

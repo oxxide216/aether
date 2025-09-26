@@ -57,6 +57,11 @@ void value_stack_push_bool(ValueStack *stack, bool _bool) {
   DA_APPEND(*stack, value);
 }
 
+void value_stack_push_record(ValueStack *stack, Record record) {
+  Value value = { ValueKindRecord, { .record = record } };
+  DA_APPEND(*stack, value);
+}
+
 Value value_stack_pop(ValueStack *stack) {
   if (stack->len > 0)
     return stack->items[--stack->len];
@@ -130,6 +135,11 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values, I
     catch_vars(vm, local_names, catched_values, expr->as.set.src);
   } break;
 
+  case IrExprKindField: {
+    if (expr->as.field.is_set)
+      catch_vars(vm, local_names, catched_values, expr->as.field.expr);
+  } break;
+
   case IrExprKindList: {
     catch_vars_block(vm, local_names, catched_values, &expr->as.list.content);
   } break;
@@ -157,6 +167,11 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values, I
   case IrExprKindNumber: break;
   case IrExprKindBool: break;
   case IrExprKindLambda: break;
+
+  case IrExprKindRecord: {
+    for (u32 i = 0; i < expr->as.record.len; ++i)
+      catch_vars(vm, local_names, catched_values, expr->as.record.items[i].expr);
+  } break;
   }
 }
 
@@ -414,6 +429,48 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       value_stack_push_unit(&vm->stack);
   } break;
 
+  case IrExprKindField: {
+    Var *var = get_var(vm, expr->as.field.record);
+    if (!var) {
+      ERROR("Variable "STR_FMT" was not defined before usage\n",
+            STR_ARG(expr->as.set.dest));
+      exit(1);
+    }
+
+    Value *record_value = vm->stack.items + var->value_index;
+    if (record_value->kind != ValueKindRecord) {
+      ERROR("Only records have fields\n");
+      exit(1);
+    }
+
+    NamedValue *field = NULL;
+
+    for (u32 i = 0; i < record_value->as.record.len; ++i) {
+      NamedValue *temp_field = record_value->as.record.items + i;
+
+      if (str_eq(temp_field->name, expr->as.field.field)) {
+        field = temp_field;
+        break;
+      }
+    }
+
+    if (!field) {
+      ERROR("Field `"STR_FMT"` was not found in `"STR_FMT"`\n",
+            STR_ARG(expr->as.field.field),
+            STR_ARG(expr->as.field.record));
+    }
+
+    if (expr->as.field.is_set) {
+      execute_expr(vm, expr->as.field.expr, true);
+      field->value = value_stack_pop(&vm->stack);
+
+      if (value_expected)
+        value_stack_push_unit(&vm->stack);
+    } else if (value_expected) {
+      DA_APPEND(vm->stack, field->value);
+    }
+  } break;
+
   case IrExprKindList: {
     if (!value_expected)
       break;
@@ -514,6 +571,25 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       catched_values,
     };
     DA_APPEND(vm->funcs, func);
+  } break;
+
+  case IrExprKindRecord: {
+    if (!value_expected)
+      break;
+
+    Record record = {0};
+
+    for (u32 i = 0; i < expr->as.record.len; ++i) {
+      execute_expr(vm, expr->as.record.items[i].expr, true);
+
+      NamedValue field;
+      field.name = expr->as.record.items[i].name;
+      field.value = value_stack_pop(&vm->stack);
+
+      DA_APPEND(record, field);
+    }
+
+    value_stack_push_record(&vm->stack, record);
   } break;
   }
 }

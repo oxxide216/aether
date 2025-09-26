@@ -16,12 +16,14 @@ typedef enum {
   IrExprKindIf,
   IrExprKindWhile,
   IrExprKindSet,
+  IrExprKindField,
   IrExprKindList,
   IrExprKindIdent,
   IrExprKindStrLit,
   IrExprKindNumber,
   IrExprKindBool,
   IrExprKindLambda,
+  IrExprKindRecord,
 } IrExprKind;
 
 typedef Da(Str) IrArgs;
@@ -68,6 +70,13 @@ typedef struct {
 } IrExprSet;
 
 typedef struct {
+  Str     record;
+  Str     field;
+  bool    is_set;
+  IrExpr *expr;
+} IrExprField;
+
+typedef struct {
   IrBlock content;
 } IrExprList;
 
@@ -92,6 +101,13 @@ typedef struct {
   IrBlock body;
 } IrExprLambda;
 
+typedef struct {
+  Str     name;
+  IrExpr *expr;
+} IrField;
+
+typedef Da(IrField) IrExprRecord;
+
 typedef union {
   IrBlock        block;
   IrExprFuncDef  func_def;
@@ -100,12 +116,14 @@ typedef union {
   IrExprIf       _if;
   IrExprWhile    _while;
   IrExprSet      set;
+  IrExprField    field;
   IrExprList     list;
   IrExprIdent    ident;
   IrExprStrLit   str_lit;
   IrExprNumber   number;
   IrExprBool     _bool;
   IrExprLambda   lambda;
+  IrExprRecord   record;
 } IrExprAs;
 
 struct IrExpr {

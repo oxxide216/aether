@@ -22,6 +22,7 @@ typedef enum {
   ValueKindNumber,
   ValueKindBool,
   ValueKindFunc,
+  ValueKindRecord,
 } ValueKind;
 
 typedef struct ListNode ListNode;
@@ -33,12 +34,15 @@ typedef struct {
   NamedValues catched_values;
 } ValueFunc;
 
+typedef NamedValues Record;
+
 typedef union {
   ListNode  *list;
   Str        str;
   i64        number;
   bool       _bool;
   ValueFunc  func;
+  Record     record;
 } ValueAs;
 
 typedef struct {
@@ -100,6 +104,7 @@ void value_stack_push_list(ValueStack *stack, ListNode *nodes);
 void value_stack_push_str(ValueStack *stack, Str str);
 void value_stack_push_number(ValueStack *stack, i64 number);
 void value_stack_push_bool(ValueStack *stack, bool _bool);
+void value_stack_push_record(ValueStack *stack, Record record);
 
 Value  value_stack_pop(ValueStack *stack);
 Value *value_stack_get(ValueStack *stack, u32 index);

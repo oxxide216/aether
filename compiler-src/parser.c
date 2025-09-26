@@ -46,6 +46,7 @@ static char *token_names[] = {
   "macro",
   "while",
   "set",
+  "field",
   "number",
   "bool",
   "identifier",
@@ -54,6 +55,8 @@ static char *token_names[] = {
   "`)`",
   "`[`",
   "`]`",
+  "`{`",
+  "`}`",
   "string literal",
 };
 
@@ -298,6 +301,11 @@ static void macro_body_expand(IrExpr **expr, IrBlock *args, Strs *arg_names) {
     macro_body_expand(&new_expr->as.set.src, args, arg_names);
   } break;
 
+  case IrExprKindField: {
+    if (new_expr->as.field.is_set)
+      macro_body_expand(&new_expr->as.field.expr, args, arg_names);
+  } break;
+
   case IrExprKindList: {
     macro_body_expand_block(&new_expr->as.list.content, args, arg_names);
   } break;
@@ -315,13 +323,18 @@ static void macro_body_expand(IrExpr **expr, IrBlock *args, Strs *arg_names) {
       *new_expr = *args->items[index];
   } break;
 
+  case IrExprKindStrLit: break;
+  case IrExprKindNumber: break;
+  case IrExprKindBool:   break;
+
   case IrExprKindLambda: {
     macro_body_expand_block(&new_expr->as.func_def.body, args, arg_names);
   } break;
 
-  case IrExprKindStrLit: break;
-  case IrExprKindNumber: break;
-  case IrExprKindBool:   break;
+  case IrExprKindRecord: {
+    for (u32 i = 0; new_expr->as.record.len; ++i)
+      macro_body_expand(&new_expr->as.record.items[i].expr, args, arg_names);
+  } break;
   }
 }
 
@@ -362,6 +375,28 @@ static IrBlock parser_parse_macro_expand(Parser *parser) {
   return body;
 }
 
+static IrExpr *parser_parse_expr(Parser *parser);
+
+static IrExprRecord parser_parse_record(Parser *parser) {
+  IrExprRecord record = {0};
+
+  Token *token;
+  while ((token = parser_peek_token(parser))->id != TT_CCURLY) {
+    Token *key_token = parser_expect_token(parser, MASK(TT_KEY));
+    Str key = key_token->lexeme;
+    --key.len;
+
+    IrExpr *expr = parser_parse_expr(parser);
+
+    IrField field = { key, expr };
+    DA_APPEND(record, field);
+  }
+
+  parser_expect_token(parser, MASK(TT_CCURLY));
+
+  return record;
+}
+
 static char *str_to_cstr(Str str) {
   char *result = malloc((str.len + 1) * sizeof(char));
   memcpy(result, str.ptr, str.len * sizeof(char));
@@ -384,7 +419,8 @@ static IrExpr *parser_parse_expr(Parser *parser) {
 
   Token *token = parser_expect_token(parser, MASK(TT_OPAREN) | MASK(TT_OBRACKET) |
                                              MASK(TT_STR) | MASK(TT_IDENT) |
-                                             MASK(TT_NUMBER) | MASK(TT_BOOL));
+                                             MASK(TT_NUMBER) | MASK(TT_BOOL) |
+                                             MASK(TT_OCURLY));
 
   if (token->id == TT_STR) {
     expr->kind = IrExprKindStrLit;
@@ -419,6 +455,13 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     expr->kind = IrExprKindList;
     expr->as.list.content = parser_parse_block(parser, MASK(TT_CBRACKET));
     parser_expect_token(parser, MASK(TT_CBRACKET));
+
+    return expr;
+  }
+
+  if (token->id == TT_OCURLY) {
+    expr->kind = IrExprKindRecord;
+    expr->as.record = parser_parse_record(parser);
 
     return expr;
   }
@@ -554,12 +597,28 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     free(path_sb.buffer);
   } break;
 
+  case TT_FIELD: {
+    parser_next_token(parser);
+
+    expr->kind = IrExprKindField;
+    expr->as.field.record = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
+    expr->as.field.field = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
+
+    if (parser_peek_token(parser)->id != TT_CPAREN) {
+      expr->as.field.is_set = true;
+      expr->as.field.expr = parser_parse_expr(parser);
+    }
+
+    parser_expect_token(parser, MASK(TT_CPAREN));
+  } break;
+
   default: {
     parser_expect_token(parser, MASK(TT_FUN) | MASK(TT_LET) |
                                 MASK(TT_IF) | MASK(TT_IDENT) |
                                 MASK(TT_MACRO_NAME) | MASK(TT_BOOL) |
                                 MASK(TT_MACRO) | MASK(TT_WHILE) |
-                                MASK(TT_SET) | MASK(TT_USE));
+                                MASK(TT_SET) | MASK(TT_USE) |
+                                MASK(TT_FIELD));
   } break;
   }
 
