@@ -114,6 +114,8 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values, I
   } break;
 
   case IrExprKindVarDef: {
+    catch_vars(vm, local_names, catched_values, expr->as.var_def.expr);
+
     DA_APPEND(*local_names, expr->as.var_def.name);
   } break;
 

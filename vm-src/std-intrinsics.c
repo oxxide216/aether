@@ -1077,6 +1077,11 @@ void is_fun_intrinsic(Vm *vm) {
   value_stack_push_bool(&vm->stack, value.kind == ValueKindFunc);
 }
 
+void is_record_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindRecord);
+}
+
 void type_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
 
@@ -1103,6 +1108,10 @@ void type_intrinsic(Vm *vm) {
 
   case ValueKindFunc: {
     value_stack_push_string(&vm->stack, STR_LIT("fun"));
+  } break;
+
+  case ValueKindRecord: {
+    value_stack_push_string(&vm->stack, STR_LIT("record"));
   } break;
 
   default: {
@@ -1189,6 +1198,7 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("number?"), 1, true, &is_number_intrinsic },
   { STR_LIT("bool?"), 1, true, &is_bool_intrinsic },
   { STR_LIT("fun?"), 1, true, &is_fun_intrinsic },
+  { STR_LIT("record?"), 1, true, &is_record_intrinsic },
   { STR_LIT("type"), 1, true, &type_intrinsic },
 };
 
