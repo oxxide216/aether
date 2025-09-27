@@ -1091,8 +1091,6 @@ void type_intrinsic(Vm *vm) {
 }
 
 Intrinsic std_intrinsics[] = {
-  // System
-  { STR_LIT("halt"), 1, false, &halt_intrinsic },
   // Io
   { STR_LIT("print"), 1, false, &print_intrinsic },
   { STR_LIT("println"), 1, false, &println_intrinsic },
