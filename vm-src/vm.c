@@ -461,6 +461,8 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     }
 
     if (expr->as.field.is_set) {
+      free_value(&field->value, vm->rc_arena);
+
       execute_expr(vm, expr->as.field.expr, true);
       field->value = value_stack_pop(&vm->stack);
 
