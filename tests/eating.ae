@@ -1,3 +1,7 @@
 (let str 'hi!')
+(println str)
 (println (eat-str str 'hi'))
-(println (eat-num-8 str))
+(println (eat-byte-8 str))
+(let result (+ (byte-16-to-str 888) str))
+(println result)
+(println (eat-byte-16 result))
