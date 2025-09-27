@@ -1,4 +1,4 @@
-whitespace=( |\t|\r|\v)*
+whitespace=( |\t|\r)*
 newline=\n
 comment=;;
 
