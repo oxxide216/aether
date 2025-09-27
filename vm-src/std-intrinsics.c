@@ -9,16 +9,6 @@
 
 #define DEFAULT_INPUT_BUFFER_SIZE 64
 
-void halt_intrinsic(Vm *vm) {
-  Value exit_code = value_stack_pop(&vm->stack);
-  if (exit_code.kind != ValueKindNumber) {
-    ERROR("halt: wrong argument kind\n");
-    exit(1);
-  }
-
-  exit(exit_code.as.number);
-}
-
 static void print_value(ValueStack *stack, Value *value, u32 level) {
   switch (value->kind) {
   case ValueKindUnit: {
