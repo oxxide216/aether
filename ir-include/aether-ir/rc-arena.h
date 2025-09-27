@@ -8,8 +8,9 @@
 typedef struct Region Region;
 
 struct Region {
-  u8      data[RC_ARENA_REGION_CAP];
-  u32     refs_count, size;
+  void   *data;
+  u32     len, cap;
+  u32     refs_count;
   Region *next;
 };
 

@@ -3,16 +3,17 @@
 #include "aether-ir/rc-arena.h"
 
 void *rc_arena_alloc(RcArena *arena, u32 size) {
+  u32 new_cap = RC_ARENA_REGION_CAP;
   if (size > RC_ARENA_REGION_CAP)
-    return NULL;
+    new_cap = size;
 
   Region *prev_region = NULL;
   Region *region = arena->regions;
   while (region) {
-    if (region->size + size <= RC_ARENA_REGION_CAP) {
+    if (region->len + size <= region->cap) {
       ++region->refs_count;
-      void *ptr = region->data + region->size;
-      region->size += size;
+      void *ptr = region->data + region->len;
+      region->len += size;
       return ptr;
     }
 
@@ -20,10 +21,12 @@ void *rc_arena_alloc(RcArena *arena, u32 size) {
     region = region->next;
   }
 
-  Region *new_region = malloc(sizeof(Region));
+  Region *new_region = malloc(sizeof(Region) + new_cap);
   *new_region = (Region) {0};
+  new_region->data = new_region + sizeof(Region);
+  new_region->cap = new_cap;
+  new_region->len = size;
   new_region->refs_count = 1;
-  new_region->size = size;
   new_region->next = region;
 
   if (prev_region)
@@ -38,8 +41,8 @@ void *rc_arena_clone(RcArena *arena, void *data) {
   Region *region = arena->regions;
   while (region) {
     if (region->refs_count > 0 &&
-        data >= (void *) region->data &&
-        data < (void *) region->data + RC_ARENA_REGION_CAP) {
+        data >= region->data &&
+        data < region->data + region->cap) {
       ++region->refs_count;
 
       break;
@@ -56,8 +59,8 @@ void rc_arena_free(RcArena *arena, void *data) {
   Region *region = arena->regions;
   while (region) {
     if (region->refs_count > 0 &&
-        data >= (void *) region->data &&
-        data < (void *) region->data + RC_ARENA_REGION_CAP) {
+        data >= region->data &&
+        data < region->data + region->cap) {
       --region->refs_count;
 
       if (region->refs_count == 0) {
