@@ -158,16 +158,13 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values, I
       exit(1);
     }
 
-    NamedValue value = {
-      var->name,
-      vm->stack.items[var->value_index],
-    };
+    NamedValue value = { var->name, var->value };
     DA_APPEND(*catched_values, value);
   } break;
 
   case IrExprKindString: break;
   case IrExprKindNumber: break;
-  case IrExprKindBool: break;
+  case IrExprKindBool:  break;
   case IrExprKindLambda: break;
 
   case IrExprKindRecord: {
@@ -177,7 +174,8 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values, I
   }
 }
 
-static void catch_vars_block(Vm *vm, Strs *local_names, NamedValues *catched_values, IrBlock *block) {
+static void catch_vars_block(Vm *vm, Strs *local_names,
+                             NamedValues *catched_values, IrBlock *block) {
   for (u32 i = 0; i < block->len; ++i)
     catch_vars(vm, local_names, catched_values, block->items[i]);
 }
@@ -188,12 +186,11 @@ static bool get_func(Vm *vm, Str name, u32 args_count, IrArgs *args,
                      IrBlock *body, NamedValues *catched_values) {
   Var *var = get_var(vm, name);
   if (var) {
-    Value *value = vm->stack.items + var->value_index;
-    if (value->kind == ValueKindFunc &&
-        value->as.func.args.len == args_count) {
-      *args = value->as.func.args;
-      *body = value->as.func.body;
-      *catched_values = value->as.func.catched_values;
+    if (var->value.kind == ValueKindFunc &&
+        var->value.as.func.args.len == args_count) {
+      *args = var->value.as.func.args;
+      *body = var->value.as.func.body;
+      *catched_values = var->value.as.func.catched_values;
 
       return true;
     }
@@ -257,7 +254,7 @@ void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected) {
   for (u32 i = 0; i < func_args.len; ++i) {
     Var var = {
       func_args.items[i],
-      vm->stack.len,
+      vm->stack.items[i],
     };
 
     DA_APPEND(vm->stack, args->items[i]);
@@ -267,7 +264,7 @@ void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected) {
   for (u32 i = 0; i < catched_values.len; ++i) {
     Var var = {
       catched_values.items[i].name,
-      vm->stack.len,
+      value_stack_pop(&vm->stack),
     };
 
     DA_APPEND(vm->stack, catched_values.items[i].value);
@@ -328,9 +325,8 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     Var *prev_var = get_var(vm, expr->as.var_def.name);
     if (prev_var) {
-      Value *prev_value = vm->stack.items + prev_var->value_index;
-      free_value(prev_value, vm->rc_arena);
-      *prev_value = value_stack_pop(&vm->stack);
+      free_value(&prev_var->value, vm->rc_arena);
+      prev_var->value = value_stack_pop(&vm->stack);
 
       if (value_expected)
         value_stack_push_unit(&vm->stack);
@@ -340,7 +336,7 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     Var var = {0};
     var.name = expr->as.var_def.name;
-    var.value_index = vm->stack.len - 1;
+    var.value = value_stack_pop(&vm->stack);
 
     if (vm->is_inside_of_func)
       DA_APPEND(vm->local_vars, var);
@@ -424,8 +420,8 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     }
 
     execute_expr(vm, expr->as.set.src, true);
-    Value value = value_stack_pop(&vm->stack);
-    vm->stack.items[var->value_index] = value;
+    free_value(&var->value, vm->rc_arena);
+    var->value = value_stack_pop(&vm->stack);
 
     if (value_expected)
       value_stack_push_unit(&vm->stack);
@@ -439,16 +435,15 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       exit(1);
     }
 
-    Value *record_value = vm->stack.items + var->value_index;
-    if (record_value->kind != ValueKindRecord) {
+    if (var->value.kind != ValueKindRecord) {
       ERROR("Only records have fields\n");
       exit(1);
     }
 
     NamedValue *field = NULL;
 
-    for (u32 i = 0; i < record_value->as.record.len; ++i) {
-      NamedValue *temp_field = record_value->as.record.items + i;
+    for (u32 i = 0; i < var->value.as.record.len; ++i) {
+      NamedValue *temp_field = var->value.as.record.items + i;
 
       if (str_eq(temp_field->name, expr->as.field.field)) {
         field = temp_field;
@@ -471,6 +466,12 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       if (value_expected)
         value_stack_push_unit(&vm->stack);
     } else if (value_expected) {
+      if (!field) {
+        ERROR("Field `"STR_FMT"` was not found in `"STR_FMT"`\n",
+              STR_ARG(expr->as.field.field),
+              STR_ARG(expr->as.field.record));
+      }
+
       DA_APPEND(vm->stack, field->value);
     }
   } break;
@@ -478,7 +479,6 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   case IrExprKindList: {
     if (!value_expected)
       break;
-
     ListNode *list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
     ListNode *list_end = list;
 
@@ -507,7 +507,7 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     Var *var = get_var(vm, expr->as.ident.ident);
     if (var) {
-      DA_APPEND(vm->stack, vm->stack.items[var->value_index]);
+      DA_APPEND(vm->stack, var->value);
       return;
     }
 

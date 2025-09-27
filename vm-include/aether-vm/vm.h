@@ -79,8 +79,8 @@ typedef Da(Intrinsic) Intrinsics;
 typedef IrArgs Args;
 
 typedef struct {
-  Str name;
-  u32 value_index;
+  Str   name;
+  Value value;
 } Var;
 
 typedef Da(Var) Vars;
