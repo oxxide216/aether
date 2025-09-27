@@ -32,7 +32,9 @@ static void print_value(ValueStack *stack, Value *value, u32 level) {
   } break;
 
   case ValueKindString: {
+    fputc('\'', stdout);
     str_print(value->as.string);
+    fputc('\'', stdout);
   } break;
 
   case ValueKindNumber: {
@@ -588,10 +590,97 @@ void split_intrinsic(Vm *vm) {
   value_stack_push_list(&vm->stack, list);
 }
 
+static void eat_num(Vm *vm, char *intrinsic_name, u32 amount) {
+  Value string = value_stack_pop(&vm->stack);
+  if (string.kind != ValueKindString) {
+    ERROR("%s: wrong argument kinds\n", intrinsic_name);
+    exit(1);
+  }
+
+  if (string.as.string.len < amount) {
+    value_stack_push_unit(&vm->stack);
+    return;
+  }
+
+  i64 number = 0;
+  switch (amount) {
+  case 8: number = *(i64 *) string.as.string.ptr; break;
+  case 4: number = *(i32 *) string.as.string.ptr; break;
+  case 2: number = *(i16 *) string.as.string.ptr; break;
+  case 1: number = *(i8 *) string.as.string.ptr; break;
+  }
+
+  ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+
+  new_list->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  new_list->next->value = (Value) { ValueKindNumber, { .number = number } };
+
+  new_list->next->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  Str new_string;
+  new_string.len = string.as.string.len - amount;
+  new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
+  memcpy(new_string.ptr, string.as.string.ptr + amount, new_string.len);
+  new_list->next->next->value = (Value) { ValueKindString, { .string = new_string } };
+
+  value_stack_push_list(&vm->stack, new_list);
+}
+
+void eat_num_64_intrinsic(Vm *vm) {
+  eat_num(vm, "eat-num-64", 8);
+}
+
+void eat_num_32_intrinsic(Vm *vm) {
+  eat_num(vm, "eat-num-32", 4);
+}
+
+void eat_num_16_intrinsic(Vm *vm) {
+  eat_num(vm, "eat-num-16", 2);
+}
+
+void eat_num_8_intrinsic(Vm *vm) {
+  eat_num(vm, "eat-num-8", 1);
+}
+
+void eat_str_intrinsic(Vm *vm) {
+  Value pattern = value_stack_pop(&vm->stack);
+  Value string = value_stack_pop(&vm->stack);
+  if (string.kind != ValueKindString ||
+      pattern.kind != ValueKindString) {
+    ERROR("eat-str: wrong argument kinds\n");
+    exit(1);
+  }
+
+  if (string.as.string.len < pattern.as.string.len) {
+    value_stack_push_bool(&vm->stack, false);
+    return;
+  }
+
+  Str string_begin = {
+    string.as.string.ptr,
+    pattern.as.string.len,
+  };
+
+  bool matches = str_eq(string_begin, pattern.as.string);
+
+  ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+
+  new_list->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  new_list->next->value = (Value) { ValueKindBool, { ._bool = matches } };
+
+  new_list->next->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  Str new_string;
+  new_string.len = string.as.string.len - pattern.as.string.len;
+  new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
+  memcpy(new_string.ptr, string.as.string.ptr + pattern.as.string.len, new_string.len);
+  new_list->next->next->value = (Value) { ValueKindString, { .string = new_string } };
+
+  value_stack_push_list(&vm->stack, new_list);
+}
+
 void str_to_num_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind != ValueKindString) {
-    ERROR("str-to-num: wrong argument kind");
+    ERROR("str-to-num: wrong argument kind\n");
     exit(1);
   }
 
@@ -601,20 +690,26 @@ void str_to_num_intrinsic(Vm *vm) {
 void num_to_str_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind != ValueKindNumber) {
-    ERROR("num-to-str: wrong argument kind");
+    ERROR("num-to-str: wrong argument kind\n");
     exit(1);
   }
 
   StringBuilder sb = {0};
   sb_push_i64(&sb, value.as.number);
 
-  value_stack_push_string(&vm->stack, sb_to_str(sb));
+  Str new_string;
+  new_string.len = sb.len;
+  new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
+  memcpy(new_string.ptr, sb.buffer, sb.len);
+  free(sb.buffer);
+
+  value_stack_push_string(&vm->stack, new_string);
 }
 
 void bool_to_str_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind != ValueKindBool) {
-    ERROR("bool-to-str: wrong argument kind");
+    ERROR("bool-to-str: wrong argument kind\n");
     exit(1);
   }
 
@@ -638,7 +733,7 @@ void bool_to_str_intrinsic(Vm *vm) {
 void bool_to_num_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind != ValueKindBool) {
-    ERROR("bool-to-num: wrong argument kind");
+    ERROR("bool-to-num: wrong argument kind\n");
     exit(1);
   }
 
@@ -920,21 +1015,35 @@ void is_fun_intrinsic(Vm *vm) {
 void type_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
 
-  if (value.kind == ValueKindUnit) {
+  switch (value.kind) {
+  case ValueKindUnit: {
     value_stack_push_string(&vm->stack, STR_LIT("unit"));
-  } else if (value.kind == ValueKindList) {
+  } break;
+
+  case ValueKindList: {
     value_stack_push_string(&vm->stack, STR_LIT("list"));
-  } else if (value.kind == ValueKindString) {
+  } break;
+
+  case ValueKindString: {
     value_stack_push_string(&vm->stack, STR_LIT("str"));
-  } else if (value.kind == ValueKindNumber) {
+  } break;
+
+  case ValueKindNumber: {
     value_stack_push_string(&vm->stack, STR_LIT("number"));
-  } else if (value.kind == ValueKindBool) {
+  } break;
+
+  case ValueKindBool: {
     value_stack_push_string(&vm->stack, STR_LIT("bool"));
-  } else if (value.kind == ValueKindFunc) {
+  } break;
+
+  case ValueKindFunc: {
     value_stack_push_string(&vm->stack, STR_LIT("fun"));
-  } else {
+  } break;
+
+  default: {
     ERROR("Unknown type\n");
     exit(1);
+  }
   }
 }
 
@@ -966,6 +1075,11 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("reduce"), 3, true, &reduce_intrinsic },
   // String operations
   { STR_LIT("split"), 2, true, &split_intrinsic },
+  { STR_LIT("eat-num-64"), 1, true, &eat_num_64_intrinsic },
+  { STR_LIT("eat-num-32"), 1, true, &eat_num_32_intrinsic },
+  { STR_LIT("eat-num-16"), 1, true, &eat_num_16_intrinsic },
+  { STR_LIT("eat-num-8"), 1, true, &eat_num_8_intrinsic },
+  { STR_LIT("eat-str"), 2, true, &eat_str_intrinsic },
   // Conversions
   { STR_LIT("str-to-num"), 1, true, &str_to_num_intrinsic },
   { STR_LIT("num-to-str"), 1, true, &num_to_str_intrinsic },
