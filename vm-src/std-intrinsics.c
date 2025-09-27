@@ -10,6 +10,16 @@
 #define DEFAULT_INPUT_BUFFER_SIZE   64
 #define DEFAULT_RECEIVE_BUFFER_SIZE 64
 
+void exit_intrinsic(Vm *vm) {
+  Value exit_code = value_stack_pop(&vm->stack);
+  if (exit_code.kind != ValueKindNumber) {
+    ERROR("exit: wrong argument kind\n");
+    exit(1);
+  }
+
+  exit(1);
+}
+
 static void print_value(ValueStack *stack, Value *value, u32 level) {
   switch (value->kind) {
   case ValueKindUnit: {
@@ -804,8 +814,8 @@ void add_intrinsic(Vm *vm) {
 
     Str new_string;
     new_string.len = sb.len;
-    new_string.ptr = rc_arena_alloc(vm->rc_arena, sb.len);
-    memcpy(new_string.ptr, sb.buffer, sb.len);
+    new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
+    memcpy(new_string.ptr, sb.buffer, new_string.len);
     free(sb.buffer);
 
     value_stack_push_string(&vm->stack, new_string);
@@ -1103,6 +1113,8 @@ void type_intrinsic(Vm *vm) {
 }
 
 Intrinsic std_intrinsics[] = {
+  // System
+  { STR_LIT("exit"), 1, false, &exit_intrinsic },
   // Io
   { STR_LIT("print"), 1, false, &print_intrinsic },
   { STR_LIT("println"), 1, false, &println_intrinsic },
