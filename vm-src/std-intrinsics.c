@@ -7,7 +7,8 @@
 #include "shl_log.h"
 #include "shl_arena.h"
 
-#define DEFAULT_INPUT_BUFFER_SIZE 64
+#define DEFAULT_INPUT_BUFFER_SIZE   64
+#define DEFAULT_RECEIVE_BUFFER_SIZE 64
 
 static void print_value(ValueStack *stack, Value *value, u32 level) {
   switch (value->kind) {
@@ -277,19 +278,30 @@ void send_intrinsic(Vm *vm) {
 }
 
 void receive_intrinsic(Vm *vm) {
-  Value size = value_stack_pop(&vm->stack);
   Value receiver = value_stack_pop(&vm->stack);
-  if (receiver.kind != ValueKindNumber ||
-      size.kind != ValueKindNumber) {
+  if (receiver.kind != ValueKindNumber) {
     ERROR("receive: wrong argument kind\n");
     exit(1);
   }
 
   Str buffer;
-  buffer.len = size.as.number;
+  buffer.len = DEFAULT_RECEIVE_BUFFER_SIZE;
   buffer.ptr = rc_arena_alloc(vm->rc_arena, buffer.len);
 
-  read(receiver.as.number, buffer.ptr, buffer.len);
+  u32 len;
+  while ((len = read(receiver.as.number,
+                     buffer.ptr + buffer.len,
+                     DEFAULT_RECEIVE_BUFFER_SIZE)) ==
+         DEFAULT_RECEIVE_BUFFER_SIZE) {
+    u32 prev_len = buffer.len;
+    char *prev_ptr = buffer.ptr;
+
+    buffer.len += DEFAULT_RECEIVE_BUFFER_SIZE;
+    buffer.ptr = rc_arena_alloc(vm->rc_arena, buffer.len);
+
+    memcpy(buffer.ptr, prev_ptr, prev_len);
+    rc_arena_free(vm->rc_arena, prev_ptr);
+  }
 
   value_stack_push_string(&vm->stack, buffer);
 }
@@ -1103,7 +1115,7 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("accept-connection"), 2, true, &accept_connection_intrinsic },
   { STR_LIT("close-connection"), 1, false, &close_connection_intrinsic },
   { STR_LIT("send"), 2, false, &send_intrinsic },
-  { STR_LIT("receive"), 2, true, &receive_intrinsic },
+  { STR_LIT("receive"), 1, true, &receive_intrinsic },
   // Base
   { STR_LIT("head"), 1, true, &head_intrinsic },
   { STR_LIT("tail"), 1, true, &tail_intrinsic },
