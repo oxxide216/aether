@@ -23,11 +23,13 @@ void *rc_arena_alloc(RcArena *arena, u32 size) {
 
   Region *new_region = malloc(sizeof(Region) + new_cap);
   *new_region = (Region) {0};
-  new_region->data = new_region + sizeof(Region);
+  new_region->data = (void *) new_region + sizeof(Region);
   new_region->cap = new_cap;
   new_region->len = size;
   new_region->refs_count = 1;
-  new_region->next = region;
+  new_region->next = NULL;
+
+  memset(new_region->data, 0, new_region->cap);
 
   if (prev_region)
     prev_region->next = new_region;
@@ -55,7 +57,7 @@ void *rc_arena_clone(RcArena *arena, void *data) {
 }
 
 void rc_arena_free(RcArena *arena, void *data) {
-  Region *prev_region = arena->regions;
+  Region *prev_region = NULL;
   Region *region = arena->regions;
   while (region) {
     if (region->refs_count > 0 &&

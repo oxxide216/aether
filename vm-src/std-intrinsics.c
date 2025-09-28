@@ -34,7 +34,11 @@ static void print_value(ValueStack *stack, Value *value, u32 level) {
       if (node != value->as.list->next)
         fputc(' ', stdout);
 
+      if (node->value.kind == ValueKindString)
+        fputc('\'', stdout);
       print_value(stack, &node->value, level);
+      if (node->value.kind == ValueKindString)
+        fputc('\'', stdout);
 
       node = node->next;
     }
@@ -43,9 +47,7 @@ static void print_value(ValueStack *stack, Value *value, u32 level) {
   } break;
 
   case ValueKindString: {
-    fputc('\'', stdout);
     str_print(value->as.string);
-    fputc('\'', stdout);
   } break;
 
   case ValueKindNumber: {
@@ -374,19 +376,16 @@ void nth_intrinsic(Vm *vm) {
   }
 
   ListNode *node = list.as.list->next;
-  ListNode *prev_node = list.as.list->next;
   u32 i = 0;
   while (node && i < index.as.number) {
     node = node->next;
-    if (prev_node->next)
-      prev_node = prev_node->next;
     ++i;
   }
 
   if (i < index.as.number)
     value_stack_push_unit(&vm->stack);
   else
-    DA_APPEND(vm->stack, prev_node->value);
+    DA_APPEND(vm->stack, node->value);
 }
 
 void len_intrinsic(Vm *vm) {

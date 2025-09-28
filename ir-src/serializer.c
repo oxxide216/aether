@@ -150,13 +150,13 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
   }
 }
 
-static void save_block_data(Ir *ir, u8 **data, u32 *data_size, u32 *end) {
+static void save_block_data(IrBlock *block, u8 **data, u32 *data_size, u32 *end) {
   reserve_space(sizeof(u32), data, data_size, end);
-  *(u32 *) (*data + *end) = ir->len;
+  *(u32 *) (*data + *end) = block->len;
   *end += sizeof(u32);
 
-  for (u32 i = 0; i < ir->len; ++i)
-    save_expr_data(ir->items[i], data, data_size, end);
+  for (u32 i = 0; i < block->len; ++i)
+    save_expr_data(block->items[i], data, data_size, end);
 }
 
 u8 *serialize(Ir *ir, u32 *size) {

@@ -167,7 +167,7 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
   case IrExprKindVarDef: {
     expr->as.var_def.expr = aalloc(sizeof(IrExpr));
 
-    load_str_data(&expr->as.string.lit, data, end, rc_arena);
+    load_str_data(&expr->as.var_def.name, data, end, rc_arena);
     load_expr_data(expr->as.var_def.expr, data, end, rc_arena);
   } break;
 
