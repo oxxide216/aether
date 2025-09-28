@@ -1,4 +1,4 @@
 #!/usr/bin/sh
 
 aetherc /tmp/aether-tmp.ac $1 && \
-aether-vm /tmp/aether-tmp.ac
+aether-vm /tmp/aether-tmp.ac ${@:2}
