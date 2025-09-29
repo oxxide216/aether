@@ -363,13 +363,14 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     EXECUTE_EXPR(vm, expr->as._if.cond, true);
 
     Value cond = value_stack_pop(&vm->stack);
-    if (cond.kind != ValueKindBool) {
-      ERROR("Only boolean value can be used as a condition\n");
+    if (cond.kind != ValueKindBool &&
+        cond.kind != ValueKindUnit) {
+      ERROR("Only boolean or unit value can be used as a condition\n");
       vm->exit_code = 1;
       return false;
     }
 
-    if (cond.as._bool) {
+    if (cond.kind != ValueKindUnit && cond.as._bool) {
       EXECUTE_BLOCK(vm, &expr->as._if.if_body, value_expected);
       break;
     }
@@ -380,13 +381,14 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       EXECUTE_EXPR(vm, expr->as._if.elifs.items[i].cond, true);
 
       cond = value_stack_pop(&vm->stack);
-      if (cond.kind != ValueKindBool) {
-        ERROR("Only boolean value can be used as a condition\n");
+      if (cond.kind != ValueKindBool &&
+          cond.kind != ValueKindUnit) {
+        ERROR("Only boolean or unit value can be used as a condition\n");
         vm->exit_code = 1;
         return false;
       }
 
-      if (cond.as._bool) {
+      if (cond.kind != ValueKindUnit && cond.as._bool) {
         EXECUTE_BLOCK(vm, &expr->as._if.elifs.items[i].body, value_expected);
         executed_elif = true;
         break;
