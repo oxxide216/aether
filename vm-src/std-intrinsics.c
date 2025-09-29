@@ -1032,18 +1032,27 @@ bool ge_intrinsic(Vm *vm) {
   return true;
 }
 
+static bool value_to_bool(Value *value, char *intrinsic_name) {
+  if (value->kind == ValueKindNumber)
+    return value->as.number != 0;
+  else if (value->kind == ValueKindBool)
+    return value->as._bool;
+  else if (value->kind == ValueKindUnit)
+    return false;
+  else if (value->kind == ValueKindList)
+    return value->as.list;
+  else
+    PANIC("%s: wrong argument kinds\n", intrinsic_name);
+}
+
 bool and_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
-  if (a.kind == ValueKindNumber &&
-      b.kind == ValueKindNumber)
-    value_stack_push_bool(&vm->stack, a.as.number & b.as.number);
-  else if (a.kind == ValueKindBool &&
-           b.kind == ValueKindBool)
-    value_stack_push_bool(&vm->stack, a.as._bool & b.as._bool);
+  if (!value_to_bool(&a, "and"))
+    value_stack_push_bool(&vm->stack, false);
   else
-    PANIC("and: wrong argument kinds\n");
+    value_stack_push_bool(&vm->stack, value_to_bool(&b, "and"));
 
   return true;
 }
@@ -1052,14 +1061,10 @@ bool or_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
-  if (a.kind == ValueKindNumber &&
-      b.kind == ValueKindNumber)
-    value_stack_push_bool(&vm->stack, a.as.number | b.as.number);
-  else if (a.kind == ValueKindBool &&
-           b.kind == ValueKindBool)
-    value_stack_push_bool(&vm->stack, a.as._bool | b.as._bool);
+  if (value_to_bool(&a, "or"))
+    value_stack_push_bool(&vm->stack, true);
   else
-    PANIC("or: wrong argument kinds\n");
+    value_stack_push_bool(&vm->stack, value_to_bool(&b, "or"));
 
   return true;
 }
@@ -1068,24 +1073,18 @@ bool xor_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
-  if (a.kind == ValueKindNumber &&
-      b.kind == ValueKindNumber)
-    value_stack_push_bool(&vm->stack, a.as.number ^ b.as.number);
-  else if (a.kind == ValueKindBool &&
-           b.kind == ValueKindBool)
-    value_stack_push_bool(&vm->stack, a.as._bool ^ b.as._bool);
+  if (value_to_bool(&a, "xor"))
+    value_stack_push_bool(&vm->stack, !value_to_bool(&b, "xor"));
   else
-    PANIC("xor: wrong argument kinds\n");
+    value_stack_push_bool(&vm->stack, value_to_bool(&b, "xor"));
 
   return true;
 }
 
 bool not_intrinsic(Vm *vm) {
-  Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindBool)
-    PANIC("not: wrong argument kind\n");
+  Value value = value_stack_pop(&vm->stak);
 
-  value_stack_push_bool(&vm->stack, !value.as._bool);
+  value_stack_push_bool(&vm->stack, !value_to_bool(&value, "not"));
 
   return true;
 }
