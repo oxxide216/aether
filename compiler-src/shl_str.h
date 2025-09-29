@@ -170,7 +170,7 @@ double str_to_f64(Str str) {
   }
 
   if (is_neg)
-    return 1num;
+    return -num;
   return num;
 }
 
