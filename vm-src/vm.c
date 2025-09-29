@@ -364,13 +364,16 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     Value cond = value_stack_pop(&vm->stack);
     if (cond.kind != ValueKindBool &&
-        cond.kind != ValueKindUnit) {
-      ERROR("Only boolean or unit value can be used as a condition\n");
+        cond.kind != ValueKindUnit &&
+        cond.kind != ValueKindList) {
+      ERROR("Only boolean, unit or list value can be used as a condition\n");
       vm->exit_code = 1;
       return false;
     }
 
-    if (cond.kind != ValueKindUnit && cond.as._bool) {
+    if (cond.kind != ValueKindUnit &&
+        ((cond.kind == ValueKindBool && cond.as._bool) ||
+         (cond.kind == ValueKindList && cond.as.list->next))) {
       EXECUTE_BLOCK(vm, &expr->as._if.if_body, value_expected);
       break;
     }
@@ -382,8 +385,9 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
       cond = value_stack_pop(&vm->stack);
       if (cond.kind != ValueKindBool &&
-          cond.kind != ValueKindUnit) {
-        ERROR("Only boolean or unit value can be used as a condition\n");
+          cond.kind != ValueKindUnit &&
+          cond.kind != ValueKindList) {
+        ERROR("Only boolean, unit or list value can be used as a condition\n");
         vm->exit_code = 1;
         return false;
       }
