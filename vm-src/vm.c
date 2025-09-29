@@ -4,6 +4,24 @@
 #include "shl_arena.h"
 #include "std-intrinsics.h"
 
+#define EXECUTE_FUNC(vm, name, args, value_expected)   \
+  do {                                                 \
+    if (!execute_func(vm, name, args, value_expected)) \
+      return false;                                    \
+  } while(0)
+
+#define EXECUTE_EXPR(vm, expr, value_expected)   \
+  do {                                           \
+    if (!execute_expr(vm, expr, value_expected)) \
+      return false;                              \
+  } while(0)
+
+#define EXECUTE_BLOCK(vm, block, value_expected)   \
+  do {                                             \
+    if (!execute_block(vm, block, value_expected)) \
+      return false;                                \
+  } while(0)
+
 typedef Da(Str) Strs;
 
 void list_use(RcArena *rc_arena, ListNode *list) {
@@ -155,7 +173,8 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values, I
     if (!var) {
       ERROR("Variable "STR_FMT" was not defined before usage\n",
             STR_ARG(expr->as.ident.ident));
-      exit(1);
+      vm->exit_code = 1;
+      return;
     }
 
     NamedValue value = { var->name, var->value };
@@ -180,22 +199,19 @@ static void catch_vars_block(Vm *vm, Strs *local_names,
     catch_vars(vm, local_names, catched_values, block->items[i]);
 }
 
-static void execute_block(Vm *vm, IrBlock *block, bool value_expected);
+static bool execute_block(Vm *vm, IrBlock *block, bool value_expected);
 
 static bool get_func(Vm *vm, Str name, u32 args_count, IrArgs *args,
                      IrBlock *body, NamedValues *catched_values) {
   Var *var = get_var(vm, name);
-  if (var) {
-    if (var->value.kind == ValueKindFunc &&
-        var->value.as.func.args.len == args_count) {
-      *args = var->value.as.func.args;
-      *body = var->value.as.func.body;
-      *catched_values = var->value.as.func.catched_values;
+  if (var &&
+      var->value.kind == ValueKindFunc &&
+      var->value.as.func.args.len == args_count) {
+    *args = var->value.as.func.args;
+    *body = var->value.as.func.body;
+    *catched_values = var->value.as.func.catched_values;
 
-      return true;
-    }
-
-    return false;
+    return true;
   }
 
   for (u32 i = vm->funcs.len; i > 0; --i) {
@@ -214,34 +230,33 @@ static bool get_func(Vm *vm, Str name, u32 args_count, IrArgs *args,
   return false;
 }
 
-void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected) {
+bool execute_func(Vm *vm, Str name, u32 args_len, bool value_expected) {
   IrArgs func_args = {0};
   IrBlock func_body = {0};
   NamedValues catched_values = {0};
-  if (!get_func(vm, name, args->len, &func_args, &func_body, &catched_values)) {
+  if (!get_func(vm, name, args_len, &func_args, &func_body, &catched_values)) {
     for (u32 i = vm->intrinsics.len; i > 0; --i) {
       Intrinsic *intrinsic = vm->intrinsics.items + i - 1;
 
       if (str_eq(intrinsic->name, name) &&
-          (intrinsic->args_count == args->len ||
+          (intrinsic->args_count == args_len ||
            intrinsic->args_count == (u32) -1)) {
-        for (u32 j = 0; j < args->len; ++j)
-          DA_APPEND(vm->stack, args->items[j]);
-
-        intrinsic->func(vm);
+        if (!intrinsic->func(vm))
+          return false;
 
         if (value_expected && !intrinsic->has_return_value)
           value_stack_push_unit(&vm->stack);
         else if (!value_expected && intrinsic->has_return_value)
           --vm->stack.len;
 
-        return;
+        return true;
       }
     }
 
     ERROR("Function "STR_FMT" with %u arguments was not defined before usage\n",
-          STR_ARG(name), args->len);
-    exit(1);
+          STR_ARG(name), args_len);
+    vm->exit_code = 1;
+    return false;
   }
 
   u32 prev_stack_len = vm->stack.len;
@@ -254,24 +269,22 @@ void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected) {
   for (u32 i = 0; i < func_args.len; ++i) {
     Var var = {
       func_args.items[i],
-      vm->stack.items[i],
+      vm->stack.items[vm->stack.len - func_args.len + i],
     };
 
-    DA_APPEND(vm->stack, args->items[i]);
     DA_APPEND(vm->local_vars, var);
   }
 
   for (u32 i = 0; i < catched_values.len; ++i) {
     Var var = {
       catched_values.items[i].name,
-      value_stack_pop(&vm->stack),
+      catched_values.items[i].value,
     };
 
-    DA_APPEND(vm->stack, catched_values.items[i].value);
     DA_APPEND(vm->local_vars, var);
   }
 
-  execute_block(vm, &func_body, value_expected);
+  EXECUTE_BLOCK(vm, &func_body, value_expected);
 
   for (u32 i = prev_stack_len; i < vm->stack.len - value_expected; ++i)
     free_value(vm->stack.items + i, vm->rc_arena);
@@ -283,12 +296,14 @@ void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected) {
   if (value_expected)
     vm->stack.items[prev_stack_len] = vm->stack.items[vm->stack.len - 1];
   vm->stack.len = prev_stack_len + value_expected;
+
+  return true;
 }
 
-void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
+bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   switch (expr->kind) {
   case IrExprKindBlock: {
-    execute_block(vm, &expr->as.block, value_expected);
+    EXECUTE_BLOCK(vm, &expr->as.block, value_expected);
   } break;
 
   case IrExprKindFuncDef: {
@@ -297,7 +312,8 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
           vm->funcs.items[i].def.args.len == expr->as.func_def.args.len) {
         ERROR("Function "STR_FMT" with %u args was redefined\n",
               STR_ARG(expr->as.func_def.name), expr->as.func_def.args.len);
-        exit(1);
+        vm->exit_code = 1;
+        return false;
       }
     }
 
@@ -309,19 +325,15 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   } break;
 
   case IrExprKindFuncCall: {
-    ValueStack args = {0};
+    for (u32 i = 0; i < expr->as.func_call.args.len; ++i)
+      EXECUTE_EXPR(vm, expr->as.func_call.args.items[i], true);
 
-    for (u32 i = 0; i < expr->as.func_call.args.len; ++i) {
-      execute_expr(vm, expr->as.func_call.args.items[i], true);
-      Value arg = value_stack_pop(&vm->stack);
-      DA_APPEND(args, arg);
-    }
-
-    execute_func(vm, expr->as.func_call.name, &args, value_expected);
+    EXECUTE_FUNC(vm, expr->as.func_call.name,
+                 expr->as.func_call.args.len, value_expected);
   } break;
 
   case IrExprKindVarDef: {
-    execute_expr(vm, expr->as.var_def.expr, true);
+    EXECUTE_EXPR(vm, expr->as.var_def.expr, true);
 
     Var *prev_var = get_var(vm, expr->as.var_def.name);
     if (prev_var) {
@@ -348,39 +360,41 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   } break;
 
   case IrExprKindIf: {
-    execute_expr(vm, expr->as._if.cond, true);
+    EXECUTE_EXPR(vm, expr->as._if.cond, true);
 
     Value cond = value_stack_pop(&vm->stack);
     if (cond.kind != ValueKindBool) {
       ERROR("Only boolean value can be used as a condition\n");
-      exit(1);
+      vm->exit_code = 1;
+      return false;
     }
 
     if (cond.as._bool) {
-      execute_block(vm, &expr->as._if.if_body, value_expected);
+      EXECUTE_BLOCK(vm, &expr->as._if.if_body, value_expected);
       break;
     }
 
     bool executed_elif = false;
 
     for (u32 i = 0; i < expr->as._if.elifs.len; ++i) {
-      execute_expr(vm, expr->as._if.elifs.items[i].cond, true);
+      EXECUTE_EXPR(vm, expr->as._if.elifs.items[i].cond, true);
 
       cond = value_stack_pop(&vm->stack);
       if (cond.kind != ValueKindBool) {
         ERROR("Only boolean value can be used as a condition\n");
-        exit(1);
+        vm->exit_code = 1;
+        return false;
       }
 
       if (cond.as._bool) {
-        execute_block(vm, &expr->as._if.elifs.items[i].body, value_expected);
+        EXECUTE_BLOCK(vm, &expr->as._if.elifs.items[i].body, value_expected);
         executed_elif = true;
         break;
       }
     }
 
     if (expr->as._if.has_else && !executed_elif)
-      execute_block(vm, &expr->as._if.else_body, value_expected);
+      EXECUTE_BLOCK(vm, &expr->as._if.else_body, value_expected);
     else if (value_expected)
       value_stack_push_unit(&vm->stack);
   } break;
@@ -391,12 +405,13 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       if (!is_first_iter && value_expected)
         --vm->stack.len;
 
-      execute_expr(vm, expr->as._while.cond, true);
+      EXECUTE_EXPR(vm, expr->as._while.cond, true);
 
       Value cond = value_stack_pop(&vm->stack);
       if (cond.kind != ValueKindBool) {
         ERROR("Only boolean value can be used as a condition\n");
-        exit(1);
+        vm->exit_code = 1;
+        return false;
       }
 
       if (!cond.as._bool)
@@ -404,7 +419,7 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
       is_first_iter = false;
 
-      execute_block(vm, &expr->as._while.body, value_expected);
+      EXECUTE_BLOCK(vm, &expr->as._while.body, value_expected);
     }
 
     if (is_first_iter && value_expected)
@@ -416,10 +431,11 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     if (!var) {
       ERROR("Variable "STR_FMT" was not defined before usage\n",
             STR_ARG(expr->as.set.dest));
-      exit(1);
+      vm->exit_code = 1;
+      return false;
     }
 
-    execute_expr(vm, expr->as.set.src, true);
+    EXECUTE_EXPR(vm, expr->as.set.src, true);
     free_value(&var->value, vm->rc_arena);
     var->value = value_stack_pop(&vm->stack);
 
@@ -432,12 +448,14 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     if (!var) {
       ERROR("Variable "STR_FMT" was not defined before usage\n",
             STR_ARG(expr->as.set.dest));
-      exit(1);
+      vm->exit_code = 1;
+      return false;
     }
 
     if (var->value.kind != ValueKindRecord) {
       ERROR("Only records have fields\n");
-      exit(1);
+      vm->exit_code = 1;
+      return false;
     }
 
     NamedValue *field = NULL;
@@ -460,7 +478,7 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     if (expr->as.field.is_set) {
       free_value(&field->value, vm->rc_arena);
 
-      execute_expr(vm, expr->as.field.expr, true);
+      EXECUTE_EXPR(vm, expr->as.field.expr, true);
       field->value = value_stack_pop(&vm->stack);
 
       if (value_expected)
@@ -483,7 +501,7 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     ListNode *list_end = list;
 
     for (u32 i = 0; i < expr->as.list.content.len; ++i) {
-      execute_expr(vm, expr->as.list.content.items[i], true);
+      EXECUTE_EXPR(vm, expr->as.list.content.items[i], true);
 
       ListNode *new_node = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
       new_node->value = value_stack_pop(&vm->stack);
@@ -503,12 +521,13 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
   case IrExprKindIdent: {
     if (!value_expected)
-      break;
+      return true;
 
     Var *var = get_var(vm, expr->as.ident.ident);
     if (var) {
       DA_APPEND(vm->stack, var->value);
-      return;
+
+      return true;
     }
 
     for (u32 i = 0; i < vm->funcs.len; ++i) {
@@ -520,13 +539,15 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
           { .func = { func->def.name, func->def.args, func->def.body, {} } },
         };
         DA_APPEND(vm->stack, func_value);
-        return;
+
+        return true;
       }
     }
 
     ERROR("Variable "STR_FMT" was not defined before usage\n",
           STR_ARG(expr->as.ident.ident));
-    exit(1);
+    vm->exit_code = 1;
+    return false;
   } break;
 
   case IrExprKindString: {
@@ -584,7 +605,7 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Record record = {0};
 
     for (u32 i = 0; i < expr->as.record.len; ++i) {
-      execute_expr(vm, expr->as.record.items[i].expr, true);
+      EXECUTE_EXPR(vm, expr->as.record.items[i].expr, true);
 
       NamedValue field;
       field.name = expr->as.record.items[i].name;
@@ -596,18 +617,22 @@ void execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     value_stack_push_record(&vm->stack, record);
   } break;
   }
+
+  return true;
 }
 
-static void execute_block(Vm *vm, IrBlock *block, bool value_expected) {
+static bool execute_block(Vm *vm, IrBlock *block, bool value_expected) {
   for (u32 i = 0; i + 1 < block->len; ++i)
-    execute_expr(vm, block->items[i], false);
+    EXECUTE_EXPR(vm, block->items[i], false);
 
   if (block->len > 0)
-    execute_expr(vm, block->items[block->len - 1], value_expected);
+    EXECUTE_EXPR(vm, block->items[block->len - 1], value_expected);
+
+  return true;
 }
 
-void execute(Ir *ir, i32 argc, char **argv,
-             RcArena *rc_arena, Intrinsics *intrinsics) {
+u32 execute(Ir *ir, i32 argc, char **argv,
+            RcArena *rc_arena, Intrinsics *intrinsics) {
   Vm vm = {0};
   vm.rc_arena = rc_arena;
   vm.intrinsics = *intrinsics;
@@ -642,4 +667,6 @@ void execute(Ir *ir, i32 argc, char **argv,
   }
 
   execute_block(&vm, ir, false);
+
+  return vm.exit_code;
 }

@@ -65,7 +65,7 @@ typedef Da(Value) ValueStack;
 
 typedef struct Vm Vm;
 
-typedef void (*IntrinsicFunc)(Vm *vm);
+typedef bool (*IntrinsicFunc)(Vm *vm);
 
 typedef struct {
   Str           name;
@@ -94,6 +94,7 @@ struct Vm {
   RcArena    *rc_arena;
   Intrinsics  intrinsics;
   bool        is_inside_of_func;
+  u32         exit_code;
 };
 
 void      list_use(RcArena *rc_arena, ListNode *list);
@@ -109,9 +110,9 @@ void value_stack_push_record(ValueStack *stack, Record record);
 Value  value_stack_pop(ValueStack *stack);
 Value *value_stack_get(ValueStack *stack, u32 index);
 
-void execute_func(Vm *vm, Str name, ValueStack *args, bool value_expected);
-void execute_expr(Vm *vm, IrExpr *expr, bool value_expected);
-void execute(Ir *ir, i32 argc, char **argv,
+bool execute_func(Vm *vm, Str name, u32 args_len, bool value_expected);
+bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected);
+u32  execute(Ir *ir, i32 argc, char **argv,
              RcArena *rc_arena, Intrinsics *intrinsics);
 
 #endif // VM_H

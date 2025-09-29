@@ -10,14 +10,20 @@
 #define DEFAULT_INPUT_BUFFER_SIZE   64
 #define DEFAULT_RECEIVE_BUFFER_SIZE 64
 
-void exit_intrinsic(Vm *vm) {
-  Value exit_code = value_stack_pop(&vm->stack);
-  if (exit_code.kind != ValueKindNumber) {
-    ERROR("exit: wrong argument kind\n");
-    exit(1);
-  }
+#define PANIC(...)      \
+  do {                  \
+    ERROR(__VA_ARGS__); \
+    vm->exit_code = 1;  \
+    return false;       \
+  } while (0)
 
-  exit(1);
+bool exit_intrinsic(Vm *vm) {
+  Value exit_code = value_stack_pop(&vm->stack);
+  if (exit_code.kind != ValueKindNumber)
+    PANIC("exit: wrong argument kind\n");
+
+  vm->exit_code = exit_code.as.number;
+  return false;
 }
 
 static void print_value(ValueStack *stack, Value *value, u32 level) {
@@ -95,17 +101,21 @@ static void print_value(ValueStack *stack, Value *value, u32 level) {
   }
 }
 
-void print_intrinsic(Vm *vm) {
+bool print_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   print_value(&vm->stack, &value, 0);
+
+  return true;
 }
 
-void println_intrinsic(Vm *vm) {
+bool println_intrinsic(Vm *vm) {
   print_intrinsic(vm);
   fputc('\n', stdout);
+
+  return true;
 }
 
-void input_intrinsic(Vm *vm) {
+bool input_intrinsic(Vm *vm) {
   (void) vm;
 
   u32 buffer_size = DEFAULT_INPUT_BUFFER_SIZE;
@@ -127,14 +137,14 @@ void input_intrinsic(Vm *vm) {
   }
 
   value_stack_push_string(&vm->stack, STR(buffer, len));
+
+  return true;
 }
 
-void read_file_intrinsic(Vm *vm) {
+bool read_file_intrinsic(Vm *vm) {
   Value path = value_stack_pop(&vm->stack);
-  if (path.kind != ValueKindString) {
-    ERROR("read-file: wrong argument kind\n");
-    exit(1);
-  }
+  if (path.kind != ValueKindString)
+    PANIC("read-file: wrong argument kind\n");
 
   char *path_cstring = aalloc(path.as.string.len + 1);
   memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
@@ -145,40 +155,45 @@ void read_file_intrinsic(Vm *vm) {
     value_stack_push_unit(&vm->stack);
   else
     value_stack_push_string(&vm->stack, content);
+
+  return true;
 }
 
-void write_file_intrinsic(Vm *vm) {
+bool write_file_intrinsic(Vm *vm) {
   Value path = value_stack_pop(&vm->stack);
   Value content = value_stack_pop(&vm->stack);
   if (path.kind != ValueKindString ||
-      content.kind != ValueKindString) {
-    ERROR("write-file: wrong argument kinds\n");
-    exit(1);
-  }
+      content.kind != ValueKindString)
+    PANIC("write-file: wrong argument kinds\n");
 
   char *path_cstring = aalloc(path.as.string.len + 1);
   memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
   path_cstring[path.as.string.len] = '\0';
 
   write_file(path_cstring, content.as.string);
+
+  return true;
 }
 
-void get_args_intrinsic(Vm *vm) {
+bool get_args_intrinsic(Vm *vm) {
   value_stack_push_list(&vm->stack, vm->args);
+
+  return true;
 }
 
-void create_server_intrinsic(Vm *vm) {
+bool create_server_intrinsic(Vm *vm) {
   Value port = value_stack_pop(&vm->stack);
-  if (port.kind != ValueKindNumber) {
-    ERROR("create-server: wrong argument kind\n");
-    exit(1);
-  }
+  if (port.kind != ValueKindNumber)
+    PANIC("create-server: wrong argument kind\n");
 
   i32 server_socket = socket(AF_INET, SOCK_STREAM, 0);
   if (server_socket < 0) {
     value_stack_push_unit(&vm->stack);
-    return;
+    return true;
   }
+
+  i32 enable = 1;
+  setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
 
   struct sockaddr_in address;
   address.sin_family = AF_INET;
@@ -188,30 +203,30 @@ void create_server_intrinsic(Vm *vm) {
   if (bind(server_socket, (struct sockaddr*) &address,
            sizeof(address)) < 0) {
     value_stack_push_unit(&vm->stack);
-    return;
+    return true;
   }
 
   if (listen(server_socket, 3) < 0) {
     value_stack_push_unit(&vm->stack);
-    return;
+    return true;
   }
 
   value_stack_push_number(&vm->stack, server_socket);
+
+  return true;
 }
 
-void create_client_intrinsic(Vm *vm) {
+bool create_client_intrinsic(Vm *vm) {
   Value port = value_stack_pop(&vm->stack);
   Value server_ip_address = value_stack_pop(&vm->stack);
   if (server_ip_address.kind != ValueKindString ||
-      port.kind != ValueKindNumber) {
-    ERROR("create-client: wrong argument kind\n");
-    exit(1);
-  }
+      port.kind != ValueKindNumber)
+    PANIC("create-client: wrong argument kind\n");
 
   i32 client_socket = socket(AF_INET, SOCK_STREAM, 0);
   if (client_socket < 0) {
     value_stack_push_unit(&vm->stack);
-    return;
+    return true;
   }
 
   struct sockaddr_in server_address;
@@ -228,27 +243,27 @@ void create_client_intrinsic(Vm *vm) {
                 server_ip_address_cstr,
                 &server_address.sin_addr) < 0) {
     value_stack_push_unit(&vm->stack);
-    return;
+    return true;
   }
 
   if (connect(client_socket,
               (struct sockaddr*) &server_address,
               sizeof(server_address)) < 0) {
     value_stack_push_unit(&vm->stack);
-    return;
+    return true;
   }
 
   value_stack_push_number(&vm->stack, client_socket);
+
+  return true;
 }
 
-void accept_connection_intrinsic(Vm *vm) {
+bool accept_connection_intrinsic(Vm *vm) {
   Value port = value_stack_pop(&vm->stack);
   Value server_socket = value_stack_pop(&vm->stack);
   if (server_socket.kind != ValueKindNumber ||
-      port.kind != ValueKindNumber) {
-    ERROR("accept-connection: wrong argument kind\n");
-    exit(1);
-  }
+      port.kind != ValueKindNumber)
+    PANIC("accept-connection: wrong argument kind\n");
 
   struct sockaddr_in address;
   address.sin_family = AF_INET;
@@ -261,40 +276,40 @@ void accept_connection_intrinsic(Vm *vm) {
                              &address_size);
   if (client_socket < 0) {
     value_stack_push_unit(&vm->stack);
-    return;
+    return true;
   }
 
   value_stack_push_number(&vm->stack, client_socket);
+
+  return true;
 }
 
-void close_connection_intrinsic(Vm *vm) {
+bool close_connection_intrinsic(Vm *vm) {
   Value client_socket = value_stack_pop(&vm->stack);
-  if (client_socket.kind != ValueKindNumber) {
-    ERROR("close-connection: wrong argument kind\n");
-    exit(1);
-  }
+  if (client_socket.kind != ValueKindNumber)
+    PANIC("close-connection: wrong argument kind\n");
 
   close(client_socket.as.number);
+
+  return true;
 }
 
-void send_intrinsic(Vm *vm) {
+bool send_intrinsic(Vm *vm) {
   Value message = value_stack_pop(&vm->stack);
   Value receiver = value_stack_pop(&vm->stack);
   if (receiver.kind != ValueKindNumber ||
-      message.kind != ValueKindString) {
-    ERROR("send: wrong argument kind\n");
-    exit(1);
-  }
+      message.kind != ValueKindString)
+    PANIC("send: wrong argument kind\n");
 
   send(receiver.as.number, message.as.string.ptr, message.as.string.len, 0);
+
+  return true;
 }
 
-void receive_intrinsic(Vm *vm) {
+bool receive_intrinsic(Vm *vm) {
   Value receiver = value_stack_pop(&vm->stack);
-  if (receiver.kind != ValueKindNumber) {
-    ERROR("receive: wrong argument kind\n");
-    exit(1);
-  }
+  if (receiver.kind != ValueKindNumber)
+    PANIC("receive: wrong argument kind\n");
 
   Str buffer;
   buffer.len = DEFAULT_RECEIVE_BUFFER_SIZE;
@@ -316,47 +331,47 @@ void receive_intrinsic(Vm *vm) {
   }
 
   value_stack_push_string(&vm->stack, buffer);
+
+  return true;
 }
 
-void head_intrinsic(Vm *vm) {
+bool head_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindList) {
-    ERROR("head: wrong argument kind\n");
-    exit(1);
-  }
+  if (value.kind != ValueKindList)
+    PANIC("head: wrong argument kind\n");
 
   if (!value.as.list->next) {
     value_stack_push_unit(&vm->stack);
-    return;
+    return true;
   }
 
   DA_APPEND(vm->stack, value.as.list->next->value);
+
+  return true;
 }
 
-void tail_intrinsic(Vm *vm) {
+bool tail_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindList) {
-    ERROR("tail: wrong argument kind\n");
-    exit(1);
-  }
+  if (value.kind != ValueKindList)
+    PANIC("tail: wrong argument kind\n");
 
   ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
   if (value.as.list->next)
     new_list->next = list_clone(vm->rc_arena, value.as.list->next->next);
 
   value_stack_push_list(&vm->stack, new_list);
+
+  return true;
 }
 
-void last_intrinsic(Vm *vm) {
+bool last_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindList) {
-    ERROR("last: wrong argument kind\n");
-    exit(1);
-  }
+  if (value.kind != ValueKindList)
+    PANIC("last: wrong argument kind\n");
 
   if (!value.as.list->next) {
     value_stack_push_unit(&vm->stack);
-    return;
+    return true;
   }
 
   ListNode *node = value.as.list->next;
@@ -364,16 +379,16 @@ void last_intrinsic(Vm *vm) {
     node = node->next;
 
   DA_APPEND(vm->stack, node->value);
+
+  return true;
 }
 
-void nth_intrinsic(Vm *vm) {
+bool nth_intrinsic(Vm *vm) {
   Value index = value_stack_pop(&vm->stack);
   Value list = value_stack_pop(&vm->stack);
   if (list.kind != ValueKindList ||
-      index.kind != ValueKindNumber) {
-    ERROR("nth: wrong argument kinds\n");
-    exit(1);
-  }
+      index.kind != ValueKindNumber)
+    PANIC("nth: wrong argument kinds\n");
 
   ListNode *node = list.as.list->next;
   u32 i = 0;
@@ -386,9 +401,11 @@ void nth_intrinsic(Vm *vm) {
     value_stack_push_unit(&vm->stack);
   else
     DA_APPEND(vm->stack, node->value);
+
+  return true;
 }
 
-void len_intrinsic(Vm *vm) {
+bool len_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind == ValueKindList) {
     ListNode *node = value.as.list->next;
@@ -402,36 +419,35 @@ void len_intrinsic(Vm *vm) {
   } else if (value.kind == ValueKindString) {
     value_stack_push_number(&vm->stack, value.as.string.len);
   } else {
-    ERROR("len: wrong argument kind\n");
-    exit(1);
+    PANIC("len: wrong argument kind\n");
   }
+
+  return true;
 }
 
-void is_empty_intrinsic(Vm *vm) {
+bool is_empty_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind != ValueKindList &&
-      value.kind != ValueKindString) {
-    ERROR("is-empty: wrong argument kind\n");
-    exit(1);
-  }
+      value.kind != ValueKindString)
+    PANIC("is-empty: wrong argument kind\n");
 
   if (value.kind == ValueKindList)
     value_stack_push_bool(&vm->stack, value.as.list->next == NULL);
   else
     value_stack_push_bool(&vm->stack, value.as.string.len == 0);
+
+  return true;
 }
 
-void get_range_intrinsic(Vm *vm) {
+bool get_range_intrinsic(Vm *vm) {
   Value end = value_stack_pop(&vm->stack);
   Value begin = value_stack_pop(&vm->stack);
   Value value = value_stack_pop(&vm->stack);
   if (begin.kind != ValueKindNumber ||
       end.kind != ValueKindNumber ||
       (value.kind != ValueKindList &&
-       value.kind != ValueKindString)) {
-    ERROR("get-range: wrong argument kinds\n");
-    exit(1);
-  }
+       value.kind != ValueKindString))
+    PANIC("get-range: wrong argument kinds\n");
 
   DA_APPEND(vm->stack, value);
   len_intrinsic(vm);
@@ -441,7 +457,7 @@ void get_range_intrinsic(Vm *vm) {
       end.as.number <= 0 || end.as.number >= len.as.number ||
       begin.as.number >= end.as.number) {
     value_stack_push_unit(&vm->stack);
-    return;
+    return true;
   }
 
   if (value.kind == ValueKindList) {
@@ -469,59 +485,53 @@ void get_range_intrinsic(Vm *vm) {
 
     value_stack_push_string(&vm->stack, sub_string);
   }
+
+  return true;
 }
 
-void map_intrinsic(Vm *vm) {
+bool map_intrinsic(Vm *vm) {
   Value list = value_stack_pop(&vm->stack);
   Value func = value_stack_pop(&vm->stack);
   if (func.kind != ValueKindFunc ||
-      list.kind != ValueKindList) {
-    ERROR("map: wrong argument kinds\n");
-    exit(1);
-  }
+      list.kind != ValueKindList)
+    PANIC("map: wrong argument kinds\n");
 
   ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
   ListNode **new_list_next = &new_list->next;
   ListNode *node = list.as.list->next;
   while (node) {
-    ValueStack args = {0};
-    DA_APPEND(args, node->value);
-    execute_func(vm, func.as.func.name, &args, true);
+    DA_APPEND(vm->stack, node->value);
+    execute_func(vm, func.as.func.name, 1, true);
 
     *new_list_next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
     (*new_list_next)->value = value_stack_pop(&vm->stack);
     new_list_next = &(*new_list_next)->next;
 
-    free(args.items);
-
     node = node->next;
   }
 
   value_stack_push_list(&vm->stack, new_list);
+
+  return true;
 }
 
-void filter_intrinsic(Vm *vm) {
+bool filter_intrinsic(Vm *vm) {
   Value list = value_stack_pop(&vm->stack);
   Value func = value_stack_pop(&vm->stack);
   if (func.kind != ValueKindFunc ||
-      list.kind != ValueKindList) {
-    ERROR("filter: wrong argument kinds\n");
-    exit(1);
-  }
+      list.kind != ValueKindList)
+    PANIC("filter: wrong argument kinds\n");
 
   ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
   ListNode **new_list_next = &new_list->next;
   ListNode *node = list.as.list->next;
   while (node) {
-    ValueStack args = {0};
-    DA_APPEND(args, node->value);
-    execute_func(vm, func.as.func.name, &args, true);
+    DA_APPEND(vm->stack, node->value);
+    execute_func(vm, func.as.func.name, 1, true);
 
     Value is_ok = value_stack_pop(&vm->stack);
-    if (is_ok.kind != ValueKindBool) {
-      ERROR("filter: wrong argument kinds\n");
-      exit(1);
-    }
+    if (is_ok.kind != ValueKindBool)
+      PANIC("filter: wrong argument kinds\n");
 
     if (is_ok.as._bool) {
       *new_list_next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
@@ -529,52 +539,47 @@ void filter_intrinsic(Vm *vm) {
       new_list_next = &(*new_list_next)->next;
     }
 
-    free(args.items);
-
     node = node->next;
   }
 
   value_stack_push_list(&vm->stack, new_list);
+
+  return true;
 }
 
-void reduce_intrinsic(Vm *vm) {
+bool reduce_intrinsic(Vm *vm) {
   Value list = value_stack_pop(&vm->stack);
   Value initial_value = value_stack_pop(&vm->stack);
   Value func = value_stack_pop(&vm->stack);
   if (func.kind != ValueKindFunc ||
-      list.kind != ValueKindList) {
-    ERROR("reduce: wrong argument kinds\n");
-    exit(1);
-  }
+      list.kind != ValueKindList)
+    PANIC("reduce: wrong argument kinds\n");
 
   Value accumulator = initial_value;
   ListNode *node = list.as.list->next;
   while (node) {
-    ValueStack args = {0};
-    DA_APPEND(args, accumulator);
-    DA_APPEND(args, node->value);
-    execute_func(vm, func.as.func.name, &args, true);
+    DA_APPEND(vm->stack, accumulator);
+    DA_APPEND(vm->stack, node->value);
+    execute_func(vm, func.as.func.name, 2, true);
 
     accumulator = value_stack_pop(&vm->stack);
-    if (accumulator.kind != initial_value.kind) {
-      ERROR("reduce: return value's and accumulator's types should be equal\n");
-      exit(1);
-    }
+    if (accumulator.kind != initial_value.kind)
+      PANIC("reduce: return value's and accumulator's types should be equal\n");
 
     node = node->next;
   }
 
   DA_APPEND(vm->stack, accumulator);
+
+  return true;
 }
 
-void split_intrinsic(Vm *vm) {
+bool split_intrinsic(Vm *vm) {
   Value delimeter = value_stack_pop(&vm->stack);
   Value string = value_stack_pop(&vm->stack);
   if (string.kind != ValueKindString ||
-      delimeter.kind != ValueKindString) {
-    ERROR("split: wrong argument kinds\n");
-    exit(1);
-  }
+      delimeter.kind != ValueKindString)
+    PANIC("split: wrong argument kinds\n");
 
   ListNode *list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
   ListNode *node = list;
@@ -609,20 +614,20 @@ void split_intrinsic(Vm *vm) {
   }
 
   value_stack_push_list(&vm->stack, list);
+
+  return true;
 }
 
-void eat_str_intrinsic(Vm *vm) {
+bool eat_str_intrinsic(Vm *vm) {
   Value pattern = value_stack_pop(&vm->stack);
   Value string = value_stack_pop(&vm->stack);
   if (string.kind != ValueKindString ||
-      pattern.kind != ValueKindString) {
-    ERROR("eat-str: wrong argument kinds\n");
-    exit(1);
-  }
+      pattern.kind != ValueKindString)
+    PANIC("eat-str: wrong argument kinds\n");
 
   if (string.as.string.len < pattern.as.string.len) {
     value_stack_push_bool(&vm->stack, false);
-    return;
+    return true;
   }
 
   Str string_begin = {
@@ -645,18 +650,18 @@ void eat_str_intrinsic(Vm *vm) {
   new_list->next->next->value = (Value) { ValueKindString, { .string = new_string } };
 
   value_stack_push_list(&vm->stack, new_list);
+
+  return true;
 }
 
-static void eat_byte(Vm *vm, char *intrinsic_name, u32 size) {
+static bool eat_byte(Vm *vm, char *intrinsic_name, u32 size) {
   Value string = value_stack_pop(&vm->stack);
-  if (string.kind != ValueKindString) {
-    ERROR("%s: wrong argument kinds\n", intrinsic_name);
-    exit(1);
-  }
+  if (string.kind != ValueKindString)
+    PANIC("%s: wrong argument kinds\n", intrinsic_name);
 
   if (string.as.string.len < size) {
     value_stack_push_unit(&vm->stack);
-    return;
+    return true;
   }
 
   i64 number = 0;
@@ -680,40 +685,48 @@ static void eat_byte(Vm *vm, char *intrinsic_name, u32 size) {
   new_list->next->next->value = (Value) { ValueKindString, { .string = new_string } };
 
   value_stack_push_list(&vm->stack, new_list);
+
+  return true;
 }
 
-void eat_byte_64_intrinsic(Vm *vm) {
+bool eat_byte_64_intrinsic(Vm *vm) {
   eat_byte(vm, "eat-byte-64", 8);
+
+  return true;
 }
 
-void eat_byte_32_intrinsic(Vm *vm) {
+bool eat_byte_32_intrinsic(Vm *vm) {
   eat_byte(vm, "eat-byte-32", 4);
+
+  return true;
 }
 
-void eat_byte_16_intrinsic(Vm *vm) {
+bool eat_byte_16_intrinsic(Vm *vm) {
   eat_byte(vm, "eat-byte-16", 2);
+
+  return true;
 }
 
-void eat_byte_8_intrinsic(Vm *vm) {
+bool eat_byte_8_intrinsic(Vm *vm) {
   eat_byte(vm, "eat-byte-8", 1);
+
+  return true;
 }
 
-void str_to_num_intrinsic(Vm *vm) {
+bool str_to_num_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindString) {
-    ERROR("str-to-num: wrong argument kind\n");
-    exit(1);
-  }
+  if (value.kind != ValueKindString)
+    PANIC("str-to-num: wrong argument kind\n");
 
   value_stack_push_number(&vm->stack, str_to_i64(value.as.string));
+
+  return true;
 }
 
-void num_to_str_intrinsic(Vm *vm) {
+bool num_to_str_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindNumber) {
-    ERROR("num-to-str: wrong argument kind\n");
-    exit(1);
-  }
+  if (value.kind != ValueKindNumber)
+    PANIC("num-to-str: wrong argument kind\n");
 
   StringBuilder sb = {0};
   sb_push_i64(&sb, value.as.number);
@@ -725,14 +738,14 @@ void num_to_str_intrinsic(Vm *vm) {
   free(sb.buffer);
 
   value_stack_push_string(&vm->stack, new_string);
+
+  return true;
 }
 
-void bool_to_str_intrinsic(Vm *vm) {
+bool bool_to_str_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindBool) {
-    ERROR("bool-to-str: wrong argument kind\n");
-    exit(1);
-  }
+  if (value.kind != ValueKindBool)
+    PANIC("bool-to-str: wrong argument kind\n");
 
   Str string;
   char *cstring;
@@ -749,24 +762,24 @@ void bool_to_str_intrinsic(Vm *vm) {
   memcpy(string.ptr, cstring, string.len);
 
   value_stack_push_string(&vm->stack, string);
+
+  return true;
 }
 
-void bool_to_num_intrinsic(Vm *vm) {
+bool bool_to_num_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindBool) {
-    ERROR("bool-to-num: wrong argument kind\n");
-    exit(1);
-  }
+  if (value.kind != ValueKindBool)
+    PANIC("bool-to-num: wrong argument kind\n");
 
   value_stack_push_number(&vm->stack, value.as._bool);
+
+  return true;
 }
 
-static void byte_to_str(Vm *vm, char *intrinsic_name, u32 size) {
+static bool byte_to_str(Vm *vm, char *intrinsic_name, u32 size) {
   Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindNumber) {
-    ERROR("%s: wrong argument kind\n", intrinsic_name);
-    exit(1);
-  }
+  if (value.kind != ValueKindNumber)
+    PANIC("%s: wrong argument kind\n", intrinsic_name);
 
   Str new_string;
   new_string.len = size;
@@ -780,25 +793,35 @@ static void byte_to_str(Vm *vm, char *intrinsic_name, u32 size) {
   }
 
   value_stack_push_string(&vm->stack, new_string);
+
+  return true;
 }
 
-void byte_64_to_str_intrinsic(Vm *vm) {
+bool byte_64_to_str_intrinsic(Vm *vm) {
   byte_to_str(vm, "byte-64-to-str", 8);
+
+  return true;
 }
 
-void byte_32_to_str_intrinsic(Vm *vm) {
+bool byte_32_to_str_intrinsic(Vm *vm) {
   byte_to_str(vm, "byte-32-to-str", 4);
+
+  return true;
 }
 
-void byte_16_to_str_intrinsic(Vm *vm) {
+bool byte_16_to_str_intrinsic(Vm *vm) {
   byte_to_str(vm, "byte-16-to-str", 2);
+
+  return true;
 }
 
-void byte_8_to_str_intrinsic(Vm *vm) {
+bool byte_8_to_str_intrinsic(Vm *vm) {
   byte_to_str(vm, "byte-8-to-str", 1);
+
+  return true;
 }
 
-void add_intrinsic(Vm *vm) {
+bool add_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
@@ -853,235 +876,270 @@ void add_intrinsic(Vm *vm) {
 
     value_stack_push_list(&vm->stack, new_list);
   } else {
-    ERROR("add: wrong argument kinds\n");
-    exit(1);
+    PANIC("add: wrong argument kinds\n");
   }
+
+  return true;
 }
 
-static void prepare_two_numbers(Value *a, Value *b, char *intrinsic_name, Vm *vm) {
+static bool prepare_two_numbers(Value *a, Value *b, char *intrinsic_name, Vm *vm) {
   *b = value_stack_pop(&vm->stack);
   *a = value_stack_pop(&vm->stack);
 
   if (a->kind != ValueKindNumber ||
-      b->kind != ValueKindNumber) {
-    ERROR("%s: wrong argument kinds\n", intrinsic_name);
-    exit(1);
-  }
+      b->kind != ValueKindNumber)
+    PANIC("%s: wrong argument kinds\n", intrinsic_name);
+
+  return true;
 }
 
-void sub_intrinsic(Vm *vm) {
+bool sub_intrinsic(Vm *vm) {
   Value a, b;
   prepare_two_numbers(&a, &b, "sub", vm);
 
   value_stack_push_number(&vm->stack, a.as.number - b.as.number);
+
+  return true;
 }
 
-void mul_intrinsic(Vm *vm) {
+bool mul_intrinsic(Vm *vm) {
   Value a, b;
   prepare_two_numbers(&a, &b, "mul", vm);
 
   value_stack_push_number(&vm->stack, a.as.number * b.as.number);
+
+  return true;
 }
 
-void div_intrinsic(Vm *vm) {
+bool div_intrinsic(Vm *vm) {
   Value a, b;
   prepare_two_numbers(&a, &b, "div", vm);
 
   value_stack_push_number(&vm->stack, a.as.number / b.as.number);
+
+  return true;
 }
 
-void mod_intrinsic(Vm *vm) {
+bool mod_intrinsic(Vm *vm) {
   Value a, b;
   prepare_two_numbers(&a, &b, "mod", vm);
 
   value_stack_push_number(&vm->stack, a.as.number % b.as.number);
+
+  return true;
 }
 
-void abs_intrinsic(Vm *vm) {
+bool abs_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindNumber) {
-    ERROR("abs: wrong argument kind\n");
-    exit(1);
-  }
+  if (value.kind != ValueKindNumber)
+    PANIC("abs: wrong argument kind\n");
 
   if (value.as.number < 0)
     value.as.number = -value.as.number;
 
   DA_APPEND(vm->stack, value);
+
+  return true;
 }
 
-void min_intrinsic(Vm *vm) {
+bool min_intrinsic(Vm *vm) {
   Value a, b;
   prepare_two_numbers(&a, &b, "min", vm);
 
   value_stack_push_number(&vm->stack, a.as.number <= b.as.number ?
                                       a.as.number :
                                       b.as.number);
+
+  return true;
 }
 
-void max_intrinsic(Vm *vm) {
+bool max_intrinsic(Vm *vm) {
   Value a, b;
   prepare_two_numbers(&a, &b, "max", vm);
 
   value_stack_push_number(&vm->stack, a.as.number >= b.as.number ?
                                       a.as.number :
                                       b.as.number);
+
+  return true;
 }
 
-void eq_intrinsic(Vm *vm) {
+bool eq_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
   if (a.kind == ValueKindNumber &&
-      b.kind == ValueKindNumber) {
+      b.kind == ValueKindNumber)
     value_stack_push_bool(&vm->stack, a.as.number == b.as.number);
-  } else if (a.kind == ValueKindString &&
-             b.kind == ValueKindString) {
+  else if (a.kind == ValueKindString &&
+           b.kind == ValueKindString)
     value_stack_push_bool(&vm->stack, str_eq(a.as.string, b.as.string));
-  } else {
-    ERROR("eq: wrong argument kinds: %u:%u\n", a.kind, b.kind);
-    exit(1);
-  }
+  else
+    PANIC("eq: wrong argument kinds: %u:%u\n", a.kind, b.kind);
+
+  return true;
 }
 
-void ne_intrinsic(Vm *vm) {
+bool ne_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
   if (a.kind == ValueKindNumber &&
-      b.kind == ValueKindNumber) {
+      b.kind == ValueKindNumber)
     value_stack_push_bool(&vm->stack, a.as.number != b.as.number);
-  } else if (a.kind == ValueKindString &&
-             b.kind == ValueKindString) {
+  else if (a.kind == ValueKindString &&
+           b.kind == ValueKindString)
     value_stack_push_bool(&vm->stack, !str_eq(a.as.string, b.as.string));
-  } else {
-    ERROR("ne: wrong argument kinds\n");
-    exit(1);
-  }
+  else
+    PANIC("ne: wrong argument kinds\n");
+
+  return true;
 }
 
-void ls_intrinsic(Vm *vm) {
+bool ls_intrinsic(Vm *vm) {
   Value a, b;
   prepare_two_numbers(&a, &b, "ls", vm);
 
   value_stack_push_bool(&vm->stack, a.as.number < b.as.number);
+
+  return true;
 }
 
-void le_intrinsic(Vm *vm) {
+bool le_intrinsic(Vm *vm) {
   Value a, b;
   prepare_two_numbers(&a, &b, "le", vm);
 
   value_stack_push_bool(&vm->stack, a.as.number <= b.as.number);
+
+  return true;
 }
 
-void gt_intrinsic(Vm *vm) {
+bool gt_intrinsic(Vm *vm) {
   Value a, b;
   prepare_two_numbers(&a, &b, "gt", vm);
 
   value_stack_push_bool(&vm->stack, a.as.number > b.as.number);
+
+  return true;
 }
 
-void ge_intrinsic(Vm *vm) {
+bool ge_intrinsic(Vm *vm) {
   Value a, b;
   prepare_two_numbers(&a, &b, "ge", vm);
 
   value_stack_push_bool(&vm->stack, a.as.number >= b.as.number);
+
+  return true;
 }
 
-void and_intrinsic(Vm *vm) {
+bool and_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
   if (a.kind == ValueKindNumber &&
-      b.kind == ValueKindNumber) {
+      b.kind == ValueKindNumber)
     value_stack_push_bool(&vm->stack, a.as.number & b.as.number);
-  } else if (a.kind == ValueKindBool &&
-             b.kind == ValueKindBool) {
+  else if (a.kind == ValueKindBool &&
+           b.kind == ValueKindBool)
     value_stack_push_bool(&vm->stack, a.as._bool & b.as._bool);
-  } else {
-    ERROR("and: wrong argument kinds\n");
-    exit(1);
-  }
+  else
+    PANIC("and: wrong argument kinds\n");
+
+  return true;
 }
 
-void or_intrinsic(Vm *vm) {
+bool or_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
   if (a.kind == ValueKindNumber &&
-      b.kind == ValueKindNumber) {
+      b.kind == ValueKindNumber)
     value_stack_push_bool(&vm->stack, a.as.number | b.as.number);
-  } else if (a.kind == ValueKindBool &&
-             b.kind == ValueKindBool) {
+  else if (a.kind == ValueKindBool &&
+           b.kind == ValueKindBool)
     value_stack_push_bool(&vm->stack, a.as._bool | b.as._bool);
-  } else {
-    ERROR("or: wrong argument kinds\n");
-    exit(1);
-  }
+  else
+    PANIC("or: wrong argument kinds\n");
+
+  return true;
 }
 
-void xor_intrinsic(Vm *vm) {
+bool xor_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
   if (a.kind == ValueKindNumber &&
-      b.kind == ValueKindNumber) {
+      b.kind == ValueKindNumber)
     value_stack_push_bool(&vm->stack, a.as.number ^ b.as.number);
-  } else if (a.kind == ValueKindBool &&
-             b.kind == ValueKindBool) {
+  else if (a.kind == ValueKindBool &&
+           b.kind == ValueKindBool)
     value_stack_push_bool(&vm->stack, a.as._bool ^ b.as._bool);
-  } else {
-    ERROR("xor: wrong argument kinds\n");
-    exit(1);
-  }
+  else
+    PANIC("xor: wrong argument kinds\n");
+
+  return true;
 }
 
-void not_intrinsic(Vm *vm) {
+bool not_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindBool) {
-    ERROR("not: wrong argument kind\n");
-    exit(1);
-  }
+  if (value.kind != ValueKindBool)
+    PANIC("not: wrong argument kind\n");
 
   value_stack_push_bool(&vm->stack, !value.as._bool);
+
+  return true;
 }
 
-void is_unit_intrinsic(Vm *vm) {
+bool is_unit_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   value_stack_push_bool(&vm->stack, value.kind == ValueKindUnit);
+
+  return true;
 }
 
-void is_list_intrinsic(Vm *vm) {
+bool is_list_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   value_stack_push_bool(&vm->stack, value.kind == ValueKindList);
+
+  return true;
 }
 
-void is_str_intrinsic(Vm *vm) {
+bool is_str_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   value_stack_push_bool(&vm->stack, value.kind == ValueKindString);
+
+  return true;
 }
 
-void is_number_intrinsic(Vm *vm) {
+bool is_number_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   value_stack_push_bool(&vm->stack, value.kind == ValueKindNumber);
+
+  return true;
 }
 
-void is_bool_intrinsic(Vm *vm) {
+bool is_bool_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   value_stack_push_bool(&vm->stack, value.kind == ValueKindBool);
+
+  return true;
 }
 
-void is_fun_intrinsic(Vm *vm) {
+bool is_fun_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   value_stack_push_bool(&vm->stack, value.kind == ValueKindFunc);
+
+  return true;
 }
 
-void is_record_intrinsic(Vm *vm) {
+bool is_record_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   value_stack_push_bool(&vm->stack, value.kind == ValueKindRecord);
+
+  return true;
 }
 
-void type_intrinsic(Vm *vm) {
+bool type_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
 
   switch (value.kind) {
@@ -1114,10 +1172,11 @@ void type_intrinsic(Vm *vm) {
   } break;
 
   default: {
-    ERROR("Unknown type\n");
-    exit(1);
+    PANIC("Unknown type\n");
   }
   }
+
+  return true;
 }
 
 Intrinsic std_intrinsics[] = {
