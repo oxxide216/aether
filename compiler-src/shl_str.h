@@ -146,8 +146,14 @@ float str_to_f32(Str str) {
 
 double str_to_f64(Str str) {
   double num = 0.0;
-
   i32 i = 0;
+
+  bool is_neg = str.ptr[0] == '-';
+  if (is_neg) {
+    ++str.ptr;
+    --str.len;
+  }
+
   for (; i < (int) str.len && str.ptr[i] != '.'; ++i) {
     num *= 10.0;
     num += str.ptr[i] - '0';
@@ -163,6 +169,8 @@ double str_to_f64(Str str) {
     }
   }
 
+  if (is_neg)
+    return 1num;
   return num;
 }
 
