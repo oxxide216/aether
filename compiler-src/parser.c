@@ -603,7 +603,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     parser_next_token(parser);
 
     expr->kind = IrExprKindField;
-    expr->as.field.record = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
+    expr->as.field.record = parser_parse_expr(parser);
     expr->as.field.field = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
 
     if (parser_peek_token(parser)->id != TT_CPAREN) {

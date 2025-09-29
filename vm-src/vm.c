@@ -452,15 +452,10 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   } break;
 
   case IrExprKindField: {
-    Var *var = get_var(vm, expr->as.field.record);
-    if (!var) {
-      ERROR("Variable "STR_FMT" was not defined before usage\n",
-            STR_ARG(expr->as.set.dest));
-      vm->exit_code = 1;
-      return false;
-    }
+    EXECUTE_EXPR(vm, expr->as.field.record, true);
 
-    if (var->value.kind != ValueKindRecord) {
+    Value value = value_stack_pop(&vm->stack);
+    if (value.kind != ValueKindRecord) {
       ERROR("Only records have fields\n");
       vm->exit_code = 1;
       return false;
@@ -468,8 +463,8 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     NamedValue *field = NULL;
 
-    for (u32 i = 0; i < var->value.as.record.len; ++i) {
-      NamedValue *temp_field = var->value.as.record.items + i;
+    for (u32 i = 0; i < value.as.record.len; ++i) {
+      NamedValue *temp_field = value.as.record.items + i;
 
       if (str_eq(temp_field->name, expr->as.field.field)) {
         field = temp_field;
@@ -478,9 +473,8 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     }
 
     if (!field) {
-      ERROR("Field `"STR_FMT"` was not found in `"STR_FMT"`\n",
-            STR_ARG(expr->as.field.field),
-            STR_ARG(expr->as.field.record));
+      ERROR("Field `"STR_FMT"` was not found in given record\n",
+            STR_ARG(expr->as.field.field));
     }
 
     if (expr->as.field.is_set) {
@@ -493,9 +487,8 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         value_stack_push_unit(&vm->stack);
     } else if (value_expected) {
       if (!field) {
-        ERROR("Field `"STR_FMT"` was not found in `"STR_FMT"`\n",
-              STR_ARG(expr->as.field.field),
-              STR_ARG(expr->as.field.record));
+        ERROR("Field `"STR_FMT"` was not found in given record\n",
+              STR_ARG(expr->as.field.field));
       }
 
       DA_APPEND(vm->stack, field->value);

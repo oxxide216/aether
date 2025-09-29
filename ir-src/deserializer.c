@@ -67,7 +67,7 @@ static void get_expr_data_size(u8 *data, u32 *size) {
   } break;
 
   case IrExprKindField: {
-    get_str_data_size(data, size);
+    get_expr_data_size(data, size);
     get_str_data_size(data, size);
 
     bool is_set = *(bool *) (data + *size);
@@ -212,7 +212,9 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
   } break;
 
   case IrExprKindField: {
-    load_str_data(&expr->as.field.record, data, end, rc_arena);
+    expr->as.field.record = aalloc(sizeof(IrExpr));
+
+    load_expr_data(expr->as.field.record, data, end, rc_arena);
     load_str_data(&expr->as.field.field, data, end, rc_arena);
 
     expr->as.field.is_set = *(bool *) (data + *end);

@@ -70,7 +70,7 @@ typedef struct {
 } IrExprSet;
 
 typedef struct {
-  Str     record;
+  IrExpr *record;
   Str     field;
   bool    is_set;
   IrExpr *expr;

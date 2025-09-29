@@ -91,7 +91,7 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
   } break;
 
   case IrExprKindField: {
-    save_str_data(expr->as.field.record, data, data_size, end);
+    save_expr_data(expr->as.field.record, data, data_size, end);
     save_str_data(expr->as.field.field, data, data_size, end);
 
     reserve_space(sizeof(bool), data, data_size, end);
