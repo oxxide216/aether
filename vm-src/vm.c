@@ -4,24 +4,6 @@
 #include "shl_arena.h"
 #include "std-intrinsics.h"
 
-#define EXECUTE_FUNC(vm, name, args, value_expected)   \
-  do {                                                 \
-    if (!execute_func(vm, name, args, value_expected)) \
-      return false;                                    \
-  } while(0)
-
-#define EXECUTE_EXPR(vm, expr, value_expected)   \
-  do {                                           \
-    if (!execute_expr(vm, expr, value_expected)) \
-      return false;                              \
-  } while(0)
-
-#define EXECUTE_BLOCK(vm, block, value_expected)   \
-  do {                                             \
-    if (!execute_block(vm, block, value_expected)) \
-      return false;                                \
-  } while(0)
-
 typedef Da(Str) Strs;
 
 void list_use(RcArena *rc_arena, ListNode *list) {
@@ -199,8 +181,6 @@ static void catch_vars_block(Vm *vm, Strs *local_names,
     catch_vars(vm, local_names, catched_values, block->items[i]);
 }
 
-static bool execute_block(Vm *vm, IrBlock *block, bool value_expected);
-
 static bool get_func(Vm *vm, Str name, u32 args_count, IrArgs *args,
                      IrBlock *body, NamedValues *catched_values) {
   Var *var = get_var(vm, name);
@@ -255,6 +235,12 @@ bool execute_func(Vm *vm, Str name, u32 args_len, bool value_expected) {
 
     ERROR("Function "STR_FMT" with %u arguments was not defined before usage\n",
           STR_ARG(name), args_len);
+    vm->exit_code = 1;
+    return false;
+  }
+
+  if (vm->stack.len < func_args.len) {
+    ERROR("Not enough data on the stack for function call\n");
     vm->exit_code = 1;
     return false;
   }
@@ -622,7 +608,7 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   return true;
 }
 
-static bool execute_block(Vm *vm, IrBlock *block, bool value_expected) {
+bool execute_block(Vm *vm, IrBlock *block, bool value_expected) {
   for (u32 i = 0; i + 1 < block->len; ++i)
     EXECUTE_EXPR(vm, block->items[i], false);
 

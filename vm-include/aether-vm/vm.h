@@ -3,6 +3,32 @@
 
 #include "aether-ir/ir.h"
 #include "aether-ir/rc-arena.h"
+#include "shl_log.h"
+
+#define EXECUTE_FUNC(vm, name, args, value_expected)   \
+  do {                                                 \
+    if (!execute_func(vm, name, args, value_expected)) \
+      return false;                                    \
+  } while(0)
+
+#define EXECUTE_EXPR(vm, expr, value_expected)   \
+  do {                                           \
+    if (!execute_expr(vm, expr, value_expected)) \
+      return false;                              \
+  } while(0)
+
+#define EXECUTE_BLOCK(vm, block, value_expected)   \
+  do {                                             \
+    if (!execute_block(vm, block, value_expected)) \
+      return false;                                \
+  } while(0)
+
+#define PANIC(...)      \
+  do {                  \
+    ERROR(__VA_ARGS__); \
+    vm->exit_code = 1;  \
+    return false;       \
+  } while (0)
 
 typedef struct NamedValue  NamedValue;
 
@@ -114,6 +140,7 @@ void free_value(Value *value, RcArena *rc_arena);
 
 bool execute_func(Vm *vm, Str name, u32 args_len, bool value_expected);
 bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected);
+bool execute_block(Vm *vm, IrBlock *block, bool value_expected);
 u32  execute(Ir *ir, i32 argc, char **argv,
              RcArena *rc_arena, Intrinsics *intrinsics);
 

@@ -233,7 +233,6 @@ static IrExprFuncCall parser_parse_func_call(Parser *parser) {
   IrBlock args = parser_parse_block(parser, MASK(TT_CPAREN));
   parser_expect_token(parser, MASK(TT_CPAREN));
 
-
   return (IrExprFuncCall) {
     name_token->lexeme,
     args,

@@ -10,13 +10,6 @@
 #define DEFAULT_INPUT_BUFFER_SIZE   64
 #define DEFAULT_RECEIVE_BUFFER_SIZE 64
 
-#define PANIC(...)      \
-  do {                  \
-    ERROR(__VA_ARGS__); \
-    vm->exit_code = 1;  \
-    return false;       \
-  } while (0)
-
 bool exit_intrinsic(Vm *vm) {
   Value exit_code = value_stack_pop(&vm->stack);
   if (exit_code.kind != ValueKindNumber)
@@ -501,7 +494,7 @@ bool map_intrinsic(Vm *vm) {
   ListNode *node = list.as.list->next;
   while (node) {
     DA_APPEND(vm->stack, node->value);
-    execute_func(vm, func.as.func.name, 1, true);
+    EXECUTE_FUNC(vm, func.as.func.name, 1, true);
 
     *new_list_next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
     (*new_list_next)->value = value_stack_pop(&vm->stack);
@@ -527,7 +520,7 @@ bool filter_intrinsic(Vm *vm) {
   ListNode *node = list.as.list->next;
   while (node) {
     DA_APPEND(vm->stack, node->value);
-    execute_func(vm, func.as.func.name, 1, true);
+    EXECUTE_FUNC(vm, func.as.func.name, 1, true);
 
     Value is_ok = value_stack_pop(&vm->stack);
     if (is_ok.kind != ValueKindBool)
@@ -560,7 +553,7 @@ bool reduce_intrinsic(Vm *vm) {
   while (node) {
     DA_APPEND(vm->stack, accumulator);
     DA_APPEND(vm->stack, node->value);
-    execute_func(vm, func.as.func.name, 2, true);
+    EXECUTE_FUNC(vm, func.as.func.name, 2, true);
 
     free_value(&accumulator, vm->rc_arena);
     accumulator = value_stack_pop(&vm->stack);
