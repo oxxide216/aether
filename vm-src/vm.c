@@ -47,8 +47,13 @@ void value_stack_push_string(ValueStack *stack, Str string) {
   DA_APPEND(*stack, value);
 }
 
-void value_stack_push_number(ValueStack *stack, i64 number) {
-  Value value = { ValueKindNumber, { .number = number } };
+void value_stack_push_int(ValueStack *stack, i64 _int) {
+  Value value = { ValueKindInt, { ._int = _int } };
+  DA_APPEND(*stack, value);
+}
+
+void value_stack_push_float(ValueStack *stack, f64 _float) {
+  Value value = { ValueKindFloat, { ._float = _float } };
   DA_APPEND(*stack, value);
 }
 
@@ -164,7 +169,8 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values, I
   } break;
 
   case IrExprKindString: break;
-  case IrExprKindNumber: break;
+  case IrExprKindInt: break;
+  case IrExprKindFloat: break;
   case IrExprKindBool:  break;
   case IrExprKindLambda: break;
 
@@ -542,9 +548,14 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       value_stack_push_string(&vm->stack, expr->as.string.lit);
   } break;
 
-  case IrExprKindNumber: {
+  case IrExprKindInt: {
     if (value_expected)
-      value_stack_push_number(&vm->stack, expr->as.number.number);
+      value_stack_push_int(&vm->stack, expr->as._int._int);
+  } break;
+
+  case IrExprKindFloat: {
+    if (value_expected)
+      value_stack_push_float(&vm->stack, expr->as._float._float);
   } break;
 
   case IrExprKindBool: {

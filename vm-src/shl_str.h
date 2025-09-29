@@ -32,6 +32,9 @@ unsigned int str_to_u32(Str str);
 unsigned long int str_to_u64(Str str);
 unsigned long int str_hash(Str str);
 
+float str_to_f32(Str str);
+double str_to_f64(Str str);
+
 Str sb_to_str(StringBuilder sb);
 void sb_push(StringBuilder *sb, char *str);
 void sb_push_char(StringBuilder *sb, char ch);
@@ -135,6 +138,32 @@ unsigned long int str_hash(Str str) {
   }
 
   return result;
+}
+
+float str_to_f32(Str str) {
+  return (float) str_to_f64(str);
+}
+
+double str_to_f64(Str str) {
+  double num = 0.0;
+
+  i32 i = 0;
+  for (; i < (int) str.len && str.ptr[i] != '.'; ++i) {
+    num *= 10.0;
+    num += str.ptr[i] - '0';
+  }
+
+  if (i < (int) str.len) {
+    ++i;
+    double divider = 1.0;
+
+    for (; i < (int) str.len; ++i) {
+      divider *= 10.0;
+      num += (str.ptr[i] - '0') / divider;
+    }
+  }
+
+  return num;
 }
 
 void sb_reserve_space(StringBuilder *sb, unsigned int amount) {

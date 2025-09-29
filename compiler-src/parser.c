@@ -48,7 +48,8 @@ static char *token_names[] = {
   "use",
   "set",
   "field",
-  "number",
+  "int",
+  "float",
   "bool",
   "identifier",
   "key",
@@ -325,7 +326,8 @@ static void macro_body_expand(IrExpr **expr, IrBlock *args, Strs *arg_names) {
   } break;
 
   case IrExprKindString: break;
-  case IrExprKindNumber: break;
+  case IrExprKindInt: break;
+  case IrExprKindFloat: break;
   case IrExprKindBool:   break;
 
   case IrExprKindLambda: {
@@ -420,8 +422,8 @@ static IrExpr *parser_parse_expr(Parser *parser) {
 
   Token *token = parser_expect_token(parser, MASK(TT_OPAREN) | MASK(TT_OBRACKET) |
                                              MASK(TT_STR) | MASK(TT_IDENT) |
-                                             MASK(TT_NUMBER) | MASK(TT_BOOL) |
-                                             MASK(TT_OCURLY));
+                                             MASK(TT_INT) | MASK(TT_FLOAT) |
+                                             MASK(TT_BOOL) | MASK(TT_OCURLY));
 
   if (token->id == TT_STR) {
     expr->kind = IrExprKindString;
@@ -438,9 +440,16 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     return expr;
   }
 
-  if (token->id == TT_NUMBER) {
-    expr->kind = IrExprKindNumber;
-    expr->as.number.number = str_to_i64(token->lexeme);
+  if (token->id == TT_INT) {
+    expr->kind = IrExprKindInt;
+    expr->as._int._int = str_to_i64(token->lexeme);
+
+    return expr;
+  }
+
+  if (token->id == TT_FLOAT) {
+    expr->kind = IrExprKindFloat;
+    expr->as._float._float = str_to_f64(token->lexeme);
 
     return expr;
   }

@@ -12,10 +12,10 @@
 
 bool exit_intrinsic(Vm *vm) {
   Value exit_code = value_stack_pop(&vm->stack);
-  if (exit_code.kind != ValueKindNumber)
+  if (exit_code.kind != ValueKindInt)
     PANIC("exit: wrong argument kind\n");
 
-  vm->exit_code = exit_code.as.number;
+  vm->exit_code = exit_code.as._int;
   return false;
 }
 
@@ -49,8 +49,12 @@ static void print_value(ValueStack *stack, Value *value, u32 level) {
     str_print(value->as.string);
   } break;
 
-  case ValueKindNumber: {
-    printf("%ld", value->as.number);
+  case ValueKindInt: {
+    printf("%ld", value->as._int);
+  } break;
+
+  case ValueKindFloat: {
+    printf("%f", value->as._float);
   } break;
 
   case ValueKindBool: {
@@ -176,7 +180,7 @@ bool get_args_intrinsic(Vm *vm) {
 
 bool create_server_intrinsic(Vm *vm) {
   Value port = value_stack_pop(&vm->stack);
-  if (port.kind != ValueKindNumber)
+  if (port.kind != ValueKindInt)
     PANIC("create-server: wrong argument kind\n");
 
   i32 server_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -191,7 +195,7 @@ bool create_server_intrinsic(Vm *vm) {
   struct sockaddr_in address;
   address.sin_family = AF_INET;
   address.sin_addr.s_addr = INADDR_ANY;
-  address.sin_port = htons(port.as.number);
+  address.sin_port = htons(port.as._int);
 
   if (bind(server_socket, (struct sockaddr*) &address,
            sizeof(address)) < 0) {
@@ -204,7 +208,7 @@ bool create_server_intrinsic(Vm *vm) {
     return true;
   }
 
-  value_stack_push_number(&vm->stack, server_socket);
+  value_stack_push_int(&vm->stack, server_socket);
 
   return true;
 }
@@ -213,7 +217,7 @@ bool create_client_intrinsic(Vm *vm) {
   Value port = value_stack_pop(&vm->stack);
   Value server_ip_address = value_stack_pop(&vm->stack);
   if (server_ip_address.kind != ValueKindString ||
-      port.kind != ValueKindNumber)
+      port.kind != ValueKindInt)
     PANIC("create-client: wrong argument kind\n");
 
   i32 client_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -224,7 +228,7 @@ bool create_client_intrinsic(Vm *vm) {
 
   struct sockaddr_in server_address;
   server_address.sin_family = AF_INET;
-  server_address.sin_port = htons(port.as.number);
+  server_address.sin_port = htons(port.as._int);
 
   char *server_ip_address_cstr = malloc(server_ip_address.as.string.len + 1);
   memcpy(server_ip_address_cstr,
@@ -246,7 +250,7 @@ bool create_client_intrinsic(Vm *vm) {
     return true;
   }
 
-  value_stack_push_number(&vm->stack, client_socket);
+  value_stack_push_int(&vm->stack, client_socket);
 
   return true;
 }
@@ -254,17 +258,17 @@ bool create_client_intrinsic(Vm *vm) {
 bool accept_connection_intrinsic(Vm *vm) {
   Value port = value_stack_pop(&vm->stack);
   Value server_socket = value_stack_pop(&vm->stack);
-  if (server_socket.kind != ValueKindNumber ||
-      port.kind != ValueKindNumber)
+  if (server_socket.kind != ValueKindInt ||
+      port.kind != ValueKindInt)
     PANIC("accept-connection: wrong argument kind\n");
 
   struct sockaddr_in address;
   address.sin_family = AF_INET;
   address.sin_addr.s_addr = INADDR_ANY;
-  address.sin_port = htons(port.as.number);
+  address.sin_port = htons(port.as._int);
 
   u32 address_size;
-  i32 client_socket = accept(server_socket.as.number,
+  i32 client_socket = accept(server_socket.as._int,
                              (struct sockaddr*) &address,
                              &address_size);
   if (client_socket < 0) {
@@ -272,17 +276,17 @@ bool accept_connection_intrinsic(Vm *vm) {
     return true;
   }
 
-  value_stack_push_number(&vm->stack, client_socket);
+  value_stack_push_int(&vm->stack, client_socket);
 
   return true;
 }
 
 bool close_connection_intrinsic(Vm *vm) {
   Value client_socket = value_stack_pop(&vm->stack);
-  if (client_socket.kind != ValueKindNumber)
+  if (client_socket.kind != ValueKindInt)
     PANIC("close-connection: wrong argument kind\n");
 
-  close(client_socket.as.number);
+  close(client_socket.as._int);
 
   return true;
 }
@@ -290,18 +294,18 @@ bool close_connection_intrinsic(Vm *vm) {
 bool send_intrinsic(Vm *vm) {
   Value message = value_stack_pop(&vm->stack);
   Value receiver = value_stack_pop(&vm->stack);
-  if (receiver.kind != ValueKindNumber ||
+  if (receiver.kind != ValueKindInt ||
       message.kind != ValueKindString)
     PANIC("send: wrong argument kind\n");
 
-  send(receiver.as.number, message.as.string.ptr, message.as.string.len, 0);
+  send(receiver.as._int, message.as.string.ptr, message.as.string.len, 0);
 
   return true;
 }
 
 bool receive_intrinsic(Vm *vm) {
   Value receiver = value_stack_pop(&vm->stack);
-  if (receiver.kind != ValueKindNumber)
+  if (receiver.kind != ValueKindInt)
     PANIC("receive: wrong argument kind\n");
 
   Str buffer;
@@ -309,7 +313,7 @@ bool receive_intrinsic(Vm *vm) {
   buffer.ptr = rc_arena_alloc(vm->rc_arena, buffer.len);
 
   u32 len;
-  while ((len = read(receiver.as.number,
+  while ((len = read(receiver.as._int,
                      buffer.ptr + buffer.len,
                      DEFAULT_RECEIVE_BUFFER_SIZE)) ==
          DEFAULT_RECEIVE_BUFFER_SIZE) {
@@ -380,17 +384,17 @@ bool nth_intrinsic(Vm *vm) {
   Value index = value_stack_pop(&vm->stack);
   Value list = value_stack_pop(&vm->stack);
   if (list.kind != ValueKindList ||
-      index.kind != ValueKindNumber)
+      index.kind != ValueKindInt)
     PANIC("nth: wrong argument kinds\n");
 
   ListNode *node = list.as.list->next;
   u32 i = 0;
-  while (node && i < index.as.number) {
+  while (node && i < index.as._int) {
     node = node->next;
     ++i;
   }
 
-  if (i < index.as.number)
+  if (i < index.as._int)
     value_stack_push_unit(&vm->stack);
   else
     DA_APPEND(vm->stack, node->value);
@@ -408,9 +412,9 @@ bool len_intrinsic(Vm *vm) {
       ++len;
     }
 
-    value_stack_push_number(&vm->stack, len);
+    value_stack_push_int(&vm->stack, len);
   } else if (value.kind == ValueKindString) {
-    value_stack_push_number(&vm->stack, value.as.string.len);
+    value_stack_push_int(&vm->stack, value.as.string.len);
   } else {
     PANIC("len: wrong argument kind\n");
   }
@@ -436,8 +440,8 @@ bool get_range_intrinsic(Vm *vm) {
   Value end = value_stack_pop(&vm->stack);
   Value begin = value_stack_pop(&vm->stack);
   Value value = value_stack_pop(&vm->stack);
-  if (begin.kind != ValueKindNumber ||
-      end.kind != ValueKindNumber ||
+  if (begin.kind != ValueKindInt ||
+      end.kind != ValueKindInt ||
       (value.kind != ValueKindList &&
        value.kind != ValueKindString))
     PANIC("get-range: wrong argument kinds\n");
@@ -446,9 +450,9 @@ bool get_range_intrinsic(Vm *vm) {
   len_intrinsic(vm);
   Value len = value_stack_pop(&vm->stack);
 
-  if (begin.as.number < 0 || begin.as.number >= len.as.number ||
-      end.as.number <= 0 || end.as.number >= len.as.number ||
-      begin.as.number >= end.as.number) {
+  if (begin.as._int < 0 || begin.as._int >= len.as._int ||
+      end.as._int <= 0 || end.as._int >= len.as._int ||
+      begin.as._int >= end.as._int) {
     value_stack_push_unit(&vm->stack);
     return true;
   }
@@ -458,10 +462,10 @@ bool get_range_intrinsic(Vm *vm) {
     ListNode *sub_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
     ListNode *sub_list_node = sub_list;
 
-    for (u32 i = 0; i < begin.as.number; ++i)
+    for (u32 i = 0; i < begin.as._int; ++i)
       node = node->next;
 
-    for (u32 i = 0; i < end.as.number - begin.as.number; ++i) {
+    for (u32 i = 0; i < end.as._int - begin.as._int; ++i) {
       sub_list_node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
       sub_list_node->next->value = node->value;
 
@@ -472,8 +476,8 @@ bool get_range_intrinsic(Vm *vm) {
     value_stack_push_list(&vm->stack, sub_list);
   } else {
     Str sub_string = {
-      value.as.string.ptr + begin.as.number,
-      value.as.string.len - begin.as.number - end.as.number,
+      value.as.string.ptr + begin.as._int,
+      value.as.string.len - begin.as._int - end.as._int,
     };
 
     value_stack_push_string(&vm->stack, sub_string);
@@ -658,18 +662,18 @@ static bool eat_byte(Vm *vm, char *intrinsic_name, u32 size) {
     return true;
   }
 
-  i64 number = 0;
+  i64 _int = 0;
   switch (size) {
-  case 8: number = *(i64 *) string.as.string.ptr; break;
-  case 4: number = *(i32 *) string.as.string.ptr; break;
-  case 2: number = *(i16 *) string.as.string.ptr; break;
-  case 1: number = *(i8 *) string.as.string.ptr; break;
+  case 8: _int = *(i64 *) string.as.string.ptr; break;
+  case 4: _int = *(i32 *) string.as.string.ptr; break;
+  case 2: _int = *(i16 *) string.as.string.ptr; break;
+  case 1: _int = *(i8 *) string.as.string.ptr; break;
   }
 
   ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
 
   new_list->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-  new_list->next->value = (Value) { ValueKindNumber, { .number = number } };
+  new_list->next->value = (Value) { ValueKindInt, { ._int = _int } };
 
   new_list->next->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
   Str new_string;
@@ -707,23 +711,23 @@ bool eat_byte_8_intrinsic(Vm *vm) {
   return true;
 }
 
-bool str_to_num_intrinsic(Vm *vm) {
+bool str_to_int_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind != ValueKindString)
-    PANIC("str-to-num: wrong argument kind\n");
+    PANIC("str-to-int: wrong argument kind\n");
 
-  value_stack_push_number(&vm->stack, str_to_i64(value.as.string));
+  value_stack_push_int(&vm->stack, str_to_i64(value.as.string));
 
   return true;
 }
 
-bool num_to_str_intrinsic(Vm *vm) {
+bool int_to_str_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindNumber)
+  if (value.kind != ValueKindInt)
     PANIC("num-to-str: wrong argument kind\n");
 
   StringBuilder sb = {0};
-  sb_push_i64(&sb, value.as.number);
+  sb_push_i64(&sb, value.as._int);
 
   Str new_string;
   new_string.len = sb.len;
@@ -760,19 +764,19 @@ bool bool_to_str_intrinsic(Vm *vm) {
   return true;
 }
 
-bool bool_to_num_intrinsic(Vm *vm) {
+bool bool_to_int_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind != ValueKindBool)
-    PANIC("bool-to-num: wrong argument kind\n");
+    PANIC("bool-to-int: wrong argument kind\n");
 
-  value_stack_push_number(&vm->stack, value.as._bool);
+  value_stack_push_int(&vm->stack, value.as._bool);
 
   return true;
 }
 
 static bool byte_to_str(Vm *vm, char *intrinsic_name, u32 size) {
   Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindNumber)
+  if (value.kind != ValueKindInt)
     PANIC("%s: wrong argument kind\n", intrinsic_name);
 
   Str new_string;
@@ -780,10 +784,10 @@ static bool byte_to_str(Vm *vm, char *intrinsic_name, u32 size) {
   new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
 
   switch (size) {
-  case 8: *(i64 *) new_string.ptr = value.as.number; break;
-  case 4: *(i32 *) new_string.ptr = value.as.number; break;
-  case 2: *(i16 *) new_string.ptr = value.as.number; break;
-  case 1: *(i8 *) new_string.ptr = value.as.number; break;
+  case 8: *(i64 *) new_string.ptr = value.as._int; break;
+  case 4: *(i32 *) new_string.ptr = value.as._int; break;
+  case 2: *(i16 *) new_string.ptr = value.as._int; break;
+  case 1: *(i8 *) new_string.ptr = value.as._int; break;
   }
 
   value_stack_push_string(&vm->stack, new_string);
@@ -819,9 +823,12 @@ bool add_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
-  if (a.kind == ValueKindNumber &&
-      b.kind == ValueKindNumber) {
-    value_stack_push_number(&vm->stack, a.as.number + b.as.number);
+  if (a.kind == ValueKindInt &&
+      b.kind == ValueKindInt) {
+    value_stack_push_int(&vm->stack, a.as._int + b.as._int);
+  } if (a.kind == ValueKindFloat &&
+        b.kind == ValueKindFloat) {
+    value_stack_push_float(&vm->stack, a.as._float + b.as._float);
   } else if (a.kind == ValueKindString &&
              b.kind == ValueKindString) {
     StringBuilder sb = {0};
@@ -876,12 +883,12 @@ bool add_intrinsic(Vm *vm) {
   return true;
 }
 
-static bool prepare_two_numbers(Value *a, Value *b, char *intrinsic_name, Vm *vm) {
+static bool prepare_rwo_numbers(Value *a, Value *b, char *intrinsic_name, Vm *vm) {
   *b = value_stack_pop(&vm->stack);
   *a = value_stack_pop(&vm->stack);
 
-  if (a->kind != ValueKindNumber ||
-      b->kind != ValueKindNumber)
+  if ((a->kind != ValueKindInt && a->kind != ValueKindFloat) ||
+      (b->kind != ValueKindInt && b->kind != ValueKindFloat))
     PANIC("%s: wrong argument kinds\n", intrinsic_name);
 
   return true;
@@ -889,47 +896,61 @@ static bool prepare_two_numbers(Value *a, Value *b, char *intrinsic_name, Vm *vm
 
 bool sub_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "-", vm);
+  prepare_rwo_numbers(&a, &b, "-", vm);
 
-  value_stack_push_number(&vm->stack, a.as.number - b.as.number);
+  if (a.kind == ValueKindInt)
+    value_stack_push_int(&vm->stack, a.as._int - b.as._int);
+  else if (a.kind == ValueKindFloat)
+    value_stack_push_float(&vm->stack, a.as._float - b.as._float);
 
   return true;
 }
 
 bool mul_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "*", vm);
+  prepare_rwo_numbers(&a, &b, "*", vm);
 
-  value_stack_push_number(&vm->stack, a.as.number * b.as.number);
+  if (a.kind == ValueKindInt)
+    value_stack_push_int(&vm->stack, a.as._int * b.as._int);
+  else if (a.kind == ValueKindFloat)
+    value_stack_push_float(&vm->stack, a.as._float * b.as._float);
 
   return true;
 }
 
 bool div_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "/", vm);
+  prepare_rwo_numbers(&a, &b, "/", vm);
 
-  value_stack_push_number(&vm->stack, a.as.number / b.as.number);
+  if (a.kind == ValueKindInt)
+    value_stack_push_int(&vm->stack, a.as._int / b.as._int);
+  else if (a.kind == ValueKindFloat)
+    value_stack_push_float(&vm->stack, a.as._float / b.as._float);
 
   return true;
 }
 
 bool mod_intrinsic(Vm *vm) {
-  Value a, b;
-  prepare_two_numbers(&a, &b, "%", vm);
+  Value b = value_stack_pop(&vm->stack);
+  Value a = value_stack_pop(&vm->stack);
 
-  value_stack_push_number(&vm->stack, a.as.number % b.as.number);
+  if (a.kind != ValueKindInt ||
+      b.kind != ValueKindInt)
+    PANIC("%%: wrong argument kinds\n");
 
   return true;
 }
 
 bool abs_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindNumber)
+  if (value.kind != ValueKindInt &&
+      value.kind != ValueKindFloat)
     PANIC("abs: wrong argument kind\n");
 
-  if (value.as.number < 0)
-    value.as.number = -value.as.number;
+  if (value.kind == ValueKindInt && value.as._int < 0)
+    value.as._int = -value.as._int;
+  else if (value.kind == ValueKindFloat && value.as._float < 0)
+    value.as._float = -value.as._float;
 
   DA_APPEND(vm->stack, value);
 
@@ -938,22 +959,32 @@ bool abs_intrinsic(Vm *vm) {
 
 bool min_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "min", vm);
+  prepare_rwo_numbers(&a, &b, "min", vm);
 
-  value_stack_push_number(&vm->stack, a.as.number <= b.as.number ?
-                                      a.as.number :
-                                      b.as.number);
+  if (a.kind == ValueKindInt)
+    value_stack_push_int(&vm->stack, a.as._int <= b.as._int ?
+                                     a.as._int :
+                                     b.as._int);
+  else
+    value_stack_push_float(&vm->stack, a.as._float <= b.as._float ?
+                                       a.as._float :
+                                       b.as._float);
 
   return true;
 }
 
 bool max_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "max", vm);
+  prepare_rwo_numbers(&a, &b, "max", vm);
 
-  value_stack_push_number(&vm->stack, a.as.number >= b.as.number ?
-                                      a.as.number :
-                                      b.as.number);
+  if (a.kind == ValueKindInt)
+    value_stack_push_int(&vm->stack, a.as._int >= b.as._int ?
+                                     a.as._int :
+                                     b.as._int);
+  else
+    value_stack_push_float(&vm->stack, a.as._float >= b.as._float ?
+                                       a.as._float :
+                                       b.as._float);
 
   return true;
 }
@@ -962,9 +993,12 @@ bool eq_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
-  if (a.kind == ValueKindNumber &&
-      b.kind == ValueKindNumber)
-    value_stack_push_bool(&vm->stack, a.as.number == b.as.number);
+  if (a.kind == ValueKindInt &&
+      b.kind == ValueKindInt)
+    value_stack_push_bool(&vm->stack, a.as._int == b.as._int);
+  else if (a.kind == ValueKindFloat &&
+           b.kind == ValueKindFloat)
+    value_stack_push_bool(&vm->stack, a.as._float == b.as._float);
   else if (a.kind == ValueKindString &&
            b.kind == ValueKindString)
     value_stack_push_bool(&vm->stack, str_eq(a.as.string, b.as.string));
@@ -978,9 +1012,12 @@ bool ne_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
-  if (a.kind == ValueKindNumber &&
-      b.kind == ValueKindNumber)
-    value_stack_push_bool(&vm->stack, a.as.number != b.as.number);
+  if (a.kind == ValueKindInt &&
+      b.kind == ValueKindInt)
+    value_stack_push_bool(&vm->stack, a.as._int != b.as._int);
+  if (a.kind == ValueKindFloat &&
+      b.kind == ValueKindFloat)
+    value_stack_push_bool(&vm->stack, a.as._float != b.as._float);
   else if (a.kind == ValueKindString &&
            b.kind == ValueKindString)
     value_stack_push_bool(&vm->stack, !str_eq(a.as.string, b.as.string));
@@ -992,36 +1029,48 @@ bool ne_intrinsic(Vm *vm) {
 
 bool ls_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "<", vm);
+  prepare_rwo_numbers(&a, &b, "<", vm);
 
-  value_stack_push_bool(&vm->stack, a.as.number < b.as.number);
+  if (a.kind == ValueKindInt)
+    value_stack_push_bool(&vm->stack, a.as._int < b.as._int);
+  else
+    value_stack_push_bool(&vm->stack, a.as._float < b.as._float);
 
   return true;
 }
 
 bool le_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "<=", vm);
+  prepare_rwo_numbers(&a, &b, "<=", vm);
 
-  value_stack_push_bool(&vm->stack, a.as.number <= b.as.number);
+  if (a.kind == ValueKindInt)
+    value_stack_push_bool(&vm->stack, a.as._int <= b.as._int);
+  else
+    value_stack_push_bool(&vm->stack, a.as._float <= b.as._float);
 
   return true;
 }
 
 bool gt_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, ">", vm);
+  prepare_rwo_numbers(&a, &b, ">", vm);
 
-  value_stack_push_bool(&vm->stack, a.as.number > b.as.number);
+  if (a.kind == ValueKindInt)
+    value_stack_push_bool(&vm->stack, a.as._int > b.as._int);
+  else
+    value_stack_push_bool(&vm->stack, a.as._float > b.as._float);
 
   return true;
 }
 
 bool ge_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, ">=", vm);
+  prepare_rwo_numbers(&a, &b, ">=", vm);
 
-  value_stack_push_bool(&vm->stack, a.as.number >= b.as.number);
+  if (a.kind == ValueKindInt)
+    value_stack_push_bool(&vm->stack, a.as._int >= b.as._int);
+  else
+    value_stack_push_bool(&vm->stack, a.as._float >= b.as._float);
 
   return true;
 }
@@ -1033,8 +1082,10 @@ static bool value_to_bool(Value *value, char *intrinsic_name, Vm *vm) {
     return value->as.list->next != NULL;
   else if (value->kind == ValueKindString)
     return value->as.string.len != 0;
-  else if (value->kind == ValueKindNumber)
-    return value->as.number != 0;
+  else if (value->kind == ValueKindInt)
+    return value->as._int != 0;
+  else if (value->kind == ValueKindFloat)
+    return value->as._float != 0.0;
   else if (value->kind == ValueKindBool)
     return value->as._bool;
   else
@@ -1045,9 +1096,9 @@ bool and_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
-  if (a.kind == ValueKindNumber &&
-      b.kind == ValueKindNumber)
-    value_stack_push_bool(&vm->stack, a.as.number & b.as.number);
+  if (a.kind == ValueKindInt &&
+      b.kind == ValueKindInt)
+    value_stack_push_bool(&vm->stack, a.as._int & b.as._int);
   else if (a.kind == ValueKindBool &&
            b.kind == ValueKindBool)
     value_stack_push_bool(&vm->stack, a.as._bool & b.as._bool);
@@ -1061,9 +1112,9 @@ bool or_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
-  if (a.kind == ValueKindNumber &&
-      b.kind == ValueKindNumber)
-    value_stack_push_bool(&vm->stack, a.as.number | b.as.number);
+  if (a.kind == ValueKindInt &&
+      b.kind == ValueKindInt)
+    value_stack_push_bool(&vm->stack, a.as._int | b.as._int);
   else if (a.kind == ValueKindBool &&
            b.kind == ValueKindBool)
     value_stack_push_bool(&vm->stack, a.as._bool | b.as._bool);
@@ -1077,9 +1128,9 @@ bool xor_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
-  if (a.kind == ValueKindNumber &&
-      b.kind == ValueKindNumber)
-    value_stack_push_bool(&vm->stack, a.as.number ^ b.as.number);
+  if (a.kind == ValueKindInt &&
+      b.kind == ValueKindInt)
+    value_stack_push_bool(&vm->stack, a.as._int ^ b.as._int);
   else if (a.kind == ValueKindBool &&
            b.kind == ValueKindBool)
     value_stack_push_bool(&vm->stack, a.as._bool ^ b.as._bool);
@@ -1143,9 +1194,16 @@ bool is_string_intrinsic(Vm *vm) {
   return true;
 }
 
-bool is_number_intrinsic(Vm *vm) {
+bool is_int_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, value.kind == ValueKindNumber);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindInt);
+
+  return true;
+}
+
+bool is_float_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindFloat);
 
   return true;
 }
@@ -1187,8 +1245,12 @@ bool type_intrinsic(Vm *vm) {
     value_stack_push_string(&vm->stack, STR_LIT("string"));
   } break;
 
-  case ValueKindNumber: {
-    value_stack_push_string(&vm->stack, STR_LIT("number"));
+  case ValueKindInt: {
+    value_stack_push_string(&vm->stack, STR_LIT("int"));
+  } break;
+
+  case ValueKindFloat: {
+    value_stack_push_string(&vm->stack, STR_LIT("float"));
   } break;
 
   case ValueKindBool: {
@@ -1247,10 +1309,13 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("eat-byte-16"), 1, true, &eat_byte_16_intrinsic },
   { STR_LIT("eat-byte-8"), 1, true, &eat_byte_8_intrinsic },
   // Conversions
-  { STR_LIT("str-to-num"), 1, true, &str_to_num_intrinsic },
-  { STR_LIT("num-to-str"), 1, true, &num_to_str_intrinsic },
+  { STR_LIT("str-to-int"), 1, true, &str_to_int_intrinsic },
+  { STR_LIT("int-to-str"), 1, true, &int_to_str_intrinsic },
   { STR_LIT("bool-to-str"), 1, true, &bool_to_str_intrinsic },
-  { STR_LIT("bool-to-num"), 1, true, &bool_to_num_intrinsic },
+  { STR_LIT("bool-to-int"), 1, true, &bool_to_int_intrinsic },
+  // TODO: floating point numbers
+  //{ STR_LIT("str-to-float"), 1, true, &str_to_float_intrinsic },
+  //{ STR_LIT("float-to-str"), 1, true, &float_to_str_intrinsics },
   { STR_LIT("byte-64-to-str"), 1, true, &byte_64_to_str_intrinsic },
   { STR_LIT("byte-32-to-str"), 1, true, &byte_32_to_str_intrinsic },
   { STR_LIT("byte-16-to-str"), 1, true, &byte_16_to_str_intrinsic },
@@ -1265,7 +1330,7 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("abs"), 1, true, &abs_intrinsic },
   { STR_LIT("min"), 2, true, &min_intrinsic },
   { STR_LIT("max"), 2, true, &max_intrinsic },
-  // TODO: floating point numbers
+  // TODO: floating point._ints
   // { STR_LIT("sqrt"), 1, true, &sqrt_intrinsic },
   // { STR_LIT("pow"), 2, true, &pow_intrinsic },
   // { STR_LIT("round"), 1, true, &round_intrinsic },
@@ -1288,7 +1353,8 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("unit?"), 1, true, &is_unit_intrinsic },
   { STR_LIT("list?"), 1, true, &is_list_intrinsic },
   { STR_LIT("string?"), 1, true, &is_string_intrinsic },
-  { STR_LIT("number?"), 1, true, &is_number_intrinsic },
+  { STR_LIT("int?"), 1, true, &is_int_intrinsic },
+  { STR_LIT("float?"), 1, true, &is_float_intrinsic },
   { STR_LIT("bool?"), 1, true, &is_bool_intrinsic },
   { STR_LIT("fun?"), 1, true, &is_fun_intrinsic },
   { STR_LIT("record?"), 1, true, &is_record_intrinsic },

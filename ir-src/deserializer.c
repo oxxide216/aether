@@ -86,8 +86,12 @@ static void get_expr_data_size(u8 *data, u32 *size) {
     get_str_data_size(data, size);
   } break;
 
-  case IrExprKindNumber: {
+  case IrExprKindInt: {
     *size += sizeof(i64);
+  } break;
+
+  case IrExprKindFloat: {
+    *size += sizeof(f64);
   } break;
 
   case IrExprKindBool: {
@@ -239,9 +243,14 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
     load_str_data(&expr->as.string.lit, data, end, rc_arena);
   } break;
 
-  case IrExprKindNumber: {
-    expr->as.number.number = *(i64 *) (data + *end);
+  case IrExprKindInt: {
+    expr->as._int._int = *(i64 *) (data + *end);
     *end += sizeof(i64);
+  } break;
+
+  case IrExprKindFloat: {
+    expr->as._float._float = *(f64 *) (data + *end);
+    *end += sizeof(f64);
   } break;
 
   case IrExprKindBool: {

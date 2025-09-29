@@ -20,7 +20,8 @@ typedef enum {
   IrExprKindList,
   IrExprKindIdent,
   IrExprKindString,
-  IrExprKindNumber,
+  IrExprKindInt,
+  IrExprKindFloat,
   IrExprKindBool,
   IrExprKindLambda,
   IrExprKindRecord,
@@ -89,8 +90,12 @@ typedef struct {
 } IrExprString;
 
 typedef struct {
-  i64 number;
-} IrExprNumber;
+  i64 _int;
+} IrExprInt;
+
+typedef struct {
+  f64 _float;
+} IrExprFloat;
 
 typedef struct {
   bool _bool;
@@ -120,7 +125,8 @@ typedef union {
   IrExprList     list;
   IrExprIdent    ident;
   IrExprString   string;
-  IrExprNumber   number;
+  IrExprInt      _int;
+  IrExprFloat    _float;
   IrExprBool     _bool;
   IrExprLambda   lambda;
   IrExprRecord   record;

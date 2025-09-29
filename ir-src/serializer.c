@@ -114,10 +114,16 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
     save_str_data(expr->as.string.lit, data, data_size, end);
   } break;
 
-  case IrExprKindNumber: {
+  case IrExprKindInt: {
     reserve_space(sizeof(i64), data, data_size, end);
-    *(i64 *) (*data + *end) = expr->as.number.number;
+    *(i64 *) (*data + *end) = expr->as._int._int;
     *end += sizeof(i64);
+  } break;
+
+  case IrExprKindFloat: {
+    reserve_space(sizeof(f64), data, data_size, end);
+    *(f64 *) (*data + *end) = expr->as._float._float;
+    *end += sizeof(f64);
   } break;
 
   case IrExprKindBool: {

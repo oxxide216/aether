@@ -45,7 +45,8 @@ typedef enum {
   ValueKindUnit = 0,
   ValueKindList,
   ValueKindString,
-  ValueKindNumber,
+  ValueKindInt,
+  ValueKindFloat,
   ValueKindBool,
   ValueKindFunc,
   ValueKindRecord,
@@ -65,7 +66,8 @@ typedef NamedValues Record;
 typedef union {
   ListNode  *list;
   Str        string;
-  i64        number;
+  i64        _int;
+  f64        _float;
   bool       _bool;
   ValueFunc  func;
   Record     record;
@@ -129,7 +131,8 @@ ListNode *list_clone(RcArena *rc_arena, ListNode *list);
 void value_stack_push_unit(ValueStack *stack);
 void value_stack_push_list(ValueStack *stack, ListNode *nodes);
 void value_stack_push_string(ValueStack *stack, Str string);
-void value_stack_push_number(ValueStack *stack, i64 number);
+void value_stack_push_int(ValueStack *stack, i64 _int);
+void value_stack_push_float(ValueStack *stack, f64 _float);
 void value_stack_push_bool(ValueStack *stack, bool _bool);
 void value_stack_push_record(ValueStack *stack, Record record);
 
