@@ -90,7 +90,7 @@ Value *value_stack_get(ValueStack *stack, u32 index) {
   return stack->items + index;
 }
 
-static void free_value(Value *value, RcArena *rc_arena) {
+void free_value(Value *value, RcArena *rc_arena) {
   if (value->kind == ValueKindList) {
     ListNode *node = value->as.list;
     while (node && !node->is_static) {
@@ -260,6 +260,7 @@ bool execute_func(Vm *vm, Str name, u32 args_len, bool value_expected) {
   }
 
   u32 prev_stack_len = vm->stack.len;
+  u32 prev_funcs_len = vm->funcs.len;
   Vars prev_local_vars = vm->local_vars;
   bool prev_is_inside_of_func = vm->is_inside_of_func;
 
@@ -290,12 +291,13 @@ bool execute_func(Vm *vm, Str name, u32 args_len, bool value_expected) {
     free_value(vm->stack.items + i, vm->rc_arena);
 
   free(vm->local_vars.items);
+  vm->funcs.len = prev_funcs_len;
   vm->local_vars = prev_local_vars;
   vm->is_inside_of_func = prev_is_inside_of_func;
 
   if (value_expected)
-    vm->stack.items[prev_stack_len] = vm->stack.items[vm->stack.len - 1];
-  vm->stack.len = prev_stack_len + value_expected;
+    vm->stack.items[prev_stack_len - args_len] = vm->stack.items[vm->stack.len - 1];
+  vm->stack.len = prev_stack_len - args_len + value_expected;
 
   return true;
 }

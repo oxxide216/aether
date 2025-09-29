@@ -81,7 +81,7 @@ static void print_value(ValueStack *stack, Value *value, u32 level) {
   } break;
 
   case ValueKindRecord: {
-    fputs("{\n", stdout);
+    fputs("\n{\n", stdout);
 
     for (u32 i = 0; i < value->as.record.len; ++i) {
       for (u32 j = 0; j < level + 1; ++j)
@@ -96,7 +96,7 @@ static void print_value(ValueStack *stack, Value *value, u32 level) {
 
     for (u32 j = 0; j < level; ++j)
       fputs("  ", stdout);
-    fputc('}', stdout);
+    fputs("}\n", stdout);
   } break;
   }
 }
@@ -562,6 +562,7 @@ bool reduce_intrinsic(Vm *vm) {
     DA_APPEND(vm->stack, node->value);
     execute_func(vm, func.as.func.name, 2, true);
 
+    free_value(&accumulator, vm->rc_arena);
     accumulator = value_stack_pop(&vm->stack);
     if (accumulator.kind != initial_value.kind)
       PANIC("reduce: return value's and accumulator's types should be equal\n");
@@ -876,7 +877,7 @@ bool add_intrinsic(Vm *vm) {
 
     value_stack_push_list(&vm->stack, new_list);
   } else {
-    PANIC("add: wrong argument kinds\n");
+    PANIC("+: wrong argument kinds\n");
   }
 
   return true;
@@ -895,7 +896,7 @@ static bool prepare_two_numbers(Value *a, Value *b, char *intrinsic_name, Vm *vm
 
 bool sub_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "sub", vm);
+  prepare_two_numbers(&a, &b, "-", vm);
 
   value_stack_push_number(&vm->stack, a.as.number - b.as.number);
 
@@ -904,7 +905,7 @@ bool sub_intrinsic(Vm *vm) {
 
 bool mul_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "mul", vm);
+  prepare_two_numbers(&a, &b, "*", vm);
 
   value_stack_push_number(&vm->stack, a.as.number * b.as.number);
 
@@ -913,7 +914,7 @@ bool mul_intrinsic(Vm *vm) {
 
 bool div_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "div", vm);
+  prepare_two_numbers(&a, &b, "/", vm);
 
   value_stack_push_number(&vm->stack, a.as.number / b.as.number);
 
@@ -922,7 +923,7 @@ bool div_intrinsic(Vm *vm) {
 
 bool mod_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "mod", vm);
+  prepare_two_numbers(&a, &b, "%", vm);
 
   value_stack_push_number(&vm->stack, a.as.number % b.as.number);
 
@@ -975,7 +976,7 @@ bool eq_intrinsic(Vm *vm) {
            b.kind == ValueKindString)
     value_stack_push_bool(&vm->stack, str_eq(a.as.string, b.as.string));
   else
-    PANIC("eq: wrong argument kinds: %u:%u\n", a.kind, b.kind);
+    PANIC("==: wrong argument kinds: %u:%u\n", a.kind, b.kind);
 
   return true;
 }
@@ -991,14 +992,14 @@ bool ne_intrinsic(Vm *vm) {
            b.kind == ValueKindString)
     value_stack_push_bool(&vm->stack, !str_eq(a.as.string, b.as.string));
   else
-    PANIC("ne: wrong argument kinds\n");
+    PANIC("!=: wrong argument kinds\n");
 
   return true;
 }
 
 bool ls_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "ls", vm);
+  prepare_two_numbers(&a, &b, "<", vm);
 
   value_stack_push_bool(&vm->stack, a.as.number < b.as.number);
 
@@ -1007,7 +1008,7 @@ bool ls_intrinsic(Vm *vm) {
 
 bool le_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "le", vm);
+  prepare_two_numbers(&a, &b, "<=", vm);
 
   value_stack_push_bool(&vm->stack, a.as.number <= b.as.number);
 
@@ -1016,7 +1017,7 @@ bool le_intrinsic(Vm *vm) {
 
 bool gt_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "gt", vm);
+  prepare_two_numbers(&a, &b, ">", vm);
 
   value_stack_push_bool(&vm->stack, a.as.number > b.as.number);
 
@@ -1025,22 +1026,24 @@ bool gt_intrinsic(Vm *vm) {
 
 bool ge_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_two_numbers(&a, &b, "ge", vm);
+  prepare_two_numbers(&a, &b, ">=", vm);
 
   value_stack_push_bool(&vm->stack, a.as.number >= b.as.number);
 
   return true;
 }
 
-static bool value_to_bool(Value *value, char *intrinsic_name) {
-  if (value->kind == ValueKindNumber)
+static bool value_to_bool(Value *value, char *intrinsic_name, Vm *vm) {
+  if (value->kind == ValueKindUnit)
+    return false;
+  else if (value->kind == ValueKindList)
+    return value->as.list->next != NULL;
+  else if (value->kind == ValueKindString)
+    return value->as.string.len != 0;
+  else if (value->kind == ValueKindNumber)
     return value->as.number != 0;
   else if (value->kind == ValueKindBool)
     return value->as._bool;
-  else if (value->kind == ValueKindUnit)
-    return false;
-  else if (value->kind == ValueKindList)
-    return value->as.list;
   else
     PANIC("%s: wrong argument kinds\n", intrinsic_name);
 }
@@ -1049,10 +1052,14 @@ bool and_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
-  if (!value_to_bool(&a, "and"))
-    value_stack_push_bool(&vm->stack, false);
+  if (a.kind == ValueKindNumber &&
+      b.kind == ValueKindNumber)
+    value_stack_push_bool(&vm->stack, a.as.number & b.as.number);
+  else if (a.kind == ValueKindBool &&
+           b.kind == ValueKindBool)
+    value_stack_push_bool(&vm->stack, a.as._bool & b.as._bool);
   else
-    value_stack_push_bool(&vm->stack, value_to_bool(&b, "and"));
+    PANIC("&: wrong argument kinds\n");
 
   return true;
 }
@@ -1061,10 +1068,14 @@ bool or_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
-  if (value_to_bool(&a, "or"))
-    value_stack_push_bool(&vm->stack, true);
+  if (a.kind == ValueKindNumber &&
+      b.kind == ValueKindNumber)
+    value_stack_push_bool(&vm->stack, a.as.number | b.as.number);
+  else if (a.kind == ValueKindBool &&
+           b.kind == ValueKindBool)
+    value_stack_push_bool(&vm->stack, a.as._bool | b.as._bool);
   else
-    value_stack_push_bool(&vm->stack, value_to_bool(&b, "or"));
+    PANIC("|: wrong argument kinds\n");
 
   return true;
 }
@@ -1073,18 +1084,47 @@ bool xor_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
-  if (value_to_bool(&a, "xor"))
-    value_stack_push_bool(&vm->stack, !value_to_bool(&b, "xor"));
+  if (a.kind == ValueKindNumber &&
+      b.kind == ValueKindNumber)
+    value_stack_push_bool(&vm->stack, a.as.number ^ b.as.number);
+  else if (a.kind == ValueKindBool &&
+           b.kind == ValueKindBool)
+    value_stack_push_bool(&vm->stack, a.as._bool ^ b.as._bool);
   else
-    value_stack_push_bool(&vm->stack, value_to_bool(&b, "xor"));
+    PANIC("^: wrong argument kinds\n");
+
 
   return true;
 }
 
 bool not_intrinsic(Vm *vm) {
-  Value value = value_stack_pop(&vm->stak);
+  Value value = value_stack_pop(&vm->stack);
 
-  value_stack_push_bool(&vm->stack, !value_to_bool(&value, "not"));
+  value_stack_push_bool(&vm->stack, !value_to_bool(&value, "not", vm));
+
+  return true;
+}
+
+bool logical_and_intrinsic(Vm *vm) {
+  Value b = value_stack_pop(&vm->stack);
+  Value a = value_stack_pop(&vm->stack);
+
+  if (!value_to_bool(&a, "&&", vm))
+    value_stack_push_bool(&vm->stack, false);
+  else
+    value_stack_push_bool(&vm->stack, value_to_bool(&b, "&&", vm));
+
+  return true;
+}
+
+bool logical_or_intrinsic(Vm *vm) {
+  Value b = value_stack_pop(&vm->stack);
+  Value a = value_stack_pop(&vm->stack);
+
+  if (value_to_bool(&a, "||", vm))
+    value_stack_push_bool(&vm->stack, true);
+  else
+    value_stack_push_bool(&vm->stack, value_to_bool(&b, "||", vm));
 
   return true;
 }
@@ -1103,7 +1143,7 @@ bool is_list_intrinsic(Vm *vm) {
   return true;
 }
 
-bool is_str_intrinsic(Vm *vm) {
+bool is_string_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   value_stack_push_bool(&vm->stack, value.kind == ValueKindString);
 
@@ -1151,7 +1191,7 @@ bool type_intrinsic(Vm *vm) {
   } break;
 
   case ValueKindString: {
-    value_stack_push_string(&vm->stack, STR_LIT("str"));
+    value_stack_push_string(&vm->stack, STR_LIT("string"));
   } break;
 
   case ValueKindNumber: {
@@ -1248,10 +1288,13 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("|"), 2, true, &or_intrinsic },
   { STR_LIT("^"), 2, true, &xor_intrinsic },
   { STR_LIT("!"), 1, true, &not_intrinsic },
+  // Logical
+  { STR_LIT("&&"), 2, true, &logical_and_intrinsic },
+  { STR_LIT("||"), 2, true, &logical_or_intrinsic },
   // Types
   { STR_LIT("unit?"), 1, true, &is_unit_intrinsic },
   { STR_LIT("list?"), 1, true, &is_list_intrinsic },
-  { STR_LIT("str?"), 1, true, &is_str_intrinsic },
+  { STR_LIT("string?"), 1, true, &is_string_intrinsic },
   { STR_LIT("number?"), 1, true, &is_number_intrinsic },
   { STR_LIT("bool?"), 1, true, &is_bool_intrinsic },
   { STR_LIT("fun?"), 1, true, &is_fun_intrinsic },

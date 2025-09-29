@@ -110,6 +110,8 @@ void value_stack_push_record(ValueStack *stack, Record record);
 Value  value_stack_pop(ValueStack *stack);
 Value *value_stack_get(ValueStack *stack, u32 index);
 
+void free_value(Value *value, RcArena *rc_arena);
+
 bool execute_func(Vm *vm, Str name, u32 args_len, bool value_expected);
 bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected);
 u32  execute(Ir *ir, i32 argc, char **argv,
