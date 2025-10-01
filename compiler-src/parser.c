@@ -204,6 +204,13 @@ static Token *parser_expect_token(Parser *parser, u64 id_mask) {
 
 static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask);
 
+static Ir parser_parse(Parser *parser, Str code, char *file_path) {
+  parser->tokens = lex(code, file_path);
+  parser->ir = parser_parse_block(parser, 0);
+
+  return parser->ir;
+}
+
 static IrExprFuncDef parser_parse_func_def(Parser *parser) {
   IrExprFuncDef func_def = {0};
 
@@ -645,7 +652,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     }
 
     expr->kind = IrExprKindBlock;
-    expr->as.block = parser_parse(parser, code, path, &parser->macros);
+    expr->as.block = parser_parse(parser, code, path);
 
     parser_expect_token(parser, MASK(TT_CPAREN));
 
@@ -695,17 +702,7 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
   return block;
 }
 
-Ir parser_parse(Parser *parser, Str code, char *file_path) {
-  parser.tokens = lex(code, file_path);
-  parser.ir = parser_parse_block(&parser, 0);
-
-  return parser.ir;
-}
-
 Ir parse(Str code, char *file_path) {
   Parser parser = {0};
-
-  parser_parse(&parser, code, file_path);
-
-  return parser.ir;
+  return parser_parse(&parser, code, file_path);
 }
