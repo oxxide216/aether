@@ -29,10 +29,10 @@ typedef struct {
 typedef Da(Macro) Macros;
 
 typedef struct {
-  Tokens tokens;
-  u32    index;
-  Ir     ir;
-  Macros macros;
+  Tokens  tokens;
+  u32     index;
+  Macros *macros;
+  Ir      ir;
 } Parser;
 
 static char *token_names[] = {
@@ -207,11 +207,14 @@ static Token *parser_expect_token(Parser *parser, u64 id_mask) {
 
 static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask);
 
-static Ir parser_parse(Parser *parser, Str code, char *file_path) {
-  parser->tokens = lex(code, file_path);
-  parser->ir = parser_parse_block(parser, 0);
+Ir parse_with_macros(Str code, char *file_path, Macros *macros) {
+  Parser parser = {0};
 
-  return parser->ir;
+  parser.tokens = lex(code, file_path);
+  parser.macros = macros;
+  parser.ir = parser_parse_block(&parser, 0);
+
+  return parser.ir;
 }
 
 static IrExprFuncDef parser_parse_func_def(Parser *parser) {
@@ -280,7 +283,7 @@ static void parser_parse_macro_def(Parser *parser) {
   macro.body = parser_parse_block(parser, MASK(TT_CPAREN));
   parser_expect_token(parser, MASK(TT_CPAREN));
 
-  DA_APPEND(parser->macros, macro);
+  DA_APPEND(*parser->macros, macro);
 }
 
 static void macro_body_expand_block(IrBlock *block, IrBlock *args,
@@ -400,8 +403,8 @@ static IrBlock parser_parse_macro_expand(Parser *parser) {
 
   Macro *macro = NULL;
 
-  for (u32 i = 0; i < parser->macros.len; ++i) {
-    Macro *temp_macro = parser->macros.items + i;
+  for (u32 i = 0; i < parser->macros->len; ++i) {
+    Macro *temp_macro = parser->macros->items + i;
 
     if (str_eq(temp_macro->name, name) &&
         (temp_macro->args.len == args.len ||
@@ -655,7 +658,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     }
 
     expr->kind = IrExprKindBlock;
-    expr->as.block = parser_parse(parser, code, path);
+    expr->as.block = parse_with_macros(code, path, parser->macros);
 
     parser_expect_token(parser, MASK(TT_CPAREN));
 
@@ -706,6 +709,6 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
 }
 
 Ir parse(Str code, char *file_path) {
-  Parser parser = {0};
-  return parser_parse(&parser, code, file_path);
+  Macros macros = {0};
+  return parse_with_macros(code, file_path, &macros);
 }
