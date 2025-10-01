@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 
 #include "std-intrinsics.h"
+#include "aether-ir/deserializer.h"
 #include "io.h"
 #include "shl_log.h"
 #include "shl_arena.h"
@@ -17,6 +18,30 @@ bool exit_intrinsic(Vm *vm) {
 
   vm->exit_code = exit_code.as._int;
   return false;
+}
+
+bool eval_intrinsic(Vm *vm) {
+  Value bytecode = value_stack_pop(&vm->stack);
+  if (bytecode.kind != ValueKindString)
+    PANIC("eval: wrong argument kind\n");
+
+  Ir ir = deserialize((u8 *) bytecode.as.string.ptr,
+                      bytecode.as.string.len,
+                      vm->rc_arena);
+
+  i32 argc = 1;
+  char *argv[] = { "eval", NULL };
+  Intrinsics intrinsics = {
+    malloc(vm->intrinsics.len * sizeof(Intrinsic)),
+    vm->intrinsics.len - std_intrinsics_len,
+    vm->intrinsics.len - std_intrinsics_len,
+  };
+  memcpy(intrinsics.items, vm->intrinsics.items,
+         intrinsics.len * sizeof(Intrinsic));
+
+  execute(&ir, argc, argv, vm->rc_arena, &intrinsics);
+
+  return true;
 }
 
 static void print_value(ValueStack *stack, Value *value, u32 level) {
@@ -1276,6 +1301,7 @@ bool type_intrinsic(Vm *vm) {
 Intrinsic std_intrinsics[] = {
   // System
   { STR_LIT("exit"), 1, false, &exit_intrinsic },
+  { STR_LIT("eval"), 1, false, &eval_intrinsic },
   // Io
   { STR_LIT("print"), 1, false, &print_intrinsic },
   { STR_LIT("println"), 1, false, &println_intrinsic },

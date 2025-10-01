@@ -3,7 +3,7 @@
 
 #include "aether-ir/ir.h"
 #include "aether-ir/rc-arena.h"
-#include "shl_log.h"
+#include "../../vm-src/shl_log.h"
 
 #define EXECUTE_FUNC(vm, name, args, value_expected)   \
   do {                                                 \
