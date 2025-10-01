@@ -27,3 +27,4 @@ cbracket=\]
 ocurly={
 ccurly=}
 str="|'
+unpack=...

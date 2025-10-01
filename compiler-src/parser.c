@@ -23,6 +23,7 @@ typedef struct {
   Str     name;
   Strs    args;
   IrBlock body;
+  bool    has_unpack;
 } Macro;
 
 typedef Da(Macro) Macros;
@@ -61,6 +62,7 @@ static char *token_names[] = {
   "`{`",
   "`}`",
   "string literal",
+  "...",
 };
 
 static char escape_char(char _char) {
@@ -252,7 +254,13 @@ static void parser_parse_macro_def(Parser *parser) {
 
   Token *next_token = parser_peek_token(parser);
   while (next_token && next_token->id != TT_CBRACKET) {
-    Token *arg_token = parser_expect_token(parser, MASK(TT_IDENT));
+    Token *arg_token = parser_expect_token(parser, MASK(TT_IDENT) | MASK(TT_UNPACK));
+    if (arg_token->id == TT_UNPACK) {
+      macro.has_unpack = true;
+
+      arg_token = parser_expect_token(parser, MASK(TT_IDENT));
+    }
+
     DA_APPEND(macro.args, arg_token->lexeme);
 
     next_token = parser_peek_token(parser);
@@ -265,51 +273,58 @@ static void parser_parse_macro_def(Parser *parser) {
   DA_APPEND(parser->macros, macro);
 }
 
-static void macro_body_expand_block(IrBlock *block, IrBlock *args, Strs *arg_names);
+static void macro_body_expand_block(IrBlock *block, IrBlock *args,
+                                    Strs *arg_names, bool unpack);
 
-static void macro_body_expand(IrExpr **expr, IrBlock *args, Strs *arg_names) {
+static void macro_body_expand(IrExpr **expr, IrBlock *args, Strs *arg_names,
+                              IrBlock *parent_block, bool unpack) {
   IrExpr *new_expr = aalloc(sizeof(IrExpr));
   *new_expr = **expr;
   *expr = new_expr;
 
   switch (new_expr->kind) {
   case IrExprKindBlock: {
-    macro_body_expand_block(&new_expr->as.block, args, arg_names);
+    macro_body_expand_block(&new_expr->as.block, args, arg_names, unpack);
   } break;
 
   case IrExprKindFuncDef: {
-    macro_body_expand_block(&new_expr->as.func_def.body, args, arg_names);
+    macro_body_expand_block(&new_expr->as.func_def.body, args, arg_names, unpack);
   } break;
 
   case IrExprKindFuncCall: {
-    macro_body_expand_block(&new_expr->as.func_call.args, args, arg_names);
+    macro_body_expand_block(&new_expr->as.func_call.args, args, arg_names, unpack);
   } break;
 
   case IrExprKindVarDef: {
-    macro_body_expand(&new_expr->as.var_def.expr, args, arg_names);
+    macro_body_expand(&new_expr->as.var_def.expr, args, arg_names, NULL, unpack);
   } break;
 
   case IrExprKindIf: {
-    macro_body_expand_block(&new_expr->as._if.if_body, args, arg_names);
+    macro_body_expand_block(&new_expr->as._if.if_body, args, arg_names, unpack);
+
+    for (u32 i = 0; i < new_expr->as._if.elifs.len; ++i)
+      macro_body_expand_block(&new_expr->as._if.elifs.items[i].body,
+                              args, arg_names, unpack);
+
     if (new_expr->as._if.has_else)
-      macro_body_expand_block(&new_expr->as._if.else_body, args, arg_names);
+      macro_body_expand_block(&new_expr->as._if.else_body, args, arg_names, unpack);
   } break;
 
   case IrExprKindWhile: {
-    macro_body_expand_block(&new_expr->as._while.body, args, arg_names);
+    macro_body_expand_block(&new_expr->as._while.body, args, arg_names, unpack);
   } break;
 
   case IrExprKindSet: {
-    macro_body_expand(&new_expr->as.set.src, args, arg_names);
+    macro_body_expand(&new_expr->as.set.src, args, arg_names, NULL, unpack);
   } break;
 
   case IrExprKindField: {
     if (new_expr->as.field.is_set)
-      macro_body_expand(&new_expr->as.field.expr, args, arg_names);
+      macro_body_expand(&new_expr->as.field.expr, args, arg_names, NULL, unpack);
   } break;
 
   case IrExprKindList: {
-    macro_body_expand_block(&new_expr->as.list.content, args, arg_names);
+    macro_body_expand_block(&new_expr->as.list.content, args, arg_names, unpack);
   } break;
 
   case IrExprKindIdent: {
@@ -321,8 +336,25 @@ static void macro_body_expand(IrExpr **expr, IrBlock *args, Strs *arg_names) {
       }
     }
 
-    if (index != (u32) -1)
-      *new_expr = *args->items[index];
+    if (index != (u32) -1) {
+      if (index + 1 == arg_names->len && unpack) {
+        if (!parent_block) {
+          ERROR("Macro arguments can be unpacked only inside of a block\n");
+          exit(1);
+        }
+
+        parent_block->len -= 1;
+
+        IrBlock *block = &args->items[args->len - 1]->as.block;
+        for (u32 i = 0; i < block->len; ++i) {
+          DA_APPEND(*parent_block, block->items[i]);
+          macro_body_expand(parent_block->items + parent_block->len - 1,
+                            args, arg_names, NULL, unpack);
+        }
+      } else {
+        *new_expr = *args->items[index];
+      }
+    }
   } break;
 
   case IrExprKindString: break;
@@ -331,19 +363,20 @@ static void macro_body_expand(IrExpr **expr, IrBlock *args, Strs *arg_names) {
   case IrExprKindBool:   break;
 
   case IrExprKindLambda: {
-    macro_body_expand_block(&new_expr->as.func_def.body, args, arg_names);
+    macro_body_expand_block(&new_expr->as.lambda.body, args, arg_names, unpack);
   } break;
 
   case IrExprKindRecord: {
     for (u32 i = 0; new_expr->as.record.len; ++i)
-      macro_body_expand(&new_expr->as.record.items[i].expr, args, arg_names);
+      macro_body_expand(&new_expr->as.record.items[i].expr, args, arg_names, NULL, unpack);
   } break;
   }
 }
 
-static void macro_body_expand_block(IrBlock *block, IrBlock *args, Strs *arg_names) {
+static void macro_body_expand_block(IrBlock *block, IrBlock *args,
+                                    Strs *arg_names, bool unpack) {
   for (u32 i = 0; i < block->len; ++i)
-    macro_body_expand(block->items + i, args, arg_names);
+    macro_body_expand(block->items + i, args, arg_names, block, unpack);
 }
 
 static IrBlock parser_parse_macro_expand(Parser *parser) {
@@ -361,7 +394,9 @@ static IrBlock parser_parse_macro_expand(Parser *parser) {
     Macro *temp_macro = parser->macros.items + i;
 
     if (str_eq(temp_macro->name, name) &&
-        temp_macro->args.len == args.len) {
+        (temp_macro->args.len == args.len ||
+         (temp_macro->args.len <= args.len &&
+          temp_macro->has_unpack))) {
       macro = temp_macro;
       break;
     }
@@ -373,8 +408,18 @@ static IrBlock parser_parse_macro_expand(Parser *parser) {
     exit(1);
   }
 
+  if (macro->has_unpack) {
+    IrExpr *unpack_body = aalloc(sizeof(IrExpr));
+    unpack_body->kind = IrExprKindBlock;
+    for (u32 i = 0; i < args.len - macro->args.len + 1; ++i)
+      DA_APPEND(unpack_body->as.block, args.items[i]);
+
+    args.items[macro->args.len - 1] = unpack_body;
+    args.len = macro->args.len;
+  }
+
   IrBlock body = macro->body;
-  macro_body_expand_block(&body, &args, &macro->args);
+  macro_body_expand_block(&body, &args, &macro->args, macro->has_unpack);
   return body;
 }
 
