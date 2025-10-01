@@ -185,7 +185,9 @@ static void print_id_mask(u64 id_mask) {
 static Token *parser_expect_token(Parser *parser, u64 id_mask) {
   Token *token = parser_next_token(parser);
   if (!token) {
-    ERROR("Expected ");
+    PERROR("%s:%u:%u: ", "Expected ",
+           token->file_path,
+           token->row + 1, token->col + 1);
     print_id_mask(id_mask);
     fprintf(stderr, ", but got EOF\n");
     exit(1);
@@ -194,11 +196,12 @@ static Token *parser_expect_token(Parser *parser, u64 id_mask) {
   if (MASK(token->id) & id_mask)
     return token;
 
-  ERROR("Expected ");
+  PERROR("%s:%u:%u: ", "Expected ",
+         token->file_path,
+         token->row + 1, token->col + 1);
   print_id_mask(id_mask);
-  fprintf(stderr, ", but got `"STR_FMT"` at %u:%u\n",
-          STR_ARG(token->lexeme),
-          token->row + 1, token->col + 1);
+  fprintf(stderr, ", but got `"STR_FMT"`\n",
+          STR_ARG(token->lexeme));
   exit(1);
 }
 
