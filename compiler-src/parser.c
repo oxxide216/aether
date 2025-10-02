@@ -424,11 +424,11 @@ static IrBlock parser_parse_macro_expand(Parser *parser) {
   if (macro->has_unpack) {
     IrExpr *unpack_body = aalloc(sizeof(IrExpr));
     unpack_body->kind = IrExprKindBlock;
-    for (u32 i = 0; i < args.len - macro->args.len + 1; ++i)
+    for (u32 i = macro->args.len - 1; i < args.len; ++i)
       DA_APPEND(unpack_body->as.block, args.items[i]);
 
-    args.items[macro->args.len - 1] = unpack_body;
     args.len = macro->args.len;
+    args.items[args.len - 1] = unpack_body;
   }
 
   IrBlock body = macro->body;
