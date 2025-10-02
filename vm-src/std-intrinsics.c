@@ -470,6 +470,22 @@ bool receive_intrinsic(Vm *vm) {
   return true;
 }
 
+bool run_command_intrinsic(Vm *vm) {
+  Value path = value_stack_pop(&vm->stack);
+  if (path.kind != ValueKindString)
+    PANIC("run-command: wrong argument kind\n");
+
+  char *path_cstring = malloc(path.as.string.len + 1);
+  memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
+  path_cstring[path.as.string.len] = '\0';
+
+  value_stack_push_int(&vm->stack, system(path_cstring));
+
+  free(path_cstring);
+
+  return true;
+}
+
 bool head_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind != ValueKindList)
@@ -1412,7 +1428,7 @@ bool type_intrinsic(Vm *vm) {
 }
 
 Intrinsic std_intrinsics[] = {
-  // System
+  // VM
   { STR_LIT("exit"), 1, false, &exit_intrinsic },
   { STR_LIT("eval"), 1, false, &eval_intrinsic },
   // Io
@@ -1438,6 +1454,8 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("close-connection"), 1, false, &close_connection_intrinsic },
   { STR_LIT("send"), 2, false, &send_intrinsic },
   { STR_LIT("receive"), 1, true, &receive_intrinsic },
+  // Processes
+  { STR_LIT("run-command"), 1, true, &run_command_intrinsic },
   // Base
   { STR_LIT("head"), 1, true, &head_intrinsic },
   { STR_LIT("tail"), 1, true, &tail_intrinsic },
