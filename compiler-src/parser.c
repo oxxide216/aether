@@ -366,13 +366,14 @@ static void macro_body_expand(IrExpr **expr, IrBlock *args, Strs *arg_names,
         }
       } else {
         *new_expr = *args->items[index];
+        macro_body_expand(&new_expr, args, arg_names, NULL, unpack);
       }
     }
   } break;
 
   case IrExprKindString: break;
-  case IrExprKindInt: break;
-  case IrExprKindFloat: break;
+  case IrExprKindInt:    break;
+  case IrExprKindFloat:  break;
   case IrExprKindBool:   break;
 
   case IrExprKindLambda: {
@@ -388,6 +389,10 @@ static void macro_body_expand(IrExpr **expr, IrBlock *args, Strs *arg_names,
 
 static void macro_body_expand_block(IrBlock *block, IrBlock *args,
                                     Strs *arg_names, bool unpack) {
+  IrExpr **new_items = malloc(block->cap * sizeof(IrExpr *));
+  memcpy(new_items, block->items, block->len * sizeof(IrExpr *));
+  block->items = new_items;
+
   for (u32 i = 0; i < block->len; ++i)
     macro_body_expand(block->items + i, args, arg_names, block, unpack);
 }
@@ -433,6 +438,7 @@ static IrBlock parser_parse_macro_expand(Parser *parser) {
 
   IrBlock body = macro->body;
   macro_body_expand_block(&body, &args, &macro->args, macro->has_unpack);
+
   return body;
 }
 

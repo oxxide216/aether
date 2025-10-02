@@ -227,6 +227,12 @@ bool execute_func(Vm *vm, Str name, u32 args_len, bool value_expected) {
       if (str_eq(intrinsic->name, name) &&
           (intrinsic->args_count == args_len ||
            intrinsic->args_count == (u32) -1)) {
+        if (vm->stack.len < intrinsic->args_count) {
+          ERROR("Not enough data on the stack for function call\n");
+          vm->exit_code = 1;
+          return false;
+        }
+
         if (!intrinsic->func(vm))
           return false;
 
@@ -474,7 +480,6 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
       EXECUTE_EXPR(vm, expr->as.field.expr, true);
       field->value = value_stack_pop(&vm->stack);
-
       if (value_expected)
         value_stack_push_unit(&vm->stack);
     } else if (value_expected) {
@@ -572,22 +577,28 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     catch_vars_block(vm, &local_names, &catched_values, &expr->as.lambda.body);
 
-    Value func_value = {
-      ValueKindFunc,
-      {
-        .func = {
-          (Str) {0},
-          expr->as.lambda.args,
-          expr->as.lambda.body,
-          catched_values,
+    StringBuilder name_sb = {0};
+    sb_push_u32(&name_sb, vm->funcs.len);
+    Str name = sb_to_str(name_sb);
+
+    if (value_expected) {
+      Value func_value = {
+        ValueKindFunc,
+        {
+          .func = {
+            name,
+            expr->as.lambda.args,
+            expr->as.lambda.body,
+            catched_values,
+          },
         },
-      },
-    };
-    DA_APPEND(vm->stack, func_value);
+      };
+      DA_APPEND(vm->stack, func_value);
+    }
 
     Func func = {
       {
-        (Str) {0},
+        name,
         expr->as.lambda.args,
         expr->as.lambda.body,
       },
