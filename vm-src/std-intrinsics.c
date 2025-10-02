@@ -1,6 +1,8 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <linux/limits.h>
+#include <dirent.h>
 
 #include "std-intrinsics.h"
 #include "aether-ir/deserializer.h"
@@ -229,6 +231,81 @@ bool delete_file_intrinsic(Vm *vm) {
   remove(path_cstring);
 
   free(path_cstring);
+
+  return true;
+}
+
+bool get_current_path_intrinsic(Vm *vm) {
+  char *path = rc_arena_alloc(vm->rc_arena, PATH_MAX);
+  getcwd(path, PATH_MAX);
+
+  value_stack_push_string(&vm->stack, STR(path, strlen(path)));
+
+  return true;
+}
+
+bool set_current_path_intrinsic(Vm *vm) {
+  Value path = value_stack_pop(&vm->stack);
+  if (path.kind != ValueKindString)
+    PANIC("set-current-path: wrong argument kind\n");
+
+  char *path_cstring = malloc(path.as.string.len + 1);
+  memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
+  path_cstring[path.as.string.len] = '\0';
+
+  chdir(path_cstring);
+
+  free(path_cstring);
+
+  return true;
+}
+
+bool get_absolute_path_intrinsic(Vm *vm) {
+  Value path = value_stack_pop(&vm->stack);
+  if (path.kind != ValueKindString)
+    PANIC("get-absolute-path: wrong argument kind\n");
+
+  char *path_cstring = malloc(path.as.string.len + 1);
+  memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
+  path_cstring[path.as.string.len] = '\0';
+
+  char *absolute_path = rc_arena_alloc(vm->rc_arena, PATH_MAX);
+  realpath(path_cstring, absolute_path);
+
+  value_stack_push_string(&vm->stack, STR(absolute_path, strlen(absolute_path)));
+
+  free(path_cstring);
+
+  return true;
+}
+
+bool list_directory_intrinsic(Vm *vm) {
+  Value path = value_stack_pop(&vm->stack);
+  if (path.kind != ValueKindString)
+    PANIC("list-directory: wrong argument kind\n");
+
+  ListNode *list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  ListNode *list_end = list;
+
+  char *path_cstring = malloc(path.as.string.len + 1);
+  memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
+  path_cstring[path.as.string.len] = '\0';
+
+  DIR *dir = opendir(path_cstring);
+  if (dir) {
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+      LL_PREPEND(list, list_end, ListNode);
+      list_end->value.kind = ValueKindString;
+      list_end->value.as.string = (Str) {
+        entry->d_name,
+        strlen(entry->d_name),
+      };
+    }
+    closedir(dir);
+  }
+
+  value_stack_push_list(&vm->stack, list);
 
   return true;
 }
@@ -1347,6 +1424,11 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("read-file"), 1, true, &read_file_intrinsic },
   { STR_LIT("write-file"), 2, false, &write_file_intrinsic },
   { STR_LIT("delete-file"), 1, false, &delete_file_intrinsic },
+  // Paths
+  { STR_LIT("get-current-path"), 0, true, &get_current_path_intrinsic },
+  { STR_LIT("set-current-path"), 1, false, &set_current_path_intrinsic },
+  { STR_LIT("get-absolute-path"), 1, true, &get_absolute_path_intrinsic },
+  { STR_LIT("list-directory"), 1, true, &list_directory_intrinsic },
   // Arguments
   { STR_LIT("get-args"), 0, true, &get_args_intrinsic },
   // Sockets

@@ -1,0 +1,5 @@
+(println (get-current-path))
+(set-current-path '..')
+(println (get-current-path))
+(println (get-absolute-path '../..'))
+(println (list-directory '.'))
