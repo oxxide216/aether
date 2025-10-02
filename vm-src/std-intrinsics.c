@@ -419,10 +419,10 @@ bool nth_intrinsic(Vm *vm) {
     ++i;
   }
 
-  if (i < index.as._int)
-    value_stack_push_unit(&vm->stack);
-  else
+  if (node)
     DA_APPEND(vm->stack, node->value);
+  else
+    value_stack_push_unit(&vm->stack);
 
   return true;
 }
