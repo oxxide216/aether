@@ -1,0 +1,9 @@
+(let path 'text.txt')
+
+(if (file-exists? path)
+  (print (read-file path))
+  (delete-file path)
+  (println 'Deleted!')
+ else
+  (write-file 'Hello, World!\n' path)
+  (println 'Wrote!'))

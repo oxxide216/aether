@@ -163,12 +163,28 @@ bool input_intrinsic(Vm *vm) {
   return true;
 }
 
+bool file_exists_intrinsic(Vm *vm) {
+  Value path = value_stack_pop(&vm->stack);
+  if (path.kind != ValueKindString)
+    PANIC("file-exists?: wrong argument kind\n");
+
+  char *path_cstring = malloc(path.as.string.len + 1);
+  memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
+  path_cstring[path.as.string.len] = '\0';
+
+  value_stack_push_bool(&vm->stack, access(path_cstring, F_OK) == 0);
+
+  free(path_cstring);
+
+  return true;
+}
+
 bool read_file_intrinsic(Vm *vm) {
   Value path = value_stack_pop(&vm->stack);
   if (path.kind != ValueKindString)
     PANIC("read-file: wrong argument kind\n");
 
-  char *path_cstring = aalloc(path.as.string.len + 1);
+  char *path_cstring = malloc(path.as.string.len + 1);
   memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
   path_cstring[path.as.string.len] = '\0';
 
@@ -177,6 +193,8 @@ bool read_file_intrinsic(Vm *vm) {
     value_stack_push_unit(&vm->stack);
   else
     value_stack_push_string(&vm->stack, content);
+
+  free(path_cstring);
 
   return true;
 }
@@ -188,11 +206,29 @@ bool write_file_intrinsic(Vm *vm) {
       content.kind != ValueKindString)
     PANIC("write-file: wrong argument kinds\n");
 
-  char *path_cstring = aalloc(path.as.string.len + 1);
+  char *path_cstring = malloc(path.as.string.len + 1);
   memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
   path_cstring[path.as.string.len] = '\0';
 
   write_file(path_cstring, content.as.string);
+
+  free(path_cstring);
+
+  return true;
+}
+
+bool delete_file_intrinsic(Vm *vm) {
+  Value path = value_stack_pop(&vm->stack);
+  if (path.kind != ValueKindString)
+    PANIC("delete-file: wrong argument kind\n");
+
+  char *path_cstring = malloc(path.as.string.len + 1);
+  memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
+  path_cstring[path.as.string.len] = '\0';
+
+  remove(path_cstring);
+
+  free(path_cstring);
 
   return true;
 }
@@ -1306,9 +1342,14 @@ Intrinsic std_intrinsics[] = {
   { STR_LIT("print"), 1, false, &print_intrinsic },
   { STR_LIT("println"), 1, false, &println_intrinsic },
   { STR_LIT("input"), 0, true, &input_intrinsic },
+  // Files
+  { STR_LIT("file-exists?"), 1, true, &file_exists_intrinsic },
   { STR_LIT("read-file"), 1, true, &read_file_intrinsic },
   { STR_LIT("write-file"), 2, false, &write_file_intrinsic },
+  { STR_LIT("delete-file"), 1, false, &delete_file_intrinsic },
+  // Arguments
   { STR_LIT("get-args"), 0, true, &get_args_intrinsic },
+  // Sockets
   { STR_LIT("create-server"), 1, true, &create_server_intrinsic },
   { STR_LIT("create-client"), 2, true, &create_client_intrinsic },
   { STR_LIT("accept-connection"), 2, true, &accept_connection_intrinsic },
