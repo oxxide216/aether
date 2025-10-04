@@ -185,9 +185,7 @@ static void print_id_mask(u64 id_mask) {
 static Token *parser_expect_token(Parser *parser, u64 id_mask) {
   Token *token = parser_next_token(parser);
   if (!token) {
-    PERROR("%s:%u:%u: ", "Expected ",
-           token->file_path,
-           token->row + 1, token->col + 1);
+    PERROR("Expected ");
     print_id_mask(id_mask);
     fprintf(stderr, ", but got EOF\n");
     exit(1);
