@@ -688,15 +688,21 @@ bool eq_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
-  if (a.kind == ValueKindInt &&
-      b.kind == ValueKindInt)
+  if (a.kind == ValueKindList &&
+      b.kind == ValueKindList)
+    value_stack_push_bool(&vm->stack, a.as.list == b.as.list);
+  else if (a.kind == ValueKindString &&
+           b.kind == ValueKindString)
+    value_stack_push_bool(&vm->stack, str_eq(a.as.string, b.as.string));
+  else if (a.kind == ValueKindInt &&
+           b.kind == ValueKindInt)
     value_stack_push_bool(&vm->stack, a.as._int == b.as._int);
   else if (a.kind == ValueKindFloat &&
            b.kind == ValueKindFloat)
     value_stack_push_bool(&vm->stack, a.as._float == b.as._float);
-  else if (a.kind == ValueKindString &&
-           b.kind == ValueKindString)
-    value_stack_push_bool(&vm->stack, str_eq(a.as.string, b.as.string));
+  else if (a.kind == ValueKindBool &&
+           b.kind == ValueKindBool)
+    value_stack_push_bool(&vm->stack, a.as._bool == b.as._bool);
   else
     PANIC("==: wrong argument kinds: %u:%u\n", a.kind, b.kind);
 
@@ -707,15 +713,21 @@ bool ne_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
-  if (a.kind == ValueKindInt &&
-      b.kind == ValueKindInt)
-    value_stack_push_bool(&vm->stack, a.as._int != b.as._int);
-  if (a.kind == ValueKindFloat &&
-      b.kind == ValueKindFloat)
-    value_stack_push_bool(&vm->stack, a.as._float != b.as._float);
+  if (a.kind == ValueKindList &&
+      b.kind == ValueKindList)
+    value_stack_push_bool(&vm->stack, a.as.list != b.as.list);
   else if (a.kind == ValueKindString &&
            b.kind == ValueKindString)
     value_stack_push_bool(&vm->stack, !str_eq(a.as.string, b.as.string));
+  else if (a.kind == ValueKindInt &&
+           b.kind == ValueKindInt)
+    value_stack_push_bool(&vm->stack, a.as._int != b.as._int);
+  else if (a.kind == ValueKindFloat &&
+           b.kind == ValueKindFloat)
+    value_stack_push_bool(&vm->stack, a.as._float != b.as._float);
+  else if (a.kind == ValueKindBool &&
+           b.kind == ValueKindBool)
+    value_stack_push_bool(&vm->stack, a.as._bool != b.as._bool);
   else
     PANIC("!=: wrong argument kinds\n");
 
