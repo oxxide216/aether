@@ -2,7 +2,13 @@
 #include "shl_str.h"
 #include "shl_log.h"
 #include "shl_arena.h"
-#include "std-intrinsics.h"
+#include "base/intrinsics.h"
+#ifndef NOSYSTEM
+#include "system/intrinsics.h"
+#endif
+#ifdef IUI
+#include "iui/intrinsics.h"
+#endif
 
 typedef Da(Str) Strs;
 
@@ -640,17 +646,27 @@ bool execute_block(Vm *vm, IrBlock *block, bool value_expected) {
   return true;
 }
 
+static void intrinsics_append(Intrinsics *a, Intrinsic *b, u32 b_len) {
+  a->cap += b_len;
+  a->items = realloc(a->items, a->cap * sizeof(Intrinsic));
+  memcpy(a->items + a->len, b, b_len * sizeof(Intrinsic));
+  a->len += b_len;
+}
+
 u32 execute(Ir *ir, i32 argc, char **argv,
             RcArena *rc_arena, Intrinsics *intrinsics) {
   Vm vm = {0};
   vm.rc_arena = rc_arena;
-  vm.intrinsics = *intrinsics;
 
-  vm.intrinsics.cap += std_intrinsics_len;
-  vm.intrinsics.items = realloc(vm.intrinsics.items, vm.intrinsics.cap * sizeof(Intrinsic));
-  memcpy(vm.intrinsics.items + vm.intrinsics.len, std_intrinsics,
-         std_intrinsics_len * sizeof(Intrinsic));
-  vm.intrinsics.len += std_intrinsics_len;
+  intrinsics_append(intrinsics, base_intrinsics, base_intrinsics_len);
+#ifndef NOSYSTEM
+  intrinsics_append(intrinsics, system_intrinsics, system_intrinsics_len);
+#endif
+#ifdef IUI
+  intrinsics_append(intrinsics, iui_intrinsics, iui_intrinsics_len);
+#endif
+
+  vm.intrinsics = *intrinsics;
 
   vm.args = rc_arena_alloc(rc_arena, sizeof(ListNode));
   ListNode *args_end = vm.args;
