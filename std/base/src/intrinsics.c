@@ -15,8 +15,8 @@ bool eval_intrinsic(Vm *vm) {
   if (bytecode.kind != ValueKindString)
     PANIC("eval: wrong argument kind\n");
 
-  Ir ir = deserialize((u8 *) bytecode.as.string.ptr,
-                      bytecode.as.string.len,
+  Ir ir = deserialize((u8 *) bytecode.as.string.str.ptr,
+                      bytecode.as.string.str.len,
                       vm->rc_arena);
 
   i32 argc = 1;
@@ -109,7 +109,7 @@ bool len_intrinsic(Vm *vm) {
 
     value_stack_push_int(&vm->stack, len);
   } else if (value.kind == ValueKindString) {
-    value_stack_push_int(&vm->stack, value.as.string.len);
+    value_stack_push_int(&vm->stack, value.as.string.str.len);
   } else {
     PANIC("len: wrong argument kind\n");
   }
@@ -126,7 +126,7 @@ bool is_empty_intrinsic(Vm *vm) {
   if (value.kind == ValueKindList)
     value_stack_push_bool(&vm->stack, value.as.list->next == NULL);
   else
-    value_stack_push_bool(&vm->stack, value.as.string.len == 0);
+    value_stack_push_bool(&vm->stack, value.as.string.str.len == 0);
 
   return true;
 }
@@ -171,8 +171,8 @@ bool get_range_intrinsic(Vm *vm) {
     value_stack_push_list(&vm->stack, sub_list);
   } else {
     Str sub_string = {
-      value.as.string.ptr + begin.as._int,
-      value.as.string.len - begin.as._int - end.as._int,
+      value.as.string.str.ptr + begin.as._int,
+      value.as.string.str.len - begin.as._int - end.as._int,
     };
 
     value_stack_push_string(&vm->stack, sub_string);
@@ -277,10 +277,11 @@ bool split_intrinsic(Vm *vm) {
   ListNode *list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
   ListNode *node = list;
   u32 index = 0, i = 0;
-  for (; i < string.as.string.len; ++i) {
+  for (; i < string.as.string.str.len; ++i) {
     u32 found = true;
-    for (u32 j = 0; j + i < string.as.string.len && j < delimeter.as.string.len; ++j) {
-      if (string.as.string.ptr[j + i] != delimeter.as.string.ptr[j]) {
+    for (u32 j = 0; j + i < string.as.string.str.len &&
+                        j < delimeter.as.string.str.len; ++j) {
+      if (string.as.string.str.ptr[j + i] != delimeter.as.string.str.ptr[j]) {
         found = false;
         break;
       }
@@ -290,8 +291,15 @@ bool split_intrinsic(Vm *vm) {
       node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
       node->next->value = (Value) {
         ValueKindString,
-        { .string = STR(string.as.string.ptr + index, i - index) },
+        {
+          .string = {
+            STR(string.as.string.str.ptr + index, i - index),
+            (Str *) string.as.string.str.ptr,
+          },
+        },
       };
+
+      rc_arena_clone(vm->rc_arena, string.as.string.str.ptr);
 
       index = i + 1;
       node = node->next;
@@ -302,11 +310,44 @@ bool split_intrinsic(Vm *vm) {
     node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
     node->next->value = (Value) {
       ValueKindString,
-      { .string = STR(string.as.string.ptr + index, i - index) },
+      {
+        .string = {
+          STR(string.as.string.str.ptr + index, i - index),
+          (Str *) string.as.string.str.ptr,
+        },
+      },
     };
   }
 
   value_stack_push_list(&vm->stack, list);
+
+  return true;
+}
+
+bool sub_str_intrinsic(Vm *vm) {
+  Value end = value_stack_pop(&vm->stack);
+  Value begin = value_stack_pop(&vm->stack);
+  Value string = value_stack_pop(&vm->stack);
+  if (string.kind != ValueKindString ||
+      begin.kind != ValueKindInt ||
+      end.kind != ValueKindInt)
+    PANIC("sub-str: wrong argument kinds\n");
+
+  if (begin.as._int >= end.as._int ||
+      end.as._int > string.as.string.str.len) {
+    value_stack_push_unit(&vm->stack);
+
+    return true;
+  }
+
+  Str sub_string = {
+    string.as.string.str.ptr + begin.as._int,
+    end.as._int - begin.as._int,
+  };
+
+  rc_arena_clone(vm->rc_arena, string.as.string.str.ptr);
+
+  value_stack_push_string(&vm->stack, sub_string);
 
   return true;
 }
@@ -318,17 +359,17 @@ bool eat_str_intrinsic(Vm *vm) {
       pattern.kind != ValueKindString)
     PANIC("eat-str: wrong argument kinds\n");
 
-  if (string.as.string.len < pattern.as.string.len) {
+  if (string.as.string.str.len < pattern.as.string.str.len) {
     value_stack_push_bool(&vm->stack, false);
     return true;
   }
 
   Str string_begin = {
-    string.as.string.ptr,
-    pattern.as.string.len,
+    string.as.string.str.ptr,
+    pattern.as.string.str.len,
   };
 
-  bool matches = str_eq(string_begin, pattern.as.string);
+  bool matches = str_eq(string_begin, pattern.as.string.str);
 
   ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
 
@@ -336,11 +377,16 @@ bool eat_str_intrinsic(Vm *vm) {
   new_list->next->value = (Value) { ValueKindBool, { ._bool = matches } };
 
   new_list->next->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-  Str new_string;
-  new_string.len = string.as.string.len - pattern.as.string.len;
-  new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
-  memcpy(new_string.ptr, string.as.string.ptr + pattern.as.string.len, new_string.len);
-  new_list->next->next->value = (Value) { ValueKindString, { .string = new_string } };
+  Str new_string = {
+    string.as.string.str.ptr + pattern.as.string.str.len,
+    string.as.string.str.len - pattern.as.string.str.len,
+  };
+  new_list->next->next->value = (Value) {
+    ValueKindString,
+    { .string = { new_string, (Str *) new_string.ptr } },
+  };
+
+  rc_arena_clone(vm->rc_arena, string.as.string.str.ptr);
 
   value_stack_push_list(&vm->stack, new_list);
 
@@ -352,17 +398,17 @@ static bool eat_byte(Vm *vm, char *intrinsic_name, u32 size) {
   if (string.kind != ValueKindString)
     PANIC("%s: wrong argument kinds\n", intrinsic_name);
 
-  if (string.as.string.len < size) {
+  if (string.as.string.str.len < size) {
     value_stack_push_unit(&vm->stack);
     return true;
   }
 
   i64 _int = 0;
   switch (size) {
-  case 8: _int = *(i64 *) string.as.string.ptr; break;
-  case 4: _int = *(i32 *) string.as.string.ptr; break;
-  case 2: _int = *(i16 *) string.as.string.ptr; break;
-  case 1: _int = *(i8 *) string.as.string.ptr; break;
+  case 8: _int = *(i64 *) string.as.string.str.ptr; break;
+  case 4: _int = *(i32 *) string.as.string.str.ptr; break;
+  case 2: _int = *(i16 *) string.as.string.str.ptr; break;
+  case 1: _int = *(i8 *) string.as.string.str.ptr; break;
   }
 
   ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
@@ -371,14 +417,16 @@ static bool eat_byte(Vm *vm, char *intrinsic_name, u32 size) {
   new_list->next->value = (Value) { ValueKindInt, { ._int = _int } };
 
   new_list->next->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-  Str new_string;
-  new_string.len = string.as.string.len - size;
-  new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
-  memcpy(new_string.ptr, string.as.string.ptr + size, new_string.len);
+  Str new_string = {
+    string.as.string.str.ptr + size,
+    string.as.string.str.len - size,
+  };
   new_list->next->next->value = (Value) {
     ValueKindString,
-    { .string = new_string },
+    { .string = { new_string, (Str *) new_string.ptr } },
   };
+
+  rc_arena_clone(vm->rc_arena, string.as.string.str.ptr);
 
   value_stack_push_list(&vm->stack, new_list);
 
@@ -406,7 +454,7 @@ bool str_to_int_intrinsic(Vm *vm) {
   if (value.kind != ValueKindString)
     PANIC("str-to-int: wrong argument kind\n");
 
-  value_stack_push_int(&vm->stack, str_to_i64(value.as.string));
+  value_stack_push_int(&vm->stack, str_to_i64(value.as.string.str));
 
   return true;
 }
@@ -522,8 +570,8 @@ bool add_intrinsic(Vm *vm) {
   } else if (a.kind == ValueKindString &&
              b.kind == ValueKindString) {
     StringBuilder sb = {0};
-    sb_push_str(&sb, a.as.string);
-    sb_push_str(&sb, b.as.string);
+    sb_push_str(&sb, a.as.string.str);
+    sb_push_str(&sb, b.as.string.str);
 
     Str new_string;
     new_string.len = sb.len;
@@ -688,7 +736,7 @@ bool eq_intrinsic(Vm *vm) {
     value_stack_push_bool(&vm->stack, a.as.list == b.as.list);
   else if (a.kind == ValueKindString &&
            b.kind == ValueKindString)
-    value_stack_push_bool(&vm->stack, str_eq(a.as.string, b.as.string));
+    value_stack_push_bool(&vm->stack, str_eq(a.as.string.str, b.as.string.str));
   else if (a.kind == ValueKindInt &&
            b.kind == ValueKindInt)
     value_stack_push_bool(&vm->stack, a.as._int == b.as._int);
@@ -699,7 +747,7 @@ bool eq_intrinsic(Vm *vm) {
            b.kind == ValueKindBool)
     value_stack_push_bool(&vm->stack, a.as._bool == b.as._bool);
   else
-    PANIC("==: wrong argument kinds: %u:%u\n", a.kind, b.kind);
+    PANIC("==: wrong argument kinds\n");
 
   return true;
 }
@@ -713,7 +761,7 @@ bool ne_intrinsic(Vm *vm) {
     value_stack_push_bool(&vm->stack, a.as.list != b.as.list);
   else if (a.kind == ValueKindString &&
            b.kind == ValueKindString)
-    value_stack_push_bool(&vm->stack, !str_eq(a.as.string, b.as.string));
+    value_stack_push_bool(&vm->stack, !str_eq(a.as.string.str, b.as.string.str));
   else if (a.kind == ValueKindInt &&
            b.kind == ValueKindInt)
     value_stack_push_bool(&vm->stack, a.as._int != b.as._int);
@@ -783,7 +831,7 @@ static bool value_to_bool(Value *value, char *intrinsic_name, Vm *vm) {
   else if (value->kind == ValueKindList)
     return value->as.list->next != NULL;
   else if (value->kind == ValueKindString)
-    return value->as.string.len != 0;
+    return value->as.string.str.len != 0;
   else if (value->kind == ValueKindInt)
     return value->as._int != 0;
   else if (value->kind == ValueKindFloat)
@@ -993,6 +1041,7 @@ Intrinsic base_intrinsics[] = {
   { STR_LIT("reduce"), 3, true, &reduce_intrinsic },
   // String operations
   { STR_LIT("split"), 2, true, &split_intrinsic },
+  { STR_LIT("sub-str"), 3, true, &sub_str_intrinsic },
   { STR_LIT("eat-str"), 2, true, &eat_str_intrinsic },
   { STR_LIT("eat-byte-64"), 1, true, &eat_byte_64_intrinsic },
   { STR_LIT("eat-byte-32"), 1, true, &eat_byte_32_intrinsic },

@@ -37,7 +37,7 @@ static void print_value(ValueStack *stack, Value *value, u32 level) {
   } break;
 
   case ValueKindString: {
-    str_print(value->as.string);
+    str_print(value->as.string.str);
   } break;
 
   case ValueKindInt: {
@@ -134,9 +134,9 @@ bool file_exists_intrinsic(Vm *vm) {
   if (path.kind != ValueKindString)
     PANIC("file-exists?: wrong argument kind\n");
 
-  char *path_cstring = malloc(path.as.string.len + 1);
-  memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
-  path_cstring[path.as.string.len] = '\0';
+  char *path_cstring = malloc(path.as.string.str.len + 1);
+  memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
+  path_cstring[path.as.string.str.len] = '\0';
 
   value_stack_push_bool(&vm->stack, access(path_cstring, F_OK) == 0);
 
@@ -150,9 +150,9 @@ bool read_file_intrinsic(Vm *vm) {
   if (path.kind != ValueKindString)
     PANIC("read-file: wrong argument kind\n");
 
-  char *path_cstring = malloc(path.as.string.len + 1);
-  memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
-  path_cstring[path.as.string.len] = '\0';
+  char *path_cstring = malloc(path.as.string.str.len + 1);
+  memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
+  path_cstring[path.as.string.str.len] = '\0';
 
   Str content = read_file(path_cstring);
   if (content.len == (u32) -1)
@@ -172,11 +172,11 @@ bool write_file_intrinsic(Vm *vm) {
       content.kind != ValueKindString)
     PANIC("write-file: wrong argument kinds\n");
 
-  char *path_cstring = malloc(path.as.string.len + 1);
-  memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
-  path_cstring[path.as.string.len] = '\0';
+  char *path_cstring = malloc(path.as.string.str.len + 1);
+  memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
+  path_cstring[path.as.string.str.len] = '\0';
 
-  write_file(path_cstring, content.as.string);
+  write_file(path_cstring, content.as.string.str);
 
   free(path_cstring);
 
@@ -188,9 +188,9 @@ bool delete_file_intrinsic(Vm *vm) {
   if (path.kind != ValueKindString)
     PANIC("delete-file: wrong argument kind\n");
 
-  char *path_cstring = malloc(path.as.string.len + 1);
-  memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
-  path_cstring[path.as.string.len] = '\0';
+  char *path_cstring = malloc(path.as.string.str.len + 1);
+  memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
+  path_cstring[path.as.string.str.len] = '\0';
 
   remove(path_cstring);
 
@@ -213,9 +213,9 @@ bool set_current_path_intrinsic(Vm *vm) {
   if (path.kind != ValueKindString)
     PANIC("set-current-path: wrong argument kind\n");
 
-  char *path_cstring = malloc(path.as.string.len + 1);
-  memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
-  path_cstring[path.as.string.len] = '\0';
+  char *path_cstring = malloc(path.as.string.str.len + 1);
+  memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
+  path_cstring[path.as.string.str.len] = '\0';
 
   chdir(path_cstring);
 
@@ -229,9 +229,9 @@ bool get_absolute_path_intrinsic(Vm *vm) {
   if (path.kind != ValueKindString)
     PANIC("get-absolute-path: wrong argument kind\n");
 
-  char *path_cstring = malloc(path.as.string.len + 1);
-  memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
-  path_cstring[path.as.string.len] = '\0';
+  char *path_cstring = malloc(path.as.string.str.len + 1);
+  memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
+  path_cstring[path.as.string.str.len] = '\0';
 
   char *absolute_path = rc_arena_alloc(vm->rc_arena, PATH_MAX);
   realpath(path_cstring, absolute_path);
@@ -251,19 +251,24 @@ bool list_directory_intrinsic(Vm *vm) {
   ListNode *list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
   ListNode *list_end = list;
 
-  char *path_cstring = malloc(path.as.string.len + 1);
-  memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
-  path_cstring[path.as.string.len] = '\0';
+  char *path_cstring = malloc(path.as.string.str.len + 1);
+  memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
+  path_cstring[path.as.string.str.len] = '\0';
 
   DIR *dir = opendir(path_cstring);
   if (dir) {
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
+      Str path;
+      path.len = strlen(entry->d_name);
+      path.ptr = rc_arena_alloc(vm->rc_arena, path.len);
+      memcpy(path.ptr, entry->d_name, path.len);
+
       LL_PREPEND(list, list_end, ListNode);
       list_end->value.kind = ValueKindString;
-      list_end->value.as.string = (Str) {
-        entry->d_name,
-        strlen(entry->d_name),
+      list_end->value.as.string = (ValueStr) {
+        path,
+        (Str *) path.ptr,
       };
     }
     closedir(dir);
@@ -332,11 +337,11 @@ bool create_client_intrinsic(Vm *vm) {
   server_address.sin_family = AF_INET;
   server_address.sin_port = htons(port.as._int);
 
-  char *server_ip_address_cstr = malloc(server_ip_address.as.string.len + 1);
+  char *server_ip_address_cstr = malloc(server_ip_address.as.string.str.len + 1);
   memcpy(server_ip_address_cstr,
-         server_ip_address.as.string.ptr,
-         server_ip_address.as.string.len);
-  server_ip_address_cstr[server_ip_address.as.string.len] = '\0';
+         server_ip_address.as.string.str.ptr,
+         server_ip_address.as.string.str.len);
+  server_ip_address_cstr[server_ip_address.as.string.str.len] = '\0';
 
   if (inet_pton(AF_INET,
                 server_ip_address_cstr,
@@ -400,7 +405,7 @@ bool send_intrinsic(Vm *vm) {
       message.kind != ValueKindString)
     PANIC("send: wrong argument kind\n");
 
-  send(receiver.as._int, message.as.string.ptr, message.as.string.len, 0);
+  send(receiver.as._int, message.as.string.str.ptr, message.as.string.str.len, 0);
 
   return true;
 }
@@ -439,9 +444,9 @@ bool run_command_intrinsic(Vm *vm) {
   if (path.kind != ValueKindString)
     PANIC("run-command: wrong argument kind\n");
 
-  char *path_cstring = malloc(path.as.string.len + 1);
-  memcpy(path_cstring, path.as.string.ptr, path.as.string.len);
-  path_cstring[path.as.string.len] = '\0';
+  char *path_cstring = malloc(path.as.string.str.len + 1);
+  memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
+  path_cstring[path.as.string.str.len] = '\0';
 
   value_stack_push_int(&vm->stack, system(path_cstring));
 

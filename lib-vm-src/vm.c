@@ -49,7 +49,10 @@ void value_stack_push_list(ValueStack *stack, ListNode *nodes) {
 }
 
 void value_stack_push_string(ValueStack *stack, Str string) {
-  Value value = { ValueKindString, { .string = string } };
+  Value value = {
+    ValueKindString,
+    { .string = { { string.ptr, string.len }, (Str *) string.ptr } },
+  };
   DA_APPEND(*stack, value);
 }
 
@@ -92,7 +95,7 @@ void free_value(Value *value, RcArena *rc_arena) {
       node = next_node;
     }
   } else if (value->kind == ValueKindString) {
-    rc_arena_free(rc_arena, value->as.string.ptr);
+    rc_arena_free(rc_arena, value->as.string.begin);
   }
 }
 
@@ -692,7 +695,7 @@ u32 execute(Ir *ir, i32 argc, char **argv,
     ListNode *new_arg = rc_arena_alloc(rc_arena, sizeof(ListNode));
     new_arg->value = (Value) {
       ValueKindString,
-      { .string = { buffer, len } },
+      { .string = { { buffer, len }, (Str *) buffer } },
     };
     new_arg->is_static = true;
 
