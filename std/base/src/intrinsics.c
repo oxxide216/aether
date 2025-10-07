@@ -564,7 +564,7 @@ bool add_intrinsic(Vm *vm) {
   if (a.kind == ValueKindInt &&
       b.kind == ValueKindInt) {
     value_stack_push_int(&vm->stack, a.as._int + b.as._int);
-  } if (a.kind == ValueKindFloat &&
+  } else if (a.kind == ValueKindFloat &&
         b.kind == ValueKindFloat) {
     value_stack_push_float(&vm->stack, a.as._float + b.as._float);
   } else if (a.kind == ValueKindString &&
