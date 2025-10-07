@@ -416,23 +416,29 @@ bool receive_intrinsic(Vm *vm) {
     PANIC("receive: wrong argument kind\n");
 
   Str buffer;
-  buffer.len = DEFAULT_RECEIVE_BUFFER_SIZE;
+  buffer.len = 0;
   buffer.ptr = rc_arena_alloc(vm->rc_arena, buffer.len);
 
+  u32 cap = DEFAULT_RECEIVE_BUFFER_SIZE;
   u32 len;
   while ((len = read(receiver.as._int,
                      buffer.ptr + buffer.len,
                      DEFAULT_RECEIVE_BUFFER_SIZE)) ==
          DEFAULT_RECEIVE_BUFFER_SIZE) {
+
     u32 prev_len = buffer.len;
     char *prev_ptr = buffer.ptr;
 
-    buffer.len += DEFAULT_RECEIVE_BUFFER_SIZE;
+    buffer.len += len;
     buffer.ptr = rc_arena_alloc(vm->rc_arena, buffer.len);
+
+    cap += DEFAULT_RECEIVE_BUFFER_SIZE;
 
     memcpy(buffer.ptr, prev_ptr, prev_len);
     rc_arena_free(vm->rc_arena, prev_ptr);
   }
+
+  buffer.len += len;
 
   value_stack_push_string(&vm->stack, buffer);
 
