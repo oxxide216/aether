@@ -415,10 +415,12 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       }
     }
 
-    if (expr->as._if.has_else && !executed_elif)
-      EXECUTE_BLOCK(vm, &expr->as._if.else_body, value_expected);
-    else if (value_expected)
-      value_stack_push_unit(&vm->stack);
+    if (!executed_elif) {
+      if (expr->as._if.has_else)
+        EXECUTE_BLOCK(vm, &expr->as._if.else_body, value_expected);
+      else
+        value_stack_push_unit(&vm->stack);
+    }
   } break;
 
   case IrExprKindWhile: {
