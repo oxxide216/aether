@@ -375,7 +375,10 @@ static bool eat_byte(Vm *vm, char *intrinsic_name, u32 size) {
   new_string.len = string.as.string.len - size;
   new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
   memcpy(new_string.ptr, string.as.string.ptr + size, new_string.len);
-  new_list->next->next->value = (Value) { ValueKindString, { .string = new_string } };
+  new_list->next->next->value = (Value) {
+    ValueKindString,
+    { .string = new_string },
+  };
 
   value_stack_push_list(&vm->stack, new_list);
 
@@ -383,27 +386,19 @@ static bool eat_byte(Vm *vm, char *intrinsic_name, u32 size) {
 }
 
 bool eat_byte_64_intrinsic(Vm *vm) {
-  eat_byte(vm, "eat-byte-64", 8);
-
-  return true;
+  return eat_byte(vm, "eat-byte-64", 8);
 }
 
 bool eat_byte_32_intrinsic(Vm *vm) {
-  eat_byte(vm, "eat-byte-32", 4);
-
-  return true;
+  return eat_byte(vm, "eat-byte-32", 4);
 }
 
 bool eat_byte_16_intrinsic(Vm *vm) {
-  eat_byte(vm, "eat-byte-16", 2);
-
-  return true;
+  return eat_byte(vm, "eat-byte-16", 2);
 }
 
 bool eat_byte_8_intrinsic(Vm *vm) {
-  eat_byte(vm, "eat-byte-8", 1);
-
-  return true;
+  return eat_byte(vm, "eat-byte-8", 1);
 }
 
 bool str_to_int_intrinsic(Vm *vm) {

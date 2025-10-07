@@ -102,6 +102,15 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
       save_expr_data(expr->as.field.expr, data, data_size, end);
   } break;
 
+  case IrExprKindRet: {
+    reserve_space(sizeof(bool), data, data_size, end);
+    *(bool *) (*data + *end) = expr->as.ret.has_expr;
+    *end += sizeof(bool);
+
+    if (expr->as.ret.has_expr)
+      save_expr_data(expr->as.ret.expr, data, data_size, end);
+  } break;
+
   case IrExprKindList: {
     save_block_data(&expr->as.list.content, data, data_size, end);
   } break;

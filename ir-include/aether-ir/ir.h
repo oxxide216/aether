@@ -25,6 +25,7 @@ typedef enum {
   IrExprKindBool,
   IrExprKindLambda,
   IrExprKindRecord,
+  IrExprKindRet,
 } IrExprKind;
 
 typedef Da(Str) IrArgs;
@@ -113,6 +114,11 @@ typedef struct {
 
 typedef Da(IrField) IrExprRecord;
 
+typedef struct {
+  bool    has_expr;
+  IrExpr *expr;
+} IrExprRet;
+
 typedef union {
   IrBlock        block;
   IrExprFuncDef  func_def;
@@ -130,6 +136,7 @@ typedef union {
   IrExprBool     _bool;
   IrExprLambda   lambda;
   IrExprRecord   record;
+  IrExprRet      ret;
 } IrExprAs;
 
 struct IrExpr {

@@ -77,6 +77,14 @@ static void get_expr_data_size(u8 *data, u32 *size) {
       get_expr_data_size(data, size);
   } break;
 
+  case IrExprKindRet: {
+    bool has_expr = *(bool *) (data + *size);
+    *size += sizeof(bool);
+
+    if (has_expr)
+      get_expr_data_size(data, size);
+  } break;
+
   case IrExprKindList: {
     get_block_data_size(data, size);
   } break;
@@ -228,6 +236,17 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
       expr->as.field.expr = aalloc(sizeof(IrExpr));
 
       load_expr_data(expr->as.field.expr, data, end, rc_arena);
+    }
+  } break;
+
+  case IrExprKindRet: {
+    expr->as.ret.has_expr = *(bool *) (data + *end);
+    *end += sizeof(bool);
+
+    if (expr->as.ret.has_expr) {
+      expr->as.ret.expr = aalloc(sizeof(IrExpr));
+
+      load_expr_data(expr->as.ret.expr, data, end, rc_arena);
     }
   } break;
 

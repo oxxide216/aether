@@ -153,6 +153,11 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values, I
       catch_vars(vm, local_names, catched_values, expr->as.field.expr);
   } break;
 
+  case IrExprKindRet: {
+    if (expr->as.ret.has_expr)
+      catch_vars(vm, local_names, catched_values, expr->as.ret.expr);
+  } break;
+
   case IrExprKindList: {
     catch_vars_block(vm, local_names, catched_values, &expr->as.list.content);
   } break;
@@ -222,7 +227,7 @@ static bool get_func(Vm *vm, Str name, u32 args_count, IrArgs *args,
   return false;
 }
 
-bool execute_func(Vm *vm, Str name, u32 args_len, bool value_expected) {
+ExecState execute_func(Vm *vm, Str name, u32 args_len, bool value_expected) {
   IrArgs func_args = {0};
   IrBlock func_body = {0};
   NamedValues catched_values = {0};
@@ -236,31 +241,31 @@ bool execute_func(Vm *vm, Str name, u32 args_len, bool value_expected) {
         if (vm->stack.len < intrinsic->args_count) {
           ERROR("Not enough data on the stack for function call\n");
           vm->exit_code = 1;
-          return false;
+          return ExecStateExit;
         }
 
         if (!intrinsic->func(vm))
-          return false;
+          return ExecStateExit;
 
         if (value_expected && !intrinsic->has_return_value)
           value_stack_push_unit(&vm->stack);
         else if (!value_expected && intrinsic->has_return_value)
           --vm->stack.len;
 
-        return true;
+        return ExecStateContinue;
       }
     }
 
     ERROR("Function "STR_FMT" with %u arguments was not defined before usage\n",
           STR_ARG(name), args_len);
     vm->exit_code = 1;
-    return false;
+    return ExecStateExit;
   }
 
   if (vm->stack.len < func_args.len) {
     ERROR("Not enough data on the stack for function call\n");
     vm->exit_code = 1;
-    return false;
+    return ExecStateExit;
   }
 
   u32 prev_stack_len = vm->stack.len;
@@ -289,7 +294,7 @@ bool execute_func(Vm *vm, Str name, u32 args_len, bool value_expected) {
     DA_APPEND(vm->local_vars, var);
   }
 
-  EXECUTE_BLOCK(vm, &func_body, value_expected);
+  ExecState result = execute_block(vm, &func_body, value_expected);
 
   for (u32 i = prev_stack_len; i < vm->stack.len - value_expected; ++i)
     free_value(vm->stack.items + i, vm->rc_arena);
@@ -303,10 +308,12 @@ bool execute_func(Vm *vm, Str name, u32 args_len, bool value_expected) {
     vm->stack.items[prev_stack_len - args_len] = vm->stack.items[vm->stack.len - 1];
   vm->stack.len = prev_stack_len - args_len + value_expected;
 
-  return true;
+  if (result == ExecStateExit)
+    return result;
+  return ExecStateContinue;
 }
 
-bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
+ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   switch (expr->kind) {
   case IrExprKindBlock: {
     EXECUTE_BLOCK(vm, &expr->as.block, value_expected);
@@ -374,7 +381,7 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         cond.kind != ValueKindList) {
       ERROR("Only boolean, unit or list value can be used as a condition\n");
       vm->exit_code = 1;
-      return false;
+      return ExecStateExit;
     }
 
     if (cond.kind != ValueKindUnit &&
@@ -423,7 +430,7 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       if (cond.kind != ValueKindBool) {
         ERROR("Only boolean value can be used as a condition\n");
         vm->exit_code = 1;
-        return false;
+        return ExecStateExit;
       }
 
       if (!cond.as._bool)
@@ -444,7 +451,7 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       ERROR("Variable "STR_FMT" was not defined before usage\n",
             STR_ARG(expr->as.set.dest));
       vm->exit_code = 1;
-      return false;
+      return ExecStateExit;
     }
 
     EXECUTE_EXPR(vm, expr->as.set.src, true);
@@ -462,7 +469,7 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     if (value.kind != ValueKindRecord) {
       ERROR("Only records have fields\n");
       vm->exit_code = 1;
-      return false;
+      return ExecStateExit;
     }
 
     NamedValue *field = NULL;
@@ -479,6 +486,7 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     if (!field) {
       ERROR("Field `"STR_FMT"` was not found in given record\n",
             STR_ARG(expr->as.field.field));
+      return ExecStateExit;
     }
 
     if (expr->as.field.is_set) {
@@ -496,6 +504,12 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
       DA_APPEND(vm->stack, field->value);
     }
+  } break;
+
+  case IrExprKindRet: {
+    EXECUTE_EXPR(vm, expr->as.ret.expr, true);
+
+    return ExecStateReturn;
   } break;
 
   case IrExprKindList: {
@@ -525,13 +539,13 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
   case IrExprKindIdent: {
     if (!value_expected)
-      return true;
+      return ExecStateContinue;
 
     Var *var = get_var(vm, expr->as.ident.ident);
     if (var) {
       DA_APPEND(vm->stack, var->value);
 
-      return true;
+      return ExecStateContinue;
     }
 
     for (u32 i = 0; i < vm->funcs.len; ++i) {
@@ -544,14 +558,14 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         };
         DA_APPEND(vm->stack, func_value);
 
-        return true;
+        return ExecStateContinue;
       }
     }
 
     ERROR("Variable "STR_FMT" was not defined before usage\n",
           STR_ARG(expr->as.ident.ident));
     vm->exit_code = 1;
-    return false;
+    return ExecStateExit;
   } break;
 
   case IrExprKindString: {
@@ -633,17 +647,17 @@ bool execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   } break;
   }
 
-  return true;
+  return ExecStateContinue;
 }
 
-bool execute_block(Vm *vm, IrBlock *block, bool value_expected) {
+ExecState execute_block(Vm *vm, IrBlock *block, bool value_expected) {
   for (u32 i = 0; i + 1 < block->len; ++i)
     EXECUTE_EXPR(vm, block->items[i], false);
 
   if (block->len > 0)
     EXECUTE_EXPR(vm, block->items[block->len - 1], value_expected);
 
-  return true;
+  return ExecStateContinue;
 }
 
 static void intrinsics_append(Intrinsics *a, Intrinsic *b, u32 b_len) {

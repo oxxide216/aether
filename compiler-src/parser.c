@@ -49,6 +49,7 @@ static char *token_names[] = {
   "use",
   "set",
   "field",
+  "ret",
   "int",
   "float",
   "bool",
@@ -332,6 +333,11 @@ static void macro_body_expand(IrExpr **expr, IrBlock *args, Strs *arg_names,
   case IrExprKindField: {
     if (new_expr->as.field.is_set)
       macro_body_expand(&new_expr->as.field.expr, args, arg_names, NULL, unpack);
+  } break;
+
+  case IrExprKindRet: {
+    if (new_expr->as.ret.has_expr)
+      macro_body_expand(&new_expr->as.ret.expr, args, arg_names, NULL, unpack);
   } break;
 
   case IrExprKindList: {
@@ -684,13 +690,25 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     parser_expect_token(parser, MASK(TT_CPAREN));
   } break;
 
+  case TT_RET: {
+    parser_next_token(parser);
+
+    expr->kind = IrExprKindRet;
+    expr->as.ret.has_expr = parser_peek_token(parser)->id != TT_CPAREN;
+
+    if (expr->as.ret.has_expr)
+      expr->as.ret.expr = parser_parse_expr(parser);
+
+    parser_expect_token(parser, MASK(TT_CPAREN));
+  } break;
+
   default: {
     parser_expect_token(parser, MASK(TT_FUN) | MASK(TT_LET) |
                                 MASK(TT_IF) | MASK(TT_IDENT) |
                                 MASK(TT_MACRO_NAME) | MASK(TT_BOOL) |
                                 MASK(TT_MACRO) | MASK(TT_WHILE) |
                                 MASK(TT_SET) | MASK(TT_USE) |
-                                MASK(TT_FIELD));
+                                MASK(TT_FIELD) | MASK(TT_RET));
   } break;
   }
 
