@@ -58,6 +58,16 @@ void iui_widgets_abs_bounds(IuiWidgets *widgets, Vec4 bounds) {
   widgets->abs_bounds = bounds;
 }
 
+void iui_widgets_add_style(IuiWidgets *widgets, Str class,
+                           Vec4 fg_color, Vec4 bg_color,
+                           Vec4 fg_color_alt, Vec4 bg_color_alt) {
+  IuiStyle style = {
+    class, fg_color, bg_color,
+    fg_color_alt, bg_color_alt,
+  };
+  DA_APPEND(widgets->styles, style);
+}
+
 static bool iui_widget_id_eq(IuiWidgetId *a, IuiWidgetId *b) {
   return a->kind == b->kind &&
          a->depth == b->depth &&
@@ -65,7 +75,8 @@ static bool iui_widget_id_eq(IuiWidgetId *a, IuiWidgetId *b) {
 }
 
 static IuiWidget *iui_widgets_get_widget(IuiWidgets *widgets,
-                                         IuiWidgetKind kind) {
+                                         IuiWidgetKind kind,
+                                         Str class) {
   IuiWidget *result = NULL;
 
   IuiWidgetId id;
@@ -90,6 +101,16 @@ static IuiWidget *iui_widgets_get_widget(IuiWidgets *widgets,
     *widgets->list_end = (IuiWidget) {0};
     widgets->list_end->id = id;
     widgets->list_end->kind = kind;
+
+    widgets->list_end->style_index = (u32) -1;
+    for (u32 i = widgets->styles.len; i > 0; --i) {
+      if (str_eq(widgets->styles.items[i - 1].class, class)) {
+        widgets->list_end->style_index = i - 1;
+
+        break;
+      }
+    }
+
     result = widgets->list_end;
   }
 
@@ -109,9 +130,10 @@ static IuiWidget *iui_widgets_get_widget(IuiWidgets *widgets,
   return result;
 }
 
-IuiWidget *iui_widgets_push_box_begin(IuiWidgets *widgets, Vec2 margin,
-                                      f32 spacing, IuiBoxDirection direction) {
-  IuiWidget *widget = iui_widgets_get_widget(widgets, IuiWidgetKindBox);
+IuiWidget *iui_widgets_push_box_begin_class(IuiWidgets *widgets, Str class,
+                                            Vec2 margin, f32 spacing,
+                                            IuiBoxDirection direction) {
+  IuiWidget *widget = iui_widgets_get_widget(widgets, IuiWidgetKindBox, class);
   widget->as.box.margin = margin;
   widget->as.box.spacing = spacing;
   widget->as.box.direction = direction;
@@ -122,24 +144,40 @@ IuiWidget *iui_widgets_push_box_begin(IuiWidgets *widgets, Vec2 margin,
   return widget;
 }
 
+IuiWidget *iui_widgets_push_box_begin(IuiWidgets *widgets, Vec2 margin,
+                                      f32 spacing, IuiBoxDirection direction) {
+  return iui_widgets_push_box_begin_class(widgets, STR_LIT(":box:"),
+                                          margin, spacing, direction);
+}
+
 void iui_widgets_push_box_end(IuiWidgets *widgets) {
   if (widgets->boxes.len > 0)
     --widgets->boxes.len;
 }
 
-IuiWidget *iui_widgets_push_button(IuiWidgets *widgets, Str text,
-                                   ValueFunc on_click) {
-  IuiWidget *widget = iui_widgets_get_widget(widgets, IuiWidgetKindButton);
+IuiWidget *iui_widgets_push_button_class(IuiWidgets *widgets, Str class,
+                                   Str text, ValueFunc on_click) {
+  IuiWidget *widget = iui_widgets_get_widget(widgets, IuiWidgetKindButton, class);
   widget->as.button.text = text;
   widget->as.button.on_click = on_click;
 
   return widget;
 }
 
-IuiWidget *iui_widgets_push_text(IuiWidgets *widgets, Str text, bool center) {
-  IuiWidget *widget = iui_widgets_get_widget(widgets, IuiWidgetKindText);
+IuiWidget *iui_widgets_push_button(IuiWidgets *widgets, Str text, ValueFunc on_click) {
+  return iui_widgets_push_button_class(widgets, STR_LIT(":button:"),
+                                       text, on_click);
+}
+
+IuiWidget *iui_widgets_push_text_class(IuiWidgets *widgets,
+                                       Str class, Str text, bool center) {
+  IuiWidget *widget = iui_widgets_get_widget(widgets, IuiWidgetKindText, class);
   widget->as.text.text = text;
   widget->as.text.center = center;
 
   return widget;
+}
+
+IuiWidget *iui_widgets_push_text(IuiWidgets *widgets, Str text, bool center) {
+  return iui_widgets_push_text_class(widgets, STR_LIT(":text:"), text, center);
 }

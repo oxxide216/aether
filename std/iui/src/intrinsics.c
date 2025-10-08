@@ -21,6 +21,35 @@ static bool process_event(IuiEvents *events, WinxEvent *event) {
   return true;
 }
 
+static void init_styles(Iui *iui) {
+  IuiStyle box_style = {
+    STR_LIT(":box:"),
+    vec4(1.0, 1.0, 1.0, 1.0),
+    vec4(0.0, 0.0, 0.0, 0.0),
+    vec4(1.0, 1.0, 1.0, 1.0),
+    vec4(0.0, 0.0, 0.0, 0.0),
+  };
+  DA_APPEND(iui->widgets.styles, box_style);
+
+  IuiStyle button_style = {
+    STR_LIT(":button:"),
+    vec4(0.0, 0.0, 0.0, 1.0),
+    vec4(1.0, 1.0, 1.0, 1.0),
+    vec4(0.0, 0.0, 0.0, 1.0),
+    vec4(1.0, 1.0, 1.0, 1.0),
+  };
+  DA_APPEND(iui->widgets.styles, button_style);
+
+  IuiStyle text_style = {
+    STR_LIT(":text:"),
+    vec4(1.0, 1.0, 1.0, 1.0),
+    vec4(0.0, 0.0, 0.0, 0.0),
+    vec4(1.0, 1.0, 1.0, 1.0),
+    vec4(0.0, 0.0, 0.0, 0.0),
+  };
+  DA_APPEND(iui->widgets.styles, text_style);
+}
+
 bool main_loop_intrinsic(Vm *vm) {
   Value body = value_stack_pop(&vm->stack);
   Value height = value_stack_pop(&vm->stack);
@@ -38,6 +67,8 @@ bool main_loop_intrinsic(Vm *vm) {
                                 WinxGraphicsModeOpenGL,
                                 NULL);
   iui.renderer = iui_init_renderer();
+
+  init_styles(&iui);
 
   bool is_running = true;
   while (is_running) {
@@ -90,7 +121,6 @@ bool vbox_intrinsic(Vm *vm) {
   Value spacing = value_stack_pop(&vm->stack);
   Value margin_y = value_stack_pop(&vm->stack);
   Value margin_x = value_stack_pop(&vm->stack);
-
   if (margin_x.kind != ValueKindFloat ||
       margin_y.kind != ValueKindFloat ||
       spacing.kind != ValueKindFloat ||
@@ -141,14 +171,21 @@ bool button_intrinsic(Vm *vm) {
 
   for (u32 i = 0; i < iui.events.len; ++i) {
     WinxEvent *event = iui.events.items + i;
-    if (event->kind == WinxEventKindButtonRelease) {
-      WinxEventButton *button_release = &event->as.button;
+    if (event->kind == WinxEventKindButtonPress ||
+        event->kind == WinxEventKindButtonRelease) {
+      WinxEventButton *button_event = &event->as.button;
 
-      if (button_release->x >= button->bounds.x &&
-          button_release->y >= button->bounds.y &&
-          button_release->x <= button->bounds.x + button->bounds.z &&
-          button_release->y <= button->bounds.y + button->bounds.w) {
-        EXECUTE_FUNC(vm, on_click.as.func.name, 0, false);
+      if (event->kind == WinxEventKindButtonRelease)
+        button->as.button.pressed = false;
+
+      if (button_event->x >= button->bounds.x &&
+          button_event->y >= button->bounds.y &&
+          button_event->x <= button->bounds.x + button->bounds.z &&
+          button_event->y <= button->bounds.y + button->bounds.w) {
+        if (event->kind == WinxEventKindButtonPress)
+          button->as.button.pressed = true;
+        else
+          EXECUTE_FUNC(vm, on_click.as.func.name, 0, false);
         break;
       }
     }

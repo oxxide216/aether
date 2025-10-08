@@ -66,6 +66,14 @@ static Str texture_fragment_shader_src = STR_LIT(
   "}\n"
 );
 
+static IuiStyle default_style = {
+  {},
+  { 0.0, 0.0, 0.0, 1.0 },
+  { 1.0, 1.0, 1.0, 1.0 },
+  { 0.0, 0.0, 0.0, 1.0 },
+  { 0.5, 0.5, 0.5, 1.0 },
+};
+
 IuiRenderer iui_init_renderer(void) {
   IuiRenderer renderer = {0};
 
@@ -108,31 +116,43 @@ void iui_renderer_resize(IuiRenderer *renderer, f32 width, f32 height) {
                      vec2(width, height));
 }
 
-static void iui_renderer_render_widget(IuiRenderer *renderer, IuiWidget *widget) {
+static void iui_renderer_render_widget(IuiRenderer *renderer,
+                                       IuiStyles *styles,
+                                       IuiWidget *widget) {
+  IuiStyle *style;
+  if (widget->style_index == (u32) -1)
+    style = &default_style;
+  else
+    style = styles->items + widget->style_index;
+
   switch (widget->kind) {
   case IuiWidgetKindBox: {
-    iui_renderer_push_quad(renderer, widget->bounds, vec4(0.05, 0.05, 0.05, 0.2));
+    if (widget->as.box.filled)
+      iui_renderer_push_quad(renderer, widget->bounds, style->bg_color);
 
     for (u32 i = 0; i < widget->as.box.children.len; ++i)
-      iui_renderer_render_widget(renderer, widget->as.box.children.items[i]);
+      iui_renderer_render_widget(renderer, styles, widget->as.box.children.items[i]);
   } break;
 
   case IuiWidgetKindButton: {
-    iui_renderer_push_quad(renderer, widget->bounds, vec4(1.0, 1.0, 1.0, 1.0));
+    if (widget->as.button.pressed)
+      iui_renderer_push_quad(renderer, widget->bounds, style->bg_color_alt);
+    else
+      iui_renderer_push_quad(renderer, widget->bounds, style->bg_color);
     iui_renderer_push_text(renderer, widget->bounds, widget->as.button.text,
-                           true, vec4(0.0, 0.0, 0.0, 1.0));
+                           true, style->fg_color);
   } break;
 
   case IuiWidgetKindText: {
     iui_renderer_push_text(renderer, widget->bounds, widget->as.text.text,
-                           widget->as.text.center, vec4(1.0, 1.0, 1.0, 1.0));
+                           widget->as.text.center, style->fg_color);
   } break;
   }
 }
 
 void iui_renderer_render_widgets(IuiRenderer *renderer, IuiWidgets *widgets) {
   if (widgets->is_dirty) {
-    iui_renderer_render_widget(renderer, widgets->root_widget);
+    iui_renderer_render_widget(renderer, &widgets->styles, widgets->root_widget);
 
     glass_put_object_data(&renderer->general_object,
                           renderer->general_vertices.items,
