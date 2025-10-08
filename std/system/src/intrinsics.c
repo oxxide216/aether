@@ -103,6 +103,21 @@ bool println_intrinsic(Vm *vm) {
   return true;
 }
 
+bool input_size_intrinsic(Vm *vm) {
+  Value size = value_stack_pop(&vm->stack);
+  if (size.kind != ValueKindInt)
+    PANIC("input-size: wrong argument kind\n");
+
+  Str buffer;
+  buffer.len = size.as._int;
+  buffer.ptr = rc_arena_alloc(vm->rc_arena, buffer.len);
+  read(0, buffer.ptr, buffer.len);
+
+  value_stack_push_string(&vm->stack, buffer);
+
+  return true;
+}
+
 bool input_intrinsic(Vm *vm) {
   (void) vm;
 
@@ -410,15 +425,29 @@ bool send_intrinsic(Vm *vm) {
   return true;
 }
 
+bool receive_size_intrinsic(Vm *vm) {
+  Value size = value_stack_pop(&vm->stack);
+  Value receiver = value_stack_pop(&vm->stack);
+  if (receiver.kind != ValueKindInt ||
+      size.kind != ValueKindInt)
+    PANIC("receive-size: wrong argument kinds\n");
+
+  Str buffer;
+  buffer.len = size.as._int;
+  buffer.ptr = rc_arena_alloc(vm->rc_arena, buffer.len);
+  read(receiver.as._int, buffer.ptr, buffer.len);
+
+  value_stack_push_string(&vm->stack, buffer);
+
+  return true;
+}
+
 bool receive_intrinsic(Vm *vm) {
   Value receiver = value_stack_pop(&vm->stack);
   if (receiver.kind != ValueKindInt)
     PANIC("receive: wrong argument kind\n");
 
-  Str buffer;
-  buffer.len = 0;
-  buffer.ptr = rc_arena_alloc(vm->rc_arena, buffer.len);
-
+  Str buffer = {0};
   u32 cap = DEFAULT_RECEIVE_BUFFER_SIZE;
   u32 len;
   while ((len = read(receiver.as._int,
@@ -439,6 +468,8 @@ bool receive_intrinsic(Vm *vm) {
   }
 
   buffer.len += len;
+  if (!buffer.ptr)
+    buffer.ptr = rc_arena_alloc(vm->rc_arena, buffer.len);
 
   value_stack_push_string(&vm->stack, buffer);
 
@@ -465,6 +496,7 @@ Intrinsic system_intrinsics[] = {
   // Io
   { STR_LIT("print"), 1, false, &print_intrinsic },
   { STR_LIT("println"), 1, false, &println_intrinsic },
+  { STR_LIT("input-size"), 1, true, &input_size_intrinsic },
   { STR_LIT("input"), 0, true, &input_intrinsic },
   // Files
   { STR_LIT("file-exists?"), 1, true, &file_exists_intrinsic },
@@ -484,6 +516,7 @@ Intrinsic system_intrinsics[] = {
   { STR_LIT("accept-connection"), 2, true, &accept_connection_intrinsic },
   { STR_LIT("close-connection"), 1, false, &close_connection_intrinsic },
   { STR_LIT("send"), 2, false, &send_intrinsic },
+  { STR_LIT("receive-size"), 2, true, &receive_size_intrinsic },
   { STR_LIT("receive"), 1, true, &receive_intrinsic },
   // Processes
   { STR_LIT("run-command"), 1, true, &run_command_intrinsic },

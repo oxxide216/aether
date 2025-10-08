@@ -352,6 +352,41 @@ bool sub_str_intrinsic(Vm *vm) {
   return true;
 }
 
+bool join_intrinsic(Vm *vm) {
+  Value filler = value_stack_pop(&vm->stack);
+  Value parts = value_stack_pop(&vm->stack);
+  if (parts.kind != ValueKindList ||
+      filler.kind != ValueKindString)
+    PANIC("join: wrong argument kinds\n");
+
+  StringBuilder sb = {0};
+
+  ListNode *node = parts.as.list->next;
+  while (node) {
+    if (node != parts.as.list->next)
+      sb_push_str(&sb, filler.as.string.str);
+
+    if (node->value.kind != ValueKindString)
+      PANIC("join: wrong part kinds: %u\n", node->value.kind);
+
+    sb_push_str(&sb, node->value.as.string.str);
+
+    node = node->next;
+  }
+
+  Str joined = {
+    rc_arena_alloc(vm->rc_arena, sb.len),
+    sb.len,
+  };
+
+  memcpy(joined.ptr, sb.buffer, sb.len);
+  free(sb.buffer);
+
+  value_stack_push_string(&vm->stack, joined);
+
+  return true;
+}
+
 bool eat_str_intrinsic(Vm *vm) {
   Value pattern = value_stack_pop(&vm->stack);
   Value string = value_stack_pop(&vm->stack);
@@ -1042,6 +1077,7 @@ Intrinsic base_intrinsics[] = {
   // String operations
   { STR_LIT("split"), 2, true, &split_intrinsic },
   { STR_LIT("sub-str"), 3, true, &sub_str_intrinsic },
+  { STR_LIT("join"), 2, true, &join_intrinsic },
   { STR_LIT("eat-str"), 2, true, &eat_str_intrinsic },
   { STR_LIT("eat-byte-64"), 1, true, &eat_byte_64_intrinsic },
   { STR_LIT("eat-byte-32"), 1, true, &eat_byte_32_intrinsic },
