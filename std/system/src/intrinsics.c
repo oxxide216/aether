@@ -403,7 +403,7 @@ bool send_intrinsic(Vm *vm) {
   Value receiver = value_stack_pop(&vm->stack);
   if (receiver.kind != ValueKindInt ||
       message.kind != ValueKindString)
-    PANIC("send: wrong argument kind\n");
+    PANIC("send: wrong argument kinds\n");
 
   send(receiver.as._int, message.as.string.str.ptr, message.as.string.str.len, 0);
 
