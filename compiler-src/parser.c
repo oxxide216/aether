@@ -89,7 +89,8 @@ static Tokens lex(Str code, char *file_path) {
     new_token.file_path = file_path;
 
     if (new_token.id == (u64) -1) {
-      ERROR("Unexpected `%c` at %u:%u\n", code.ptr[0], row + 1, col + 1);
+      PERROR("%s:%u:%u: ", "Unexpected `%c`\n",
+             file_path, row + 1, col + 1, code.ptr[0]);
       exit(1);
     }
 
@@ -119,8 +120,8 @@ static Tokens lex(Str code, char *file_path) {
       }
 
       if (code.len == 0) {
-        ERROR("String literal at %u:%u was not closed\n",
-              new_token.row + 1, new_token.col + 1);
+        PERROR("%s:%u:%u: ", "String literal was not closed\n",
+               new_token.file_path, new_token.row + 1, new_token.col + 1);
         exit(1);
       }
 
@@ -186,7 +187,7 @@ static void print_id_mask(u64 id_mask) {
 static Token *parser_expect_token(Parser *parser, u64 id_mask) {
   Token *token = parser_next_token(parser);
   if (!token) {
-    PERROR("Expected ");
+    PERROR("%s: ", "Expected ", token->file_path);
     print_id_mask(id_mask);
     fprintf(stderr, ", but got EOF\n");
     exit(1);

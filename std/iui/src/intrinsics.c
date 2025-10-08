@@ -33,7 +33,7 @@ bool main_loop_intrinsic(Vm *vm) {
     PANIC("iui-main-loop: wrong argument kinds\n");
 
   iui.winx = winx_init();
-  iui.window = winx_init_window(&iui.winx, title.as.string,
+  iui.window = winx_init_window(&iui.winx, title.as.string.str,
                                 width.as._int, height.as._int,
                                 WinxGraphicsModeOpenGL,
                                 NULL);
@@ -136,7 +136,7 @@ bool button_intrinsic(Vm *vm) {
     PANIC("iui-button: wrong argument kinds\n");
 
   IuiWidget *button = iui_widgets_push_button(&iui.widgets,
-                                              text.as.string,
+                                              text.as.string.str,
                                               on_click.as.func);
 
   for (u32 i = 0; i < iui.events.len; ++i) {
@@ -164,7 +164,7 @@ bool text_intrinsic(Vm *vm) {
       center.kind != ValueKindBool)
     PANIC("iui-text: wrong argument kinds\n");
 
-  iui_widgets_push_text(&iui.widgets, text.as.string, center.as._bool);
+  iui_widgets_push_text(&iui.widgets, text.as.string.str, center.as._bool);
 
   return true;
 }
