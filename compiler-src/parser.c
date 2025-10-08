@@ -55,7 +55,6 @@ static char *token_names[] = {
   "bool",
   "identifier",
   "key",
-  "macro_name",
   "`(`",
   "`)`",
   "`[`",
@@ -244,17 +243,6 @@ static IrExprFuncDef parser_parse_func_def(Parser *parser) {
   return func_def;
 }
 
-static IrExprFuncCall parser_parse_func_call(Parser *parser) {
-  Token *name_token = parser_expect_token(parser, MASK(TT_IDENT));
-  IrBlock args = parser_parse_block(parser, MASK(TT_CPAREN));
-  parser_expect_token(parser, MASK(TT_CPAREN));
-
-  return (IrExprFuncCall) {
-    name_token->lexeme,
-    args,
-  };
-}
-
 static void parser_parse_macro_def(Parser *parser) {
   Macro macro = {0};
 
@@ -402,11 +390,9 @@ static void macro_body_expand_block(IrBlock *block, IrBlock *args,
     macro_body_expand(block->items + i, args, arg_names, block, unpack);
 }
 
-static IrBlock parser_parse_macro_expand(Parser *parser) {
-  Token *name_token = parser_expect_token(parser, MASK(TT_MACRO_NAME));
+static IrBlock parser_parse_macro_expand(Parser *parser, bool *found) {
+  Token *name_token = parser_expect_token(parser, MASK(TT_IDENT));
   Str name = name_token->lexeme;
-  ++name.ptr;
-  --name.len;
 
   IrBlock args = parser_parse_block(parser, MASK(TT_CPAREN));
   parser_expect_token(parser, MASK(TT_CPAREN));
@@ -425,11 +411,10 @@ static IrBlock parser_parse_macro_expand(Parser *parser) {
     }
   }
 
-  if (!macro) {
-    ERROR("Macro "STR_FMT" with %u arguments was not defined before usage\n",
-          STR_ARG(name), args.len);
-    exit(1);
-  }
+  *found = macro != NULL;
+
+  if (!*found)
+    return args;
 
   if (macro->has_unpack) {
     IrExpr *unpack_body = aalloc(sizeof(IrExpr));
@@ -605,13 +590,19 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   } break;
 
   case TT_IDENT: {
-    expr->kind = IrExprKindFuncCall;
-    expr->as.func_call = parser_parse_func_call(parser);
-  } break;
+    bool found_macro = false;
+    IrBlock args = parser_parse_macro_expand(parser, &found_macro);
 
-  case TT_MACRO_NAME: {
-    expr->kind = IrExprKindBlock;
-    expr->as.block = parser_parse_macro_expand(parser);
+    if (found_macro) {
+      expr->kind = IrExprKindBlock;
+      expr->as.block = args;
+    } else {
+      expr->kind = IrExprKindFuncCall;
+      expr->as.func_call = (IrExprFuncCall) {
+        token->lexeme,
+        args,
+      };
+    }
   } break;
 
   case TT_BOOL: {
@@ -706,10 +697,10 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   default: {
     parser_expect_token(parser, MASK(TT_FUN) | MASK(TT_LET) |
                                 MASK(TT_IF) | MASK(TT_IDENT) |
-                                MASK(TT_MACRO_NAME) | MASK(TT_BOOL) |
-                                MASK(TT_MACRO) | MASK(TT_WHILE) |
-                                MASK(TT_SET) | MASK(TT_USE) |
-                                MASK(TT_FIELD) | MASK(TT_RET));
+                                MASK(TT_BOOL) | MASK(TT_MACRO) |
+                                MASK(TT_WHILE) | MASK(TT_SET) |
+                                MASK(TT_USE) | MASK(TT_FIELD) |
+                                MASK(TT_RET));
   } break;
   }
 
