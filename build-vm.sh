@@ -15,7 +15,7 @@ else
   CFLAGS="$CFLAGS -DNOSYSTEM"
 fi
 
-if [ "$IUI" != "" ]; then
+if [ "$NOIUI" == "" ]; then
   CFLAGS="$CFLAGS -DIUI -Ilibs/winx/include -Ilibs/glass/include \
           -Istd/iui/include"
   LDFLAGS="$LDFLAGS -lX11 -lGL -lGLEW -lm"

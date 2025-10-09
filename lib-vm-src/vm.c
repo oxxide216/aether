@@ -6,7 +6,7 @@
 #ifndef NOSYSTEM
 #include "system/intrinsics.h"
 #endif
-#ifdef IUI
+#ifndef NOIUI
 #include "iui/intrinsics.h"
 #endif
 
@@ -681,7 +681,7 @@ u32 execute(Ir *ir, i32 argc, char **argv,
 #ifndef NOSYSTEM
   intrinsics_append(intrinsics, system_intrinsics, system_intrinsics_len);
 #endif
-#ifdef IUI
+#ifndef NOIUI
   intrinsics_append(intrinsics, iui_intrinsics, iui_intrinsics_len);
 #endif
 
