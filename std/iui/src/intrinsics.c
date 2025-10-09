@@ -250,7 +250,8 @@ bool iui_input_intrinsic(Vm *vm) {
                 event->kind == WinxEventKindKeyHold)) {
       WinxEventKey *key_event = &event->as.key;
 
-      if (key_event->key_code == WinxKeyCodeEnter) {
+      switch (key_event->key_code) {
+      case WinxKeyCodeEnter: {
         input->as.input.focused = false;
 
         Str content = {
@@ -260,12 +261,45 @@ bool iui_input_intrinsic(Vm *vm) {
         value_stack_push_string(&vm->stack, content);
 
         EXECUTE_FUNC(vm, on_submit.as.func.name, 1, false);
-      } else if (key_event->_char) {
+      } break;
+
+      case WinxKeyCodeBackspace: {
+        if (input->as.input.cursor_pos > 0) {
+          --input->as.input.cursor_pos;
+          DA_REMOVE_AT(input->as.input.buffer, input->as.input.cursor_pos);
+        }
+      } break;
+
+      case WinxKeyCodeDelete: {
+        if (input->as.input.cursor_pos < input->as.input.buffer.len)
+          DA_REMOVE_AT(input->as.input.buffer, input->as.input.cursor_pos);
+      } break;
+
+      case WinxKeyCodeLeft: {
+        if (input->as.input.cursor_pos > 0)
+          --input->as.input.cursor_pos;
+      } break;
+
+      case WinxKeyCodeRight: {
+        if (input->as.input.cursor_pos < input->as.input.buffer.len)
+          ++input->as.input.cursor_pos;
+      } break;
+
+      case WinxKeyCodeUp: {
+        input->as.input.cursor_pos = 0;
+      } break;
+
+      case WinxKeyCodeDown: {
+        input->as.input.cursor_pos = input->as.input.buffer.len;
+      } break;
+
+      default: {
         DA_INSERT(input->as.input.buffer,
                   input->as.input.cursor_pos,
                   key_event->_char);
 
         ++input->as.input.cursor_pos;
+      } break;
       }
     }
   }
