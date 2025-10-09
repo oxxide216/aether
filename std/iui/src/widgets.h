@@ -12,6 +12,7 @@ typedef enum {
   IuiWidgetKindBox = 0,
   IuiWidgetKindButton,
   IuiWidgetKindText,
+  IuiWidgetKindInput,
 } IuiWidgetKind;
 
 typedef struct {
@@ -43,13 +44,27 @@ typedef struct {
 
 typedef struct {
   Str  text;
-  bool center;
+  bool center_x;
+  bool center_y;
+  f32  left_padding;
 } IuiText;
+
+typedef Da(char) IuiInputBuffer;
+
+typedef struct {
+  IuiInputBuffer buffer;
+  u32            cursor_pos;
+  Str            placeholder;
+  f32            left_padding;
+  bool           focused;
+  ValueFunc      on_submit;
+} IuiInput;
 
 typedef union {
   IuiBox    box;
   IuiButton button;
   IuiText   text;
+  IuiInput  input;
 } IuiWidgetAs;
 
 struct IuiWidget {
@@ -98,8 +113,16 @@ IuiWidget *iui_widgets_push_button_class(IuiWidgets *widgets, Str class,
                                          Str text, ValueFunc on_click);
 IuiWidget *iui_widgets_push_button(IuiWidgets *widgets, Str text, ValueFunc on_click);
 
-IuiWidget *iui_widgets_push_text_class(IuiWidgets *widgets, Str class,
-                                       Str text, bool center);
-IuiWidget *iui_widgets_push_text(IuiWidgets *widgets, Str text, bool center);
+IuiWidget *iui_widgets_push_text_class(IuiWidgets *widgets, Str class, Str text,
+                                       bool center_x, bool center_y, f32 left_padding);
+IuiWidget *iui_widgets_push_text(IuiWidgets *widgets, Str text,
+                                 bool center_x, bool center_y,
+                                 f32 left_padding);
+
+IuiWidget *iui_widgets_push_input_class(IuiWidgets *widgets, Str class,
+                                        Str placeholder, f32 left_padding,
+                                        ValueFunc on_submit);
+IuiWidget *iui_widgets_push_input(IuiWidgets *widgets, Str placeholder,
+                                  f32 left_padding, ValueFunc on_submit);
 
 #endif // IUI_WIDGETS_H

@@ -169,15 +169,39 @@ IuiWidget *iui_widgets_push_button(IuiWidgets *widgets, Str text, ValueFunc on_c
                                        text, on_click);
 }
 
-IuiWidget *iui_widgets_push_text_class(IuiWidgets *widgets,
-                                       Str class, Str text, bool center) {
+IuiWidget *iui_widgets_push_text_class(IuiWidgets *widgets, Str class, Str text,
+                                       bool center_x, bool center_y,
+                                       f32 left_padding) {
   IuiWidget *widget = iui_widgets_get_widget(widgets, IuiWidgetKindText, class);
   widget->as.text.text = text;
-  widget->as.text.center = center;
+  widget->as.text.center_x = center_x;
+  widget->as.text.center_y = center_y;
+  widget->as.input.left_padding = left_padding;
 
   return widget;
 }
 
-IuiWidget *iui_widgets_push_text(IuiWidgets *widgets, Str text, bool center) {
-  return iui_widgets_push_text_class(widgets, STR_LIT(":text:"), text, center);
+IuiWidget *iui_widgets_push_text(IuiWidgets *widgets, Str text,
+                                 bool center_x, bool center_y,
+                                 f32 left_padding) {
+  return iui_widgets_push_text_class(widgets, STR_LIT(":text:"), text,
+                                     center_x, center_y, left_padding);
+}
+
+IuiWidget *iui_widgets_push_input_class(IuiWidgets *widgets, Str class,
+                                        Str placeholder, f32 left_padding,
+                                        ValueFunc on_submit) {
+  IuiWidget *widget = iui_widgets_get_widget(widgets, IuiWidgetKindInput, class);
+  widget->as.input.placeholder = placeholder;
+  widget->as.input.left_padding = left_padding;
+  widget->as.input.on_submit = on_submit;
+
+  return widget;
+}
+
+IuiWidget *iui_widgets_push_input(IuiWidgets *widgets, Str placeholder,
+                                  f32 left_padding, ValueFunc on_submit) {
+  return iui_widgets_push_input_class(widgets, STR_LIT(":input:"),
+                                      placeholder, left_padding,
+                                      on_submit);
 }

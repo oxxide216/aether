@@ -7,5 +7,11 @@
 (macro iui-button [text ...body]
   (iui-button text (fun [] body)))
 
-(macro iui-text [text center]
-  (iui-text text center))
+(macro iui-text [text]
+  (iui-text text false true 10.0))
+
+(macro iui-header [text]
+  (iui-text text true true 10.0))
+
+(macro iui-input [placeholder ...body]
+  (iui-input placeholder 5.0 (fun [content] body)))

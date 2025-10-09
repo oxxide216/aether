@@ -25,7 +25,9 @@
     u32 len, cap; \
   }
 
-#define DA_APPEND(da, element)                                                    \
+#define DA_APPEND(da, element) DA_INSERT(da, (da).len, element)
+
+#define DA_INSERT(da, index, element)                                             \
   do {                                                                            \
     if ((da).cap <= (da).len) {                                                   \
       if ((da).cap != 0) {                                                        \
@@ -37,7 +39,8 @@
         (da).items = SHL_DEFS_DA_ALLOC(sizeof(element));                          \
       }                                                                           \
     }                                                                             \
-    (da).items[(da).len++] = element;                                             \
+    (da).items[index] = element;                                                  \
+    ++(da).len;                                                                   \
   } while (0)
 
 #define DA_REMOVE(da) (da).items[--(da).len]

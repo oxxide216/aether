@@ -64,8 +64,11 @@ void        iui_renderer_load_font(u8 *data);
 void        iui_renderer_resize(IuiRenderer *renderer, f32 width, f32 height);
 void        iui_renderer_render_widgets(IuiRenderer *renderer, IuiWidgets *widgets);
 
+f32 iui_renderer_measure_text_width(IuiRenderer *renderer, Str text, f32 line_height);
+
 void iui_renderer_push_quad(IuiRenderer *renderer, Vec4 bounds, Vec4 color);
 void iui_renderer_push_texture(IuiRenderer *renderer, Vec4 bounds, Vec4 uv, Vec4 color);
-void iui_renderer_push_text(IuiRenderer *renderer, Vec4 bounds, Str text, bool center, Vec4 color);
+void iui_renderer_push_text(IuiRenderer *renderer, Vec4 bounds, Str text,
+                            bool center_x, bool center_y, Vec4 color);
 
 #endif // IUI_RENDERER_H

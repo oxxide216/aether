@@ -10,6 +10,7 @@
 
 #define TEXT_SIZE_MULTIPLIER    0.55
 #define TEXT_QUALITY_MULTIPLIER 2.0
+#define INPUT_CURSOR_WIDTH      2.0
 
 #define DEFAULT_FONT std_iui_fonts_JetBrainsMono_Regular_ttf
 
@@ -140,12 +141,62 @@ static void iui_renderer_render_widget(IuiRenderer *renderer,
     else
       iui_renderer_push_quad(renderer, widget->bounds, style->bg_color);
     iui_renderer_push_text(renderer, widget->bounds, widget->as.button.text,
-                           true, style->fg_color);
+                           true, true, style->fg_color);
   } break;
 
   case IuiWidgetKindText: {
+    if (!widget->as.text.center_x) {
+      widget->bounds.x += widget->as.text.left_padding;
+      widget->bounds.z -= widget->as.text.left_padding;
+    }
+
     iui_renderer_push_text(renderer, widget->bounds, widget->as.text.text,
-                           widget->as.text.center, style->fg_color);
+                           widget->as.text.center_x, widget->as.text.center_y,
+                           style->fg_color);
+  } break;
+
+  case IuiWidgetKindInput: {
+    iui_renderer_push_quad(renderer, widget->bounds, style->bg_color);
+
+    widget->bounds.x += widget->as.input.left_padding;
+    widget->bounds.z -= widget->as.input.left_padding;
+
+    if (widget->as.input.buffer.len > 0) {
+      Str buffer_str = {
+        widget->as.input.buffer.items,
+        widget->as.input.buffer.len,
+      };
+
+      iui_renderer_push_text(renderer, widget->bounds,
+                             buffer_str,
+                             false, true, style->fg_color);
+    } else {
+      iui_renderer_push_text(renderer, widget->bounds,
+                             widget->as.input.placeholder,
+                             false, true, style->fg_color_alt);
+    }
+
+    Str before_cursor = {
+      widget->as.input.buffer.items,
+      widget->as.input.cursor_pos,
+    };
+
+    f32 line_height = widget->bounds.z;
+    if (line_height > widget->bounds.w)
+      line_height = widget->bounds.w;
+
+    f32 cursor_x_offset = iui_renderer_measure_text_width(renderer,
+                                                          before_cursor,
+                                                          line_height);
+
+    Vec4 cursor_bounds = {
+      widget->bounds.x + cursor_x_offset,
+      widget->bounds.y,
+      INPUT_CURSOR_WIDTH,
+      line_height,
+    };
+
+    iui_renderer_push_quad(renderer, cursor_bounds, style->fg_color);
   } break;
   }
 }
@@ -337,17 +388,24 @@ static IuiGlyph *iui_renderer_get_glyph(IuiRenderer *renderer,
   return renderer->glyphs.items + renderer->glyphs.len - 1;
 }
 
-void iui_renderer_push_text(IuiRenderer *renderer, Vec4 bounds, Str text, bool center, Vec4 color) {
+f32 iui_renderer_measure_text_width(IuiRenderer *renderer, Str text, f32 line_height) {
+  f32 width = 0.0;
+
+  for (u32 i = 0; i < text.len; ++i)
+    width += iui_renderer_get_glyph(renderer, line_height, text.ptr[i])->size.x;
+
+  return width;
+}
+
+void iui_renderer_push_text(IuiRenderer *renderer, Vec4 bounds, Str text,
+                            bool center_x, bool center_y, Vec4 color) {
   f32 line_height = bounds.z;
   if (line_height > bounds.w)
     line_height = bounds.w;
 
   f32 x_offset = 0.0;
-  if (center) {
-    f32 width = 0.0;
-    for (u32 i = 0; i < text.len; ++i)
-      width += iui_renderer_get_glyph(renderer, line_height, text.ptr[i])->size.x;
-
+  if (center_x) {
+    f32 width = iui_renderer_measure_text_width(renderer, text, line_height);
     x_offset = (bounds.z - width) / 2.0;
   }
 
@@ -355,7 +413,7 @@ void iui_renderer_push_text(IuiRenderer *renderer, Vec4 bounds, Str text, bool c
     IuiGlyph *glyph = iui_renderer_get_glyph(renderer, line_height, text.ptr[i]);
 
     f32 y_offset = glyph->baseline - glyph->bearing_y;
-    if (center)
+    if (center_y)
       y_offset = (bounds.w + glyph->baseline) / 2.0 - glyph->bearing_y;
 
     Vec4 glyph_bounds = {

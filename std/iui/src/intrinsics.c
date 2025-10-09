@@ -48,9 +48,18 @@ static void init_styles(Iui *iui) {
     vec4(0.0, 0.0, 0.0, 0.0),
   };
   DA_APPEND(iui->widgets.styles, text_style);
+
+  IuiStyle input_style = {
+    STR_LIT(":input:"),
+    vec4(1.0, 1.0, 1.0, 1.0),
+    vec4(0.0, 0.0, 0.0, 0.5),
+    vec4(1.0, 1.0, 1.0, 0.5),
+    vec4(0.0, 0.0, 0.0, 0.5),
+  };
+  DA_APPEND(iui->widgets.styles, input_style);
 }
 
-bool main_loop_intrinsic(Vm *vm) {
+bool iui_main_loop_intrinsic(Vm *vm) {
   Value body = value_stack_pop(&vm->stack);
   Value height = value_stack_pop(&vm->stack);
   Value width = value_stack_pop(&vm->stack);
@@ -116,7 +125,7 @@ bool main_loop_intrinsic(Vm *vm) {
   return true;
 }
 
-bool vbox_intrinsic(Vm *vm) {
+bool iui_vbox_intrinsic(Vm *vm) {
   Value body = value_stack_pop(&vm->stack);
   Value spacing = value_stack_pop(&vm->stack);
   Value margin_y = value_stack_pop(&vm->stack);
@@ -137,7 +146,7 @@ bool vbox_intrinsic(Vm *vm) {
   return true;
 }
 
-bool hbox_intrinsic(Vm *vm) {
+bool iui_hbox_intrinsic(Vm *vm) {
   Value body = value_stack_pop(&vm->stack);
   Value spacing = value_stack_pop(&vm->stack);
   Value margin_y = value_stack_pop(&vm->stack);
@@ -158,7 +167,7 @@ bool hbox_intrinsic(Vm *vm) {
   return true;
 }
 
-bool button_intrinsic(Vm *vm) {
+bool iui_button_intrinsic(Vm *vm) {
   Value on_click = value_stack_pop(&vm->stack);
   Value text = value_stack_pop(&vm->stack);
   if (text.kind != ValueKindString ||
@@ -194,19 +203,77 @@ bool button_intrinsic(Vm *vm) {
   return true;
 }
 
-bool text_intrinsic(Vm *vm) {
-  Value center = value_stack_pop(&vm->stack);
+bool iui_text_intrinsic(Vm *vm) {
+  Value left_padding = value_stack_pop(&vm->stack);
+  Value center_y = value_stack_pop(&vm->stack);
+  Value center_x = value_stack_pop(&vm->stack);
   Value text = value_stack_pop(&vm->stack);
   if (text.kind != ValueKindString ||
-      center.kind != ValueKindBool)
+      left_padding.kind != ValueKindFloat ||
+      center_x.kind != ValueKindBool ||
+      center_y.kind != ValueKindBool)
     PANIC("iui-text: wrong argument kinds\n");
 
-  iui_widgets_push_text(&iui.widgets, text.as.string.str, center.as._bool);
+  iui_widgets_push_text(&iui.widgets, text.as.string.str,
+                        center_x.as._bool, center_y.as._bool,
+                        left_padding.as._float);
 
   return true;
 }
 
-bool abs_bounds_intrinsic(Vm *vm) {
+bool iui_input_intrinsic(Vm *vm) {
+  Value on_submit = value_stack_pop(&vm->stack);
+  Value left_padding = value_stack_pop(&vm->stack);
+  Value placeholder = value_stack_pop(&vm->stack);
+  if (placeholder.kind != ValueKindString ||
+      left_padding.kind != ValueKindFloat ||
+      on_submit.kind != ValueKindFunc)
+    PANIC("iui-input: wrong argument kinds\n");
+
+  IuiWidget *input = iui_widgets_push_input(&iui.widgets, placeholder.as.string.str,
+                                            left_padding.as._float, on_submit.as.func);
+
+  for (u32 i = 0; i < iui.events.len; ++i) {
+    WinxEvent *event = iui.events.items + i;
+    if (event->kind == WinxEventKindButtonPress) {
+      WinxEventButton *button_event = &event->as.button;
+
+      if (button_event->x >= input->bounds.x &&
+          button_event->y >= input->bounds.y &&
+          button_event->x <= input->bounds.x + input->bounds.z &&
+          button_event->y <= input->bounds.y + input->bounds.w)
+        input->as.input.focused = true;
+      else
+        input->as.input.focused = false;
+    } else if (input->as.input.focused &&
+               (event->kind == WinxEventKindKeyPress ||
+                event->kind == WinxEventKindKeyHold)) {
+      WinxEventKey *key_event = &event->as.key;
+
+      if (key_event->key_code == WinxKeyCodeEnter) {
+        input->as.input.focused = false;
+
+        Str content = {
+          input->as.input.buffer.items,
+          input->as.input.buffer.len,
+        };
+        value_stack_push_string(&vm->stack, content);
+
+        EXECUTE_FUNC(vm, on_submit.as.func.name, 1, false);
+      } else if (key_event->_char) {
+        DA_INSERT(input->as.input.buffer,
+                  input->as.input.cursor_pos,
+                  key_event->_char);
+
+        ++input->as.input.cursor_pos;
+      }
+    }
+  }
+
+  return true;
+}
+
+bool iui_abs_bounds_intrinsic(Vm *vm) {
   Value height = value_stack_pop(&vm->stack);
   Value width = value_stack_pop(&vm->stack);
   Value y = value_stack_pop(&vm->stack);
@@ -229,12 +296,13 @@ bool abs_bounds_intrinsic(Vm *vm) {
 }
 
 Intrinsic iui_intrinsics[] = {
-  { STR_LIT("iui-main-loop"), 4, false, &main_loop_intrinsic },
-  { STR_LIT("iui-vbox"), 4, false, &vbox_intrinsic },
-  { STR_LIT("iui-hbox"), 4, false, &hbox_intrinsic },
-  { STR_LIT("iui-button"), 2, false, &button_intrinsic },
-  { STR_LIT("iui-text"), 2, false, &text_intrinsic },
-  { STR_LIT("iui-abs-bounds"), 4, false, &abs_bounds_intrinsic },
+  { STR_LIT("iui-main-loop"), 4, false, &iui_main_loop_intrinsic },
+  { STR_LIT("iui-vbox"), 4, false, &iui_vbox_intrinsic },
+  { STR_LIT("iui-hbox"), 4, false, &iui_hbox_intrinsic },
+  { STR_LIT("iui-button"), 2, false, &iui_button_intrinsic },
+  { STR_LIT("iui-text"), 4, false, &iui_text_intrinsic },
+  { STR_LIT("iui-input"), 3, false, &iui_input_intrinsic },
+  { STR_LIT("iui-abs-bounds"), 4, false, &iui_abs_bounds_intrinsic },
 };
 
 u32 iui_intrinsics_len = ARRAY_LEN(iui_intrinsics);
