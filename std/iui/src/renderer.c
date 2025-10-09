@@ -293,12 +293,8 @@ static IuiGlyph *iui_renderer_get_glyph(IuiRenderer *renderer,
 
   Vec2 size = {
     advance * scale,
-    (y1 - y0),
+    y1 - y0,
   };
-
-  void *bitmap = malloc(size.x * size.y);
-  stbtt_MakeCodepointBitmap(&renderer->default_font.info, bitmap,
-                            size.x, size.y, size.x, scale, scale, _char);
 
   Vec4 buffer_bounds = {
     renderer->texture_buffer_width,
@@ -306,6 +302,10 @@ static IuiGlyph *iui_renderer_get_glyph(IuiRenderer *renderer,
     renderer->texture_buffer_width + size.x,
     size.y,
   };
+
+  void *bitmap = malloc(size.x * size.y);
+  stbtt_MakeCodepointBitmap(&renderer->default_font.info, bitmap,
+                            size.x, size.y, size.x, scale, scale, _char);
 
   void *new_buffer = merge_texture_buffers(renderer->texture_buffer,
                                            renderer->texture_buffer_height,

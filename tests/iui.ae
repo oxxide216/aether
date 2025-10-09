@@ -1,6 +1,6 @@
 (use '../std/iui/iui.ae')
 
-(let menu-size { x: 250.0 y: 175.0 })
+(let menu-size { x: 350.0 y: 250.0 })
 
 (fun main-loop [window-size]
   (iui-abs-bounds
