@@ -1,0 +1,21 @@
+(use '../std/iui/iui.ae')
+
+(let TODOs [])
+
+(fun main-loop [window-size]
+  (iui-abs-bounds
+    0.0
+    0.0
+    (field window-size x)
+    (- (- (field window-size y) 64.0) 16.0))
+  (iui-vbox 16.0 16.0 25.0)
+
+  (iui-abs-bounds
+    16.0
+    (- (- (field window-size y) 64.0) 16.0)
+    (- (field window-size x) 32.0)
+    64.0)
+  (iui-input 'Type your TODO here'
+    (set TODOs (+ TODOs content))))
+
+(iui-main-loop 'TODO app' 640 480 main-loop)

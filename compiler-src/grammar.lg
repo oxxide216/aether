@@ -2,7 +2,6 @@ whitespace=( |\t|\r)*
 newline=\n
 comment=;;
 
-fun=fun
 let=let
 if=if
 elif=elif
@@ -13,12 +12,7 @@ set=set
 use=use
 field=field
 ret=ret
-
-int=\-?0-9+
-float=\-?0-9+.0-9+
-bool=true|false
-ident=(a-z|A-Z|_|\-|!|\?|#|$|%|^|&|\*|\+|/|=|<|>|\|)(a-z|A-Z|_|\-|!|\?|#|$|%|^|&|\*|\+|/|=|<|>|\||0-9)*
-key=(a-z|A-Z|_|\-|!|\?|#|$|%|^|&|\*|\+|/|=|<|>|\|)(a-z|A-Z|_|\-|!|\?|#|$|%|^|&|\*|\+|/|=|<|>|\||0-9)*:
+import=import
 
 oparen=\(
 cparen=\)
@@ -28,3 +22,10 @@ ocurly={
 ccurly=}
 str="|'
 unpack=...
+right_arrow=\->
+
+int=\-?0-9+
+float=\-?0-9+.0-9+
+bool=true|false
+ident=(a-z|A-Z|_|\-|!|\?|#|$|%|^|&|\*|\+|/|=|<|>|\|)(a-z|A-Z|_|\-|!|\?|#|$|%|^|&|\*|\+|/|=|<|>|\||0-9)*
+key=(a-z|A-Z|_|\-|!|\?|#|$|%|^|&|\*|\+|/|=|<|>|\|)(a-z|A-Z|_|\-|!|\?|#|$|%|^|&|\*|\+|/|=|<|>|\||0-9)*:

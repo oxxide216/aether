@@ -112,7 +112,7 @@ bool iui_main_loop_intrinsic(Vm *vm) {
 
     value_stack_push_record(&vm->stack, window_size);
 
-    EXECUTE_FUNC(vm, body.as.func.name, 1, false);
+    EXECUTE_FUNC(vm, &body.as.func, false);
 
     Vec4 bounds = { 0.0, 0.0, iui.window.width, iui.window.height };
     iui_widgets_recompute_layout(&iui.widgets, bounds);
@@ -139,7 +139,7 @@ bool iui_vbox_intrinsic(Vm *vm) {
   iui_widgets_push_box_begin(&iui.widgets, vec2(margin_x.as._float, margin_y.as._float),
                              spacing.as._float, IuiBoxDirectionVertical);
 
-  EXECUTE_FUNC(vm, body.as.func.name, 0, false);
+  EXECUTE_FUNC(vm, &body.as.func, false);
 
   iui_widgets_push_box_end(&iui.widgets);
 
@@ -160,7 +160,7 @@ bool iui_hbox_intrinsic(Vm *vm) {
   iui_widgets_push_box_begin(&iui.widgets, vec2(margin_x.as._float, margin_y.as._float),
                              spacing.as._float, IuiBoxDirectionHorizontal);
 
-  EXECUTE_FUNC(vm, body.as.func.name, 0, false);
+  EXECUTE_FUNC(vm, &body.as.func, false);
 
   iui_widgets_push_box_end(&iui.widgets);
 
@@ -194,7 +194,7 @@ bool iui_button_intrinsic(Vm *vm) {
         if (event->kind == WinxEventKindButtonPress)
           button->as.button.pressed = true;
         else
-          EXECUTE_FUNC(vm, on_click.as.func.name, 0, false);
+          EXECUTE_FUNC(vm, &on_click.as.func, false);
         break;
       }
     }
@@ -260,7 +260,7 @@ bool iui_input_intrinsic(Vm *vm) {
         };
         value_stack_push_string(&vm->stack, content);
 
-        EXECUTE_FUNC(vm, on_submit.as.func.name, 1, false);
+        EXECUTE_FUNC(vm, &on_submit.as.func, false);
       } break;
 
       case WinxKeyCodeBackspace: {

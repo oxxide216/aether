@@ -121,8 +121,6 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values, I
     catch_vars_block(vm, local_names, catched_values, &expr->as.block);
   } break;
 
-  case IrExprKindFuncDef: break;
-
   case IrExprKindFuncCall: {
     catch_vars_block(vm, local_names, catched_values, &expr->as.func_call.args);
   } break;
@@ -201,115 +199,71 @@ static void catch_vars_block(Vm *vm, Strs *local_names,
     catch_vars(vm, local_names, catched_values, block->items[i]);
 }
 
-static bool get_func(Vm *vm, Str name, u32 args_count, IrArgs *args,
-                     IrBlock *body, NamedValues *catched_values) {
-  Var *var = get_var(vm, name);
-  if (var &&
-      var->value.kind == ValueKindFunc &&
-      var->value.as.func.args.len == args_count) {
-    *args = var->value.as.func.args;
-    *body = var->value.as.func.body;
-    *catched_values = var->value.as.func.catched_values;
+Intrinsic *get_intrinsic(Vm *vm, Str name) {
+  for (u32 i = 0; i < vm->intrinsics.len; ++i)
+    if (str_eq(vm->intrinsics.items[i].name, name))
+      return vm->intrinsics.items + i;
 
-    return true;
-  }
-
-  for (u32 i = vm->funcs.len; i > 0; --i) {
-    Func *func = vm->funcs.items + i - 1;
-
-    if (str_eq(func->def.name, name) &&
-        func->def.args.len == args_count) {
-      *args = func->def.args;
-      *body = func->def.body;
-      *catched_values = func->catched_values;
-
-      return true;
-    }
-  }
-
-  return false;
+  return NULL;
 }
 
-ExecState execute_func(Vm *vm, Str name, u32 args_len, bool value_expected) {
-  IrArgs func_args = {0};
-  IrBlock func_body = {0};
-  NamedValues catched_values = {0};
-  if (!get_func(vm, name, args_len, &func_args, &func_body, &catched_values)) {
-    for (u32 i = vm->intrinsics.len; i > 0; --i) {
-      Intrinsic *intrinsic = vm->intrinsics.items + i - 1;
-
-      if (str_eq(intrinsic->name, name) &&
-          (intrinsic->args_count == args_len ||
-           intrinsic->args_count == (u32) -1)) {
-        if (vm->stack.len < intrinsic->args_count) {
-          ERROR("Not enough data on the stack for function call\n");
-          vm->exit_code = 1;
-          return ExecStateExit;
-        }
-
-        if (!intrinsic->func(vm))
-          return ExecStateExit;
-
-        if (value_expected && !intrinsic->has_return_value)
-          value_stack_push_unit(&vm->stack);
-        else if (!value_expected && intrinsic->has_return_value)
-          --vm->stack.len;
-
-        return ExecStateContinue;
-      }
+ExecState execute_func(Vm *vm, ValueFunc *func, bool value_expected) {
+  if (func->intrinsic_name.len > 0) {
+    Intrinsic *intrinsic = get_intrinsic(vm, func->intrinsic_name);
+    if (!intrinsic) {
+      ERROR("Intrinsic `"STR_FMT"` was not found\n",
+            STR_ARG(intrinsic->name));
+      return ExecStateExit;
     }
 
-    ERROR("Function "STR_FMT" with %u arguments was not defined before usage\n",
-          STR_ARG(name), args_len);
-    vm->exit_code = 1;
-    return ExecStateExit;
-  }
+    if (!(*intrinsic->func)(vm))
+      return ExecStateExit;
 
-  if (vm->stack.len < func_args.len) {
-    ERROR("Not enough data on the stack for function call\n");
-    vm->exit_code = 1;
-    return ExecStateExit;
+    if (value_expected && !intrinsic->has_return_value)
+      value_stack_push_unit(&vm->stack);
+    else if (!value_expected && intrinsic->has_return_value)
+      --vm->stack.len;
+
+    return ExecStateContinue;
   }
 
   u32 prev_stack_len = vm->stack.len;
-  u32 prev_funcs_len = vm->funcs.len;
   Vars prev_local_vars = vm->local_vars;
   bool prev_is_inside_of_func = vm->is_inside_of_func;
 
   vm->local_vars = (Vars) {0};
   vm->is_inside_of_func = true;
 
-  for (u32 i = 0; i < func_args.len; ++i) {
+  for (u32 i = 0; i < func->args.len; ++i) {
     Var var = {
-      func_args.items[i],
-      vm->stack.items[vm->stack.len - func_args.len + i],
+      func->args.items[i],
+      vm->stack.items[vm->stack.len - func->args.len + i],
     };
 
     DA_APPEND(vm->local_vars, var);
   }
 
-  for (u32 i = 0; i < catched_values.len; ++i) {
+  for (u32 i = 0; i < func->catched_values.len; ++i) {
     Var var = {
-      catched_values.items[i].name,
-      catched_values.items[i].value,
+      func->catched_values.items[i].name,
+      func->catched_values.items[i].value,
     };
 
     DA_APPEND(vm->local_vars, var);
   }
 
-  ExecState result = execute_block(vm, &func_body, value_expected);
+  ExecState result = execute_block(vm, &func->body, value_expected);
 
   for (u32 i = prev_stack_len; i < vm->stack.len - value_expected; ++i)
     free_value(vm->stack.items + i, vm->rc_arena);
 
   free(vm->local_vars.items);
-  vm->funcs.len = prev_funcs_len;
   vm->local_vars = prev_local_vars;
   vm->is_inside_of_func = prev_is_inside_of_func;
 
   if (value_expected)
-    vm->stack.items[prev_stack_len - args_len] = vm->stack.items[vm->stack.len - 1];
-  vm->stack.len = prev_stack_len - args_len + value_expected;
+    vm->stack.items[prev_stack_len - func->args.len] = vm->stack.items[vm->stack.len - 1];
+  vm->stack.len = prev_stack_len - func->args.len + value_expected;
 
   if (result == ExecStateExit)
     return result;
@@ -322,30 +276,26 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     EXECUTE_BLOCK(vm, &expr->as.block, value_expected);
   } break;
 
-  case IrExprKindFuncDef: {
-    for (u32 i = 0; i < vm->funcs.len; ++i) {
-      if (str_eq(vm->funcs.items[i].def.name, expr->as.func_def.name) &&
-          vm->funcs.items[i].def.args.len == expr->as.func_def.args.len) {
-        ERROR("Function "STR_FMT" with %u args was redefined\n",
-              STR_ARG(expr->as.func_def.name), expr->as.func_def.args.len);
-        vm->exit_code = 1;
-        return false;
-      }
-    }
-
-    Func func = { expr->as.func_def, {} };
-    DA_APPEND(vm->funcs, func);
-
-    if (value_expected)
-      value_stack_push_unit(&vm->stack);
-  } break;
-
   case IrExprKindFuncCall: {
     for (u32 i = 0; i < expr->as.func_call.args.len; ++i)
       EXECUTE_EXPR(vm, expr->as.func_call.args.items[i], true);
 
-    EXECUTE_FUNC(vm, expr->as.func_call.name,
-                 expr->as.func_call.args.len, value_expected);
+    Var *func_var = get_var(vm, expr->as.func_call.name);
+
+    if (!func_var) {
+      ERROR("Symbol "STR_FMT" was not defined before usage\n",
+            STR_ARG(expr->as.ident.ident));
+      vm->exit_code = 1;
+      return ExecStateExit;
+    }
+
+    if (func_var->value.kind != ValueKindFunc) {
+      ERROR("Symbol "STR_FMT" is not callable\n",
+            STR_ARG(func_var->name));
+      return ExecStateExit;
+    }
+
+    EXECUTE_FUNC(vm, &func_var->value.as.func, value_expected);
   } break;
 
   case IrExprKindVarDef: {
@@ -553,21 +503,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       return ExecStateContinue;
     }
 
-    for (u32 i = 0; i < vm->funcs.len; ++i) {
-      Func *func = vm->funcs.items + i;
-
-      if (str_eq(func->def.name, expr->as.ident.ident)) {
-        Value func_value = {
-          ValueKindFunc,
-          { .func = { func->def.name, func->def.args, func->def.body, {} } },
-        };
-        DA_APPEND(vm->stack, func_value);
-
-        return ExecStateContinue;
-      }
-    }
-
-    ERROR("Variable "STR_FMT" was not defined before usage\n",
+    ERROR("Symbol "STR_FMT" was not defined before usage\n",
           STR_ARG(expr->as.ident.ident));
     vm->exit_code = 1;
     return ExecStateExit;
@@ -602,34 +538,20 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     catch_vars_block(vm, &local_names, &catched_values, &expr->as.lambda.body);
 
-    StringBuilder name_sb = {0};
-    sb_push_u32(&name_sb, vm->funcs.len);
-    Str name = sb_to_str(name_sb);
-
     if (value_expected) {
       Value func_value = {
         ValueKindFunc,
         {
           .func = {
-            name,
             expr->as.lambda.args,
             expr->as.lambda.body,
             catched_values,
+            expr->as.lambda.intrinsic_name,
           },
         },
       };
       DA_APPEND(vm->stack, func_value);
     }
-
-    Func func = {
-      {
-        name,
-        expr->as.lambda.args,
-        expr->as.lambda.body,
-      },
-      catched_values,
-    };
-    DA_APPEND(vm->funcs, func);
   } break;
 
   case IrExprKindRecord: {

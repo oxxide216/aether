@@ -2,21 +2,25 @@
   (println arg0)
   (println arg1))
 
-(@println2 'hello' 'world')
+(println2 'hello' 'world')
 
 (macro list [...body]
   [body])
 
-(let list (@list
-            '0' '1'
-            '2' '3'))
+(let list (list '0' '1' '2' '3'))
 
 (println list)
 
 (macro lazy [...body]
   (fun [] body))
 
-(let lazy-lambda (@lazy
-                   (println 'Lazy hello!')))
+(let lazy-lambda (lazy (println 'Lazy hello!')))
 
 (lazy-lambda)
+
+(macro for-each [func list]
+  (if list
+    (func (head list))
+    (for-each func (tail list))))
+
+(for-each (fun [x] (println x)) [1 2 3 4 0])

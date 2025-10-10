@@ -193,7 +193,7 @@ bool map_intrinsic(Vm *vm) {
   ListNode *node = list.as.list->next;
   while (node) {
     DA_APPEND(vm->stack, node->value);
-    EXECUTE_FUNC(vm, func.as.func.name, 1, true);
+    EXECUTE_FUNC(vm, &func.as.func, true);
 
     *new_list_next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
     (*new_list_next)->value = value_stack_pop(&vm->stack);
@@ -219,7 +219,7 @@ bool filter_intrinsic(Vm *vm) {
   ListNode *node = list.as.list->next;
   while (node) {
     DA_APPEND(vm->stack, node->value);
-    EXECUTE_FUNC(vm, func.as.func.name, 1, true);
+    EXECUTE_FUNC(vm, &func.as.func, true);
 
     Value is_ok = value_stack_pop(&vm->stack);
     if (is_ok.kind != ValueKindBool)
@@ -252,7 +252,7 @@ bool reduce_intrinsic(Vm *vm) {
   while (node) {
     DA_APPEND(vm->stack, accumulator);
     DA_APPEND(vm->stack, node->value);
-    EXECUTE_FUNC(vm, func.as.func.name, 2, true);
+    EXECUTE_FUNC(vm, &func.as.func, true);
 
     free_value(&accumulator, vm->rc_arena);
     accumulator = value_stack_pop(&vm->stack);

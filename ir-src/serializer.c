@@ -36,19 +36,6 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
     save_block_data(&expr->as.block, data, data_size, end);
   } break;
 
-  case IrExprKindFuncDef: {
-    save_str_data(expr->as.func_def.name, data, data_size, end);
-
-    reserve_space(sizeof(u32), data, data_size, end);
-    *(u32 *) (*data + *end) = expr->as.func_def.args.len;
-    *end += sizeof(u32);
-
-    for (u32 i = 0; i < expr->as.func_def.args.len; ++i)
-      save_str_data(expr->as.func_def.args.items[i], data, data_size, end);
-
-    save_block_data(&expr->as.func_def.body, data, data_size, end);
-  } break;
-
   case IrExprKindFuncCall: {
     save_str_data(expr->as.func_call.name, data, data_size, end);
     save_block_data(&expr->as.func_call.args, data, data_size, end);
@@ -150,6 +137,7 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
       save_str_data(expr->as.lambda.args.items[i], data, data_size, end);
 
     save_block_data(&expr->as.lambda.body, data, data_size, end);
+    save_str_data(expr->as.lambda.intrinsic_name, data, data_size, end);
   } break;
 
   case IrExprKindRecord: {

@@ -1,13 +1,15 @@
-(fun test []
-  (println 'test!'))
+(let print [arg] -> import 'print')
+(let println [arg] -> import 'println')
+
+(let test [] -> (println 'test!'))
 
 (let test-func test)
 
 (let test-lambda
-  (fun [arg]
-     (print '[')
-     (print arg)
-     (println ']')))
+  [arg] ->
+    (print '[')
+    (print arg)
+    (println ']'))
 
 (test)
 (test-func)

@@ -18,15 +18,6 @@ static void get_expr_data_size(u8 *data, u32 *size) {
     get_block_data_size(data, size);
   } break;
 
-  case IrExprKindFuncDef: {
-    get_str_data_size(data, size);
-
-    u32 len = *(u32 *) (data + *size);
-    *size += sizeof(u32) + len * sizeof(Str);
-
-    get_block_data_size(data, size);
-  } break;
-
   case IrExprKindFuncCall: {
     get_str_data_size(data, size);
     get_block_data_size(data, size);
@@ -111,6 +102,7 @@ static void get_expr_data_size(u8 *data, u32 *size) {
     *size += sizeof(u32) + len * sizeof(Str);
 
     get_block_data_size(data, size);
+    get_str_data_size(data, size);
   } break;
 
   case IrExprKindRecord: {
@@ -121,6 +113,8 @@ static void get_expr_data_size(u8 *data, u32 *size) {
       get_str_data_size(data, size);
       get_expr_data_size(data, size);
     }
+
+    get_str_data_size(data, size);
   } break;
   }
 }
@@ -153,22 +147,6 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
   switch (expr->kind) {
   case IrExprKindBlock: {
     load_block_data(&expr->as.block, data, end, rc_arena);
-  } break;
-
-  case IrExprKindFuncDef: {
-    load_str_data(&expr->as.func_def.name, data, end, rc_arena);
-
-    IrArgs *args = &expr->as.func_def.args;
-
-    args->len = *(u32 *) (data + *end);
-    args->cap = args->len;
-    *end += sizeof(u32);
-
-    args->items = malloc(args->len * sizeof(Str));
-    for (u32 i = 0; i < args->len; ++i)
-      load_str_data(args->items + i, data, end, rc_arena);
-
-    load_block_data(&expr->as.func_def.body, data, end, rc_arena);
   } break;
 
   case IrExprKindFuncCall: {
@@ -289,6 +267,7 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
       load_str_data(args->items + i, data, end, rc_arena);
 
     load_block_data(&expr->as.lambda.body, data, end, rc_arena);
+    load_str_data(&expr->as.lambda.intrinsic_name, data, end, rc_arena);
   } break;
 
   case IrExprKindRecord: {
