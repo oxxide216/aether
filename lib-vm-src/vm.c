@@ -113,9 +113,11 @@ static Var *get_var(Vm *vm, Str name) {
   return NULL;
 }
 
-static void catch_vars_block(Vm *vm, Strs *local_names, NamedValues *catched_values, IrBlock *block);
+static void catch_vars_block(Vm *vm, Strs *local_names, NamedValues *catched_values,
+                             IrBlock *block);
 
-static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values, IrExpr *expr) {
+static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values,
+                       IrExpr *expr) {
   switch (expr->kind) {
   case IrExprKindBlock: {
     catch_vars_block(vm, local_names, catched_values, &expr->as.block);
@@ -193,8 +195,8 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values, I
   }
 }
 
-static void catch_vars_block(Vm *vm, Strs *local_names,
-                             NamedValues *catched_values, IrBlock *block) {
+static void catch_vars_block(Vm *vm, Strs *local_names, NamedValues *catched_values,
+                             IrBlock *block) {
   for (u32 i = 0; i < block->len; ++i)
     catch_vars(vm, local_names, catched_values, block->items[i]);
 }
@@ -212,7 +214,7 @@ ExecState execute_func(Vm *vm, ValueFunc *func, bool value_expected) {
     Intrinsic *intrinsic = get_intrinsic(vm, func->intrinsic_name);
     if (!intrinsic) {
       ERROR("Intrinsic `"STR_FMT"` was not found\n",
-            STR_ARG(intrinsic->name));
+            STR_ARG(func->intrinsic_name));
       return ExecStateExit;
     }
 
@@ -230,9 +232,11 @@ ExecState execute_func(Vm *vm, ValueFunc *func, bool value_expected) {
   u32 prev_stack_len = vm->stack.len;
   Vars prev_local_vars = vm->local_vars;
   bool prev_is_inside_of_func = vm->is_inside_of_func;
+  ValueFunc prev_current_func_value = vm->current_func_value;
 
   vm->local_vars = (Vars) {0};
   vm->is_inside_of_func = true;
+  vm->current_func_value = *func;
 
   for (u32 i = 0; i < func->args.len; ++i) {
     Var var = {
@@ -257,9 +261,11 @@ ExecState execute_func(Vm *vm, ValueFunc *func, bool value_expected) {
   for (u32 i = prev_stack_len; i < vm->stack.len - value_expected; ++i)
     free_value(vm->stack.items + i, vm->rc_arena);
 
-  free(vm->local_vars.items);
+  if (vm->local_vars.items)
+    free(vm->local_vars.items);
   vm->local_vars = prev_local_vars;
   vm->is_inside_of_func = prev_is_inside_of_func;
+  vm->current_func_value = prev_current_func_value;
 
   if (value_expected)
     vm->stack.items[prev_stack_len - func->args.len] = vm->stack.items[vm->stack.len - 1];
@@ -277,25 +283,18 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   } break;
 
   case IrExprKindFuncCall: {
+    EXECUTE_EXPR(vm, expr->as.func_call.func, true);
+
+    Value func_value = value_stack_pop(&vm->stack);
+    if (func_value.kind != ValueKindFunc) {
+      ERROR("Value is not callable\n");
+      return ExecStateExit;
+    }
+
     for (u32 i = 0; i < expr->as.func_call.args.len; ++i)
       EXECUTE_EXPR(vm, expr->as.func_call.args.items[i], true);
 
-    Var *func_var = get_var(vm, expr->as.func_call.name);
-
-    if (!func_var) {
-      ERROR("Symbol "STR_FMT" was not defined before usage\n",
-            STR_ARG(expr->as.ident.ident));
-      vm->exit_code = 1;
-      return ExecStateExit;
-    }
-
-    if (func_var->value.kind != ValueKindFunc) {
-      ERROR("Symbol "STR_FMT" is not callable\n",
-            STR_ARG(func_var->name));
-      return ExecStateExit;
-    }
-
-    EXECUTE_FUNC(vm, &func_var->value.as.func, value_expected);
+    EXECUTE_FUNC(vm, &func_value.as.func, value_expected);
   } break;
 
   case IrExprKindVarDef: {

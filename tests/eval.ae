@@ -1,1 +1,4 @@
+(use '../std/base/base.ae')
+(use '../std/system/system.ae')
+
 (eval (read-file 'eval.ac'))

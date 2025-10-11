@@ -1,5 +1,8 @@
-(let a (str-to-num (input)))
-(let b (str-to-num (input)))
+(use '../std/base/base.ae')
+(use '../std/system/system.ae')
+
+(let a (str-to-int (input)))
+(let b (str-to-int (input)))
 
 (if (== a b)
   (println 'equal'))

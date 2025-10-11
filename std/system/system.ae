@@ -1,0 +1,32 @@
+;; IO
+(let print [aeg] -> import 'print')
+(let println [aeg] -> import 'println')
+(let input-size [size] -> import 'input-size')
+(let input [] -> import 'input')
+
+;; Files
+(let file-exists? [path] -> import 'file-exists')
+(let read-file [path] -> import 'read-file')
+(let write-file [content path] -> import 'write-file')
+(let delete-file [] -> import 'delete-file')
+
+;; Paths
+(let get-current-path [] -> import 'get-current-path')
+(let set-current-path [path] -> import 'set-current-path')
+(let get-absolute-path [path] -> import 'get-absolute-path')
+(let list-directory [path] -> import 'list-directory')
+
+;; Arguments
+(let get-args [] -> import 'get-args')
+
+;; Sockets
+(let create-server [port] -> import 'create-server')
+(let create-client [server-address port] -> import 'create-client')
+(let accept-connection [server port] -> import 'accept-connection')
+(let close-connection [client] -> import 'close-connection')
+(let send [receiver message] -> import 'receiver-message')
+(let receive-size [receiver size] -> import 'receive-size')
+(let receive [receiver] -> import 'receive')
+
+;; Processes
+(let run-command [command] -> import 'run-command')

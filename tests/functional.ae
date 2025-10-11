@@ -1,7 +1,10 @@
+(use '../std/base/base.ae')
+(use '../std/system/system.ae')
+
 (let list [0 1 2 3])
-(set list (map (fun [num] (+ num 1)) list))
+(set list (map [num] -> (+ num 1) <- list))
 (println list)
-(set list (filter (fun [num] (! (& num 1))) list))
+(set list (filter [num] -> (! (& num 1)) <- list))
 (println list)
-(let sum (reduce (fun [acc num] (+ acc num)) 0 list))
+(let sum (reduce [acc num] -> (+ acc num) <- 0 list))
 (println sum)

@@ -499,7 +499,7 @@ Intrinsic system_intrinsics[] = {
   { STR_LIT("input-size"), 1, true, &input_size_intrinsic },
   { STR_LIT("input"), 0, true, &input_intrinsic },
   // Files
-  { STR_LIT("file-exists?"), 1, true, &file_exists_intrinsic },
+  { STR_LIT("file-exists"), 1, true, &file_exists_intrinsic },
   { STR_LIT("read-file"), 1, true, &read_file_intrinsic },
   { STR_LIT("write-file"), 2, false, &write_file_intrinsic },
   { STR_LIT("delete-file"), 1, false, &delete_file_intrinsic },

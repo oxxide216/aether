@@ -48,6 +48,9 @@ void sb_push_u16(StringBuilder *sb, unsigned short int num);
 void sb_push_u32(StringBuilder *sb, unsigned int num);
 void sb_push_u64(StringBuilder *sb, unsigned long int num);
 
+void sb_push_f32(StringBuilder *sb, float num);
+void sb_push_f64(StringBuilder *sb, double num);
+
 #endif // SHL_STR_H
 
 #ifdef SHL_STR_IMPLEMENTATION
@@ -264,6 +267,31 @@ void sb_push_u64(StringBuilder *sb, unsigned long int num) {
 
   sb_reserve_space(sb, len);
   snprintf(sb->buffer + sb->len, len + 1, "%lu", num);
+  sb->len += len;
+}
+
+void sb_push_f32(StringBuilder *sb, float num) {
+  sb_push_f64(sb, num);
+}
+
+void sb_push_f64(StringBuilder *sb, double num) {
+  double _num = num;
+  unsigned int len = 1;
+
+  while (_num >= 10.0) {
+    _num /= 10.0;
+    ++len;
+  }
+
+  ++len;
+
+  while (_num - (double) (long int) _num > 0.0) {
+    _num *= 10.0;
+    ++len;
+  }
+
+  sb_reserve_space(sb, len);
+  snprintf(sb->buffer + sb->len, len + 1, "%f", num);
   sb->len += len;
 }
 

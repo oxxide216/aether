@@ -1,3 +1,6 @@
+(use '../std/base/base.ae')
+(use '../std/system/system.ae')
+
 (let str 'hi!')
 (println str)
 (println (eat-str str 'hi'))

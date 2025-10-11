@@ -32,6 +32,9 @@ unsigned int str_to_u32(Str str);
 unsigned long int str_to_u64(Str str);
 unsigned long int str_hash(Str str);
 
+float str_to_f32(Str str);
+double str_to_f64(Str str);
+
 Str sb_to_str(StringBuilder sb);
 void sb_push(StringBuilder *sb, char *str);
 void sb_push_char(StringBuilder *sb, char ch);
@@ -44,6 +47,9 @@ void sb_push_u8(StringBuilder *sb, unsigned char num);
 void sb_push_u16(StringBuilder *sb, unsigned short int num);
 void sb_push_u32(StringBuilder *sb, unsigned int num);
 void sb_push_u64(StringBuilder *sb, unsigned long int num);
+
+void sb_push_f32(StringBuilder *sb, float num);
+void sb_push_f64(StringBuilder *sb, double num);
 
 #endif // SHL_STR_H
 
@@ -137,6 +143,40 @@ unsigned long int str_hash(Str str) {
   return result;
 }
 
+float str_to_f32(Str str) {
+  return (float) str_to_f64(str);
+}
+
+double str_to_f64(Str str) {
+  double num = 0.0;
+  i32 i = 0;
+
+  bool is_neg = str.ptr[0] == '-';
+  if (is_neg) {
+    ++str.ptr;
+    --str.len;
+  }
+
+  for (; i < (int) str.len && str.ptr[i] != '.'; ++i) {
+    num *= 10.0;
+    num += str.ptr[i] - '0';
+  }
+
+  if (i < (int) str.len) {
+    ++i;
+    double divider = 1.0;
+
+    for (; i < (int) str.len; ++i) {
+      divider *= 10.0;
+      num += (str.ptr[i] - '0') / divider;
+    }
+  }
+
+  if (is_neg)
+    return -num;
+  return num;
+}
+
 void sb_reserve_space(StringBuilder *sb, unsigned int amount) {
   if (amount > sb->cap - sb->len) {
     if (sb->cap != 0) {
@@ -227,6 +267,31 @@ void sb_push_u64(StringBuilder *sb, unsigned long int num) {
 
   sb_reserve_space(sb, len);
   snprintf(sb->buffer + sb->len, len + 1, "%lu", num);
+  sb->len += len;
+}
+
+void sb_push_f32(StringBuilder *sb, float num) {
+  sb_push_f64(sb, num);
+}
+
+void sb_push_f64(StringBuilder *sb, double num) {
+  double _num = num;
+  unsigned int len = 1;
+
+  while (_num >= 10.0) {
+    _num /= 10.0;
+    ++len;
+  }
+
+  ++len;
+
+  while (_num - (double) (long int) _num > 0.0) {
+    _num *= 10.0;
+    ++len;
+  }
+
+  sb_reserve_space(sb, len);
+  snprintf(sb->buffer + sb->len, len + 1, "%f", num);
   sb->len += len;
 }
 

@@ -30,8 +30,8 @@ typedef enum {
 typedef Da(Str) IrArgs;
 
 typedef struct {
-  Str     name;
-  IrBlock args;
+  IrExpr  *func;
+  IrBlock  args;
 } IrExprFuncCall;
 
 typedef struct {

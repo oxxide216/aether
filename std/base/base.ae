@@ -1,0 +1,84 @@
+;; Base
+(let head [list] -> import 'head')
+(let tail [list] -> import 'tail')
+(let last [list] -> import 'last')
+(let nth [list index] -> import 'nth')
+(let len [list] -> import 'len')
+(let is-empty [list] -> import 'is-empty')
+(let get-range [list begin end] -> import 'get-range')
+(let exit [exit-code] -> import 'exit')
+(let eval [byte-code] -> import 'eval')
+
+;; Functional stuff
+(let map [func list] -> import 'map')
+(let filter [func list] -> import 'filter')
+(let reduce [func accumulator list] -> import 'reduce')
+
+;; String operations
+(let split [str delimiter] -> import 'split')
+(let sub-str [str begin end] -> import 'sub-str')
+(let join [str filler] -> import 'join')
+(let eat-str [str pattern] -> import 'eat-str')
+(let eat-byte-64 [str] -> import 'eat-byte-64')
+(let eat-byte-32 [str] -> import 'eat-byte-32')
+(let eat-byte-16 [str] -> import 'eat-byte-16')
+(let eat-byte-8 [str] -> import 'eat-byte-8')
+
+;; Conversions
+(let str-to-int [str] -> import 'str-to-int')
+(let str-to-float [str] -> import 'str-to-float')
+(let int-to-float [int] -> import 'int-to-float')
+(let int-to-str [int] -> import 'int-to-str')
+(let bool-to-int [bool] -> import 'bool-to-int')
+(let bool-to-str [bool] -> import 'bool-to-str')
+(let float-to-int [float] -> import 'float-to-int')
+(let float-to-str [float] -> import 'float-to-str')
+(let byte-64-to-str [int] -> import 'byte-64-to-str')
+(let byte-32-to-str [int] -> import 'byte-32-to-str')
+(let byte-16-to-str [int] -> import 'byte-16-to-str')
+(let byte-8-to-str [int] -> import 'byte-8-to-str')
+
+;; Math
+(let + [a b] -> import 'add')
+(let - [a b] -> import 'sub')
+(let * [a b] -> import 'mul')
+(let / [a b] -> import 'div')
+(let % [a b] -> import 'mod')
+
+;; Advanced math
+(let abs [num] -> import 'abs')
+(let min [num] -> import 'min')
+(let max [num] -> import 'max')
+(let sqrt [num] -> import 'sqrt')
+(let pow [num pow] -> import 'pow')
+(let round [num] -> import 'round')
+
+;; Comparisons
+(let == [a b] -> import 'eq')
+(let != [a b] -> import 'ne')
+(let < [a b] -> import 'ls')
+(let <= [a b] -> import 'le')
+(let > [a b] -> import 'gt')
+(let >= [a b] -> import 'ge')
+
+;; Boolean
+(let & [a b] -> import 'and')
+(let | [a b] -> import 'or')
+(let ^ [a b] -> import 'xor')
+(let ! [value] -> import 'not')
+
+;; Logical
+(let && [a b] -> import 'logical-and')
+(let || [a b] -> import 'logical-or')
+
+;; Types
+(let type [value] -> import 'type')
+(let unit? [value] -> import 'is-unit')
+(let list? [value] -> import 'is-list')
+(let str? [value] -> import 'is-str')
+(let int? [value] -> import 'it-int')
+(let float? [value] -> import 'is-float')
+(let bool? [value] -> import 'is-bool')
+(let is-func [value] -> import 'is-func')
+(let is-record [value] -> import 'is-record')
+

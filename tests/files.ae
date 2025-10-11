@@ -1,3 +1,5 @@
+(use '../std/system/system.ae')
+
 (let path 'text.txt')
 
 (if (file-exists? path)

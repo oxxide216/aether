@@ -1,4 +1,7 @@
-(if (unit? (head (tail (tail (get-args)))))
+(use '../std/base/base.ae')
+(use '../std/system/system.ae')
+
+(if (< (len (get-args)) 3)
   (println 'ERROR: input file was not provided')
  else
   (println (len (split (read-file (head (tail (tail (get-args))))) '\n'))))

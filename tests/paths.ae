@@ -1,3 +1,5 @@
+(use '../std/system/system.ae')
+
 (println (get-current-path))
 (set-current-path '..')
 (println (get-current-path))

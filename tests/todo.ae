@@ -1,13 +1,16 @@
+(use '../std/base/base.ae')
+(use '../std/system/system.ae')
+
 (let todos [])
 
-(fun add-todo [todo]
+(let add-todo [todo] ->
   (set todos (+ todos todo)))
 
-(fun remove-todo [todo-to-remove]
-  (set todos (filter (fun [todo] (!= todo todo-to-remove)) todos)))
+(let remove-todo [todo-to-remove] ->
+  (set todos (filter [todo] -> (!= todo todo-to-remove) <> todos)))
 
-(fun print-todos [left]
-  (if (! (is-empty left))
+(let print-todos [left] ->
+  (if left
     (println (head left))
     (print-todos (tail left))))
 
@@ -16,9 +19,9 @@
 
   (let command (split (input) ' '))
 
-  (if (& (== (head command) 'add') (! (is-empty (tail command))))
-    (add-todo (head (tail command)))
-   elif (& (== (head command) 'remove') (! (is-empty (tail command))))
+  (if (&& (== (head command) 'add') (tail command))
+    (add-todo (nth command 1))
+   elif (&& (== (head command) 'remove') (tail command))
     (remove-todo (head (tail command)))
    elif (== (head command) 'list')
     (print-todos todos)

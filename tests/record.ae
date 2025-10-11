@@ -1,3 +1,6 @@
+(use '../std/base/base.ae')
+(use '../std/system/system.ae')
+
 (let user {
   name: 'John'
   surname: 'Doe'

@@ -19,7 +19,7 @@ static void get_expr_data_size(u8 *data, u32 *size) {
   } break;
 
   case IrExprKindFuncCall: {
-    get_str_data_size(data, size);
+    get_expr_data_size(data, size);
     get_block_data_size(data, size);
   } break;
 
@@ -150,7 +150,9 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
   } break;
 
   case IrExprKindFuncCall: {
-    load_str_data(&expr->as.func_call.name, data, end, rc_arena);
+    expr->as.func_call.func = aalloc(sizeof(IrExpr));
+
+    load_expr_data(expr->as.func_call.func, data, end, rc_arena);
     load_block_data(&expr->as.func_call.args, data, end, rc_arena);
   } break;
 

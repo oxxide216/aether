@@ -1,1 +1,3 @@
+(use '../std/system/system.ae')
+
 (println (run-command 'ls -la'))

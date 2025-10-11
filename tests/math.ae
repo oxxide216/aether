@@ -1,8 +1,11 @@
-(let a (str-to-num (input)))
-(let b (str-to-num (input)))
+(use '../std/base/base.ae')
+(use '../std/system/system.ae')
 
-(println (num-to-str (+ a b)))
-(println (num-to-str (- a b)))
-(println (num-to-str (* a b)))
-(println (num-to-str (/ a b)))
-(println (num-to-str (% a b)))
+(let a (str-to-int (input)))
+(let b (str-to-int (input)))
+
+(println (int-to-str (+ a b)))
+(println (int-to-str (- a b)))
+(println (int-to-str (* a b)))
+(println (int-to-str (/ a b)))
+(println (int-to-str (% a b)))

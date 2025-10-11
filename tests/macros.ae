@@ -1,3 +1,6 @@
+(use '../std/base/base.ae')
+(use '../std/system/system.ae')
+
 (macro println2 [arg0 arg1]
   (println arg0)
   (println arg1))
@@ -12,15 +15,8 @@
 (println list)
 
 (macro lazy [...body]
-  (fun [] body))
+  [] -> body)
 
 (let lazy-lambda (lazy (println 'Lazy hello!')))
 
 (lazy-lambda)
-
-(macro for-each [func list]
-  (if list
-    (func (head list))
-    (for-each func (tail list))))
-
-(for-each (fun [x] (println x)) [1 2 3 4 0])

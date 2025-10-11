@@ -1,17 +1,20 @@
-(fun print-list [list]
-  (fun print-list-rec [list]
+(use '../std/base/base.ae')
+(use '../std/system/system.ae')
+
+(let print-list [list] ->
+  (let print-list-rec [list] ->
     (if (! (is-empty list))
       (print (head list))
       (if (! (is-empty (tail list)))
         (print ' '))
-      (print-list-rec (tail list))))
+      (<-> (tail list))))
   (print '[')
   (print-list-rec list)
   (println ']'))
 
 (let list [0 1 2])
-(+ -1 list)
-(+ list -2)
+(set list (+ -1 list))
+(set list (+ list -2))
 
 (println (nth list 2))
 (println (nth list 10))

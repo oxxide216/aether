@@ -1,6 +1,12 @@
-(fun fmt [args]
+(use '../std/base/base.ae')
+(use '../std/system/system.ae')
+
+(let fmt [args] ->
   (if (is-empty (tail args))
-    (head args)
+    (if args
+      (head args)
+     else
+      [])
    else
     (+ (head args) (fmt (tail args)))))
 

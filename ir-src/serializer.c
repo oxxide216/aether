@@ -37,7 +37,7 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
   } break;
 
   case IrExprKindFuncCall: {
-    save_str_data(expr->as.func_call.name, data, data_size, end);
+    save_expr_data(expr->as.func_call.func, data, data_size, end);
     save_block_data(&expr->as.func_call.args, data, data_size, end);
   } break;
 

@@ -1,31 +1,7 @@
+#include <math.h>
+
 #include "base/intrinsics.h"
 #include "aether-ir/deserializer.h"
-
-bool exit_intrinsic(Vm *vm) {
-  Value exit_code = value_stack_pop(&vm->stack);
-  if (exit_code.kind != ValueKindInt)
-    PANIC("exit: wrong argument kind\n");
-
-  vm->exit_code = exit_code.as._int;
-  return false;
-}
-
-bool eval_intrinsic(Vm *vm) {
-  Value bytecode = value_stack_pop(&vm->stack);
-  if (bytecode.kind != ValueKindString)
-    PANIC("eval: wrong argument kind\n");
-
-  Ir ir = deserialize((u8 *) bytecode.as.string.str.ptr,
-                      bytecode.as.string.str.len,
-                      vm->rc_arena);
-
-  i32 argc = 1;
-  char *argv[] = { "eval", NULL };
-  Intrinsics intrinsics = {0};
-  execute(&ir, argc, argv, vm->rc_arena, &intrinsics);
-
-  return true;
-}
 
 bool head_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
@@ -117,20 +93,6 @@ bool len_intrinsic(Vm *vm) {
   return true;
 }
 
-bool is_empty_intrinsic(Vm *vm) {
-  Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindList &&
-      value.kind != ValueKindString)
-    PANIC("is-empty: wrong argument kind\n");
-
-  if (value.kind == ValueKindList)
-    value_stack_push_bool(&vm->stack, value.as.list->next == NULL);
-  else
-    value_stack_push_bool(&vm->stack, value.as.string.str.len == 0);
-
-  return true;
-}
-
 bool get_range_intrinsic(Vm *vm) {
   Value end = value_stack_pop(&vm->stack);
   Value begin = value_stack_pop(&vm->stack);
@@ -177,6 +139,32 @@ bool get_range_intrinsic(Vm *vm) {
 
     value_stack_push_string(&vm->stack, sub_string);
   }
+
+  return true;
+}
+
+bool exit_intrinsic(Vm *vm) {
+  Value exit_code = value_stack_pop(&vm->stack);
+  if (exit_code.kind != ValueKindInt)
+    PANIC("exit: wrong argument kind\n");
+
+  vm->exit_code = exit_code.as._int;
+  return false;
+}
+
+bool eval_intrinsic(Vm *vm) {
+  Value bytecode = value_stack_pop(&vm->stack);
+  if (bytecode.kind != ValueKindString)
+    PANIC("eval: wrong argument kind\n");
+
+  Ir ir = deserialize((u8 *) bytecode.as.string.str.ptr,
+                      bytecode.as.string.str.len,
+                      vm->rc_arena);
+
+  i32 argc = 1;
+  char *argv[] = { "eval", NULL };
+  Intrinsics intrinsics = {0};
+  execute(&ir, argc, argv, vm->rc_arena, &intrinsics);
 
   return true;
 }
@@ -494,13 +482,62 @@ bool str_to_int_intrinsic(Vm *vm) {
   return true;
 }
 
+bool str_to_float_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  if (value.kind != ValueKindString)
+    PANIC("str-to-float: wrong argument kind\n");
+
+  value_stack_push_float(&vm->stack, str_to_f64(value.as.string.str));
+
+  return true;
+}
+
+bool int_to_float_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  if (value.kind != ValueKindInt)
+    PANIC("int-to-float: wrong argument kind\n");
+
+  value_stack_push_float(&vm->stack, (f64) value.as._int);
+
+  return true;
+}
+
 bool int_to_str_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  if (value.kind != ValueKindInt)
+    PANIC("int-to-str: wrong argument kind\n");
+
+  StringBuilder sb = {0};
+  sb_push_i64(&sb, value.as._int);
+
+  Str new_string;
+  new_string.len = sb.len;
+  new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
+  memcpy(new_string.ptr, sb.buffer, sb.len);
+  free(sb.buffer);
+
+  value_stack_push_string(&vm->stack, new_string);
+
+  return true;
+}
+
+bool float_to_int_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  if (value.kind != ValueKindFloat)
+    PANIC("float-to-int: wrong argument kind\n");
+
+  value_stack_push_int(&vm->stack, (i64) value.as._float);
+
+  return true;
+}
+
+bool float_to_str_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind != ValueKindInt)
     PANIC("num-to-str: wrong argument kind\n");
 
   StringBuilder sb = {0};
-  sb_push_i64(&sb, value.as._int);
+  sb_push_f64(&sb, value.as._int);
 
   Str new_string;
   new_string.len = sb.len;
@@ -629,28 +666,24 @@ bool add_intrinsic(Vm *vm) {
 
     value_stack_push_list(&vm->stack, new_list);
   } else if (a.kind == ValueKindList) {
-    ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-    new_list->next = list_clone(vm->rc_arena, a.as.list->next);
-
-    ListNode *node = new_list;
+    ListNode *node = a.as.list;
     while (node && node->next)
       node = node->next;
 
-    if (node) {
-      node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-      node->next->value = b;
-    }
+    node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+    node->next->value = b;
 
-    value_stack_push_list(&vm->stack, new_list);
+    value_stack_push_list(&vm->stack, a.as.list);
   } else if (b.kind == ValueKindList) {
-    ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-    new_list->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-    new_list->next->value = a;
-    new_list->next->next = list_clone(vm->rc_arena, b.as.list->next);
+    ListNode *next = b.as.list->next;
 
-    value_stack_push_list(&vm->stack, new_list);
+    b.as.list->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+    b.as.list->next->value = a;
+    b.as.list->next->next = next;
+
+    value_stack_push_list(&vm->stack, b.as.list);
   } else {
-    PANIC("+: wrong argument kinds\n");
+    PANIC("add: wrong argument kinds\n");
   }
 
   return true;
@@ -669,7 +702,7 @@ static bool prepare_rwo_numbers(Value *a, Value *b, char *intrinsic_name, Vm *vm
 
 bool sub_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_rwo_numbers(&a, &b, "-", vm);
+  prepare_rwo_numbers(&a, &b, "sub", vm);
 
   if (a.kind == ValueKindInt)
     value_stack_push_int(&vm->stack, a.as._int - b.as._int);
@@ -681,7 +714,7 @@ bool sub_intrinsic(Vm *vm) {
 
 bool mul_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_rwo_numbers(&a, &b, "*", vm);
+  prepare_rwo_numbers(&a, &b, "mul", vm);
 
   if (a.kind == ValueKindInt)
     value_stack_push_int(&vm->stack, a.as._int * b.as._int);
@@ -693,7 +726,7 @@ bool mul_intrinsic(Vm *vm) {
 
 bool div_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_rwo_numbers(&a, &b, "/", vm);
+  prepare_rwo_numbers(&a, &b, "div", vm);
 
   if (a.kind == ValueKindInt)
     value_stack_push_int(&vm->stack, a.as._int / b.as._int);
@@ -709,7 +742,9 @@ bool mod_intrinsic(Vm *vm) {
 
   if (a.kind != ValueKindInt ||
       b.kind != ValueKindInt)
-    PANIC("%%: wrong argument kinds\n");
+    PANIC("mod: wrong argument kinds\n");
+
+  value_stack_push_int(&vm->stack, a.as._int % b.as._int);
 
   return true;
 }
@@ -787,6 +822,53 @@ bool eq_intrinsic(Vm *vm) {
   return true;
 }
 
+bool sqrt_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  if (value.kind != ValueKindFloat)
+    PANIC("sqrt: wrong argument kind\n");
+
+  value_stack_push_float(&vm->stack, sqrt(value.as._float));
+
+  return true;
+}
+
+bool pow_intrinsic(Vm *vm) {
+  Value pow = value_stack_pop(&vm->stack);
+  Value value = value_stack_pop(&vm->stack);
+  if ((value.kind != ValueKindInt &&
+       value.kind != ValueKindFloat) ||
+      pow.kind != ValueKindInt)
+    PANIC("sqrt: wrong argument kind\n");
+
+  if (value.kind == ValueKindInt) {
+    i64 result = 1;
+
+    for (u32 i = 0; i < pow.as._int; ++i)
+      result *= value.as._int;
+
+    value_stack_push_int(&vm->stack, result);
+  } else {
+    f64 result = 1;
+
+    for (u32 i = 0; i < pow.as._int; ++i)
+      result *= value.as._float;
+
+    value_stack_push_float(&vm->stack, result);
+  }
+
+  return true;
+}
+
+bool round_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  if (value.kind != ValueKindFloat)
+    PANIC("round: wrong argument kind\n");
+
+  value_stack_push_float(&vm->stack, round(value.as._float));
+
+  return true;
+}
+
 bool ne_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
@@ -807,14 +889,14 @@ bool ne_intrinsic(Vm *vm) {
            b.kind == ValueKindBool)
     value_stack_push_bool(&vm->stack, a.as._bool != b.as._bool);
   else
-    PANIC("!=: wrong argument kinds\n");
+    PANIC("ne: wrong argument kinds\n");
 
   return true;
 }
 
 bool ls_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_rwo_numbers(&a, &b, "<", vm);
+  prepare_rwo_numbers(&a, &b, "ls", vm);
 
   if (a.kind == ValueKindInt)
     value_stack_push_bool(&vm->stack, a.as._int < b.as._int);
@@ -826,7 +908,7 @@ bool ls_intrinsic(Vm *vm) {
 
 bool le_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_rwo_numbers(&a, &b, "<=", vm);
+  prepare_rwo_numbers(&a, &b, "le", vm);
 
   if (a.kind == ValueKindInt)
     value_stack_push_bool(&vm->stack, a.as._int <= b.as._int);
@@ -838,7 +920,7 @@ bool le_intrinsic(Vm *vm) {
 
 bool gt_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_rwo_numbers(&a, &b, ">", vm);
+  prepare_rwo_numbers(&a, &b, "gt", vm);
 
   if (a.kind == ValueKindInt)
     value_stack_push_bool(&vm->stack, a.as._int > b.as._int);
@@ -850,7 +932,7 @@ bool gt_intrinsic(Vm *vm) {
 
 bool ge_intrinsic(Vm *vm) {
   Value a, b;
-  prepare_rwo_numbers(&a, &b, ">=", vm);
+  prepare_rwo_numbers(&a, &b, "ge", vm);
 
   if (a.kind == ValueKindInt)
     value_stack_push_bool(&vm->stack, a.as._int >= b.as._int);
@@ -958,62 +1040,6 @@ bool logical_or_intrinsic(Vm *vm) {
   return true;
 }
 
-bool is_unit_intrinsic(Vm *vm) {
-  Value value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, value.kind == ValueKindUnit);
-
-  return true;
-}
-
-bool is_list_intrinsic(Vm *vm) {
-  Value value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, value.kind == ValueKindList);
-
-  return true;
-}
-
-bool is_string_intrinsic(Vm *vm) {
-  Value value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, value.kind == ValueKindString);
-
-  return true;
-}
-
-bool is_int_intrinsic(Vm *vm) {
-  Value value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, value.kind == ValueKindInt);
-
-  return true;
-}
-
-bool is_float_intrinsic(Vm *vm) {
-  Value value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, value.kind == ValueKindFloat);
-
-  return true;
-}
-
-bool is_bool_intrinsic(Vm *vm) {
-  Value value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, value.kind == ValueKindBool);
-
-  return true;
-}
-
-bool is_fun_intrinsic(Vm *vm) {
-  Value value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, value.kind == ValueKindFunc);
-
-  return true;
-}
-
-bool is_record_intrinsic(Vm *vm) {
-  Value value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, value.kind == ValueKindRecord);
-
-  return true;
-}
-
 bool type_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
 
@@ -1058,18 +1084,72 @@ bool type_intrinsic(Vm *vm) {
   return true;
 }
 
+bool is_unit_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindUnit);
+
+  return true;
+}
+
+bool is_list_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindList);
+
+  return true;
+}
+
+bool is_string_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindString);
+
+  return true;
+}
+
+bool is_int_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindInt);
+
+  return true;
+}
+
+bool is_float_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindFloat);
+
+  return true;
+}
+
+bool is_bool_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindBool);
+
+  return true;
+}
+
+bool is_func_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindFunc);
+
+  return true;
+}
+
+bool is_record_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindRecord);
+
+  return true;
+}
+
 Intrinsic base_intrinsics[] = {
-  // VM
-  { STR_LIT("exit"), 1, false, &exit_intrinsic },
-  { STR_LIT("eval"), 1, false, &eval_intrinsic },
   // Base
   { STR_LIT("head"), 1, true, &head_intrinsic },
   { STR_LIT("tail"), 1, true, &tail_intrinsic },
   { STR_LIT("last"), 1, true, &last_intrinsic },
   { STR_LIT("nth"), 2, true, &nth_intrinsic },
   { STR_LIT("len"), 1, true, &len_intrinsic },
-  { STR_LIT("is-empty"), 1, true, &is_empty_intrinsic },
   { STR_LIT("get-range"), 3, true, &get_range_intrinsic },
+  { STR_LIT("exit"), 1, false, &exit_intrinsic },
+  { STR_LIT("eval"), 1, false, &eval_intrinsic },
   // Functional stuff
   { STR_LIT("map"), 2, true, &map_intrinsic },
   { STR_LIT("filter"), 2, true, &filter_intrinsic },
@@ -1085,55 +1165,55 @@ Intrinsic base_intrinsics[] = {
   { STR_LIT("eat-byte-8"), 1, true, &eat_byte_8_intrinsic },
   // Conversions
   { STR_LIT("str-to-int"), 1, true, &str_to_int_intrinsic },
+  { STR_LIT("str-to-float"), 1, true, &str_to_float_intrinsic },
   { STR_LIT("int-to-str"), 1, true, &int_to_str_intrinsic },
-  { STR_LIT("bool-to-str"), 1, true, &bool_to_str_intrinsic },
+  { STR_LIT("int-to-str"), 1, true, &int_to_str_intrinsic },
   { STR_LIT("bool-to-int"), 1, true, &bool_to_int_intrinsic },
-  // TODO: floating point numbers
-  //{ STR_LIT("str-to-float"), 1, true, &str_to_float_intrinsic },
-  //{ STR_LIT("float-to-str"), 1, true, &float_to_str_intrinsics },
+  { STR_LIT("bool-to-str"), 1, true, &bool_to_str_intrinsic },
+  { STR_LIT("float-to-int"), 1, true, &int_to_str_intrinsic },
+  { STR_LIT("float-to-str"), 1, true, &int_to_str_intrinsic },
   { STR_LIT("byte-64-to-str"), 1, true, &byte_64_to_str_intrinsic },
   { STR_LIT("byte-32-to-str"), 1, true, &byte_32_to_str_intrinsic },
   { STR_LIT("byte-16-to-str"), 1, true, &byte_16_to_str_intrinsic },
   { STR_LIT("byte-8-to-str"), 1, true, &byte_8_to_str_intrinsic },
   // Math
-  { STR_LIT("+"), 2, true, &add_intrinsic },
-  { STR_LIT("-"), 2, true, &sub_intrinsic },
-  { STR_LIT("*"), 2, true, &mul_intrinsic },
-  { STR_LIT("/"), 2, true, &div_intrinsic },
-  { STR_LIT("%"), 2, true, &mod_intrinsic },
+  { STR_LIT("add"), 2, true, &add_intrinsic },
+  { STR_LIT("sub"), 2, true, &sub_intrinsic },
+  { STR_LIT("mul"), 2, true, &mul_intrinsic },
+  { STR_LIT("div"), 2, true, &div_intrinsic },
+  { STR_LIT("mod"), 2, true, &mod_intrinsic },
   // Advanced math
   { STR_LIT("abs"), 1, true, &abs_intrinsic },
   { STR_LIT("min"), 2, true, &min_intrinsic },
   { STR_LIT("max"), 2, true, &max_intrinsic },
-  // TODO: floating point numbers
-  // { STR_LIT("sqrt"), 1, true, &sqrt_intrinsic },
-  // { STR_LIT("pow"), 2, true, &pow_intrinsic },
-  // { STR_LIT("round"), 1, true, &round_intrinsic },
+  { STR_LIT("sqrt"), 1, true, &sqrt_intrinsic },
+  { STR_LIT("pow"), 2, true, &pow_intrinsic },
+  { STR_LIT("round"), 1, true, &round_intrinsic },
   // Comparisons
-  { STR_LIT("=="), 2, true, &eq_intrinsic },
-  { STR_LIT("!="), 2, true, &ne_intrinsic },
-  { STR_LIT("<"), 2, true, &ls_intrinsic },
-  { STR_LIT("<="), 2, true, &le_intrinsic },
-  { STR_LIT(">"), 2, true, &gt_intrinsic },
-  { STR_LIT(">="), 2, true, &ge_intrinsic },
+  { STR_LIT("eq"), 2, true, &eq_intrinsic },
+  { STR_LIT("ne"), 2, true, &ne_intrinsic },
+  { STR_LIT("ls"), 2, true, &ls_intrinsic },
+  { STR_LIT("le"), 2, true, &le_intrinsic },
+  { STR_LIT("gt"), 2, true, &gt_intrinsic },
+  { STR_LIT("ge"), 2, true, &ge_intrinsic },
   // Boolean
-  { STR_LIT("&"), 2, true, &and_intrinsic },
-  { STR_LIT("|"), 2, true, &or_intrinsic },
-  { STR_LIT("^"), 2, true, &xor_intrinsic },
-  { STR_LIT("!"), 1, true, &not_intrinsic },
+  { STR_LIT("and"), 2, true, &and_intrinsic },
+  { STR_LIT("or"), 2, true, &or_intrinsic },
+  { STR_LIT("xor"), 2, true, &xor_intrinsic },
+  { STR_LIT("not"), 1, true, &not_intrinsic },
   // Logical
-  { STR_LIT("&&"), 2, true, &logical_and_intrinsic },
-  { STR_LIT("||"), 2, true, &logical_or_intrinsic },
+  { STR_LIT("logical-and"), 2, true, &logical_and_intrinsic },
+  { STR_LIT("logical-or"), 2, true, &logical_or_intrinsic },
   // Types
-  { STR_LIT("unit?"), 1, true, &is_unit_intrinsic },
-  { STR_LIT("list?"), 1, true, &is_list_intrinsic },
-  { STR_LIT("string?"), 1, true, &is_string_intrinsic },
-  { STR_LIT("int?"), 1, true, &is_int_intrinsic },
-  { STR_LIT("float?"), 1, true, &is_float_intrinsic },
-  { STR_LIT("bool?"), 1, true, &is_bool_intrinsic },
-  { STR_LIT("fun?"), 1, true, &is_fun_intrinsic },
-  { STR_LIT("record?"), 1, true, &is_record_intrinsic },
   { STR_LIT("type"), 1, true, &type_intrinsic },
+  { STR_LIT("is-unit"), 1, true, &is_unit_intrinsic },
+  { STR_LIT("is-list"), 1, true, &is_list_intrinsic },
+  { STR_LIT("is-string"), 1, true, &is_string_intrinsic },
+  { STR_LIT("is-int"), 1, true, &is_int_intrinsic },
+  { STR_LIT("is-float"), 1, true, &is_float_intrinsic },
+  { STR_LIT("is-bool"), 1, true, &is_bool_intrinsic },
+  { STR_LIT("is-func"), 1, true, &is_func_intrinsic },
+  { STR_LIT("is-record"), 1, true, &is_record_intrinsic },
 };
 
 u32 base_intrinsics_len = ARRAY_LEN(base_intrinsics);

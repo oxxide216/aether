@@ -1,8 +1,10 @@
+(use '../std/base/base.ae')
+(use '../std/system/system.ae')
 (use '../std/iui/iui.ae')
 
 (let menu-size { x: 350.0 y: 250.0 })
 
-(fun main-loop [window-size]
+(let main-loop [window-size] ->
   (iui-abs-bounds
     (/ (- (field window-size x) (field menu-size x)) 2.0)
     (/ (- (field window-size y) (field menu-size y)) 2.0)
