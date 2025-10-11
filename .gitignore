@@ -1,7 +1,7 @@
-./aetherc
-./aether-vm
-./libs
-./test.ac
-./eval.ac
-./compiler-src/grammar.h
-./std/iui/include/iui/fonts
+aetherc
+aethervm
+libs
+test.ac
+eval.ac
+compiler-src/grammar.h
+std/iui/include/iui/fonts

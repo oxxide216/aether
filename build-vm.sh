@@ -27,4 +27,4 @@ if [ "$NOIUI" == "" ]; then
     std/iui/include/iui/fonts/JetBrainsMono-Regular.h
 fi
 
-cc -o aether-vm $CFLAGS $LDFLAGS $BUILD_FLAGS $SRC $LIB_SRC $IR_SRC $STD_SRC
+cc -o aethervm $CFLAGS $LDFLAGS $BUILD_FLAGS $SRC $LIB_SRC $IR_SRC $STD_SRC
