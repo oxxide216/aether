@@ -249,8 +249,11 @@ static void parser_parse_macro_def(Parser *parser) {
     next_token = parser_peek_token(parser);
   }
 
-  parser_expect_token(parser, MASK(TT_IDENT) | MASK(TT_CBRACKET));
+  parser_expect_token(parser, MASK(TT_CBRACKET));
+  parser_expect_token(parser, MASK(TT_RIGHT_ARROW));
+
   macro.body = parser_parse_block(parser, MASK(TT_CPAREN));
+
   parser_expect_token(parser, MASK(TT_CPAREN));
 
   DA_APPEND(*parser->macros, macro);
@@ -443,6 +446,41 @@ static IrExprRecord parser_parse_record(Parser *parser) {
   return record;
 }
 
+static IrExprLambda parser_parse_lambda(Parser *parser) {
+  IrExprLambda lambda = {0};
+
+  Token *arg_token;
+  while ((arg_token = parser_peek_token(parser)) &&
+         arg_token->id != TT_CBRACKET) {
+    arg_token = parser_expect_token(parser, MASK(TT_IDENT));
+    DA_APPEND(lambda.args, arg_token->lexeme);
+  }
+
+  parser_expect_token(parser, MASK(TT_CBRACKET));
+  parser_expect_token(parser, MASK(TT_RIGHT_ARROW));
+
+  if (parser_peek_token(parser)->id == TT_IMPORT) {
+    parser_next_token(parser);
+
+    Token *intrinsic_name_token = parser_expect_token(parser, MASK(TT_STR));
+    Str intrinsic_name = {
+      intrinsic_name_token->lexeme.ptr + 1,
+      intrinsic_name_token->lexeme.len - 2,
+    };
+
+    lambda.intrinsic_name = intrinsic_name;
+  } else {
+    lambda.body = parser_parse_block(parser, MASK(TT_CPAREN) |
+                                             MASK(TT_CBRACKET) |
+                                             MASK(TT_RHOMBUS));
+
+    if (parser_peek_token(parser)->id == TT_RHOMBUS)
+      parser_next_token(parser);
+  }
+
+  return lambda;
+}
+
 static char *str_to_cstr(Str str) {
   char *result = malloc((str.len + 1) * sizeof(char));
   memcpy(result, str.ptr, str.len * sizeof(char));
@@ -514,39 +552,8 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     if (token->id == TT_RIGHT_ARROW) {
       parser->index = index;
 
-      IrArgs args = {0};
-
-      Token *arg_token;
-      while ((arg_token = parser_peek_token(parser)) &&
-             arg_token->id != TT_CBRACKET) {
-        arg_token = parser_expect_token(parser, MASK(TT_IDENT));
-        DA_APPEND(args, arg_token->lexeme);
-      }
-
-      parser_expect_token(parser, MASK(TT_CBRACKET));
-      parser_expect_token(parser, MASK(TT_RIGHT_ARROW));
-
       expr->kind = IrExprKindLambda;
-      expr->as.lambda.args = args;
-
-      if (parser_peek_token(parser)->id == TT_IMPORT) {
-        parser_next_token(parser);
-
-        Token *intrinsic_name_token = parser_expect_token(parser, MASK(TT_STR));
-        Str intrinsic_name = {
-          intrinsic_name_token->lexeme.ptr + 1,
-          intrinsic_name_token->lexeme.len - 2,
-        };
-
-        expr->as.lambda.intrinsic_name = intrinsic_name;
-      } else {
-        expr->as.lambda.body = parser_parse_block(parser, MASK(TT_CPAREN) |
-                                                          MASK(TT_CBRACKET) |
-                                                          MASK(TT_RHOMBUS));
-
-        if (parser_peek_token(parser)->id == TT_RHOMBUS)
-          parser_next_token(parser);
-      }
+      expr->as.lambda = parser_parse_lambda(parser);
     } else {
       expr->kind = IrExprKindList;
       expr->as.list.content = block;

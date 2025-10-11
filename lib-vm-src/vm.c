@@ -172,7 +172,7 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values,
 
     Var *var = get_var(vm, expr->as.ident.ident);
     if (!var) {
-      ERROR("Variable "STR_FMT" was not defined before usage\n",
+      ERROR("Symbol "STR_FMT" was not defined before usage\n",
             STR_ARG(expr->as.ident.ident));
       vm->exit_code = 1;
       return;

@@ -1,25 +1,26 @@
 (let iui-main-loop [title width height body] -> import 'iui-main-loop')
-(let iui-vbox [margin-x margin-y spacing body] -> import 'iui-vbox')
-(let iui-hbox [margin-x margin-y spacing body] -> import 'iui-hbox')
-(let iui-button [text on-click] -> import 'iui-button')
-(let iui-text [title center-x center-y left-padding] -> import 'iui-text')
-(let iui-input [placeholder left-padding on-submit] -> import 'iui-input')
 (let iui-abs-bounds [x y width height] -> import 'iui-abs-bounds')
 
-(macro iui-vbox [margin-x margin-y spacing ...body]
-  (iui-vbox margin-x margin-y spacing [] -> body))
+(let -iui-vbox [margin-x margin-y spacing body] -> import 'iui-vbox')
+(let -iui-hbox [margin-x margin-y spacing body] -> import 'iui-hbox')
+(let -iui-button [text on-click] -> import 'iui-button')
+(let -iui-text [title center-x center-y left-padding] -> import 'iui-text')
+(let -iui-input [placeholder left-padding on-submit] -> import 'iui-input')
 
-(macro iui-hbox [margin-x margin-y spacing ...body]
-  (iui-hbox margin-x margin-y spacing [] -> body))
+(macro iui-vbox [margin-x margin-y spacing ...body] ->
+  (-iui-vbox margin-x margin-y spacing [] -> body))
 
-(macro iui-button [text ...body]
-  (iui-button text [] -> body))
+(macro iui-hbox [margin-x margin-y spacing ...body] ->
+  (-iui-hbox margin-x margin-y spacing [] -> body))
 
-(macro iui-text [text]
-  (iui-text text false true 10.0))
+(macro iui-button [text ...body] ->
+  (-iui-button text [] -> body))
 
-(macro iui-header [text]
-  (iui-text text true true 10.0))
+(macro iui-text [text] ->
+  (-iui-text text false true 10.0))
 
-(macro iui-input [placeholder ...body]
-  (iui-input placeholder 5.0 [content] -> body))
+(macro iui-header [text] ->
+  (-iui-text text true true 10.0))
+
+(macro iui-input [placeholder ...body] ->
+  (-iui-input placeholder 5.0 [content] -> body))
