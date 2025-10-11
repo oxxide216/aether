@@ -1,0 +1,76 @@
+#include "io.h"
+#include "aether-compiler/compiler.h"
+#include "aether-vm/vm.h"
+#include "aether-ir/serializer.h"
+#include "aether-ir/deserializer.h"
+#include "shl_defs.h"
+#include "shl_log.h"
+#define SHL_ARENA_IMPLEMENTATION
+#include "shl_arena.h"
+#define SHL_STR_IMPLEMENTATION
+#include "shl_str.h"
+
+typedef struct {
+  bool  compile_only;
+  char *compiled_path;
+  bool  load_from_file;
+} Config;
+
+Config parse_args(i32 argc, char **argv) {
+  Config config = {0};
+
+  for (u32 i = 0; i < (u32) argc; ++i) {
+    if (strcmp(argv[i], "-c") == 0) {
+      config.compile_only = true;
+      if (i + 1 < (u32) argc) {
+        config.compiled_path = argv[++i];
+      } else {
+        ERROR("Flag %s requires an argument\n", argv[i]);
+        exit(1);
+      }
+    } else if (strcmp(argv[i], "-l") == 0) {
+      config.load_from_file = true;
+    } else {
+      ERROR("Unknown flag %s\n", argv[i]);
+      exit(1);
+    }
+  }
+
+  return config;
+}
+
+int main(i32 argc, char **argv) {
+  if (argc < 2) {
+    ERROR("Input file was not provided\n");
+    exit(1);
+  }
+
+  Config config = parse_args(argc - 2, argv + 2);
+
+  char *input_file_path = argv[1];
+  Str code = read_file(input_file_path);
+  if (code.len == (u32) -1) {
+    ERROR("Could not open input file %s\n", input_file_path);
+    exit(1);
+  }
+
+  RcArena rc_arena = {0};
+  Ir ir;
+
+  if (config.load_from_file)
+    ir = deserialize((u8 *) code.ptr, code.len, &rc_arena);
+  else
+    ir = parse(code, input_file_path);
+
+  if (config.compile_only) {
+    Str bytecode = {0};
+    bytecode.ptr = (char *) serialize(&ir, &bytecode.len);
+    write_file(config.compiled_path, bytecode);
+
+    return 0;
+  }
+
+  Intrinsics intrinsics = {0};
+
+  return execute(&ir, argc, argv, &rc_arena, &intrinsics);
+}

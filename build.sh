@@ -1,11 +1,16 @@
 #!/usr/bin/sh
 
-CFLAGS="-Wall -Wextra -Ilib-vm-include -Iir-include -Istd/base/include"
+# Compiler
+CFLAGS="-Wall -Wextra -Icompiler-lib-include -Ivm-lib-include -Iir-include \
+        -Ilibs -Istd/base/include"
 LDFLAGS="-z execstack"
 BUILD_FLAGS="${@:1}"
-SRC="$(find vm-src -name "*.c")"
-IR_SRC="$(find ir-src -name "*.c" -not -name "serializer.*")"
-LIB_SRC="$(find lib-vm-src -name "*.c" -not -name "io.c")"
+SRC="$(find src -name "*.c")"
+COMPILER_SRC="$(find compiler-lib-src -name "*.c")"
+VM_SRC="$(find vm-lib-src -name "*.c")"
+IR_SRC="$(find ir-src -name "*.c")"
+LEXGEN_RUNTIME_SRC="$(find libs/lexgen/runtime-src -name "*.c")"
+LIB_SRC=""
 STD_SRC="$(find std/base/src -name "*.c")"
 
 if [ "$NOSYSTEM" == "" ]; then
@@ -27,4 +32,6 @@ if [ "$NOIUI" == "" ]; then
     std/iui/include/iui/fonts/JetBrainsMono-Regular.h
 fi
 
-cc -o aethervm $CFLAGS $LDFLAGS $BUILD_FLAGS $SRC $LIB_SRC $IR_SRC $STD_SRC
+lexgen compiler-src/grammar.h compiler-src/grammar.lg
+cc -o aether $CFLAGS $LDFLAGS $BUILD_FLAGS $SRC $COMPILER_SRC $VM_SRC \
+             $IR_SRC $LEXGEN_RUNTIME_SRC $LIB_SRC $STD_SRC
