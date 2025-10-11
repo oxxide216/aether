@@ -942,7 +942,7 @@ bool ge_intrinsic(Vm *vm) {
   return true;
 }
 
-static bool value_to_bool(Value *value, char *intrinsic_name, Vm *vm) {
+static bool value_to_bool(Value *value, char *intrinsic_name) {
   if (value->kind == ValueKindUnit)
     return false;
   else if (value->kind == ValueKindList)
@@ -1011,7 +1011,7 @@ bool xor_intrinsic(Vm *vm) {
 bool not_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
 
-  value_stack_push_bool(&vm->stack, !value_to_bool(&value, "not", vm));
+  value_stack_push_bool(&vm->stack, !value_to_bool(&value, "not"));
 
   return true;
 }
@@ -1020,10 +1020,10 @@ bool logical_and_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
-  if (!value_to_bool(&a, "&&", vm))
+  if (!value_to_bool(&a, "&&"))
     value_stack_push_bool(&vm->stack, false);
   else
-    value_stack_push_bool(&vm->stack, value_to_bool(&b, "&&", vm));
+    value_stack_push_bool(&vm->stack, value_to_bool(&b, "&&"));
 
   return true;
 }
@@ -1032,10 +1032,10 @@ bool logical_or_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
-  if (value_to_bool(&a, "||", vm))
+  if (value_to_bool(&a, "||"))
     value_stack_push_bool(&vm->stack, true);
   else
-    value_stack_push_bool(&vm->stack, value_to_bool(&b, "||", vm));
+    value_stack_push_bool(&vm->stack, value_to_bool(&b, "||"));
 
   return true;
 }

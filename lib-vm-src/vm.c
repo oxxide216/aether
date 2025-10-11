@@ -201,7 +201,7 @@ static void catch_vars_block(Vm *vm, Strs *local_names, NamedValues *catched_val
     catch_vars(vm, local_names, catched_values, block->items[i]);
 }
 
-Intrinsic *get_intrinsic(Vm *vm, Str name) {
+static Intrinsic *get_intrinsic(Vm *vm, Str name) {
   for (u32 i = 0; i < vm->intrinsics.len; ++i)
     if (str_eq(vm->intrinsics.items[i].name, name))
       return vm->intrinsics.items + i;

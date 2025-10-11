@@ -281,10 +281,7 @@ bool list_directory_intrinsic(Vm *vm) {
 
       LL_PREPEND(list, list_end, ListNode);
       list_end->value.kind = ValueKindString;
-      list_end->value.as.string = (ValueStr) {
-        path,
-        (Str *) path.ptr,
-      };
+      list_end->value.as.string = (ValueString) { path, (Str *) path.ptr };
     }
     closedir(dir);
   }

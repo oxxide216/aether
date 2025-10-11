@@ -1,0 +1,156 @@
+#ifndef AETHER_VM
+#define AETHER_VM
+
+#include "aether-ir/ir.h"
+#include "aether-ir/rc-arena.h"
+#include "shl_defs.h"
+#include "shl_str.h"
+#include "shl_log.h"
+
+#define EXECUTE_FUNC(vm, func, value_expected)                \
+  do {                                                        \
+    ExecState state = execute_func(vm, func, value_expected); \
+    if (state != ExecStateContinue)                           \
+      return state;                                           \
+  } while (0)
+
+#define EXECUTE_EXPR(vm, expr, value_expected)                \
+  do {                                                        \
+    ExecState state = execute_expr(vm, expr, value_expected); \
+    if (state != ExecStateContinue)                           \
+      return state;                                           \
+  } while (0)
+
+#define EXECUTE_BLOCK(vm, block, value_expected)                \
+  do {                                                          \
+    ExecState state = execute_block(vm, block, value_expected); \
+    if (state != ExecStateContinue)                             \
+      return state;                                             \
+  } while (0)
+
+#define PANIC(...)      \
+  do {                  \
+    ERROR(__VA_ARGS__); \
+    return false;       \
+  } while(0)
+
+typedef enum {
+  ValueKindUnit = 0,
+  ValueKindList,
+  ValueKindString,
+  ValueKindInt,
+  ValueKindFloat,
+  ValueKindBool,
+  ValueKindRecord,
+  ValueKindFunc,
+} ValueKind;
+
+typedef struct {
+  Str  str;
+  Str *begin;
+} ValueString;
+
+typedef struct ListNode ListNode;
+
+typedef struct NamedValue NamedValue;
+
+typedef Da(NamedValue) NamedValues;
+
+typedef NamedValues Record;
+
+typedef struct {
+  IrArgs      args;
+  IrBlock     body;
+  NamedValues catched_values;
+  Str         intrinsic_name;
+} ValueFunc;
+
+typedef union {
+  ListNode    *list;
+  ValueString  string;
+  i64          _int;
+  f64          _float;
+  bool         _bool;
+  Record       record;
+  ValueFunc    func;
+} ValueAs;
+
+typedef struct {
+  ValueKind kind;
+  ValueAs   as;
+} Value;
+
+struct ListNode {
+  Value     value;
+  bool      is_static;
+  ListNode *next;
+};
+
+struct NamedValue {
+  Str   name;
+  Value value;
+};
+
+typedef enum {
+  ExecStateContinue = 0,
+  ExecStateReturn,
+  ExecStateExit,
+} ExecState;
+
+typedef struct Vm Vm;
+
+typedef Da(Value) ValueStack;
+
+typedef struct {
+  Str   name;
+  Value value;
+} Var;
+
+typedef Da(Var) Vars;
+
+typedef bool (*IntrinsicFunc)(Vm *vm);
+
+typedef struct {
+  Str           name;
+  u32           args_count;
+  bool          has_return_value;
+  IntrinsicFunc func;
+} Intrinsic;
+
+typedef Da(Intrinsic) Intrinsics;
+
+struct Vm {
+  ValueStack  stack;
+  Vars        global_vars;
+  Vars        local_vars;
+  Intrinsics  intrinsics;
+  RcArena    *rc_arena;
+  ListNode   *args;
+  i64         exit_code;
+  bool        is_inside_of_func;
+  ValueFunc   current_func_value;
+};
+
+void      list_use(RcArena *rc_arena, ListNode *list);
+ListNode *list_clone(RcArena *rc_arena, ListNode *list);
+
+void value_stack_push_unit(ValueStack *stack);
+void value_stack_push_list(ValueStack *stack, ListNode *list);
+void value_stack_push_string(ValueStack *stack, Str string);
+void value_stack_push_int(ValueStack *stack, i64 _int);
+void value_stack_push_float(ValueStack *stack, f64 _float);
+void value_stack_push_bool(ValueStack *stack, bool _bool);
+void value_stack_push_record(ValueStack *stack, Record record);
+void value_stack_push_func(ValueStack *stack, ValueFunc func);
+
+Value value_stack_pop(ValueStack *stack);
+Value *value_stack_get(ValueStack *stack, u32 index);
+
+void free_value(Value *value, RcArena *rc_arena);
+
+ExecState execute_func(Vm *vm, ValueFunc *func, bool value_expected);
+ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected);
+ExecState execute_block(Vm *vm, IrBlock *block, bool value_expected);
+u32       execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena, Intrinsics *intrinsics);
+
+#endif // AETHER_VM
