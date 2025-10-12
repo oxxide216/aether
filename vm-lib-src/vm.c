@@ -210,6 +210,11 @@ static Intrinsic *get_intrinsic(Vm *vm, Str name) {
 }
 
 ExecState execute_func(Vm *vm, ValueFunc *func, bool value_expected) {
+  if (vm->stack.len < func->args.len) {
+    ERROR("Not enough values on the stack for function call\n");
+    exit(1);
+  }
+
   if (func->intrinsic_name.len > 0) {
     Intrinsic *intrinsic = get_intrinsic(vm, func->intrinsic_name);
     if (!intrinsic) {
