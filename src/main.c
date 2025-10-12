@@ -1,5 +1,5 @@
 #include "io.h"
-#include "aether-compiler/compiler.h"
+#include "aether-compiler/parser.h"
 #include "aether-vm/vm.h"
 #include "aether-ir/serializer.h"
 #include "aether-ir/deserializer.h"

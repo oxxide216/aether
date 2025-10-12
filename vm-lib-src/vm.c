@@ -407,7 +407,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   case IrExprKindSet: {
     Var *var = get_var(vm, expr->as.set.dest);
     if (!var) {
-      ERROR("Variable "STR_FMT" was not defined before usage\n",
+      ERROR("Symbol "STR_FMT" was not defined before usage\n",
             STR_ARG(expr->as.set.dest));
       vm->exit_code = 1;
       return ExecStateExit;

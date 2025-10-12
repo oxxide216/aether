@@ -1,7 +1,7 @@
 #include <math.h>
 
 #include "base/intrinsics.h"
-#include "aether-ir/deserializer.h"
+#include "aether-compiler/parser.h"
 
 bool head_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
@@ -153,13 +153,11 @@ bool exit_intrinsic(Vm *vm) {
 }
 
 bool eval_intrinsic(Vm *vm) {
-  Value bytecode = value_stack_pop(&vm->stack);
-  if (bytecode.kind != ValueKindString)
+  Value code = value_stack_pop(&vm->stack);
+  if (code.kind != ValueKindString)
     PANIC("eval: wrong argument kind\n");
 
-  Ir ir = deserialize((u8 *) bytecode.as.string.str.ptr,
-                      bytecode.as.string.str.len,
-                      vm->rc_arena);
+  Ir ir = parse(code.as.string.str, "eval");
 
   i32 argc = 1;
   char *argv[] = { "eval", NULL };
@@ -355,7 +353,7 @@ bool join_intrinsic(Vm *vm) {
       sb_push_str(&sb, filler.as.string.str);
 
     if (node->value.kind != ValueKindString)
-      PANIC("join: wrong part kinds: %u\n", node->value.kind);
+      PANIC("join: wrong part kinds\n");
 
     sb_push_str(&sb, node->value.as.string.str);
 
