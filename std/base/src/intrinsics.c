@@ -2,6 +2,7 @@
 
 #include "base/intrinsics.h"
 #include "aether-compiler/parser.h"
+#include "aether-ir/deserializer.h"
 
 bool head_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
@@ -158,6 +159,23 @@ bool eval_intrinsic(Vm *vm) {
     PANIC("eval: wrong argument kind\n");
 
   Ir ir = parse(code.as.string.str, "eval");
+
+  i32 argc = 1;
+  char *argv[] = { "eval", NULL };
+  Intrinsics intrinsics = {0};
+  execute(&ir, argc, argv, vm->rc_arena, &intrinsics);
+
+  return true;
+}
+
+bool eval_bytes_intrinsic(Vm *vm) {
+  Value bytecode = value_stack_pop(&vm->stack);
+  if (bytecode.kind != ValueKindString)
+    PANIC("eval-bytes: wrong argument kind\n");
+
+  Ir ir = deserialize((u8 *) bytecode.as.string.str.ptr,
+                       bytecode.as.string.str.len,
+                       vm->rc_arena);
 
   i32 argc = 1;
   char *argv[] = { "eval", NULL };
@@ -1148,6 +1166,7 @@ Intrinsic base_intrinsics[] = {
   { STR_LIT("get-range"), 3, true, &get_range_intrinsic },
   { STR_LIT("exit"), 1, false, &exit_intrinsic },
   { STR_LIT("eval"), 1, false, &eval_intrinsic },
+  { STR_LIT("eval-bytes"), 1, false, &eval_bytes_intrinsic },
   // Functional stuff
   { STR_LIT("map"), 2, true, &map_intrinsic },
   { STR_LIT("filter"), 2, true, &filter_intrinsic },

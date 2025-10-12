@@ -7,7 +7,8 @@
 (let is-empty [list] -> import 'is-empty')
 (let get-range [list begin end] -> import 'get-range')
 (let exit [exit-code] -> import 'exit')
-(let eval [byte-code] -> import 'eval')
+(let eval [code] -> import 'eval')
+(let eval-bytes [byte-code] -> import 'eval-bytes')
 
 ;; Functional stuff
 (let map [func list] -> import 'map')
