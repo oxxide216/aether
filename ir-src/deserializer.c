@@ -116,6 +116,10 @@ static void get_expr_data_size(u8 *data, u32 *size) {
 
     get_str_data_size(data, size);
   } break;
+
+  case IrExprKindSelfCall: {
+    get_block_data_size(data, size);
+  } break;
   }
 }
 
@@ -283,6 +287,10 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
       load_str_data(&expr->as.record.items[i].name, data, end, rc_arena);
       load_expr_data(expr->as.record.items[i].expr, data, end, rc_arena);
     }
+  } break;
+
+  case IrExprKindSelfCall: {
+    load_block_data(&expr->as.self_call.args, data, end, rc_arena);
   } break;
   }
 }

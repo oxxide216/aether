@@ -25,6 +25,7 @@ typedef enum {
   IrExprKindLambda,
   IrExprKindRecord,
   IrExprKindRet,
+  IrExprKindSelfCall,
 } IrExprKind;
 
 typedef Da(Str) IrArgs;
@@ -113,6 +114,10 @@ typedef struct {
   IrExpr *expr;
 } IrExprRet;
 
+typedef struct {
+  IrBlock  args;
+} IrExprSelfCall;
+
 typedef union {
   IrBlock        block;
   IrExprFuncCall func_call;
@@ -130,6 +135,7 @@ typedef union {
   IrExprLambda   lambda;
   IrExprRecord   record;
   IrExprRet      ret;
+  IrExprSelfCall self_call;
 } IrExprAs;
 
 struct IrExpr {

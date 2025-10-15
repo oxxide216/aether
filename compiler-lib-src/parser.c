@@ -1,4 +1,4 @@
-#include "parser.h"
+#include "aether-compiler/parser.h"
 #include "io.h"
 #include "lexgen/runtime-src/runtime.h"
 #define LEXGEN_TRANSITION_TABLE_IMPLEMENTATION
@@ -37,6 +37,7 @@ typedef struct {
   Tokens  tokens;
   u32     index;
   Macros *macros;
+  char   *file_path;
   Ir      ir;
 } Parser;
 
@@ -194,7 +195,7 @@ static void print_id_mask(u64 id_mask) {
 static Token *parser_expect_token(Parser *parser, u64 id_mask) {
   Token *token = parser_next_token(parser);
   if (!token) {
-    PERROR("%s: ", "Expected ", token->file_path);
+    PERROR("%s: ", "Expected ", parser->file_path);
     print_id_mask(id_mask);
     fprintf(stderr, ", but got EOF\n");
     exit(1);
@@ -219,6 +220,7 @@ Ir parse_with_macros(Str code, char *file_path, Macros *macros) {
 
   parser.tokens = lex(code, file_path);
   parser.macros = macros;
+  parser.file_path = file_path;
   parser.ir = parser_parse_block(&parser, 0);
 
   return parser.ir;
@@ -226,8 +228,6 @@ Ir parse_with_macros(Str code, char *file_path, Macros *macros) {
 
 static void parser_parse_macro_def(Parser *parser) {
   Macro macro = {0};
-
-  parser_expect_token(parser, MASK(TT_MACRO));
 
   Token *name_token = parser_expect_token(parser, MASK(TT_IDENT));
   macro.name = name_token->lexeme;
@@ -366,6 +366,11 @@ static void macro_body_expand(IrExpr **expr, Macro *macro,
     for (u32 i = 0; new_expr->as.record.len; ++i)
       macro_body_expand(&new_expr->as.record.items[i].expr, macro, args, NULL);
   } break;
+
+  case IrExprKindSelfCall: {
+    for (u32 i = 0; new_expr->as.self_call.args.len; ++i)
+      macro_body_expand(&new_expr->as.self_call.args.items[i], macro, args, NULL);
+  } break;
   }
 }
 
@@ -378,32 +383,27 @@ static void macro_body_expand_block(IrBlock *block, Macro *macro, IrBlock *args)
     macro_body_expand(block->items + i, macro, args, block);
 }
 
-static IrBlock parser_parse_macro_expand(Parser *parser, bool *found) {
-  Token *name_token = parser_expect_token(parser, MASK(TT_IDENT) |
-                                                  MASK(TT_DOUBLE_ARROW));
-  Str name = name_token->lexeme;
-
-  IrBlock args = parser_parse_block(parser, MASK(TT_CPAREN));
-
-  parser_expect_token(parser, MASK(TT_CPAREN));
-
-  if (name_token->id == TT_DOUBLE_ARROW)
-    return args;
-
-  Macro *macro = NULL;
-
+static Macro *get_macro(Parser *parser, Str name, u32 args_len) {
   for (u32 i = 0; i < parser->macros->len; ++i) {
-    Macro *temp_macro = parser->macros->items + i;
+    Macro *macro = parser->macros->items + i;
 
-    if (str_eq(temp_macro->name, name) &&
-        (temp_macro->args.len == args.len ||
-         (temp_macro->args.len <= args.len &&
-          temp_macro->has_unpack))) {
-      macro = temp_macro;
-      break;
-    }
+    if (str_eq(macro->name, name) &&
+        (macro->args.len == args_len ||
+         (macro->args.len <= args_len &&
+          macro->has_unpack)))
+      return macro;
   }
 
+  return NULL;
+}
+
+static IrBlock parser_parse_macro_expand(Parser *parser, bool *found) {
+  Token *name_token = parser_expect_token(parser, MASK(TT_IDENT));
+  IrBlock args = parser_parse_block(parser, MASK(TT_CPAREN));
+  parser_expect_token(parser, MASK(TT_CPAREN));
+
+  Str name = name_token->lexeme;
+  Macro *macro = get_macro(parser, name, args.len);
   *found = macro != NULL;
   if (!*found)
     return args;
@@ -449,17 +449,18 @@ static IrExprRecord parser_parse_record(Parser *parser) {
 static IrExprLambda parser_parse_lambda(Parser *parser) {
   IrExprLambda lambda = {0};
 
-  Token *arg_token;
-  while ((arg_token = parser_peek_token(parser)) &&
-         arg_token->id != TT_CBRACKET) {
-    arg_token = parser_expect_token(parser, MASK(TT_IDENT));
+  Token *arg_token = parser_expect_token(parser, MASK(TT_IDENT) |
+                                                 MASK(TT_CBRACKET));
+  while (arg_token->id != TT_CBRACKET) {
     DA_APPEND(lambda.args, arg_token->lexeme);
+    arg_token = parser_expect_token(parser, MASK(TT_IDENT) |
+                                            MASK(TT_CBRACKET));
   }
 
-  parser_expect_token(parser, MASK(TT_CBRACKET));
   parser_expect_token(parser, MASK(TT_RIGHT_ARROW));
 
-  if (parser_peek_token(parser)->id == TT_IMPORT) {
+  Token *token = parser_peek_token(parser);
+  if (token && token->id == TT_IMPORT) {
     parser_next_token(parser);
 
     Token *intrinsic_name_token = parser_expect_token(parser, MASK(TT_STR));
@@ -474,7 +475,8 @@ static IrExprLambda parser_parse_lambda(Parser *parser) {
                                              MASK(TT_CBRACKET) |
                                              MASK(TT_RHOMBUS));
 
-    if (parser_peek_token(parser)->id == TT_RHOMBUS)
+    token = parser_peek_token(parser);
+    if (token && token->id == TT_RHOMBUS)
       parser_next_token(parser);
   }
 
@@ -501,48 +503,49 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   IrExpr *expr = aalloc(sizeof(IrExpr));
   *expr = (IrExpr) {0};
 
-  Token *token = parser_expect_token(parser, MASK(TT_OPAREN) | MASK(TT_OBRACKET) |
-                                             MASK(TT_STR) | MASK(TT_IDENT) |
-                                             MASK(TT_INT) | MASK(TT_FLOAT) |
-                                             MASK(TT_BOOL) | MASK(TT_OCURLY));
+  Token *token = parser_expect_token(parser, MASK(TT_OPAREN) | MASK(TT_STR) |
+                                             MASK(TT_IDENT) | MASK(TT_INT) |
+                                             MASK(TT_FLOAT) | MASK(TT_BOOL) |
+                                             MASK(TT_OCURLY) | MASK(TT_OBRACKET));
 
-  if (token->id == TT_STR) {
+  switch (token->id) {
+  case TT_STR: {
     expr->kind = IrExprKindString;
     expr->as.string.lit = STR(token->lexeme.ptr + 1,
                               token->lexeme.len - 2);
 
     return expr;
-  }
+  } break;
 
-  if (token->id == TT_IDENT) {
+  case TT_IDENT: {
     expr->kind = IrExprKindIdent;
     expr->as.ident.ident = token->lexeme;
 
     return expr;
-  }
+  } break;
 
-  if (token->id == TT_INT) {
+  case TT_INT: {
     expr->kind = IrExprKindInt;
     expr->as._int._int = str_to_i64(token->lexeme);
 
     return expr;
-  }
+  } break;
 
-  if (token->id == TT_FLOAT) {
+  case TT_FLOAT: {
     expr->kind = IrExprKindFloat;
     expr->as._float._float = str_to_f64(token->lexeme);
 
     return expr;
-  }
+  } break;
 
-  if (token->id == TT_BOOL) {
+  case TT_BOOL: {
     expr->kind = IrExprKindBool;
     expr->as._bool._bool = str_eq(token->lexeme, STR_LIT("true"));
 
     return expr;
-  }
+  } break;
 
-  if (token->id == TT_OBRACKET) {
+  case TT_OBRACKET: {
     u32 index = parser->index;
 
     IrBlock block = parser_parse_block(parser, MASK(TT_CBRACKET));
@@ -560,19 +563,22 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     }
 
     return expr;
-  }
+  } break;
 
-  if (token->id == TT_OCURLY) {
+  case TT_OCURLY: {
     expr->kind = IrExprKindRecord;
     expr->as.record = parser_parse_record(parser);
 
     return expr;
+  } break;
   }
 
   token = parser_peek_token(parser);
+
   switch (token->id) {
   case TT_LET: {
     parser_next_token(parser);
+
     Token *name_token = parser_expect_token(parser, MASK(TT_IDENT));
 
     expr->kind = IrExprKindVarDef;
@@ -616,12 +622,9 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     }
   } break;
 
-  case TT_BOOL: {
-    expr->kind = IrExprKindBool;
-    expr->as._bool._bool = str_eq(token->lexeme, STR_LIT("true"));
-  } break;
-
   case TT_MACRO: {
+    parser_next_token(parser);
+
     parser_parse_macro_def(parser);
 
     return NULL;
@@ -706,8 +709,21 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   } break;
 
   default: {
-    if (token->id == TT_IDENT) {
-      u32 prev_index = parser->index;
+    token = parser_peek_token(parser);
+
+    if (token && token->id == TT_DOUBLE_ARROW) {
+      parser_next_token(parser);
+
+      expr->kind = IrExprKindSelfCall;
+      expr->as.self_call.args = parser_parse_block(parser, MASK(TT_CPAREN));
+
+      parser_expect_token(parser, MASK(TT_CPAREN));
+
+      break;
+    }
+
+    if (token && token->id == TT_IDENT) {
+      u32 prev_parser_index = parser->index;
       bool found_macro = false;
       IrBlock args = parser_parse_macro_expand(parser, &found_macro);
 
@@ -718,7 +734,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
         break;
       }
 
-      parser->index = prev_index;
+      parser->index = prev_parser_index;
     }
 
     expr->kind = IrExprKindFuncCall;

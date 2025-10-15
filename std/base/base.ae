@@ -76,10 +76,15 @@
 (let type [value] -> import 'type')
 (let unit? [value] -> import 'is-unit')
 (let list? [value] -> import 'is-list')
-(let str? [value] -> import 'is-str')
-(let int? [value] -> import 'it-int')
+(let str? [value] -> import 'is-string')
+(let int? [value] -> import 'is-int')
 (let float? [value] -> import 'is-float')
 (let bool? [value] -> import 'is-bool')
-(let is-func [value] -> import 'is-func')
-(let is-record [value] -> import 'is-record')
+(let func? [value] -> import 'is-func')
+(let record? [value] -> import 'is-record')
 
+(let for [list body] ->
+  ([rest] ->
+    (if (> (len rest) 0)
+      (body)
+      (<-> (tail rest)))))

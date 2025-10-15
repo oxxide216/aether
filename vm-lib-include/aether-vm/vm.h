@@ -104,6 +104,7 @@ typedef Da(Value) ValueStack;
 typedef struct {
   Str   name;
   Value value;
+  bool  is_global;
 } Var;
 
 typedef Da(Var) Vars;

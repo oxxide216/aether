@@ -20,7 +20,7 @@ typedef struct {
 Config parse_args(i32 argc, char **argv) {
   Config config = {0};
 
-  for (u32 i = 0; i < (u32) argc; ++i) {
+  for (u32 i = 1; i < (u32) argc; ++i) {
     config.flags_end = i;
     if (argv[i][0] != '-')
       break;
@@ -50,9 +50,9 @@ int main(i32 argc, char **argv) {
     exit(1);
   }
 
-  Config config = parse_args(argc - 1, argv + 1);
+  Config config = parse_args(argc, argv);
 
-  char *input_file_path = argv[config.flags_end + 1];
+  char *input_file_path = argv[config.flags_end];
   Str code = read_file(input_file_path);
   if (code.len == (u32) -1) {
     ERROR("Could not open input file %s\n", input_file_path);
@@ -77,7 +77,5 @@ int main(i32 argc, char **argv) {
 
   Intrinsics intrinsics = {0};
 
-  return execute(&ir, config.flags_end + 1,
-                 argv + config.flags_end + 1,
-                 &rc_arena, &intrinsics);
+  return execute(&ir, argc, argv, &rc_arena, &intrinsics);
 }

@@ -682,20 +682,24 @@ bool add_intrinsic(Vm *vm) {
 
     value_stack_push_list(&vm->stack, new_list);
   } else if (a.kind == ValueKindList) {
-    ListNode *node = a.as.list;
+    ListNode *new_list = list_clone(vm->rc_arena, a.as.list);
+    ListNode *node = new_list;
+
     while (node && node->next)
       node = node->next;
 
     node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
     node->next->value = b;
+    node->next->next = NULL;
 
-    value_stack_push_list(&vm->stack, a.as.list);
+    value_stack_push_list(&vm->stack, new_list);
   } else if (b.kind == ValueKindList) {
-    ListNode *next = b.as.list->next;
+    ListNode *new_list = list_clone(vm->rc_arena, b.as.list);
+    ListNode *next = new_list->next;
 
-    b.as.list->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-    b.as.list->next->value = a;
-    b.as.list->next->next = next;
+    new_list->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+    new_list->next->value = a;
+    new_list->next->next = next;
 
     value_stack_push_list(&vm->stack, b.as.list);
   } else {
@@ -1085,7 +1089,7 @@ bool type_intrinsic(Vm *vm) {
   } break;
 
   case ValueKindFunc: {
-    value_stack_push_string(&vm->stack, STR_LIT("fun"));
+    value_stack_push_string(&vm->stack, STR_LIT("func"));
   } break;
 
   case ValueKindRecord: {

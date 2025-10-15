@@ -178,19 +178,26 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values,
       return;
     }
 
-    NamedValue value = { var->name, var->value };
-    DA_APPEND(*catched_values, value);
+    if (!var->is_global) {
+      NamedValue value = { var->name, var->value };
+      DA_APPEND(*catched_values, value);
+    }
   } break;
 
   case IrExprKindString: break;
-  case IrExprKindInt: break;
-  case IrExprKindFloat: break;
-  case IrExprKindBool:  break;
+  case IrExprKindInt:    break;
+  case IrExprKindFloat:  break;
+  case IrExprKindBool:   break;
   case IrExprKindLambda: break;
 
   case IrExprKindRecord: {
     for (u32 i = 0; i < expr->as.record.len; ++i)
       catch_vars(vm, local_names, catched_values, expr->as.record.items[i].expr);
+  } break;
+
+  case IrExprKindSelfCall: {
+    for (u32 i = 0; i < expr->as.self_call.args.len; ++i)
+      catch_vars(vm, local_names, catched_values, expr->as.self_call.args.items[i]);
   } break;
   }
 }
@@ -247,6 +254,7 @@ ExecState execute_func(Vm *vm, ValueFunc *func, bool value_expected) {
     Var var = {
       func->args.items[i],
       vm->stack.items[vm->stack.len - func->args.len + i],
+      false,
     };
 
     DA_APPEND(vm->local_vars, var);
@@ -256,6 +264,7 @@ ExecState execute_func(Vm *vm, ValueFunc *func, bool value_expected) {
     Var var = {
       func->catched_values.items[i].name,
       func->catched_values.items[i].value,
+      false,
     };
 
     DA_APPEND(vm->local_vars, var);
@@ -319,11 +328,12 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Var var = {0};
     var.name = expr->as.var_def.name;
     var.value = value_stack_pop(&vm->stack);
+    var.is_global = !vm->is_inside_of_func;
 
-    if (vm->is_inside_of_func)
-      DA_APPEND(vm->local_vars, var);
-    else
+    if (var.is_global)
       DA_APPEND(vm->global_vars, var);
+    else
+      DA_APPEND(vm->local_vars, var);
 
     if (value_expected)
       value_stack_push_unit(&vm->stack);
@@ -413,8 +423,8 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       return ExecStateExit;
     }
 
-    EXECUTE_EXPR(vm, expr->as.set.src, true);
     free_value(&var->value, vm->rc_arena);
+    EXECUTE_EXPR(vm, expr->as.set.src, true);
     var->value = value_stack_pop(&vm->stack);
 
     if (value_expected)
@@ -575,6 +585,13 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     }
 
     value_stack_push_record(&vm->stack, record);
+  } break;
+
+  case IrExprKindSelfCall: {
+    for (u32 i = 0; i < expr->as.self_call.args.len; ++i)
+      EXECUTE_EXPR(vm, expr->as.self_call.args.items[i], true);
+
+    EXECUTE_FUNC(vm, &vm->current_func_value, value_expected);
   } break;
   }
 
