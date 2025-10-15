@@ -330,13 +330,27 @@ bool iui_abs_bounds_intrinsic(Vm *vm) {
 }
 
 Intrinsic iui_intrinsics[] = {
-  { STR_LIT("iui-main-loop"), 4, false, &iui_main_loop_intrinsic },
-  { STR_LIT("iui-vbox"), 4, false, &iui_vbox_intrinsic },
-  { STR_LIT("iui-hbox"), 4, false, &iui_hbox_intrinsic },
-  { STR_LIT("iui-button"), 2, false, &iui_button_intrinsic },
-  { STR_LIT("iui-text"), 4, false, &iui_text_intrinsic },
-  { STR_LIT("iui-input"), 3, false, &iui_input_intrinsic },
-  { STR_LIT("iui-abs-bounds"), 4, false, &iui_abs_bounds_intrinsic },
+  { STR_LIT("iui-main-loop"), false, 4,
+    { ValueKindString, ValueKindInt, ValueKindInt, ValueKindFunc },
+    &iui_main_loop_intrinsic },
+  { STR_LIT("iui-vbox"), false, 4,
+    { ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFunc },
+    &iui_vbox_intrinsic },
+  { STR_LIT("iui-hbox"), false, 4,
+    { ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFunc },
+    &iui_hbox_intrinsic },
+  { STR_LIT("iui-button"), false, 2,
+    { ValueKindString, ValueKindFunc },
+    &iui_button_intrinsic },
+  { STR_LIT("iui-text"), false, 4,
+    { ValueKindString, ValueKindFloat, ValueKindBool, ValueKindBool },
+    &iui_text_intrinsic },
+  { STR_LIT("iui-input"), false, 3,
+    { ValueKindString, ValueKindFloat, ValueKindFunc },
+    &iui_input_intrinsic },
+  { STR_LIT("iui-abs-bounds"), false, 4,
+    { ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFloat },
+    &iui_abs_bounds_intrinsic },
 };
 
 u32 iui_intrinsics_len = ARRAY_LEN(iui_intrinsics);

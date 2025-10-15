@@ -156,7 +156,7 @@ void iui_widgets_push_box_end(IuiWidgets *widgets) {
 }
 
 IuiWidget *iui_widgets_push_button_class(IuiWidgets *widgets, Str class,
-                                   Str text, ValueFunc on_click) {
+                                   Str text, Func on_click) {
   IuiWidget *widget = iui_widgets_get_widget(widgets, IuiWidgetKindButton, class);
   widget->as.button.text = text;
   widget->as.button.on_click = on_click;
@@ -164,7 +164,7 @@ IuiWidget *iui_widgets_push_button_class(IuiWidgets *widgets, Str class,
   return widget;
 }
 
-IuiWidget *iui_widgets_push_button(IuiWidgets *widgets, Str text, ValueFunc on_click) {
+IuiWidget *iui_widgets_push_button(IuiWidgets *widgets, Str text, Func on_click) {
   return iui_widgets_push_button_class(widgets, STR_LIT(":button:"),
                                        text, on_click);
 }
@@ -190,7 +190,7 @@ IuiWidget *iui_widgets_push_text(IuiWidgets *widgets, Str text,
 
 IuiWidget *iui_widgets_push_input_class(IuiWidgets *widgets, Str class,
                                         Str placeholder, f32 left_padding,
-                                        ValueFunc on_submit) {
+                                        Func on_submit) {
   IuiWidget *widget = iui_widgets_get_widget(widgets, IuiWidgetKindInput, class);
   widget->as.input.placeholder = placeholder;
   widget->as.input.left_padding = left_padding;
@@ -200,7 +200,7 @@ IuiWidget *iui_widgets_push_input_class(IuiWidgets *widgets, Str class,
 }
 
 IuiWidget *iui_widgets_push_input(IuiWidgets *widgets, Str placeholder,
-                                  f32 left_padding, ValueFunc on_submit) {
+                                  f32 left_padding, Func on_submit) {
   return iui_widgets_push_input_class(widgets, STR_LIT(":input:"),
                                       placeholder, left_padding,
                                       on_submit);

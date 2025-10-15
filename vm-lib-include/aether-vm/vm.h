@@ -7,6 +7,8 @@
 #include "shl_str.h"
 #include "shl_log.h"
 
+#define MAX_INTRINSIC_ARGS_COUNT 8
+
 #define EXECUTE_FUNC(vm, func, value_expected)                \
   do {                                                        \
     ExecState state = execute_func(vm, func, value_expected); \
@@ -48,7 +50,7 @@ typedef enum {
 typedef struct {
   Str  str;
   Str *begin;
-} ValueString;
+} String;
 
 typedef struct ListNode ListNode;
 
@@ -63,16 +65,16 @@ typedef struct {
   IrBlock     body;
   NamedValues catched_values;
   Str         intrinsic_name;
-} ValueFunc;
+} Func;
 
 typedef union {
-  ListNode    *list;
-  ValueString  string;
-  i64          _int;
-  f64          _float;
-  bool         _bool;
-  Record       record;
-  ValueFunc    func;
+  ListNode *list;
+  String    string;
+  i64       _int;
+  f64       _float;
+  bool      _bool;
+  Record    record;
+  Func      func;
 } ValueAs;
 
 typedef struct {
@@ -113,8 +115,9 @@ typedef bool (*IntrinsicFunc)(Vm *vm);
 
 typedef struct {
   Str           name;
-  u32           args_count;
   bool          has_return_value;
+  u32           args_count;
+  ValueKind     arg_kinds[MAX_INTRINSIC_ARGS_COUNT];
   IntrinsicFunc func;
 } Intrinsic;
 
@@ -129,7 +132,7 @@ struct Vm {
   ListNode   *args;
   i64         exit_code;
   bool        is_inside_of_func;
-  ValueFunc   current_func_value;
+  Func        current_func_value;
 };
 
 void      list_use(RcArena *rc_arena, ListNode *list);
@@ -142,16 +145,17 @@ void value_stack_push_int(ValueStack *stack, i64 _int);
 void value_stack_push_float(ValueStack *stack, f64 _float);
 void value_stack_push_bool(ValueStack *stack, bool _bool);
 void value_stack_push_record(ValueStack *stack, Record record);
-void value_stack_push_func(ValueStack *stack, ValueFunc func);
+void value_stack_push_func(ValueStack *stack, Func func);
 
 Value value_stack_pop(ValueStack *stack);
 Value *value_stack_get(ValueStack *stack, u32 index);
 
 void free_value(Value *value, RcArena *rc_arena);
 
-ExecState execute_func(Vm *vm, ValueFunc *func, bool value_expected);
+ExecState execute_func(Vm *vm, Func *func, bool value_expected);
 ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected);
 ExecState execute_block(Vm *vm, IrBlock *block, bool value_expected);
-u32       execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena, Intrinsics *intrinsics);
+u32       execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena,
+                  Intrinsics *intrinsics);
 
 #endif // AETHER_VM

@@ -124,6 +124,7 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values,
   } break;
 
   case IrExprKindFuncCall: {
+    catch_vars(vm, local_names, catched_values, expr->as.func_call.func);
     catch_vars_block(vm, local_names, catched_values, &expr->as.func_call.args);
   } break;
 
@@ -134,6 +135,7 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values,
   } break;
 
   case IrExprKindIf: {
+    catch_vars(vm, local_names, catched_values, expr->as._if.cond);
     catch_vars_block(vm, local_names, catched_values, &expr->as._if.if_body);
 
     for (u32 i = 0; i < expr->as._if.elifs.len; ++i)
@@ -188,7 +190,13 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values,
   case IrExprKindInt:    break;
   case IrExprKindFloat:  break;
   case IrExprKindBool:   break;
-  case IrExprKindLambda: break;
+
+  case IrExprKindLambda: {
+    for (u32 i = 0; i < expr->as.lambda.args.len; ++i)
+      DA_APPEND(*local_names, expr->as.lambda.args.items[i]);
+
+    catch_vars_block(vm, local_names, catched_values, &expr->as.lambda.body);
+  } break;
 
   case IrExprKindRecord: {
     for (u32 i = 0; i < expr->as.record.len; ++i)
@@ -208,24 +216,38 @@ static void catch_vars_block(Vm *vm, Strs *local_names, NamedValues *catched_val
     catch_vars(vm, local_names, catched_values, block->items[i]);
 }
 
-static Intrinsic *get_intrinsic(Vm *vm, Str name) {
-  for (u32 i = 0; i < vm->intrinsics.len; ++i)
-    if (str_eq(vm->intrinsics.items[i].name, name))
+bool value_list_matches_kinds(u32 len, Value *values, ValueKind *kinds) {
+  for (u32 i = 0; i < len; ++i)
+    if (values[i].kind != kinds[i] && kinds[i] != ValueKindUnit)
+      return false;
+
+  return true;
+}
+
+static Intrinsic *get_intrinsic(Vm *vm, Str name, u32 args_count, Value *args) {
+  for (u32 i = 0; i < vm->intrinsics.len; ++i) {
+    if (str_eq(vm->intrinsics.items[i].name, name) &&
+        vm->intrinsics.items[i].args_count == args_count &&
+        value_list_matches_kinds(args_count, args,
+                                 vm->intrinsics.items[i].arg_kinds)) {
       return vm->intrinsics.items + i;
+    }
+  }
 
   return NULL;
 }
 
-ExecState execute_func(Vm *vm, ValueFunc *func, bool value_expected) {
+ExecState execute_func(Vm *vm, Func *func, bool value_expected) {
   if (vm->stack.len < func->args.len) {
     ERROR("Not enough values on the stack for function call\n");
     exit(1);
   }
 
   if (func->intrinsic_name.len > 0) {
-    Intrinsic *intrinsic = get_intrinsic(vm, func->intrinsic_name);
+    Intrinsic *intrinsic = get_intrinsic(vm, func->intrinsic_name, func->args.len,
+                                         vm->stack.items + vm->stack.len - func->args.len);
     if (!intrinsic) {
-      ERROR("Intrinsic `"STR_FMT"` was not found\n",
+      ERROR("Intrinsic `"STR_FMT"` with such signature was not found\n",
             STR_ARG(func->intrinsic_name));
       return ExecStateExit;
     }
@@ -244,7 +266,7 @@ ExecState execute_func(Vm *vm, ValueFunc *func, bool value_expected) {
   u32 prev_stack_len = vm->stack.len;
   Vars prev_local_vars = vm->local_vars;
   bool prev_is_inside_of_func = vm->is_inside_of_func;
-  ValueFunc prev_current_func_value = vm->current_func_value;
+  Func prev_current_func_value = vm->current_func_value;
 
   vm->local_vars = (Vars) {0};
   vm->is_inside_of_func = true;
@@ -372,7 +394,9 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         return false;
       }
 
-      if (cond.kind != ValueKindUnit && cond.as._bool) {
+      if (cond.kind != ValueKindUnit &&
+          ((cond.kind == ValueKindBool && cond.as._bool) ||
+           (cond.kind == ValueKindList && cond.as.list->next != NULL))) {
         EXECUTE_BLOCK(vm, &expr->as._if.elifs.items[i].body, value_expected);
         executed_elif = true;
         break;
@@ -388,29 +412,27 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   } break;
 
   case IrExprKindWhile: {
-    bool is_first_iter = true;
     while (true) {
-      if (!is_first_iter && value_expected)
-        --vm->stack.len;
-
       EXECUTE_EXPR(vm, expr->as._while.cond, true);
 
       Value cond = value_stack_pop(&vm->stack);
-      if (cond.kind != ValueKindBool) {
-        ERROR("Only boolean value can be used as a condition\n");
+      if (cond.kind != ValueKindBool &&
+          cond.kind != ValueKindUnit &&
+          cond.kind != ValueKindList) {
+        ERROR("Only boolean, unit or list value can be used as a condition\n");
         vm->exit_code = 1;
         return ExecStateExit;
       }
 
-      if (!cond.as._bool)
+      if (cond.kind == ValueKindUnit ||
+          ((cond.kind == ValueKindBool && !cond.as._bool) ||
+           (cond.kind == ValueKindList && cond.as.list->next == NULL)))
         break;
 
-      is_first_iter = false;
-
-      EXECUTE_BLOCK(vm, &expr->as._while.body, value_expected);
+      EXECUTE_BLOCK(vm, &expr->as._while.body, false);
     }
 
-    if (is_first_iter && value_expected)
+    if (value_expected)
       value_stack_push_unit(&vm->stack);
   } break;
 

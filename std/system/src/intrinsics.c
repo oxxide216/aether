@@ -277,6 +277,7 @@ bool list_directory_intrinsic(Vm *vm) {
   DIR *dir = opendir(path_cstring);
   if (dir) {
     struct dirent *entry;
+
     while ((entry = readdir(dir)) != NULL) {
       Str path;
       path.len = strlen(entry->d_name);
@@ -285,8 +286,9 @@ bool list_directory_intrinsic(Vm *vm) {
 
       LL_PREPEND(list, list_end, ListNode);
       list_end->value.kind = ValueKindString;
-      list_end->value.as.string = (ValueString) { path, (Str *) path.ptr };
+      list_end->value.as.string = (String) { path, (Str *) path.ptr };
     }
+
     closedir(dir);
   }
 
@@ -547,33 +549,47 @@ bool sleep_intrinsic(Vm *vm) {
 
 Intrinsic system_intrinsics[] = {
   // Io
-  { STR_LIT("print"), 1, false, &print_intrinsic },
-  { STR_LIT("println"), 1, false, &println_intrinsic },
-  { STR_LIT("input-size"), 1, true, &input_size_intrinsic },
-  { STR_LIT("input"), 0, true, &input_intrinsic },
+  { STR_LIT("print"), false, 1, { ValueKindUnit }, &print_intrinsic },
+  { STR_LIT("println"), false, 1, { ValueKindUnit }, &println_intrinsic },
+  { STR_LIT("input-size"), true, 1, { ValueKindInt }, &input_size_intrinsic },
+  { STR_LIT("input"), true, 0, {}, &input_intrinsic },
   // Files
-  { STR_LIT("file-exists"), 1, true, &file_exists_intrinsic },
-  { STR_LIT("read-file"), 1, true, &read_file_intrinsic },
-  { STR_LIT("write-file"), 2, false, &write_file_intrinsic },
-  { STR_LIT("delete-file"), 1, false, &delete_file_intrinsic },
+  { STR_LIT("file-exists"), true, 1, { ValueKindString }, &file_exists_intrinsic },
+  { STR_LIT("read-file"), true, 1, { ValueKindString }, &read_file_intrinsic },
+  { STR_LIT("write-file"), false, 2,
+    { ValueKindString, ValueKindString },
+    &write_file_intrinsic },
+  { STR_LIT("delete-file"), false, 1, { ValueKindString }, &delete_file_intrinsic },
   // Paths
-  { STR_LIT("get-current-path"), 0, true, &get_current_path_intrinsic },
-  { STR_LIT("set-current-path"), 1, false, &set_current_path_intrinsic },
-  { STR_LIT("get-absolute-path"), 1, true, &get_absolute_path_intrinsic },
-  { STR_LIT("list-directory"), 1, true, &list_directory_intrinsic },
+  { STR_LIT("get-current-path"), true, 0, {}, &get_current_path_intrinsic },
+  { STR_LIT("set-current-path"), false, 1, { ValueKindString }, &set_current_path_intrinsic },
+  { STR_LIT("get-absolute-path"), true, 1, { ValueKindString }, &get_absolute_path_intrinsic },
+  { STR_LIT("list-directory"), true, 1, { ValueKindString }, &list_directory_intrinsic },
   // Arguments
-  { STR_LIT("get-args"), 0, true, &get_args_intrinsic },
+  { STR_LIT("get-args"), true, 0, {}, &get_args_intrinsic },
   // Sockets
-  { STR_LIT("create-server"), 2, true, &create_server_intrinsic },
-  { STR_LIT("create-client"), 3, true, &create_client_intrinsic },
-  { STR_LIT("accept-connection"), 2, true, &accept_connection_intrinsic },
-  { STR_LIT("close-connection"), 1, false, &close_connection_intrinsic },
-  { STR_LIT("send"), 3, false, &send_intrinsic },
-  { STR_LIT("receive-size"), 3, true, &receive_size_intrinsic },
-  { STR_LIT("receive"), 2, true, &receive_intrinsic },
+  { STR_LIT("create-server"), true, 2,
+    { ValueKindInt, ValueKindBool },
+    &create_server_intrinsic },
+  { STR_LIT("create-client"), true, 3,
+    { ValueKindString, ValueKindInt, ValueKindBool },
+    &create_client_intrinsic },
+  { STR_LIT("accept-connection"), true, 2,
+    { ValueKindInt, ValueKindInt },
+    &accept_connection_intrinsic },
+  { STR_LIT("close-connection"), false, 1, { ValueKindInt }, &close_connection_intrinsic },
+  { STR_LIT("send"), false, 3,
+    { ValueKindInt, ValueKindString, ValueKindBool },
+    &send_intrinsic },
+  { STR_LIT("receive-size"), true, 3,
+    { ValueKindInt, ValueKindInt, ValueKindBool },
+    &receive_size_intrinsic },
+  { STR_LIT("receive"), true, 2,
+    { ValueKindInt, ValueKindBool },
+    &receive_intrinsic },
   // Processes
-  { STR_LIT("run-command"), 1, true, &run_command_intrinsic },
-  { STR_LIT("sleep"), 1, false, &sleep_intrinsic },
+  { STR_LIT("run-command"), true, 1, { ValueKindString }, &run_command_intrinsic },
+  { STR_LIT("sleep"), false, 1, { ValueKindFloat }, &sleep_intrinsic },
 };
 
 u32 system_intrinsics_len = ARRAY_LEN(system_intrinsics);

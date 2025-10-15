@@ -24,9 +24,15 @@ bool tail_intrinsic(Vm *vm) {
   if (value.kind != ValueKindList)
     PANIC("tail: wrong argument kind\n");
 
+  if (!value.as.list->next) {
+    value_stack_push_unit(&vm->stack);
+
+    return true;
+  }
+
   ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-  if (value.as.list->next)
-    new_list->next = list_clone(vm->rc_arena, value.as.list->next->next);
+  new_list->next = value.as.list->next->next;
+  list_use(vm->rc_arena, new_list->next);
 
   value_stack_push_list(&vm->stack, new_list);
 
@@ -817,41 +823,6 @@ bool max_intrinsic(Vm *vm) {
   return true;
 }
 
-bool eq_intrinsic(Vm *vm) {
-  Value b = value_stack_pop(&vm->stack);
-  Value a = value_stack_pop(&vm->stack);
-
-  if (a.kind == ValueKindList &&
-      b.kind == ValueKindList)
-    value_stack_push_bool(&vm->stack, a.as.list == b.as.list);
-  else if (a.kind == ValueKindString &&
-           b.kind == ValueKindString)
-    value_stack_push_bool(&vm->stack, str_eq(a.as.string.str, b.as.string.str));
-  else if (a.kind == ValueKindInt &&
-           b.kind == ValueKindInt)
-    value_stack_push_bool(&vm->stack, a.as._int == b.as._int);
-  else if (a.kind == ValueKindFloat &&
-           b.kind == ValueKindFloat)
-    value_stack_push_bool(&vm->stack, a.as._float == b.as._float);
-  else if (a.kind == ValueKindBool &&
-           b.kind == ValueKindBool)
-    value_stack_push_bool(&vm->stack, a.as._bool == b.as._bool);
-  else
-    PANIC("==: wrong argument kinds\n");
-
-  return true;
-}
-
-bool sqrt_intrinsic(Vm *vm) {
-  Value value = value_stack_pop(&vm->stack);
-  if (value.kind != ValueKindFloat)
-    PANIC("sqrt: wrong argument kind\n");
-
-  value_stack_push_float(&vm->stack, sqrt(value.as._float));
-
-  return true;
-}
-
 bool pow_intrinsic(Vm *vm) {
   Value pow = value_stack_pop(&vm->stack);
   Value value = value_stack_pop(&vm->stack);
@@ -879,6 +850,16 @@ bool pow_intrinsic(Vm *vm) {
   return true;
 }
 
+bool sqrt_intrinsic(Vm *vm) {
+  Value value = value_stack_pop(&vm->stack);
+  if (value.kind != ValueKindFloat)
+    PANIC("sqrt: wrong argument kind\n");
+
+  value_stack_push_float(&vm->stack, sqrt(value.as._float));
+
+  return true;
+}
+
 bool round_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
   if (value.kind != ValueKindFloat)
@@ -889,13 +870,38 @@ bool round_intrinsic(Vm *vm) {
   return true;
 }
 
+bool eq_intrinsic(Vm *vm) {
+  Value b = value_stack_pop(&vm->stack);
+  Value a = value_stack_pop(&vm->stack);
+
+  if (a.kind == ValueKindList &&
+      b.kind == ValueKindList)
+    value_stack_push_bool(&vm->stack, a.as.list->next == b.as.list->next);
+  else if (a.kind == ValueKindString &&
+           b.kind == ValueKindString)
+    value_stack_push_bool(&vm->stack, str_eq(a.as.string.str, b.as.string.str));
+  else if (a.kind == ValueKindInt &&
+           b.kind == ValueKindInt)
+    value_stack_push_bool(&vm->stack, a.as._int == b.as._int);
+  else if (a.kind == ValueKindFloat &&
+           b.kind == ValueKindFloat)
+    value_stack_push_bool(&vm->stack, a.as._float == b.as._float);
+  else if (a.kind == ValueKindBool &&
+           b.kind == ValueKindBool)
+    value_stack_push_bool(&vm->stack, a.as._bool == b.as._bool);
+  else
+    value_stack_push_bool(&vm->stack, false);
+
+  return true;
+}
+
 bool ne_intrinsic(Vm *vm) {
   Value b = value_stack_pop(&vm->stack);
   Value a = value_stack_pop(&vm->stack);
 
   if (a.kind == ValueKindList &&
       b.kind == ValueKindList)
-    value_stack_push_bool(&vm->stack, a.as.list != b.as.list);
+    value_stack_push_bool(&vm->stack, a.as.list->next != b.as.list->next);
   else if (a.kind == ValueKindString &&
            b.kind == ValueKindString)
     value_stack_push_bool(&vm->stack, !str_eq(a.as.string.str, b.as.string.str));
@@ -909,7 +915,7 @@ bool ne_intrinsic(Vm *vm) {
            b.kind == ValueKindBool)
     value_stack_push_bool(&vm->stack, a.as._bool != b.as._bool);
   else
-    PANIC("ne: wrong argument kinds\n");
+    value_stack_push_bool(&vm->stack, true);
 
   return true;
 }
@@ -1162,79 +1168,121 @@ bool is_record_intrinsic(Vm *vm) {
 
 Intrinsic base_intrinsics[] = {
   // Base
-  { STR_LIT("head"), 1, true, &head_intrinsic },
-  { STR_LIT("tail"), 1, true, &tail_intrinsic },
-  { STR_LIT("last"), 1, true, &last_intrinsic },
-  { STR_LIT("nth"), 2, true, &nth_intrinsic },
-  { STR_LIT("len"), 1, true, &len_intrinsic },
-  { STR_LIT("get-range"), 3, true, &get_range_intrinsic },
-  { STR_LIT("exit"), 1, false, &exit_intrinsic },
-  { STR_LIT("eval"), 1, false, &eval_intrinsic },
-  { STR_LIT("eval-bytes"), 1, false, &eval_bytes_intrinsic },
+  { STR_LIT("head"), true, 1, { ValueKindList }, &head_intrinsic },
+  { STR_LIT("tail"), true, 1, { ValueKindList }, &tail_intrinsic },
+  { STR_LIT("last"), true, 1, { ValueKindList }, &last_intrinsic },
+  { STR_LIT("nth"), true, 2, { ValueKindList, ValueKindInt }, &nth_intrinsic },
+  { STR_LIT("len"), true, 1, { ValueKindList }, &len_intrinsic },
+  { STR_LIT("get-range"), true, 3,
+    { ValueKindList, ValueKindInt, ValueKindInt },
+    &get_range_intrinsic },
+  { STR_LIT("exit"), false, 1, { ValueKindInt }, &exit_intrinsic },
+  { STR_LIT("eval"), false, 1, { ValueKindString }, &eval_intrinsic },
+  { STR_LIT("eval-bytes"), false, 1, { ValueKindString }, &eval_bytes_intrinsic },
   // Functional stuff
-  { STR_LIT("map"), 2, true, &map_intrinsic },
-  { STR_LIT("filter"), 2, true, &filter_intrinsic },
-  { STR_LIT("reduce"), 3, true, &reduce_intrinsic },
+  { STR_LIT("map"), true, 2, { ValueKindFunc, ValueKindList }, &map_intrinsic },
+  { STR_LIT("filter"), true, 2, { ValueKindFunc, ValueKindList }, &filter_intrinsic },
+  { STR_LIT("reduce"), true, 3,
+    { ValueKindFunc, ValueKindUnit, ValueKindList },
+    &reduce_intrinsic },
   // String operations
-  { STR_LIT("split"), 2, true, &split_intrinsic },
-  { STR_LIT("sub-str"), 3, true, &sub_str_intrinsic },
-  { STR_LIT("join"), 2, true, &join_intrinsic },
-  { STR_LIT("eat-str"), 2, true, &eat_str_intrinsic },
-  { STR_LIT("eat-byte-64"), 1, true, &eat_byte_64_intrinsic },
-  { STR_LIT("eat-byte-32"), 1, true, &eat_byte_32_intrinsic },
-  { STR_LIT("eat-byte-16"), 1, true, &eat_byte_16_intrinsic },
-  { STR_LIT("eat-byte-8"), 1, true, &eat_byte_8_intrinsic },
+  { STR_LIT("split"), true, 2, { ValueKindString, ValueKindString }, &split_intrinsic },
+  { STR_LIT("sub-str"), true, 3,
+    { ValueKindString, ValueKindInt, ValueKindInt },
+    &sub_str_intrinsic },
+  { STR_LIT("join"), true, 2, { ValueKindList, ValueKindString }, &join_intrinsic },
+  { STR_LIT("eat-str"), true, 2, { ValueKindString, ValueKindString }, &eat_str_intrinsic },
+  { STR_LIT("eat-byte-64"), true, 1, { ValueKindString }, &eat_byte_64_intrinsic },
+  { STR_LIT("eat-byte-32"), true, 1, { ValueKindString }, &eat_byte_32_intrinsic },
+  { STR_LIT("eat-byte-16"), true, 1, { ValueKindString }, &eat_byte_16_intrinsic },
+  { STR_LIT("eat-byte-8"), true, 1, { ValueKindString }, &eat_byte_8_intrinsic },
   // Conversions
-  { STR_LIT("str-to-int"), 1, true, &str_to_int_intrinsic },
-  { STR_LIT("str-to-float"), 1, true, &str_to_float_intrinsic },
-  { STR_LIT("int-to-str"), 1, true, &int_to_str_intrinsic },
-  { STR_LIT("int-to-str"), 1, true, &int_to_str_intrinsic },
-  { STR_LIT("bool-to-int"), 1, true, &bool_to_int_intrinsic },
-  { STR_LIT("bool-to-str"), 1, true, &bool_to_str_intrinsic },
-  { STR_LIT("float-to-int"), 1, true, &int_to_str_intrinsic },
-  { STR_LIT("float-to-str"), 1, true, &int_to_str_intrinsic },
-  { STR_LIT("byte-64-to-str"), 1, true, &byte_64_to_str_intrinsic },
-  { STR_LIT("byte-32-to-str"), 1, true, &byte_32_to_str_intrinsic },
-  { STR_LIT("byte-16-to-str"), 1, true, &byte_16_to_str_intrinsic },
-  { STR_LIT("byte-8-to-str"), 1, true, &byte_8_to_str_intrinsic },
+  { STR_LIT("str-to-int"), true, 1, { ValueKindString }, &str_to_int_intrinsic },
+  { STR_LIT("str-to-float"), true, 1, { ValueKindString }, &str_to_float_intrinsic },
+  { STR_LIT("int-to-str"), true, 1, { ValueKindInt }, &int_to_str_intrinsic },
+  { STR_LIT("int-to-str"), true, 1, { ValueKindInt }, &int_to_str_intrinsic },
+  { STR_LIT("bool-to-int"), true, 1, { ValueKindBool }, &bool_to_int_intrinsic },
+  { STR_LIT("bool-to-str"), true, 1, { ValueKindBool }, &bool_to_str_intrinsic },
+  { STR_LIT("float-to-int"), true, 1, { ValueKindFloat }, &int_to_str_intrinsic },
+  { STR_LIT("float-to-str"), true, 1, { ValueKindFloat }, &int_to_str_intrinsic },
+  { STR_LIT("byte-64-to-str"), true, 1, { ValueKindInt }, &byte_64_to_str_intrinsic },
+  { STR_LIT("byte-32-to-str"), true, 1, { ValueKindInt }, &byte_32_to_str_intrinsic },
+  { STR_LIT("byte-16-to-str"), true, 1, { ValueKindInt }, &byte_16_to_str_intrinsic },
+  { STR_LIT("byte-8-to-str"), true, 1, { ValueKindInt }, &byte_8_to_str_intrinsic },
   // Math
-  { STR_LIT("add"), 2, true, &add_intrinsic },
-  { STR_LIT("sub"), 2, true, &sub_intrinsic },
-  { STR_LIT("mul"), 2, true, &mul_intrinsic },
-  { STR_LIT("div"), 2, true, &div_intrinsic },
-  { STR_LIT("mod"), 2, true, &mod_intrinsic },
+  { STR_LIT("add"), true, 2, { ValueKindInt, ValueKindInt }, &add_intrinsic },
+  { STR_LIT("add"), true, 2, { ValueKindFloat, ValueKindFloat }, &add_intrinsic },
+  { STR_LIT("add"), true, 2, { ValueKindString, ValueKindString }, &add_intrinsic },
+  { STR_LIT("add"), true, 2, { ValueKindList, ValueKindList }, &add_intrinsic },
+  { STR_LIT("add"), true, 2, { ValueKindList, ValueKindUnit }, &add_intrinsic },
+  { STR_LIT("add"), true, 2, { ValueKindUnit, ValueKindList }, &add_intrinsic },
+  { STR_LIT("sub"), true, 2, { ValueKindInt, ValueKindInt }, &sub_intrinsic },
+  { STR_LIT("sub"), true, 2, { ValueKindFloat, ValueKindFloat }, &sub_intrinsic },
+  { STR_LIT("mul"), true, 2, { ValueKindInt, ValueKindInt }, &mul_intrinsic },
+  { STR_LIT("mul"), true, 2, { ValueKindFloat, ValueKindFloat }, &mul_intrinsic },
+  { STR_LIT("div"), true, 2, { ValueKindInt, ValueKindInt }, &div_intrinsic },
+  { STR_LIT("div"), true, 2, { ValueKindFloat, ValueKindFloat }, &div_intrinsic },
+  { STR_LIT("mod"), true, 2, { ValueKindInt, ValueKindInt }, mod_intrinsic },
+  { STR_LIT("mod"), true, 2, { ValueKindFloat, ValueKindFloat }, &mod_intrinsic },
   // Advanced math
-  { STR_LIT("abs"), 1, true, &abs_intrinsic },
-  { STR_LIT("min"), 2, true, &min_intrinsic },
-  { STR_LIT("max"), 2, true, &max_intrinsic },
-  { STR_LIT("sqrt"), 1, true, &sqrt_intrinsic },
-  { STR_LIT("pow"), 2, true, &pow_intrinsic },
-  { STR_LIT("round"), 1, true, &round_intrinsic },
+  { STR_LIT("abs"), true, 1, { ValueKindInt }, &abs_intrinsic },
+  { STR_LIT("abs"), true, 1, { ValueKindFloat }, &abs_intrinsic },
+  { STR_LIT("min"), true, 1, { ValueKindInt, ValueKindInt }, &min_intrinsic },
+  { STR_LIT("min"), true, 1, { ValueKindFloat, ValueKindFloat }, &min_intrinsic },
+  { STR_LIT("max"), true, 1, { ValueKindInt, ValueKindInt }, &max_intrinsic },
+  { STR_LIT("max"), true, 1, { ValueKindFloat, ValueKindFloat }, &max_intrinsic },
+  { STR_LIT("pow"), true, 1, { ValueKindInt, ValueKindInt }, &pow_intrinsic },
+  { STR_LIT("pow"), true, 1, { ValueKindFloat, ValueKindInt }, &pow_intrinsic },
+  { STR_LIT("sqrt"), true, 1, { ValueKindFloat }, &sqrt_intrinsic },
+  { STR_LIT("round"), true, 1, { ValueKindFloat }, &round_intrinsic },
   // Comparisons
-  { STR_LIT("eq"), 2, true, &eq_intrinsic },
-  { STR_LIT("ne"), 2, true, &ne_intrinsic },
-  { STR_LIT("ls"), 2, true, &ls_intrinsic },
-  { STR_LIT("le"), 2, true, &le_intrinsic },
-  { STR_LIT("gt"), 2, true, &gt_intrinsic },
-  { STR_LIT("ge"), 2, true, &ge_intrinsic },
+  { STR_LIT("eq"), true, 2, { ValueKindList, ValueKindList }, &eq_intrinsic },
+  { STR_LIT("eq"), true, 2, { ValueKindString, ValueKindString }, &eq_intrinsic },
+  { STR_LIT("eq"), true, 2, { ValueKindInt, ValueKindInt }, &eq_intrinsic },
+  { STR_LIT("eq"), true, 2, { ValueKindFloat, ValueKindFloat }, &eq_intrinsic },
+  { STR_LIT("eq"), true, 2, { ValueKindBool, ValueKindBool }, &eq_intrinsic },
+  { STR_LIT("ne"), true, 2, { ValueKindList, ValueKindList }, &ne_intrinsic },
+  { STR_LIT("ne"), true, 2, { ValueKindString, ValueKindString }, &ne_intrinsic },
+  { STR_LIT("ne"), true, 2, { ValueKindInt, ValueKindInt }, &ne_intrinsic },
+  { STR_LIT("ne"), true, 2, { ValueKindFloat, ValueKindFloat }, &ne_intrinsic },
+  { STR_LIT("ne"), true, 2, { ValueKindBool, ValueKindBool }, &ne_intrinsic },
+  { STR_LIT("ls"), true, 2, { ValueKindInt }, &ls_intrinsic },
+  { STR_LIT("ls"), true, 2, { ValueKindFloat }, &ls_intrinsic },
+  { STR_LIT("le"), true, 2, { ValueKindInt }, &le_intrinsic },
+  { STR_LIT("le"), true, 2, { ValueKindFloat }, &le_intrinsic },
+  { STR_LIT("gt"), true, 2, { ValueKindInt }, &gt_intrinsic },
+  { STR_LIT("gt"), true, 2, { ValueKindFloat }, &gt_intrinsic },
+  { STR_LIT("ge"), true, 2, { ValueKindInt }, &ge_intrinsic },
+  { STR_LIT("ge"), true, 2, { ValueKindFloat }, &ge_intrinsic },
   // Boolean
-  { STR_LIT("and"), 2, true, &and_intrinsic },
-  { STR_LIT("or"), 2, true, &or_intrinsic },
-  { STR_LIT("xor"), 2, true, &xor_intrinsic },
-  { STR_LIT("not"), 1, true, &not_intrinsic },
+  { STR_LIT("and"), true, 2, { ValueKindInt, ValueKindInt }, &and_intrinsic },
+  { STR_LIT("and"), true, 2, { ValueKindBool, ValueKindBool }, &and_intrinsic },
+  { STR_LIT("or"), true, 2, { ValueKindInt, ValueKindInt }, &or_intrinsic },
+  { STR_LIT("or"), true, 2, { ValueKindBool, ValueKindBool }, &or_intrinsic },
+  { STR_LIT("and"), true, 2, { ValueKindInt, ValueKindInt }, &xor_intrinsic },
+  { STR_LIT("and"), true, 2, { ValueKindBool, ValueKindBool }, &xor_intrinsic },
+  { STR_LIT("not"), true, 1, { ValueKindBool }, &not_intrinsic },
   // Logical
-  { STR_LIT("logical-and"), 2, true, &logical_and_intrinsic },
-  { STR_LIT("logical-or"), 2, true, &logical_or_intrinsic },
+  { STR_LIT("logical-and"), true, 2, { ValueKindList, ValueKindList }, &logical_and_intrinsic },
+  { STR_LIT("logical-and"), true, 2, { ValueKindString, ValueKindString }, &logical_and_intrinsic },
+  { STR_LIT("logical-and"), true, 2, { ValueKindInt, ValueKindInt }, &logical_and_intrinsic },
+  { STR_LIT("logical-and"), true, 2, { ValueKindFloat, ValueKindFloat }, &logical_and_intrinsic },
+  { STR_LIT("logical-and"), true, 2, { ValueKindBool, ValueKindBool }, &logical_and_intrinsic },
+  { STR_LIT("logical-or"), true, 2, { ValueKindList, ValueKindList }, &logical_or_intrinsic },
+  { STR_LIT("logical-or"), true, 2, { ValueKindString, ValueKindString }, &logical_or_intrinsic },
+  { STR_LIT("logical-or"), true, 2, { ValueKindInt, ValueKindInt }, &logical_or_intrinsic },
+  { STR_LIT("logical-or"), true, 2, { ValueKindFloat, ValueKindFloat }, &logical_or_intrinsic },
+  { STR_LIT("logical-or"), true, 2, { ValueKindBool, ValueKindBool }, &logical_or_intrinsic },
   // Types
-  { STR_LIT("type"), 1, true, &type_intrinsic },
-  { STR_LIT("is-unit"), 1, true, &is_unit_intrinsic },
-  { STR_LIT("is-list"), 1, true, &is_list_intrinsic },
-  { STR_LIT("is-string"), 1, true, &is_string_intrinsic },
-  { STR_LIT("is-int"), 1, true, &is_int_intrinsic },
-  { STR_LIT("is-float"), 1, true, &is_float_intrinsic },
-  { STR_LIT("is-bool"), 1, true, &is_bool_intrinsic },
-  { STR_LIT("is-func"), 1, true, &is_func_intrinsic },
-  { STR_LIT("is-record"), 1, true, &is_record_intrinsic },
+  { STR_LIT("type"), true, 1, { ValueKindUnit }, &type_intrinsic },
+  { STR_LIT("is-unit"), true, 1, { ValueKindUnit }, &is_unit_intrinsic },
+  { STR_LIT("is-list"), true, 1, { ValueKindUnit }, &is_list_intrinsic },
+  { STR_LIT("is-string"), true, 1, { ValueKindUnit }, &is_string_intrinsic },
+  { STR_LIT("is-int"), true, 1, { ValueKindUnit }, &is_int_intrinsic },
+  { STR_LIT("is-float"), true, 1, { ValueKindUnit }, &is_float_intrinsic },
+  { STR_LIT("is-bool"), true, 1, { ValueKindUnit }, &is_bool_intrinsic },
+  { STR_LIT("is-func"), true, 1, { ValueKindUnit }, &is_func_intrinsic },
+  { STR_LIT("is-record"), true, 1, { ValueKindUnit }, &is_record_intrinsic },
 };
 
 u32 base_intrinsics_len = ARRAY_LEN(base_intrinsics);

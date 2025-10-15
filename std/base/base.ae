@@ -50,8 +50,8 @@
 (let abs [num] -> import 'abs')
 (let min [num] -> import 'min')
 (let max [num] -> import 'max')
-(let sqrt [num] -> import 'sqrt')
 (let pow [num pow] -> import 'pow')
+(let sqrt [num] -> import 'sqrt')
 (let round [num] -> import 'round')
 
 ;; Comparisons
@@ -83,8 +83,9 @@
 (let func? [value] -> import 'is-func')
 (let record? [value] -> import 'is-record')
 
-(let for [list body] ->
+(macro for [list element ...body] ->
   ([rest] ->
     (if (> (len rest) 0)
-      (body)
-      (<-> (tail rest)))))
+      (let element (head rest))
+      body
+      (<-> (tail rest))) <> list))

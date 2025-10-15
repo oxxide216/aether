@@ -37,9 +37,9 @@ typedef struct {
 typedef Da(IuiBox *) IuiBoxes;
 
 typedef struct {
-  Str       text;
-  bool      pressed;
-  ValueFunc on_click;
+  Str  text;
+  bool pressed;
+  Func on_click;
 } IuiButton;
 
 typedef struct {
@@ -57,7 +57,7 @@ typedef struct {
   Str            placeholder;
   f32            left_padding;
   bool           focused;
-  ValueFunc      on_submit;
+  Func           on_submit;
 } IuiInput;
 
 typedef union {
@@ -110,8 +110,8 @@ IuiWidget *iui_widgets_push_box_begin(IuiWidgets *widgets, Vec2 margin,
 void iui_widgets_push_box_end(IuiWidgets *widgets);
 
 IuiWidget *iui_widgets_push_button_class(IuiWidgets *widgets, Str class,
-                                         Str text, ValueFunc on_click);
-IuiWidget *iui_widgets_push_button(IuiWidgets *widgets, Str text, ValueFunc on_click);
+                                         Str text, Func on_click);
+IuiWidget *iui_widgets_push_button(IuiWidgets *widgets, Str text, Func on_click);
 
 IuiWidget *iui_widgets_push_text_class(IuiWidgets *widgets, Str class, Str text,
                                        bool center_x, bool center_y, f32 left_padding);
@@ -121,8 +121,8 @@ IuiWidget *iui_widgets_push_text(IuiWidgets *widgets, Str text,
 
 IuiWidget *iui_widgets_push_input_class(IuiWidgets *widgets, Str class,
                                         Str placeholder, f32 left_padding,
-                                        ValueFunc on_submit);
+                                        Func on_submit);
 IuiWidget *iui_widgets_push_input(IuiWidgets *widgets, Str placeholder,
-                                  f32 left_padding, ValueFunc on_submit);
+                                  f32 left_padding, Func on_submit);
 
 #endif // IUI_WIDGETS_H
