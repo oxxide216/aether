@@ -303,6 +303,13 @@ bool get_args_intrinsic(Vm *vm) {
   return true;
 }
 
+static void setup_non_blocking_socket(i32 socket) {
+  fcntl(socket, F_SETFL, O_NONBLOCK);
+
+  i32 enable = 1;
+  setsockopt(socket, SOL_TCP, TCP_NODELAY, &enable, sizeof(enable));
+}
+
 bool create_server_intrinsic(Vm *vm) {
   Value block = value_stack_pop(&vm->stack);
   Value port = value_stack_pop(&vm->stack);
@@ -316,11 +323,10 @@ bool create_server_intrinsic(Vm *vm) {
     return true;
   }
 
-  if (!block.as._bool)
-    fcntl(server_socket, F_SETFL, O_NONBLOCK);
-
   i32 enable = 1;
   setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
+  if (!block.as._bool)
+    setup_non_blocking_socket(server_socket);
 
   struct sockaddr_in address;
   address.sin_family = AF_INET;
@@ -360,7 +366,7 @@ bool create_client_intrinsic(Vm *vm) {
   }
 
   if (!block.as._bool)
-    fcntl(client_socket, F_SETFL, O_NONBLOCK);
+    setup_non_blocking_socket(client_socket);
 
   struct sockaddr_in server_address;
   server_address.sin_family = AF_INET;
@@ -398,10 +404,12 @@ bool create_client_intrinsic(Vm *vm) {
 }
 
 bool accept_connection_intrinsic(Vm *vm) {
+  Value block = value_stack_pop(&vm->stack);
   Value port = value_stack_pop(&vm->stack);
   Value server_socket = value_stack_pop(&vm->stack);
   if (server_socket.kind != ValueKindInt ||
-      port.kind != ValueKindInt)
+      port.kind != ValueKindInt ||
+      block.kind != ValueKindBool)
     PANIC("accept-connection: wrong argument kinds\n");
 
   struct sockaddr_in address;
@@ -418,6 +426,9 @@ bool accept_connection_intrinsic(Vm *vm) {
 
     return true;
   }
+
+  if (!block.as._bool)
+    setup_non_blocking_socket(client_socket);
 
   value_stack_push_int(&vm->stack, client_socket);
 
@@ -574,8 +585,8 @@ Intrinsic system_intrinsics[] = {
   { STR_LIT("create-client"), true, 3,
     { ValueKindString, ValueKindInt, ValueKindBool },
     &create_client_intrinsic },
-  { STR_LIT("accept-connection"), true, 2,
-    { ValueKindInt, ValueKindInt },
+  { STR_LIT("accept-connection"), true, 3,
+    { ValueKindInt, ValueKindInt, ValueKindBool },
     &accept_connection_intrinsic },
   { STR_LIT("close-connection"), false, 1, { ValueKindInt }, &close_connection_intrinsic },
   { STR_LIT("send"), false, 3,

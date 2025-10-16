@@ -22,7 +22,7 @@
 ;; Sockets
 (let create-server [port block] -> import 'create-server')
 (let create-client [server-address port block] -> import 'create-client')
-(let accept-connection [server port] -> import 'accept-connection')
+(let accept-connection [server port block] -> import 'accept-connection')
 (let close-connection [client] -> import 'close-connection')
 (let send [receiver message block] -> import 'send')
 (let receive-size [receiver size block] -> import 'receive-size')

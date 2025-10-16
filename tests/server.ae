@@ -1,0 +1,10 @@
+(use '../std/base/base.ae')
+(use '../std/system/system.ae')
+
+(let server (create-server '127.0.0.1' 8080 true))
+
+(while true
+  (let client (accept-connection server 8080 true))
+  (if (int? client)
+    (send client 'Hello, Network!\n' true)
+    (close-connection client)))
