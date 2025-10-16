@@ -311,10 +311,8 @@ static void setup_non_blocking_socket(i32 socket) {
 }
 
 bool create_server_intrinsic(Vm *vm) {
-  Value block = value_stack_pop(&vm->stack);
   Value port = value_stack_pop(&vm->stack);
-  if (port.kind != ValueKindInt ||
-      block.kind != ValueKindBool)
+  if (port.kind != ValueKindInt)
     PANIC("create-server: wrong argument kinds\n");
 
   i32 server_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -325,8 +323,7 @@ bool create_server_intrinsic(Vm *vm) {
 
   i32 enable = 1;
   setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
-  if (!block.as._bool)
-    setup_non_blocking_socket(server_socket);
+  setup_non_blocking_socket(server_socket);
 
   struct sockaddr_in address;
   address.sin_family = AF_INET;
@@ -350,12 +347,10 @@ bool create_server_intrinsic(Vm *vm) {
 }
 
 bool create_client_intrinsic(Vm *vm) {
-  Value block = value_stack_pop(&vm->stack);
   Value port = value_stack_pop(&vm->stack);
   Value server_ip_address = value_stack_pop(&vm->stack);
   if (server_ip_address.kind != ValueKindString ||
-      port.kind != ValueKindInt ||
-      block.kind != ValueKindBool)
+      port.kind != ValueKindInt)
     PANIC("create-client: wrong argument kinds\n");
 
   i32 client_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -364,9 +359,6 @@ bool create_client_intrinsic(Vm *vm) {
 
     return true;
   }
-
-  if (!block.as._bool)
-    setup_non_blocking_socket(client_socket);
 
   struct sockaddr_in server_address;
   server_address.sin_family = AF_INET;
@@ -404,12 +396,10 @@ bool create_client_intrinsic(Vm *vm) {
 }
 
 bool accept_connection_intrinsic(Vm *vm) {
-  Value block = value_stack_pop(&vm->stack);
   Value port = value_stack_pop(&vm->stack);
   Value server_socket = value_stack_pop(&vm->stack);
   if (server_socket.kind != ValueKindInt ||
-      port.kind != ValueKindInt ||
-      block.kind != ValueKindBool)
+      port.kind != ValueKindInt)
     PANIC("accept-connection: wrong argument kinds\n");
 
   struct sockaddr_in address;
@@ -427,8 +417,7 @@ bool accept_connection_intrinsic(Vm *vm) {
     return true;
   }
 
-  if (!block.as._bool)
-    setup_non_blocking_socket(client_socket);
+  setup_non_blocking_socket(client_socket);
 
   value_stack_push_int(&vm->stack, client_socket);
 
@@ -445,17 +434,20 @@ bool close_connection_intrinsic(Vm *vm) {
   return true;
 }
 
+static bool socket_is_non_blocking(i32 socket) {
+  i32 receiver_flags = fcntl(socket, F_GETFL, 0);
+  return (receiver_flags & O_NONBLOCK) != 0;
+}
+
 bool send_intrinsic(Vm *vm) {
-  Value block = value_stack_pop(&vm->stack);
   Value message = value_stack_pop(&vm->stack);
   Value receiver = value_stack_pop(&vm->stack);
   if (receiver.kind != ValueKindInt ||
-      message.kind != ValueKindString ||
-      block.kind != ValueKindBool)
+      message.kind != ValueKindString)
     PANIC("send: wrong argument kinds\n");
 
   i32 flags = 0;
-  if (!block.as._bool)
+  if (socket_is_non_blocking(receiver.as._int))
     flags = MSG_DONTWAIT | MSG_NOSIGNAL;
 
   send(receiver.as._int, message.as.string.str.ptr,
@@ -465,16 +457,14 @@ bool send_intrinsic(Vm *vm) {
 }
 
 bool receive_size_intrinsic(Vm *vm) {
-  Value block = value_stack_pop(&vm->stack);
   Value size = value_stack_pop(&vm->stack);
   Value receiver = value_stack_pop(&vm->stack);
   if (receiver.kind != ValueKindInt ||
-      size.kind != ValueKindInt ||
-      block.kind != ValueKindBool)
+      size.kind != ValueKindInt)
     PANIC("receive-size: wrong argument kinds\n");
 
   i32 flags = 0;
-  if (!block.as._bool)
+  if (socket_is_non_blocking(receiver.as._int))
     flags = MSG_DONTWAIT;
 
   Str buffer;
@@ -488,10 +478,8 @@ bool receive_size_intrinsic(Vm *vm) {
 }
 
 bool receive_intrinsic(Vm *vm) {
-  Value block = value_stack_pop(&vm->stack);
   Value receiver = value_stack_pop(&vm->stack);
-  if (receiver.kind != ValueKindInt ||
-      block.kind != ValueKindBool)
+  if (receiver.kind != ValueKindInt)
     PANIC("receive: wrong argument kinds\n");
 
   u32 cap = DEFAULT_RECEIVE_BUFFER_SIZE;
@@ -500,7 +488,7 @@ bool receive_intrinsic(Vm *vm) {
   buffer.ptr = rc_arena_alloc(vm->rc_arena, cap);
 
   i32 flags = 0;
-  if (!block.as._bool)
+  if (socket_is_non_blocking(receiver.as._int))
     flags = MSG_DONTWAIT;
 
   i32 len = 0;
@@ -579,25 +567,19 @@ Intrinsic system_intrinsics[] = {
   // Arguments
   { STR_LIT("get-args"), true, 0, {}, &get_args_intrinsic },
   // Sockets
-  { STR_LIT("create-server"), true, 2,
-    { ValueKindInt, ValueKindBool },
-    &create_server_intrinsic },
-  { STR_LIT("create-client"), true, 3,
-    { ValueKindString, ValueKindInt, ValueKindBool },
+  { STR_LIT("create-server"), true, 1, { ValueKindInt }, &create_server_intrinsic },
+  { STR_LIT("create-client"), true, 2,
+    { ValueKindString, ValueKindInt },
     &create_client_intrinsic },
-  { STR_LIT("accept-connection"), true, 3,
-    { ValueKindInt, ValueKindInt, ValueKindBool },
+  { STR_LIT("accept-connection"), true, 2,
+    { ValueKindInt, ValueKindInt },
     &accept_connection_intrinsic },
   { STR_LIT("close-connection"), false, 1, { ValueKindInt }, &close_connection_intrinsic },
-  { STR_LIT("send"), false, 3,
-    { ValueKindInt, ValueKindString, ValueKindBool },
-    &send_intrinsic },
-  { STR_LIT("receive-size"), true, 3,
-    { ValueKindInt, ValueKindInt, ValueKindBool },
+  { STR_LIT("send"), false, 2, { ValueKindInt, ValueKindString }, &send_intrinsic },
+  { STR_LIT("receive-size"), true, 2,
+    { ValueKindInt, ValueKindInt },
     &receive_size_intrinsic },
-  { STR_LIT("receive"), true, 2,
-    { ValueKindInt, ValueKindBool },
-    &receive_intrinsic },
+  { STR_LIT("receive"), true, 1, { ValueKindInt }, &receive_intrinsic },
   // Processes
   { STR_LIT("run-command"), true, 1, { ValueKindString }, &run_command_intrinsic },
   { STR_LIT("sleep"), false, 1, { ValueKindFloat }, &sleep_intrinsic },
