@@ -303,13 +303,6 @@ bool get_args_intrinsic(Vm *vm) {
   return true;
 }
 
-static void setup_non_blocking_socket(i32 socket) {
-  fcntl(socket, F_SETFL, O_NONBLOCK);
-
-  i32 enable = 1;
-  setsockopt(socket, SOL_TCP, TCP_NODELAY, &enable, sizeof(enable));
-}
-
 bool create_server_intrinsic(Vm *vm) {
   Value port = value_stack_pop(&vm->stack);
   if (port.kind != ValueKindInt)
@@ -321,11 +314,13 @@ bool create_server_intrinsic(Vm *vm) {
     return true;
   }
 
-  i32 enable = 1;
-  setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
-  setup_non_blocking_socket(server_socket);
+  fcntl(server_socket, F_SETFL, O_NONBLOCK);
 
-  struct sockaddr_in address;
+  i32 enable = 1;
+  setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &enable, sizeof(enable));
+  setsockopt(server_socket, SOL_TCP, TCP_NODELAY, &enable, sizeof(enable));
+
+  struct sockaddr_in address = {0};
   address.sin_family = AF_INET;
   address.sin_addr.s_addr = INADDR_ANY;
   address.sin_port = htons(port.as._int);
@@ -359,6 +354,9 @@ bool create_client_intrinsic(Vm *vm) {
 
     return true;
   }
+
+  i32 enable = 1;
+  setsockopt(client_socket, SOL_TCP, TCP_NODELAY, &enable, sizeof(enable));
 
   struct sockaddr_in server_address;
   server_address.sin_family = AF_INET;
@@ -417,7 +415,8 @@ bool accept_connection_intrinsic(Vm *vm) {
     return true;
   }
 
-  setup_non_blocking_socket(client_socket);
+  i32 enable = 1;
+  setsockopt(client_socket, SOL_TCP, TCP_NODELAY, &enable, sizeof(enable));
 
   value_stack_push_int(&vm->stack, client_socket);
 
@@ -434,11 +433,6 @@ bool close_connection_intrinsic(Vm *vm) {
   return true;
 }
 
-static bool socket_is_non_blocking(i32 socket) {
-  i32 receiver_flags = fcntl(socket, F_GETFL, 0);
-  return (receiver_flags & O_NONBLOCK) != 0;
-}
-
 bool send_intrinsic(Vm *vm) {
   Value message = value_stack_pop(&vm->stack);
   Value receiver = value_stack_pop(&vm->stack);
@@ -446,12 +440,8 @@ bool send_intrinsic(Vm *vm) {
       message.kind != ValueKindString)
     PANIC("send: wrong argument kinds\n");
 
-  i32 flags = 0;
-  if (socket_is_non_blocking(receiver.as._int))
-    flags = MSG_DONTWAIT | MSG_NOSIGNAL;
-
   send(receiver.as._int, message.as.string.str.ptr,
-       message.as.string.str.len, flags);
+       message.as.string.str.len, 0);
 
   return true;
 }
@@ -463,14 +453,10 @@ bool receive_size_intrinsic(Vm *vm) {
       size.kind != ValueKindInt)
     PANIC("receive-size: wrong argument kinds\n");
 
-  i32 flags = 0;
-  if (socket_is_non_blocking(receiver.as._int))
-    flags = MSG_DONTWAIT;
-
   Str buffer;
   buffer.len = size.as._int;
   buffer.ptr = rc_arena_alloc(vm->rc_arena, buffer.len);
-  recv(receiver.as._int, buffer.ptr, buffer.len, flags);
+  recv(receiver.as._int, buffer.ptr, buffer.len, 0);
 
   value_stack_push_string(&vm->stack, buffer);
 
@@ -480,21 +466,17 @@ bool receive_size_intrinsic(Vm *vm) {
 bool receive_intrinsic(Vm *vm) {
   Value receiver = value_stack_pop(&vm->stack);
   if (receiver.kind != ValueKindInt)
-    PANIC("receive: wrong argument kinds\n");
+    PANIC("receive: wrong argument kind\n");
 
   u32 cap = DEFAULT_RECEIVE_BUFFER_SIZE;
 
   Str buffer = {0};
   buffer.ptr = rc_arena_alloc(vm->rc_arena, cap);
 
-  i32 flags = 0;
-  if (socket_is_non_blocking(receiver.as._int))
-    flags = MSG_DONTWAIT;
-
   i32 len = 0;
   while ((len = recv(receiver.as._int,
                      buffer.ptr + buffer.len,
-                     cap - buffer.len, flags)) > 0) {
+                     cap - buffer.len, MSG_DONTWAIT)) > 0) {
     buffer.len += (u32) len;
 
     if (buffer.len >= cap) {

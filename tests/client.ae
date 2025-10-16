@@ -1,0 +1,10 @@
+(use '../std/base/base.ae')
+(use '../std/system/system.ae')
+
+(let client (create-client '127.0.0.1' 8080))
+(if (unit? client)
+  (println 'ERROR: Could not connect to server')
+  (exit 1))
+
+(println (receive client))
+(send client 'Hi!')
