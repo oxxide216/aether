@@ -1,0 +1,5 @@
+(use '../std/system.ae')
+
+(let name 'John')
+(printf 'Hello, ' name '!\n')
+(printlnf 'Hi, ' name '!')

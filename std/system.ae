@@ -1,3 +1,5 @@
+(use 'base.ae')
+
 ;; IO
 (let print [aeg] -> import 'print')
 (let println [aeg] -> import 'println')
@@ -33,3 +35,13 @@
 ;; Processes
 (let run-command [command] -> import 'run-command')
 (let sleep [time] -> import 'sleep')
+
+(let -printf [args] ->
+  (for args arg
+    (print arg)))
+
+(macro printf [...args] ->
+  (-printf [args]))
+
+(macro printlnf [...args] ->
+  (-printf [args '\n']))
