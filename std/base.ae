@@ -3,7 +3,7 @@
 (let tail [list] -> import 'tail')
 (let last [list] -> import 'last')
 (let nth [list index] -> import 'nth')
-(let len [list] -> import 'len')
+(let len [collection] -> import 'len')
 (let is-empty [list] -> import 'is-empty')
 (let get-range [list begin end] -> import 'get-range')
 (let exit [exit-code] -> import 'exit')

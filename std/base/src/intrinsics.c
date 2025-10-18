@@ -1173,6 +1173,7 @@ Intrinsic base_intrinsics[] = {
   { STR_LIT("last"), true, 1, { ValueKindList }, &last_intrinsic },
   { STR_LIT("nth"), true, 2, { ValueKindList, ValueKindInt }, &nth_intrinsic },
   { STR_LIT("len"), true, 1, { ValueKindList }, &len_intrinsic },
+  { STR_LIT("len"), true, 1, { ValueKindString }, &len_intrinsic },
   { STR_LIT("get-range"), true, 3,
     { ValueKindList, ValueKindInt, ValueKindInt },
     &get_range_intrinsic },

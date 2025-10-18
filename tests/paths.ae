@@ -1,4 +1,4 @@
-(use '../std/system/system.ae')
+(use '../std/system.ae')
 
 (println (get-current-path))
 (set-current-path '..')

@@ -1,5 +1,5 @@
-(use '../std/base/base.ae')
-(use '../std/system/system.ae')
+(use '../std/base.ae')
+(use '../std/system.ae')
 
 (let list [0 1 2 3])
 (set list (map [num] -> (+ num 1) <- list))

@@ -6,6 +6,9 @@
 #include "shl_log.h"
 #include "shl_arena.h"
 
+#define STD_PREFIX "/usr/include/aether/"
+#define INCLUDE_PATHS(current_file_path) { current_file_path, STD_PREFIX }
+
 #define MASK(id) (1 << (id))
 
 typedef struct {
@@ -676,14 +679,32 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     new_file_path.ptr += 1;
     new_file_path.len -= 2;
 
+    char *prefix = str_to_cstr(get_file_dir(current_file_path));
+    char *include_paths[] = INCLUDE_PATHS(prefix);
     StringBuilder path_sb = {0};
-    sb_push_str(&path_sb, get_file_dir(current_file_path));
-    sb_push_str(&path_sb, new_file_path);
-    char *path = str_to_cstr(sb_to_str(path_sb));
+    char *path = NULL;
+    Str code;
 
-    Str code = read_file(path);
+    for (u32 i = 0; i < ARRAY_LEN(include_paths); ++i) {
+      if (path) {
+        free(path);
+        path = NULL;
+      }
+
+      sb_push(&path_sb, include_paths[i]);
+      sb_push_str(&path_sb, new_file_path);
+
+      path = str_to_cstr(sb_to_str(path_sb));
+      code = read_file(path);
+
+      if (code.len != (u32) -1)
+        break;
+
+      path_sb.len = 0;
+    }
+
     if (code.len == (u32) -1) {
-      ERROR("File %s was not found\n", path);
+      ERROR("File "STR_FMT" was not found\n", STR_ARG(new_file_path));
       exit(1);
     }
 
@@ -692,7 +713,9 @@ static IrExpr *parser_parse_expr(Parser *parser) {
 
     parser_expect_token(parser, MASK(TT_CPAREN));
 
+    free(prefix);
     free(path_sb.buffer);
+    free(path);
   } break;
 
   case TT_FIELD: {

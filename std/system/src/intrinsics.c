@@ -148,6 +148,22 @@ bool input_intrinsic(Vm *vm) {
   return true;
 }
 
+bool unblock_input_intrinsic(Vm *vm) {
+  (void) vm;
+
+  fcntl(0, F_SETFL, fcntl(0, F_GETFL) | O_NONBLOCK);
+
+  return true;
+}
+
+bool block_input_intrinsic(Vm *vm) {
+  (void) vm;
+
+  fcntl(0, F_SETFL, fcntl(0, F_GETFL) ^ O_NONBLOCK);
+
+  return true;
+}
+
 bool file_exists_intrinsic(Vm *vm) {
   Value path = value_stack_pop(&vm->stack);
   if (path.kind != ValueKindString)
@@ -534,6 +550,8 @@ Intrinsic system_intrinsics[] = {
   { STR_LIT("println"), false, 1, { ValueKindUnit }, &println_intrinsic },
   { STR_LIT("input-size"), true, 1, { ValueKindInt }, &input_size_intrinsic },
   { STR_LIT("input"), true, 0, {}, &input_intrinsic },
+  { STR_LIT("unblock-input"), false, 0, {}, &unblock_input_intrinsic },
+  { STR_LIT("block-input"), false, 0, {}, &block_input_intrinsic },
   // Files
   { STR_LIT("file-exists"), true, 1, { ValueKindString }, &file_exists_intrinsic },
   { STR_LIT("read-file"), true, 1, { ValueKindString }, &read_file_intrinsic },

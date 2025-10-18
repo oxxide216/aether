@@ -1,6 +1,6 @@
-(use '../std/base/base.ae')
-(use '../std/system/system.ae')
-(use '../std/iui/iui.ae')
+(use '../std/base.ae')
+(use '../std/system.ae')
+(use '../std/iui.ae')
 
 (let menu-size { x: 350.0 y: 250.0 })
 
