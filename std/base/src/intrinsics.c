@@ -669,13 +669,28 @@ bool sub_intrinsic(Vm *vm) {
 }
 
 bool mul_intrinsic(Vm *vm) {
-  Value a, b;
-  prepare_rwo_numbers(&a, &b, vm);
+  Value b = value_stack_pop(&vm->stack);
+  Value a = value_stack_pop(&vm->stack);
 
-  if (a.kind == ValueKindInt)
+  if (a.kind == ValueKindInt) {
     value_stack_push_int(&vm->stack, a.as._int * b.as._int);
-  else if (a.kind == ValueKindFloat)
+  } else if (a.kind == ValueKindFloat) {
     value_stack_push_float(&vm->stack, a.as._float * b.as._float);
+  } else if (a.kind == ValueKindString) {
+    StringBuilder sb = {0};
+    for (u32 i = 0; i < b.as._int; ++i)
+      sb_push_str(&sb, a.as.string.str);
+
+    Str result = {
+      rc_arena_alloc(vm->rc_arena, sb.len),
+      sb.len,
+    };
+    memcpy(result.ptr, sb.buffer, result.len);
+
+    free(sb.buffer);
+
+    value_stack_push_string(&vm->stack, result);
+  }
 
   return true;
 }
@@ -1133,6 +1148,7 @@ Intrinsic base_intrinsics[] = {
   { STR_LIT("sub"), true, 2, { ValueKindFloat, ValueKindFloat }, &sub_intrinsic },
   { STR_LIT("mul"), true, 2, { ValueKindInt, ValueKindInt }, &mul_intrinsic },
   { STR_LIT("mul"), true, 2, { ValueKindFloat, ValueKindFloat }, &mul_intrinsic },
+  { STR_LIT("mul"), true, 2, { ValueKindString, ValueKindInt }, &mul_intrinsic },
   { STR_LIT("div"), true, 2, { ValueKindInt, ValueKindInt }, &div_intrinsic },
   { STR_LIT("div"), true, 2, { ValueKindFloat, ValueKindFloat }, &div_intrinsic },
   { STR_LIT("mod"), true, 2, { ValueKindInt, ValueKindInt }, mod_intrinsic },
