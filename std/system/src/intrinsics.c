@@ -283,7 +283,8 @@ bool list_directory_intrinsic(Vm *vm) {
       path.ptr = rc_arena_alloc(vm->rc_arena, path.len);
       memcpy(path.ptr, entry->d_name, path.len);
 
-      LL_PREPEND(list, list_end, ListNode);
+      list_end->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+      list_end = list_end->next;
       list_end->value.kind = ValueKindString;
       list_end->value.as.string = (String) { path, (Str *) path.ptr };
     }
