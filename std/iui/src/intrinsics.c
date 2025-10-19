@@ -209,9 +209,9 @@ bool iui_text_intrinsic(Vm *vm) {
   Value center_x = value_stack_pop(&vm->stack);
   Value text = value_stack_pop(&vm->stack);
   if (text.kind != ValueKindString ||
-      left_padding.kind != ValueKindFloat ||
       center_x.kind != ValueKindBool ||
-      center_y.kind != ValueKindBool)
+      center_y.kind != ValueKindBool ||
+      left_padding.kind != ValueKindFloat)
     PANIC("iui-text: wrong argument kinds\n");
 
   iui_widgets_push_text(&iui.widgets, text.as.string.str,
@@ -343,7 +343,7 @@ Intrinsic iui_intrinsics[] = {
     { ValueKindString, ValueKindFunc },
     &iui_button_intrinsic },
   { STR_LIT("iui-text"), false, 4,
-    { ValueKindString, ValueKindFloat, ValueKindBool, ValueKindBool },
+    { ValueKindString, ValueKindBool, ValueKindBool, ValueKindFloat },
     &iui_text_intrinsic },
   { STR_LIT("iui-input"), false, 3,
     { ValueKindString, ValueKindFloat, ValueKindFunc },

@@ -5,11 +5,7 @@
 (let menu-size { x: 350.0 y: 250.0 })
 
 (let main-loop [window-size] ->
-  (iui-abs-bounds
-    (/ (- (field window-size x) (field menu-size x)) 2.0)
-    (/ (- (field window-size y) (field menu-size y)) 2.0)
-    (field menu-size x)
-    (field menu-size y))
+  (iui-center window-size menu-size)
   (iui-vbox 0.0 0.0 25.0
     (iui-header 'Label!')
     (iui-input 'Type here...'

@@ -24,3 +24,10 @@
 
 (macro iui-input [placeholder ...body] ->
   (-iui-input placeholder 5.0 [content] -> body))
+
+(let iui-center [outer-size inner-size] ->
+  (iui-abs-bounds
+    (/ (- (field outer-size x) (field inner-size x)) 2.0)
+    (/ (- (field outer-size y) (field inner-size y)) 2.0)
+    (field inner-size x)
+    (field inner-size y)))
