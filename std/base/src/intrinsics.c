@@ -99,7 +99,7 @@ bool get_range_intrinsic(Vm *vm) {
   Value len = value_stack_pop(&vm->stack);
 
   if (begin.as._int < 0 || begin.as._int >= len.as._int ||
-      end.as._int <= 0 || end.as._int >= len.as._int ||
+      end.as._int <= 0 || end.as._int > len.as._int ||
       begin.as._int >= end.as._int) {
     value_stack_push_unit(&vm->stack);
     return true;
@@ -125,7 +125,7 @@ bool get_range_intrinsic(Vm *vm) {
   } else {
     Str sub_string = {
       value.as.string.str.ptr + begin.as._int,
-      value.as.string.str.len - begin.as._int - end.as._int,
+      end.as._int - begin.as._int,
     };
 
     value_stack_push_string(&vm->stack, sub_string);
@@ -1085,6 +1085,9 @@ Intrinsic base_intrinsics[] = {
   { STR_LIT("len"), true, 1, { ValueKindString }, &len_intrinsic },
   { STR_LIT("get-range"), true, 3,
     { ValueKindList, ValueKindInt, ValueKindInt },
+    &get_range_intrinsic },
+  { STR_LIT("get-range"), true, 3,
+    { ValueKindString, ValueKindInt, ValueKindInt },
     &get_range_intrinsic },
   { STR_LIT("exit"), false, 1, { ValueKindInt }, &exit_intrinsic },
   { STR_LIT("eval"), false, 1, { ValueKindString }, &eval_intrinsic },
