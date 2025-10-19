@@ -327,6 +327,12 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       return ExecStateExit;
     }
 
+    if (expr->as.func_call.args.len != func_value.as.func.args.len) {
+      ERROR("Wrong arguments count: %u, expected %u\n", expr->as.func_call.args.len,
+            func_value.as.func.args.len);
+      return ExecStateExit;
+    }
+
     for (u32 i = 0; i < expr->as.func_call.args.len; ++i)
       EXECUTE_EXPR(vm, expr->as.func_call.args.items[i], true);
 
