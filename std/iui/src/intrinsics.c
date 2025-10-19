@@ -64,11 +64,6 @@ bool iui_main_loop_intrinsic(Vm *vm) {
   Value height = value_stack_pop(&vm->stack);
   Value width = value_stack_pop(&vm->stack);
   Value title = value_stack_pop(&vm->stack);
-  if (title.kind != ValueKindString ||
-      width.kind != ValueKindInt ||
-      height.kind != ValueKindInt ||
-      body.kind != ValueKindFunc)
-    PANIC("iui-main-loop: wrong argument kinds\n");
 
   iui.winx = winx_init();
   iui.window = winx_init_window(&iui.winx, title.as.string.str,
@@ -130,11 +125,6 @@ bool iui_vbox_intrinsic(Vm *vm) {
   Value spacing = value_stack_pop(&vm->stack);
   Value margin_y = value_stack_pop(&vm->stack);
   Value margin_x = value_stack_pop(&vm->stack);
-  if (margin_x.kind != ValueKindFloat ||
-      margin_y.kind != ValueKindFloat ||
-      spacing.kind != ValueKindFloat ||
-      body.kind != ValueKindFunc)
-    PANIC("iui-vbox: wrong argument kinds\n");
 
   iui_widgets_push_box_begin(&iui.widgets, vec2(margin_x.as._float, margin_y.as._float),
                              spacing.as._float, IuiBoxDirectionVertical);
@@ -151,11 +141,6 @@ bool iui_hbox_intrinsic(Vm *vm) {
   Value spacing = value_stack_pop(&vm->stack);
   Value margin_y = value_stack_pop(&vm->stack);
   Value margin_x = value_stack_pop(&vm->stack);
-  if (margin_x.kind != ValueKindFloat ||
-      margin_y.kind != ValueKindFloat ||
-      spacing.kind != ValueKindFloat ||
-      body.kind != ValueKindFunc)
-    PANIC("iui-hbox: wrong argument kinds\n");
 
   iui_widgets_push_box_begin(&iui.widgets, vec2(margin_x.as._float, margin_y.as._float),
                              spacing.as._float, IuiBoxDirectionHorizontal);
@@ -170,9 +155,6 @@ bool iui_hbox_intrinsic(Vm *vm) {
 bool iui_button_intrinsic(Vm *vm) {
   Value on_click = value_stack_pop(&vm->stack);
   Value text = value_stack_pop(&vm->stack);
-  if (text.kind != ValueKindString ||
-      on_click.kind != ValueKindFunc)
-    PANIC("iui-button: wrong argument kinds\n");
 
   IuiWidget *button = iui_widgets_push_button(&iui.widgets,
                                               text.as.string.str,
@@ -208,11 +190,6 @@ bool iui_text_intrinsic(Vm *vm) {
   Value center_y = value_stack_pop(&vm->stack);
   Value center_x = value_stack_pop(&vm->stack);
   Value text = value_stack_pop(&vm->stack);
-  if (text.kind != ValueKindString ||
-      center_x.kind != ValueKindBool ||
-      center_y.kind != ValueKindBool ||
-      left_padding.kind != ValueKindFloat)
-    PANIC("iui-text: wrong argument kinds\n");
 
   iui_widgets_push_text(&iui.widgets, text.as.string.str,
                         center_x.as._bool, center_y.as._bool,
@@ -225,10 +202,6 @@ bool iui_input_intrinsic(Vm *vm) {
   Value on_submit = value_stack_pop(&vm->stack);
   Value left_padding = value_stack_pop(&vm->stack);
   Value placeholder = value_stack_pop(&vm->stack);
-  if (placeholder.kind != ValueKindString ||
-      left_padding.kind != ValueKindFloat ||
-      on_submit.kind != ValueKindFunc)
-    PANIC("iui-input: wrong argument kinds\n");
 
   IuiWidget *input = iui_widgets_push_input(&iui.widgets, placeholder.as.string.str,
                                             left_padding.as._float, on_submit.as.func);
@@ -312,11 +285,6 @@ bool iui_abs_bounds_intrinsic(Vm *vm) {
   Value width = value_stack_pop(&vm->stack);
   Value y = value_stack_pop(&vm->stack);
   Value x = value_stack_pop(&vm->stack);
-  if (x.kind != ValueKindFloat ||
-      y.kind != ValueKindFloat ||
-      width.kind != ValueKindFloat ||
-      height.kind != ValueKindFloat)
-    PANIC("iui-abs: wrong argument kinds\n");
 
   Vec4 bounds = {
     x.as._float,

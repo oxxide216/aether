@@ -109,8 +109,6 @@ bool println_intrinsic(Vm *vm) {
 
 bool input_size_intrinsic(Vm *vm) {
   Value size = value_stack_pop(&vm->stack);
-  if (size.kind != ValueKindInt)
-    PANIC("input-size: wrong argument kind\n");
 
   Str buffer;
   buffer.len = size.as._int;
@@ -166,8 +164,6 @@ bool block_input_intrinsic(Vm *vm) {
 
 bool file_exists_intrinsic(Vm *vm) {
   Value path = value_stack_pop(&vm->stack);
-  if (path.kind != ValueKindString)
-    PANIC("file-exists?: wrong argument kind\n");
 
   char *path_cstring = malloc(path.as.string.str.len + 1);
   memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
@@ -182,8 +178,6 @@ bool file_exists_intrinsic(Vm *vm) {
 
 bool read_file_intrinsic(Vm *vm) {
   Value path = value_stack_pop(&vm->stack);
-  if (path.kind != ValueKindString)
-    PANIC("read-file: wrong argument kind\n");
 
   char *path_cstring = malloc(path.as.string.str.len + 1);
   memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
@@ -203,9 +197,6 @@ bool read_file_intrinsic(Vm *vm) {
 bool write_file_intrinsic(Vm *vm) {
   Value path = value_stack_pop(&vm->stack);
   Value content = value_stack_pop(&vm->stack);
-  if (path.kind != ValueKindString ||
-      content.kind != ValueKindString)
-    PANIC("write-file: wrong argument kinds\n");
 
   char *path_cstring = malloc(path.as.string.str.len + 1);
   memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
@@ -220,8 +211,6 @@ bool write_file_intrinsic(Vm *vm) {
 
 bool delete_file_intrinsic(Vm *vm) {
   Value path = value_stack_pop(&vm->stack);
-  if (path.kind != ValueKindString)
-    PANIC("delete-file: wrong argument kind\n");
 
   char *path_cstring = malloc(path.as.string.str.len + 1);
   memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
@@ -245,8 +234,6 @@ bool get_current_path_intrinsic(Vm *vm) {
 
 bool set_current_path_intrinsic(Vm *vm) {
   Value path = value_stack_pop(&vm->stack);
-  if (path.kind != ValueKindString)
-    PANIC("set-current-path: wrong argument kind\n");
 
   char *path_cstring = malloc(path.as.string.str.len + 1);
   memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
@@ -261,8 +248,6 @@ bool set_current_path_intrinsic(Vm *vm) {
 
 bool get_absolute_path_intrinsic(Vm *vm) {
   Value path = value_stack_pop(&vm->stack);
-  if (path.kind != ValueKindString)
-    PANIC("get-absolute-path: wrong argument kind\n");
 
   char *path_cstring = malloc(path.as.string.str.len + 1);
   memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
@@ -280,8 +265,6 @@ bool get_absolute_path_intrinsic(Vm *vm) {
 
 bool list_directory_intrinsic(Vm *vm) {
   Value path = value_stack_pop(&vm->stack);
-  if (path.kind != ValueKindString)
-    PANIC("list-directory: wrong argument kind\n");
 
   ListNode *list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
   ListNode *list_end = list;
@@ -321,8 +304,6 @@ bool get_args_intrinsic(Vm *vm) {
 
 bool create_server_intrinsic(Vm *vm) {
   Value port = value_stack_pop(&vm->stack);
-  if (port.kind != ValueKindInt)
-    PANIC("create-server: wrong argument kinds\n");
 
   i32 server_socket = socket(AF_INET, SOCK_STREAM, 0);
   if (server_socket < 0) {
@@ -360,9 +341,6 @@ bool create_server_intrinsic(Vm *vm) {
 bool create_client_intrinsic(Vm *vm) {
   Value port = value_stack_pop(&vm->stack);
   Value server_ip_address = value_stack_pop(&vm->stack);
-  if (server_ip_address.kind != ValueKindString ||
-      port.kind != ValueKindInt)
-    PANIC("create-client: wrong argument kinds\n");
 
   i32 client_socket = socket(AF_INET, SOCK_STREAM, 0);
   if (client_socket < 0) {
@@ -412,9 +390,6 @@ bool create_client_intrinsic(Vm *vm) {
 bool accept_connection_intrinsic(Vm *vm) {
   Value port = value_stack_pop(&vm->stack);
   Value server_socket = value_stack_pop(&vm->stack);
-  if (server_socket.kind != ValueKindInt ||
-      port.kind != ValueKindInt)
-    PANIC("accept-connection: wrong argument kinds\n");
 
   struct sockaddr_in address;
   address.sin_family = AF_INET;
@@ -441,8 +416,6 @@ bool accept_connection_intrinsic(Vm *vm) {
 
 bool close_connection_intrinsic(Vm *vm) {
   Value client_socket = value_stack_pop(&vm->stack);
-  if (client_socket.kind != ValueKindInt)
-    PANIC("close-connection: wrong argument kind\n");
 
   close(client_socket.as._int);
 
@@ -452,9 +425,6 @@ bool close_connection_intrinsic(Vm *vm) {
 bool send_intrinsic(Vm *vm) {
   Value message = value_stack_pop(&vm->stack);
   Value receiver = value_stack_pop(&vm->stack);
-  if (receiver.kind != ValueKindInt ||
-      message.kind != ValueKindString)
-    PANIC("send: wrong argument kinds\n");
 
   send(receiver.as._int, message.as.string.str.ptr,
        message.as.string.str.len, 0);
@@ -465,9 +435,6 @@ bool send_intrinsic(Vm *vm) {
 bool receive_size_intrinsic(Vm *vm) {
   Value size = value_stack_pop(&vm->stack);
   Value receiver = value_stack_pop(&vm->stack);
-  if (receiver.kind != ValueKindInt ||
-      size.kind != ValueKindInt)
-    PANIC("receive-size: wrong argument kinds\n");
 
   Str buffer;
   buffer.len = size.as._int;
@@ -481,8 +448,6 @@ bool receive_size_intrinsic(Vm *vm) {
 
 bool receive_intrinsic(Vm *vm) {
   Value receiver = value_stack_pop(&vm->stack);
-  if (receiver.kind != ValueKindInt)
-    PANIC("receive: wrong argument kind\n");
 
   u32 cap = DEFAULT_RECEIVE_BUFFER_SIZE;
 
@@ -520,8 +485,6 @@ bool receive_intrinsic(Vm *vm) {
 
 bool run_command_intrinsic(Vm *vm) {
   Value path = value_stack_pop(&vm->stack);
-  if (path.kind != ValueKindString)
-    PANIC("run-command: wrong argument kind\n");
 
   char *path_cstring = malloc(path.as.string.str.len + 1);
   memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
@@ -536,8 +499,6 @@ bool run_command_intrinsic(Vm *vm) {
 
 bool sleep_intrinsic(Vm *vm) {
   Value time = value_stack_pop(&vm->stack);
-  if (time.kind != ValueKindFloat)
-    PANIC("sleep: wrong argument kind\n");
 
   usleep((i64) (time.as._float * 1000000.0));
 
