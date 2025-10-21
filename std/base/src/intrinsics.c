@@ -2,6 +2,7 @@
 
 #include "base/intrinsics.h"
 #include "aether/parser.h"
+#include "aether/serializer.h"
 #include "aether/deserializer.h"
 
 bool head_intrinsic(Vm *vm) {
@@ -141,20 +142,19 @@ bool exit_intrinsic(Vm *vm) {
   return false;
 }
 
-bool eval_intrinsic(Vm *vm) {
+bool compile_intrinsic(Vm *vm) {
   Value code = value_stack_pop(&vm->stack);
 
   Ir ir = parse(code.as.string.str, "eval");
+  Str bytecode = {0};
+  bytecode.ptr = (char *) serialize(&ir, &bytecode.len);
 
-  i32 argc = 1;
-  char *argv[] = { "eval", NULL };
-  Intrinsics intrinsics = {0};
-  execute(&ir, argc, argv, vm->rc_arena, &intrinsics);
+  value_stack_push_string(&vm->stack, bytecode);
 
   return true;
 }
 
-bool eval_bytes_intrinsic(Vm *vm) {
+bool eval_intrinsic(Vm *vm) {
   Value bytecode = value_stack_pop(&vm->stack);
 
   Ir ir = deserialize((u8 *) bytecode.as.string.str.ptr,
@@ -162,7 +162,7 @@ bool eval_bytes_intrinsic(Vm *vm) {
                        vm->rc_arena);
 
   i32 argc = 1;
-  char *argv[] = { "eval", NULL };
+  char *argv[] = { "aether", "eval", NULL };
   Intrinsics intrinsics = {0};
   execute(&ir, argc, argv, vm->rc_arena, &intrinsics);
 
@@ -1105,8 +1105,8 @@ Intrinsic base_intrinsics[] = {
     { ValueKindString, ValueKindInt, ValueKindInt },
     &get_range_intrinsic },
   { STR_LIT("exit"), false, 1, { ValueKindInt }, &exit_intrinsic },
+  { STR_LIT("compile"), true, 1, { ValueKindString }, &compile_intrinsic },
   { STR_LIT("eval"), false, 1, { ValueKindString }, &eval_intrinsic },
-  { STR_LIT("eval-bytes"), false, 1, { ValueKindString }, &eval_bytes_intrinsic },
   // Functional stuff
   { STR_LIT("map"), true, 2, { ValueKindFunc, ValueKindList }, &map_intrinsic },
   { STR_LIT("filter"), true, 2, { ValueKindFunc, ValueKindList }, &filter_intrinsic },

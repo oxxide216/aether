@@ -1,3 +1,0 @@
-(use '../std/system.ae')
-
-(println 'Hello from evaluated bytecode!')
