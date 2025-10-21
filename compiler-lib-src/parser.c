@@ -249,8 +249,8 @@ static void parser_parse_macro_def(Parser *parser) {
 
 static IrExpr *parser_parse_expr(Parser *parser);
 
-static IrExprRecord parser_parse_record(Parser *parser) {
-  IrExprRecord record = {0};
+static IrExprDict parser_parse_dict(Parser *parser) {
+  IrExprDict dict = {0};
 
   Token *token;
   while ((token = parser_peek_token(parser))->id != TT_CCURLY) {
@@ -261,12 +261,12 @@ static IrExprRecord parser_parse_record(Parser *parser) {
     IrExpr *expr = parser_parse_expr(parser);
 
     IrField field = { key, expr };
-    DA_APPEND(record, field);
+    DA_APPEND(dict, field);
   }
 
   parser_expect_token(parser, MASK(TT_CCURLY));
 
-  return record;
+  return dict;
 }
 
 static IrExprLambda parser_parse_lambda(Parser *parser) {
@@ -389,8 +389,8 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   } break;
 
   case TT_OCURLY: {
-    expr->kind = IrExprKindRecord;
-    expr->as.record = parser_parse_record(parser);
+    expr->kind = IrExprKindDict;
+    expr->as.dict = parser_parse_dict(parser);
 
     return expr;
   } break;
@@ -540,7 +540,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     parser_next_token(parser);
 
     expr->kind = IrExprKindField;
-    expr->as.field.record = parser_parse_expr(parser);
+    expr->as.field.dict = parser_parse_expr(parser);
     expr->as.field.field = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
 
     if (parser_peek_token(parser)->id != TT_CPAREN) {

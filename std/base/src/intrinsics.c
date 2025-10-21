@@ -1025,7 +1025,7 @@ bool type_intrinsic(Vm *vm) {
     value_stack_push_string(&vm->stack, STR_LIT("func"));
   } break;
 
-  case ValueKindRecord: {
+  case ValueKindDict: {
     value_stack_push_string(&vm->stack, STR_LIT("record"));
   } break;
 
@@ -1088,7 +1088,7 @@ bool is_func_intrinsic(Vm *vm) {
 
 bool is_record_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, value.kind == ValueKindRecord);
+  value_stack_push_bool(&vm->stack, value.kind == ValueKindDict);
 
   return true;
 }

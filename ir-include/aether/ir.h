@@ -23,7 +23,7 @@ typedef enum {
   IrExprKindFloat,
   IrExprKindBool,
   IrExprKindLambda,
-  IrExprKindRecord,
+  IrExprKindDict,
   IrExprKindRet,
   IrExprKindSelfCall,
 } IrExprKind;
@@ -66,7 +66,7 @@ typedef struct {
 } IrExprSet;
 
 typedef struct {
-  IrExpr *record;
+  IrExpr *dict;
   Str     field;
   bool    is_set;
   IrExpr *expr;
@@ -107,7 +107,7 @@ typedef struct {
   IrExpr *expr;
 } IrField;
 
-typedef Da(IrField) IrExprRecord;
+typedef Da(IrField) IrExprDict;
 
 typedef struct {
   bool    has_expr;
@@ -133,7 +133,7 @@ typedef union {
   IrExprFloat    _float;
   IrExprBool     _bool;
   IrExprLambda   lambda;
-  IrExprRecord   record;
+  IrExprDict     dict;
   IrExprRet      ret;
   IrExprSelfCall self_call;
 } IrExprAs;

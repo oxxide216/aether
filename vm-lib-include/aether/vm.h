@@ -43,7 +43,7 @@ typedef enum {
   ValueKindInt,
   ValueKindFloat,
   ValueKindBool,
-  ValueKindRecord,
+  ValueKindDict,
   ValueKindFunc,
 } ValueKind;
 
@@ -58,7 +58,7 @@ typedef struct NamedValue NamedValue;
 
 typedef Da(NamedValue) NamedValues;
 
-typedef NamedValues Record;
+typedef NamedValues Dict;
 
 typedef struct {
   IrArgs      args;
@@ -73,7 +73,7 @@ typedef union {
   i64       _int;
   f64       _float;
   bool      _bool;
-  Record    record;
+  Dict      dict;
   Func      func;
 } ValueAs;
 
@@ -144,7 +144,7 @@ void value_stack_push_string(ValueStack *stack, Str string);
 void value_stack_push_int(ValueStack *stack, i64 _int);
 void value_stack_push_float(ValueStack *stack, f64 _float);
 void value_stack_push_bool(ValueStack *stack, bool _bool);
-void value_stack_push_record(ValueStack *stack, Record record);
+void value_stack_push_dict(ValueStack *stack, Dict record);
 void value_stack_push_func(ValueStack *stack, Func func);
 
 Value value_stack_pop(ValueStack *stack);

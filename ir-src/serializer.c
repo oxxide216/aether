@@ -78,7 +78,7 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
   } break;
 
   case IrExprKindField: {
-    save_expr_data(expr->as.field.record, data, data_size, end);
+    save_expr_data(expr->as.field.dict, data, data_size, end);
     save_str_data(expr->as.field.field, data, data_size, end);
 
     reserve_space(sizeof(bool), data, data_size, end);
@@ -140,14 +140,14 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
     save_str_data(expr->as.lambda.intrinsic_name, data, data_size, end);
   } break;
 
-  case IrExprKindRecord: {
+  case IrExprKindDict: {
     reserve_space(sizeof(u32), data, data_size, end);
-    *(u32 *) (*data + *end) = expr->as.record.len;
+    *(u32 *) (*data + *end) = expr->as.dict.len;
     *end += sizeof(u32);
 
-    for (u32 i = 0; i < expr->as.record.len; ++i) {
-      save_str_data(expr->as.record.items[i].name, data, data_size, end);
-      save_expr_data(expr->as.record.items[i].expr, data, data_size, end);
+    for (u32 i = 0; i < expr->as.dict.len; ++i) {
+      save_str_data(expr->as.dict.items[i].name, data, data_size, end);
+      save_expr_data(expr->as.dict.items[i].expr, data, data_size, end);
     }
   } break;
 

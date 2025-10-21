@@ -85,7 +85,7 @@ bool iui_main_loop_intrinsic(Vm *vm) {
         break;
     }
 
-    Record window_size = {0};
+    Dict window_size = {0};
 
     NamedValue width = {
       STR_LIT("x"),
@@ -105,7 +105,7 @@ bool iui_main_loop_intrinsic(Vm *vm) {
     };
     DA_APPEND(window_size, height);
 
-    value_stack_push_record(&vm->stack, window_size);
+    value_stack_push_dict(&vm->stack, window_size);
 
     EXECUTE_FUNC(vm, &body.as.func, false);
 

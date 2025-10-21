@@ -45,7 +45,7 @@ static void clone_expr(IrExpr **expr) {
   } break;
 
   case IrExprKindField: {
-    clone_expr(&new_expr->as.field.record);
+    clone_expr(&new_expr->as.field.dict);
     clone_expr(&new_expr->as.field.expr);
   } break;
 
@@ -63,9 +63,9 @@ static void clone_expr(IrExpr **expr) {
     clone_block(&new_expr->as.lambda.body);
   } break;
 
-  case IrExprKindRecord: {
-    for (u32 i = 0; i < new_expr->as.record.len; ++i)
-      clone_expr(&new_expr->as.record.items[i].expr);
+  case IrExprKindDict: {
+    for (u32 i = 0; i < new_expr->as.dict.len; ++i)
+      clone_expr(&new_expr->as.dict.items[i].expr);
   } break;
 
   case IrExprKindRet: {
@@ -275,7 +275,7 @@ void expand_macros(IrExpr *expr, Macros *macros,
   } break;
 
   case IrExprKindField: {
-    INLINE_THEN_EXPAND(expr->as.field.record);
+    INLINE_THEN_EXPAND(expr->as.field.dict);
     INLINE_THEN_EXPAND(expr->as.field.expr);
   } break;
 
@@ -293,9 +293,9 @@ void expand_macros(IrExpr *expr, Macros *macros,
     expand_macros_block(&expr->as.lambda.body, macros, arg_names, args, unpack);
   } break;
 
-  case IrExprKindRecord: {
-    for (u32 i = 0; i < expr->as.record.len; ++i)
-      INLINE_THEN_EXPAND(expr->as.record.items[i].expr);
+  case IrExprKindDict: {
+    for (u32 i = 0; i < expr->as.dict.len; ++i)
+      INLINE_THEN_EXPAND(expr->as.dict.items[i].expr);
   } break;
 
   case IrExprKindRet: {

@@ -3,7 +3,7 @@
 
 #include "../src/widgets.h"
 #include "../src/renderer.h"
-#include "aether-vm/vm.h"
+#include "aether/vm.h"
 #include "winx/winx.h"
 #include "winx/event.h"
 #include "glass/glass.h"

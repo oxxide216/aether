@@ -105,7 +105,7 @@ static void get_expr_data_size(u8 *data, u32 *size) {
     get_str_data_size(data, size);
   } break;
 
-  case IrExprKindRecord: {
+  case IrExprKindDict: {
     u32 len = *(u32 *) (data + *size);
     *size += sizeof(u32);
 
@@ -208,9 +208,9 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
   } break;
 
   case IrExprKindField: {
-    expr->as.field.record = aalloc(sizeof(IrExpr));
+    expr->as.field.dict = aalloc(sizeof(IrExpr));
 
-    load_expr_data(expr->as.field.record, data, end, rc_arena);
+    load_expr_data(expr->as.field.dict, data, end, rc_arena);
     load_str_data(&expr->as.field.field, data, end, rc_arena);
 
     expr->as.field.is_set = *(bool *) (data + *end);
@@ -276,16 +276,16 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
     load_str_data(&expr->as.lambda.intrinsic_name, data, end, rc_arena);
   } break;
 
-  case IrExprKindRecord: {
-    expr->as.record.len = *(u32 *) (data + *end);
+  case IrExprKindDict: {
+    expr->as.dict.len = *(u32 *) (data + *end);
     *end += sizeof(u32);
 
-    expr->as.record.items = malloc(expr->as.record.len * sizeof(IrField));
-    for (u32 i = 0; i < expr->as.record.len; ++i) {
-      expr->as.record.items[i].expr = aalloc(sizeof(IrExpr));
+    expr->as.dict.items = malloc(expr->as.dict.len * sizeof(IrField));
+    for (u32 i = 0; i < expr->as.dict.len; ++i) {
+      expr->as.dict.items[i].expr = aalloc(sizeof(IrExpr));
 
-      load_str_data(&expr->as.record.items[i].name, data, end, rc_arena);
-      load_expr_data(expr->as.record.items[i].expr, data, end, rc_arena);
+      load_str_data(&expr->as.dict.items[i].name, data, end, rc_arena);
+      load_expr_data(expr->as.dict.items[i].expr, data, end, rc_arena);
     }
   } break;
 

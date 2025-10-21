@@ -71,8 +71,8 @@ void value_stack_push_bool(ValueStack *stack, bool _bool) {
   DA_APPEND(*stack, value);
 }
 
-void value_stack_push_record(ValueStack *stack, Record record) {
-  Value value = { ValueKindRecord, { .record = record } };
+void value_stack_push_dict(ValueStack *stack, Dict dict) {
+  Value value = { ValueKindDict, { .dict = dict } };
   DA_APPEND(*stack, value);
 }
 
@@ -96,9 +96,9 @@ void free_value(Value *value, RcArena *rc_arena) {
     }
   } else if (value->kind == ValueKindString) {
     rc_arena_free(rc_arena, value->as.string.begin);
-  } else if (value->kind == ValueKindRecord) {
-    for (u32 i = 0; i < value->as.record.len; ++i)
-      free_value(&value->as.record.items[i].value, rc_arena);
+  } else if (value->kind == ValueKindDict) {
+    for (u32 i = 0; i < value->as.dict.len; ++i)
+      free_value(&value->as.dict.items[i].value, rc_arena);
   }
 }
 
@@ -217,9 +217,9 @@ static ExecState catch_vars(Vm *vm, Strs *local_names,
     CATCH_VARS_BLOCK(vm, local_names, catched_values, &expr->as.lambda.body);
   } break;
 
-  case IrExprKindRecord: {
-    for (u32 i = 0; i < expr->as.record.len; ++i)
-      CATCH_VARS(vm, local_names, catched_values, expr->as.record.items[i].expr);
+  case IrExprKindDict: {
+    for (u32 i = 0; i < expr->as.dict.len; ++i)
+      CATCH_VARS(vm, local_names, catched_values, expr->as.dict.items[i].expr);
   } break;
 
   case IrExprKindSelfCall: {
@@ -484,19 +484,19 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   } break;
 
   case IrExprKindField: {
-    EXECUTE_EXPR(vm, expr->as.field.record, true);
+    EXECUTE_EXPR(vm, expr->as.field.dict, true);
 
     Value value = value_stack_pop(&vm->stack);
-    if (value.kind != ValueKindRecord) {
-      ERROR("Only records have fields\n");
+    if (value.kind != ValueKindDict) {
+      ERROR("Only dicts have fields\n");
       vm->exit_code = 1;
       return ExecStateExit;
     }
 
     NamedValue *field = NULL;
 
-    for (u32 i = 0; i < value.as.record.len; ++i) {
-      NamedValue *temp_field = value.as.record.items + i;
+    for (u32 i = 0; i < value.as.dict.len; ++i) {
+      NamedValue *temp_field = value.as.dict.items + i;
 
       if (str_eq(temp_field->name, expr->as.field.field)) {
         field = temp_field;
@@ -505,7 +505,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     }
 
     if (!field) {
-      ERROR("Field `"STR_FMT"` was not found in given record\n",
+      ERROR("Field `"STR_FMT"` was not found in given dict\n",
             STR_ARG(expr->as.field.field));
       return ExecStateExit;
     }
@@ -519,7 +519,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         value_stack_push_unit(&vm->stack);
     } else if (value_expected) {
       if (!field) {
-        ERROR("Field `"STR_FMT"` was not found in given record\n",
+        ERROR("Field `"STR_FMT"` was not found in given dict\n",
               STR_ARG(expr->as.field.field));
       }
 
@@ -620,23 +620,23 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     }
   } break;
 
-  case IrExprKindRecord: {
+  case IrExprKindDict: {
     if (!value_expected)
       break;
 
-    Record record = {0};
+    Dict dict = {0};
 
-    for (u32 i = 0; i < expr->as.record.len; ++i) {
-      EXECUTE_EXPR(vm, expr->as.record.items[i].expr, true);
+    for (u32 i = 0; i < expr->as.dict.len; ++i) {
+      EXECUTE_EXPR(vm, expr->as.dict.items[i].expr, true);
 
       NamedValue field;
-      field.name = expr->as.record.items[i].name;
+      field.name = expr->as.dict.items[i].name;
       field.value = value_stack_pop(&vm->stack);
 
-      DA_APPEND(record, field);
+      DA_APPEND(dict, field);
     }
 
-    value_stack_push_record(&vm->stack, record);
+    value_stack_push_dict(&vm->stack, dict);
   } break;
 
   case IrExprKindSelfCall: {

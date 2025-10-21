@@ -1,7 +1,7 @@
 #ifndef IUI_WIDGETS_H
 #define IUI_WIDGETS_H
 
-#include "aether-vm/vm.h"
+#include "aether/vm.h"
 #include "glass/math.h"
 
 typedef struct IuiWidget IuiWidget;

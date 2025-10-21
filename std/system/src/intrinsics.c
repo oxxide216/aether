@@ -72,16 +72,16 @@ static void print_value(ValueStack *stack, Value *value, u32 level) {
     fputs("])", stdout);
   } break;
 
-  case ValueKindRecord: {
+  case ValueKindDict: {
     fputs("\n{\n", stdout);
 
-    for (u32 i = 0; i < value->as.record.len; ++i) {
+    for (u32 i = 0; i < value->as.dict.len; ++i) {
       for (u32 j = 0; j < level + 1; ++j)
         fputs("  ", stdout);
 
-      str_print(value->as.record.items[i].name);
+      str_print(value->as.dict.items[i].name);
       fputs(": ", stdout);
-      print_value(stack, &value->as.record.items[i].value, level + 1);
+      print_value(stack, &value->as.dict.items[i].value, level + 1);
 
       fputc('\n', stdout);
     }
