@@ -40,11 +40,11 @@
 (let byte-8-to-str [int] -> import 'byte-8-to-str')
 
 ;; Math
-(let + [a b] -> import 'add')
-(let - [a b] -> import 'sub')
-(let * [a b] -> import 'mul')
-(let / [a b] -> import 'div')
-(let % [a b] -> import 'mod')
+(let add [a b] -> import 'add')
+(let sub [a b] -> import 'sub')
+(let mul [a b] -> import 'mul')
+(let div [a b] -> import 'div')
+(let mod [a b] -> import 'mod')
 
 ;; Advanced math
 (let abs [num] -> import 'abs')
@@ -82,6 +82,24 @@
 (let bool? [value] -> import 'is-bool')
 (let func? [value] -> import 'is-func')
 (let record? [value] -> import 'is-record')
+
+(macro -op [op args] ->
+  (reduce [acc elem] -> (op acc elem) <> (head args) (tail args)))
+
+(macro + [...args] ->
+  (-op add [args]))
+
+(macro - [...args] ->
+  (-op sub [args]))
+
+(macro * [...args] ->
+  (-op mul [args]))
+
+(macro / [...args] ->
+  (-op div [args]))
+
+(macro % [...args] ->
+  (-op mod [args]))
 
 (macro for [list element ...body] ->
   ([rest] ->

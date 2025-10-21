@@ -1,8 +1,8 @@
 #include "io.h"
-#include "aether-compiler/parser.h"
-#include "aether-vm/vm.h"
-#include "aether-ir/serializer.h"
-#include "aether-ir/deserializer.h"
+#include "aether/parser.h"
+#include "aether/vm.h"
+#include "aether/serializer.h"
+#include "aether/deserializer.h"
 #include "shl_defs.h"
 #include "shl_log.h"
 #define SHL_ARENA_IMPLEMENTATION

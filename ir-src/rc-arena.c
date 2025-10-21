@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "aether-ir/rc-arena.h"
+#include "aether/rc-arena.h"
 
 void *rc_arena_alloc(RcArena *arena, u32 size) {
   u32 new_cap = RC_ARENA_REGION_CAP;

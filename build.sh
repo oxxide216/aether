@@ -2,7 +2,7 @@
 
 # Compiler
 CFLAGS="-Wall -Wextra -Icompiler-lib-include -Ivm-lib-include -Iir-include \
-        -Ilibs -Istd/base/include"
+        -Ilibs -Istd/base/include -lm"
 LDFLAGS="-z execstack"
 BUILD_FLAGS="${@:1}"
 SRC="$(find src -name "*.c")"
@@ -20,10 +20,11 @@ else
   CFLAGS="$CFLAGS -DNOSYSTEM"
 fi
 
-if [ "$NOIUI" == "" ]; then
-  CFLAGS="$CFLAGS -DIUI -Ilibs/winx/include -Ilibs/glass/include \
-          -Istd/iui/include"
-  LDFLAGS="$LDFLAGS -lX11 -lGL -lGLEW -lm"
+if [ "$IUI" == "" ]; then
+  CFLAGS="$CFLAGS -DNOIUI"
+else
+  CFLAGS="$CFLAGS -Ilibs/winx/include -Ilibs/glass/include -Istd/iui/include"
+  LDFLAGS="$LDFLAGS -lX11 -lGL -lGLEW"
   LIB_SRC="$LIB_SRC $(find libs/winx/src -name "*.c" -not -name "io.c")"
   LIB_SRC="$LIB_SRC $(find libs/glass/src -name "*.c" -not -name "io.c")"
   STD_SRC="$STD_SRC $(find std/iui/src -name "*.c")"

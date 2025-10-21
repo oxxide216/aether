@@ -1,8 +1,8 @@
 (use 'base.ae')
 
 ;; IO
-(let print [aeg] -> import 'print')
-(let println [aeg] -> import 'println')
+(let -print [arg] -> import 'print')
+(let -println [arg] -> import 'println')
 (let input-size [size] -> import 'input-size')
 (let input [] -> import 'input')
 (let unblock-input [] -> import 'unblock-input')
@@ -36,12 +36,12 @@
 (let run-command [command] -> import 'run-command')
 (let sleep [time] -> import 'sleep')
 
-(let -printf [args] ->
+(let printf [args] ->
   (for args arg
-    (print arg)))
+    (-print arg)))
 
-(macro printf [...args] ->
-  (-printf [args]))
+(macro print [...args] ->
+  (printf [args]))
 
-(macro printlnf [...args] ->
-  (-printf [args '\n']))
+(macro println [...args] ->
+  (printf [args '\n']))

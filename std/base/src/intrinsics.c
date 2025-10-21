@@ -1,8 +1,8 @@
 #include <math.h>
 
 #include "base/intrinsics.h"
-#include "aether-compiler/parser.h"
-#include "aether-ir/deserializer.h"
+#include "aether/parser.h"
+#include "aether/deserializer.h"
 
 bool head_intrinsic(Vm *vm) {
   Value value = value_stack_pop(&vm->stack);

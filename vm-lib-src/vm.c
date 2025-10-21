@@ -1,4 +1,4 @@
-#include "aether-vm/vm.h"
+#include "aether/vm.h"
 #include "shl_str.h"
 #include "shl_log.h"
 #include "shl_arena.h"
@@ -113,71 +113,87 @@ static Var *get_var(Vm *vm, Str name) {
   return NULL;
 }
 
-static void catch_vars_block(Vm *vm, Strs *local_names, NamedValues *catched_values,
-                             IrBlock *block);
+static ExecState catch_vars_block(Vm *vm, Strs *local_names,
+                                  NamedValues *catched_values,
+                                  IrBlock *block);
 
-static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values,
-                       IrExpr *expr) {
+#define CATCH_VARS(vm, local_names, catched_values, expr)                \
+  do {                                                                   \
+    ExecState state = catch_vars(vm, local_names, catched_values, expr); \
+    if (state != ExecStateContinue)                                      \
+      return state;                                                      \
+  } while (0)
+
+#define CATCH_VARS_BLOCK(vm, local_names, catched_values, block)                \
+  do {                                                                          \
+    ExecState state = catch_vars_block(vm, local_names, catched_values, block); \
+    if (state != ExecStateContinue)                                             \
+      return state;                                                             \
+  } while (0)
+
+static ExecState catch_vars(Vm *vm, Strs *local_names,
+                            NamedValues *catched_values,
+                            IrExpr *expr) {
   switch (expr->kind) {
   case IrExprKindBlock: {
-    catch_vars_block(vm, local_names, catched_values, &expr->as.block);
+    CATCH_VARS_BLOCK(vm, local_names, catched_values, &expr->as.block);
   } break;
 
   case IrExprKindFuncCall: {
-    catch_vars(vm, local_names, catched_values, expr->as.func_call.func);
-    catch_vars_block(vm, local_names, catched_values, &expr->as.func_call.args);
+    CATCH_VARS(vm, local_names, catched_values, expr->as.func_call.func);
+    CATCH_VARS_BLOCK(vm, local_names, catched_values, &expr->as.func_call.args);
   } break;
 
   case IrExprKindVarDef: {
-    catch_vars(vm, local_names, catched_values, expr->as.var_def.expr);
+    CATCH_VARS(vm, local_names, catched_values, expr->as.var_def.expr);
 
     DA_APPEND(*local_names, expr->as.var_def.name);
   } break;
 
   case IrExprKindIf: {
-    catch_vars(vm, local_names, catched_values, expr->as._if.cond);
-    catch_vars_block(vm, local_names, catched_values, &expr->as._if.if_body);
+    CATCH_VARS(vm, local_names, catched_values, expr->as._if.cond);
+    CATCH_VARS_BLOCK(vm, local_names, catched_values, &expr->as._if.if_body);
 
     for (u32 i = 0; i < expr->as._if.elifs.len; ++i)
-      catch_vars_block(vm, local_names, catched_values, &expr->as._if.elifs.items[i].body);
+      CATCH_VARS_BLOCK(vm, local_names, catched_values, &expr->as._if.elifs.items[i].body);
 
     if (expr->as._if.has_else)
-      catch_vars_block(vm, local_names, catched_values, &expr->as._if.else_body);
+      CATCH_VARS_BLOCK(vm, local_names, catched_values, &expr->as._if.else_body);
   } break;
 
   case IrExprKindWhile: {
-    catch_vars_block(vm, local_names, catched_values, &expr->as._while.body);
+    CATCH_VARS_BLOCK(vm, local_names, catched_values, &expr->as._while.body);
   } break;
 
   case IrExprKindSet: {
-    catch_vars(vm, local_names, catched_values, expr->as.set.src);
+    CATCH_VARS(vm, local_names, catched_values, expr->as.set.src);
   } break;
 
   case IrExprKindField: {
     if (expr->as.field.is_set)
-      catch_vars(vm, local_names, catched_values, expr->as.field.expr);
+      CATCH_VARS(vm, local_names, catched_values, expr->as.field.expr);
   } break;
 
   case IrExprKindRet: {
     if (expr->as.ret.has_expr)
-      catch_vars(vm, local_names, catched_values, expr->as.ret.expr);
+      CATCH_VARS(vm, local_names, catched_values, expr->as.ret.expr);
   } break;
 
   case IrExprKindList: {
-    catch_vars_block(vm, local_names, catched_values, &expr->as.list.content);
+    CATCH_VARS_BLOCK(vm, local_names, catched_values, &expr->as.list.content);
   } break;
 
   case IrExprKindIdent: {
     for (u32 i = 0; i < local_names->len; ++i)
       if (str_eq(expr->as.ident.ident, local_names->items[i]))
-        return;
+        return ExecStateContinue;
 
     Var *var = get_var(vm, expr->as.ident.ident);
     if (!var) {
       ERROR("Symbol "STR_FMT" was not defined before usage\n",
             STR_ARG(expr->as.ident.ident));
       vm->exit_code = 1;
-      return;
+      return ExecStateExit;
     }
 
     if (!var->is_global) {
@@ -195,25 +211,30 @@ static void catch_vars(Vm *vm, Strs *local_names, NamedValues *catched_values,
     for (u32 i = 0; i < expr->as.lambda.args.len; ++i)
       DA_APPEND(*local_names, expr->as.lambda.args.items[i]);
 
-    catch_vars_block(vm, local_names, catched_values, &expr->as.lambda.body);
+    CATCH_VARS_BLOCK(vm, local_names, catched_values, &expr->as.lambda.body);
   } break;
 
   case IrExprKindRecord: {
     for (u32 i = 0; i < expr->as.record.len; ++i)
-      catch_vars(vm, local_names, catched_values, expr->as.record.items[i].expr);
+      CATCH_VARS(vm, local_names, catched_values, expr->as.record.items[i].expr);
   } break;
 
   case IrExprKindSelfCall: {
     for (u32 i = 0; i < expr->as.self_call.args.len; ++i)
-      catch_vars(vm, local_names, catched_values, expr->as.self_call.args.items[i]);
+      CATCH_VARS(vm, local_names, catched_values, expr->as.self_call.args.items[i]);
   } break;
   }
+
+  return ExecStateContinue;
 }
 
-static void catch_vars_block(Vm *vm, Strs *local_names, NamedValues *catched_values,
-                             IrBlock *block) {
+static ExecState catch_vars_block(Vm *vm, Strs *local_names,
+                                  NamedValues *catched_values,
+                                  IrBlock *block) {
   for (u32 i = 0; i < block->len; ++i)
-    catch_vars(vm, local_names, catched_values, block->items[i]);
+    CATCH_VARS(vm, local_names, catched_values, block->items[i]);
+
+  return ExecStateContinue;
 }
 
 bool value_list_matches_kinds(u32 len, Value *values, ValueKind *kinds) {
@@ -578,7 +599,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     for (u32 i = 0; i < expr->as.lambda.args.len; ++i)
       DA_APPEND(local_names, expr->as.lambda.args.items[i]);
 
-    catch_vars_block(vm, &local_names, &catched_values, &expr->as.lambda.body);
+    CATCH_VARS_BLOCK(vm, &local_names, &catched_values, &expr->as.lambda.body);
 
     if (value_expected) {
       Value func_value = {

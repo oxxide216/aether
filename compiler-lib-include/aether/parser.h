@@ -1,7 +1,7 @@
 #ifndef COMPILER_H
 #define COMPILER_H
 
-#include "aether-ir/ir.h"
+#include "aether/ir.h"
 
 Ir parse(Str code, char *input_file_name);
 

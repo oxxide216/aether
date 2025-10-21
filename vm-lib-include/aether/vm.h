@@ -1,8 +1,8 @@
 #ifndef AETHER_VM
 #define AETHER_VM
 
-#include "aether-ir/ir.h"
-#include "aether-ir/rc-arena.h"
+#include "aether/ir.h"
+#include "aether/rc-arena.h"
 #include "shl_defs.h"
 #include "shl_str.h"
 #include "shl_log.h"
