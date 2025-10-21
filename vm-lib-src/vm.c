@@ -96,6 +96,9 @@ void free_value(Value *value, RcArena *rc_arena) {
     }
   } else if (value->kind == ValueKindString) {
     rc_arena_free(rc_arena, value->as.string.begin);
+  } else if (value->kind == ValueKindRecord) {
+    for (u32 i = 0; i < value->as.record.len; ++i)
+      free_value(&value->as.record.items[i].value, rc_arena);
   }
 }
 
@@ -664,8 +667,8 @@ static void intrinsics_append(Intrinsics *a, Intrinsic *b, u32 b_len) {
   a->len += b_len;
 }
 
-u32 execute(Ir *ir, i32 argc, char **argv,
-            RcArena *rc_arena, Intrinsics *intrinsics) {
+u32 execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena,
+            Intrinsics *intrinsics, Value *result_value) {
   Vm vm = {0};
   vm.rc_arena = rc_arena;
 
@@ -702,7 +705,35 @@ u32 execute(Ir *ir, i32 argc, char **argv,
     }
   }
 
-  execute_block(&vm, ir, false);
+  execute_block(&vm, ir, result_value != NULL);
+
+  if (result_value)
+    --vm.stack.len;
+
+  cleanup(&vm);
 
   return vm.exit_code;
+}
+
+void cleanup(Vm *vm) {
+  for (u32 i = 0; i < vm->stack.len; ++i)
+    free_value(vm->stack.items + i, vm->rc_arena);
+  free(vm->stack.items);
+
+  for (u32 i = 0; i < vm->global_vars.len; ++i)
+    free_value(&vm->global_vars.items[i].value, vm->rc_arena);
+  free(vm->global_vars.items);
+
+  for (u32 i = 0; i < vm->local_vars.len; ++i)
+    free_value(&vm->local_vars.items[i].value, vm->rc_arena);
+  free(vm->local_vars.items);
+
+  free(vm->intrinsics.items);
+
+  ListNode *arg = vm->args;
+  while (arg) {
+    ListNode *prev_arg = arg;
+    arg = arg->next;
+    rc_arena_free(vm->rc_arena, prev_arg);
+  }
 }

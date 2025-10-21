@@ -156,6 +156,8 @@ ExecState execute_func(Vm *vm, Func *func, bool value_expected);
 ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected);
 ExecState execute_block(Vm *vm, IrBlock *block, bool value_expected);
 u32       execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena,
-                  Intrinsics *intrinsics);
+                  Intrinsics *intrinsics, Value *result_value);
+
+void cleanup(Vm *vm);
 
 #endif // AETHER_VM

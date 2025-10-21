@@ -77,5 +77,5 @@ int main(i32 argc, char **argv) {
 
   Intrinsics intrinsics = {0};
 
-  return execute(&ir, argc, argv, &rc_arena, &intrinsics);
+  return execute(&ir, argc, argv, &rc_arena, &intrinsics, NULL);
 }

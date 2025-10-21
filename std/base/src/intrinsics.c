@@ -164,7 +164,10 @@ bool eval_intrinsic(Vm *vm) {
   i32 argc = 1;
   char *argv[] = { "aether", "eval", NULL };
   Intrinsics intrinsics = {0};
-  execute(&ir, argc, argv, vm->rc_arena, &intrinsics);
+  Value result_value;
+  execute(&ir, argc, argv, vm->rc_arena, &intrinsics, &result_value);
+
+  DA_APPEND(vm->stack, result_value);
 
   return true;
 }
