@@ -63,14 +63,14 @@
 (let >= [a b] -> import 'ge')
 
 ;; Boolean
-(let & [a b] -> import 'and')
-(let | [a b] -> import 'or')
-(let ^ [a b] -> import 'xor')
-(let ! [value] -> import 'not')
+(let -and [a b] -> import 'and')
+(let -or [a b] -> import 'or')
+(let -xor [a b] -> import 'xor')
+(let not [value] -> import 'not')
 
 ;; Logical
-(let && [a b] -> import 'logical-and')
-(let || [a b] -> import 'logical-or')
+(let -land [a b] -> import 'logical-and')
+(let -lor [a b] -> import 'logical-or')
 
 ;; Types
 (let type [value] -> import 'type')
@@ -101,9 +101,31 @@
 (macro % [...args] ->
   (-op mod [args]))
 
+(macro and [...args] ->
+  (-op -and [args]))
+
+(macro or [...args] ->
+  (-op -or [args]))
+
+(macro xor [...args] ->
+  (-op -xor [args]))
+
+(macro land [...args] ->
+  (-op -land [args]))
+
+(macro lor [...args] ->
+  (-op -lor [args]))
+
+;(macro for [list element ...body] ->
+  ;([rest] ->
+    ;(if (> (len rest) 0)
+      ;(let element (head rest))
+      ;body
+      ;(<-> (tail rest)) <> list))
+
 (macro for [list element ...body] ->
-  ([rest] ->
-    (if (> (len rest) 0)
-      (let element (head rest))
-      body
-      (<-> (tail rest))) <> list))
+  (let -list list)
+  (while -list
+    (let element (head -list))
+    body
+    (set -list (tail -list))))

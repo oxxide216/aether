@@ -1,6 +1,6 @@
 whitespace=( |\t|\r)*
 newline=\n
-comment=;;
+comment=;
 
 let=let
 if=if
@@ -9,10 +9,12 @@ else=else
 macro=macro
 while=while
 set=set
+get=get
 use=use
 field=field
 ret=ret
 import=import
+set_in=set\-in
 
 oparen=\(
 cparen=\)
@@ -25,9 +27,9 @@ unpack=...
 right_arrow=\->
 double_arrow=<\->
 rhombus=<>
+colon=:
 
 int=\-?0-9+
 float=\-?0-9+.0-9+
 bool=true|false
 ident=(a-z|A-Z|_|\-|!|\?|#|$|%|^|&|\*|\+|/|=|<|>|\|)(a-z|A-Z|_|\-|!|\?|#|$|%|^|&|\*|\+|/|=|<|>|\||0-9)*
-key=(a-z|A-Z|_|\-|!|\?|#|$|%|^|&|\*|\+|/|=|<|>|\|)(a-z|A-Z|_|\-|!|\?|#|$|%|^|&|\*|\+|/|=|<|>|\||0-9)*:

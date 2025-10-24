@@ -2,5 +2,5 @@
 libs
 test.ac
 eval.ac
-compiler-src/grammar.h
+compiler-lib-src/grammar.h
 std/iui/include/iui/fonts

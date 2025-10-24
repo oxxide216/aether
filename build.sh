@@ -33,6 +33,6 @@ else
     std/iui/include/iui/fonts/JetBrainsMono-Regular.h
 fi
 
-lexgen compiler-src/grammar.h compiler-src/grammar.lg
+lexgen compiler-lib-src/grammar.h compiler-lib-src/grammar.lg
 cc -o aether $CFLAGS $LDFLAGS $BUILD_FLAGS $SRC $COMPILER_SRC $VM_SRC \
              $IR_SRC $LEXGEN_RUNTIME_SRC $LIB_SRC $STD_SRC

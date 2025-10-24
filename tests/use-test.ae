@@ -1,0 +1,4 @@
+(use 'std/system.ae')
+
+(println 'First')
+(println 'Second')

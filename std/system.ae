@@ -2,7 +2,6 @@
 
 ;; IO
 (let -print [arg] -> import 'print')
-(let -println [arg] -> import 'println')
 (let input-size [size] -> import 'input-size')
 (let input [] -> import 'input')
 (let unblock-input [] -> import 'unblock-input')

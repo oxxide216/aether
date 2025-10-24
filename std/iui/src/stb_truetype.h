@@ -1467,22 +1467,22 @@ static int stbtt_InitFont_internal(stbtt_fontinfo *info, unsigned char *data, in
    numTables = ttUSHORT(data + cmap + 2);
    info->index_map = 0;
    for (i=0; i < numTables; ++i) {
-      stbtt_uint32 encoding_record = cmap + 4 + 8 * i;
+      stbtt_uint32 encoding_dict = cmap + 4 + 8 * i;
       // find an encoding we understand:
-      switch(ttUSHORT(data+encoding_record)) {
+      switch(ttUSHORT(data+encoding_dict)) {
          case STBTT_PLATFORM_ID_MICROSOFT:
-            switch (ttUSHORT(data+encoding_record+2)) {
+            switch (ttUSHORT(data+encoding_dict+2)) {
                case STBTT_MS_EID_UNICODE_BMP:
                case STBTT_MS_EID_UNICODE_FULL:
                   // MS/Unicode
-                  info->index_map = cmap + ttULONG(data+encoding_record+4);
+                  info->index_map = cmap + ttULONG(data+encoding_dict+4);
                   break;
             }
             break;
         case STBTT_PLATFORM_ID_UNICODE:
             // Mac/iOS has these
             // all the encodingIDs are unicode, so we don't bother to check it
-            info->index_map = cmap + ttULONG(data+encoding_record+4);
+            info->index_map = cmap + ttULONG(data+encoding_dict+4);
             break;
       }
    }
@@ -2421,17 +2421,17 @@ static stbtt_int32 stbtt__GetCoverageIndex(stbtt_uint8 *coverageTable, int glyph
          stbtt_int32 l=0, r=rangeCount-1, m;
          int strawStart, strawEnd, needle=glyph;
          while (l <= r) {
-            stbtt_uint8 *rangeRecord;
+            stbtt_uint8 *rangeDict;
             m = (l + r) >> 1;
-            rangeRecord = rangeArray + 6 * m;
-            strawStart = ttUSHORT(rangeRecord);
-            strawEnd = ttUSHORT(rangeRecord + 2);
+            rangeDict = rangeArray + 6 * m;
+            strawStart = ttUSHORT(rangeDict);
+            strawEnd = ttUSHORT(rangeDict + 2);
             if (needle < strawStart)
                r = m - 1;
             else if (needle > strawEnd)
                l = m + 1;
             else {
-               stbtt_uint16 startCoverageIndex = ttUSHORT(rangeRecord + 4);
+               stbtt_uint16 startCoverageIndex = ttUSHORT(rangeDict + 4);
                return startCoverageIndex + glyph - strawStart;
             }
          }
@@ -2461,23 +2461,23 @@ static stbtt_int32  stbtt__GetGlyphClass(stbtt_uint8 *classDefTable, int glyph)
 
       case 2: {
          stbtt_uint16 classRangeCount = ttUSHORT(classDefTable + 2);
-         stbtt_uint8 *classRangeRecords = classDefTable + 4;
+         stbtt_uint8 *classRangeDicts = classDefTable + 4;
 
          // Binary search.
          stbtt_int32 l=0, r=classRangeCount-1, m;
          int strawStart, strawEnd, needle=glyph;
          while (l <= r) {
-            stbtt_uint8 *classRangeRecord;
+            stbtt_uint8 *classRangeDict;
             m = (l + r) >> 1;
-            classRangeRecord = classRangeRecords + 6 * m;
-            strawStart = ttUSHORT(classRangeRecord);
-            strawEnd = ttUSHORT(classRangeRecord + 2);
+            classRangeDict = classRangeDicts + 6 * m;
+            strawStart = ttUSHORT(classRangeDict);
+            strawEnd = ttUSHORT(classRangeDict + 2);
             if (needle < strawStart)
                r = m - 1;
             else if (needle > strawEnd)
                l = m + 1;
             else
-               return (stbtt_int32)ttUSHORT(classRangeRecord + 4);
+               return (stbtt_int32)ttUSHORT(classRangeDict + 4);
          }
          break;
       }
@@ -2537,7 +2537,7 @@ static stbtt_int32 stbtt__GetGlyphGPOSInfoAdvance(const stbtt_fontinfo *info, in
                stbtt_uint16 valueFormat1 = ttUSHORT(table + 4);
                stbtt_uint16 valueFormat2 = ttUSHORT(table + 6);
                if (valueFormat1 == 4 && valueFormat2 == 0) { // Support more formats?
-                  stbtt_int32 valueRecordPairSizeInBytes = 2;
+                  stbtt_int32 valueDictPairSizeInBytes = 2;
                   stbtt_uint16 pairSetCount = ttUSHORT(table + 8);
                   stbtt_uint16 pairPosOffset = ttUSHORT(table + 10 + 2 * coverageIndex);
                   stbtt_uint8 *pairValueTable = table + pairPosOffset;
@@ -2555,7 +2555,7 @@ static stbtt_int32 stbtt__GetGlyphGPOSInfoAdvance(const stbtt_fontinfo *info, in
                      stbtt_uint16 secondGlyph;
                      stbtt_uint8 *pairValue;
                      m = (l + r) >> 1;
-                     pairValue = pairValueArray + (2 + valueRecordPairSizeInBytes) * m;
+                     pairValue = pairValueArray + (2 + valueDictPairSizeInBytes) * m;
                      secondGlyph = ttUSHORT(pairValue);
                      straw = secondGlyph;
                      if (needle < straw)
@@ -2583,15 +2583,15 @@ static stbtt_int32 stbtt__GetGlyphGPOSInfoAdvance(const stbtt_fontinfo *info, in
 
                   stbtt_uint16 class1Count = ttUSHORT(table + 12);
                   stbtt_uint16 class2Count = ttUSHORT(table + 14);
-                  stbtt_uint8 *class1Records, *class2Records;
+                  stbtt_uint8 *class1Dicts, *class2Dicts;
                   stbtt_int16 xAdvance;
 
                   if (glyph1class < 0 || glyph1class >= class1Count) return 0; // malformed
                   if (glyph2class < 0 || glyph2class >= class2Count) return 0; // malformed
 
-                  class1Records = table + 16;
-                  class2Records = class1Records + 2 * (glyph1class * class2Count);
-                  xAdvance = ttSHORT(class2Records + 2 * glyph2class);
+                  class1Dicts = table + 16;
+                  class2Dicts = class1Dicts + 2 * (glyph1class * class2Count);
+                  xAdvance = ttSHORT(class2Dicts + 2 * glyph2class);
                   return xAdvance;
                } else
                   return 0;
@@ -2886,7 +2886,7 @@ static void stbtt__fill_active_edges(unsigned char *scanline, int len, stbtt__ac
 
    while (e) {
       if (w == 0) {
-         // if we're currently at zero, we need to record the edge start point
+         // if we're currently at zero, we need to dict the edge start point
          x0 = e->x; w += e->direction;
       } else {
          int x1 = e->x; w += e->direction;

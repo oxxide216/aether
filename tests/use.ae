@@ -1,3 +1,5 @@
 (use 'functions.ae')
+(use 'use-test.ae')
+(use 'use-test.ae')
 
 (test)

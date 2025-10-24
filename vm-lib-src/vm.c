@@ -12,6 +12,8 @@
 
 typedef Da(Str) Strs;
 
+static Value unit_value = (Value) { ValueKindUnit, {}, 0 };
+
 void list_use(RcArena *rc_arena, ListNode *list) {
   while (list) {
     rc_arena_clone(rc_arena, list);
@@ -29,7 +31,7 @@ ListNode *list_clone(RcArena *rc_arena, ListNode *list) {
   ListNode *node = list;
   while (node) {
     *new_list_next = rc_arena_alloc(rc_arena, sizeof(ListNode));
-    (*new_list_next)->value = node->value;
+    (*new_list_next)->value = value_clone(rc_arena, node->value);
     new_list_next = &(*new_list_next)->next;
 
     node = node->next;
@@ -38,67 +40,113 @@ ListNode *list_clone(RcArena *rc_arena, ListNode *list) {
   return new_list;
 }
 
+Dict dict_clone(RcArena *rc_arena, Dict *dict) {
+  Dict copy = {
+    malloc(dict->len * sizeof(IrField)),
+    dict->len,
+    dict->len,
+  };
+
+  for (u32 i = 0; i < copy.len; ++i)
+    copy.items[i].value = value_clone(rc_arena, dict->items[i].value);
+
+  return copy;
+}
+
 void value_stack_push_unit(ValueStack *stack) {
-  Value value = { ValueKindUnit, {} };
+  DA_APPEND(*stack, &unit_value);
+}
+
+void value_stack_push_list(ValueStack *stack, RcArena *rc_arena, ListNode *nodes) {
+  Value *value = rc_arena_alloc(rc_arena, sizeof(Value));
+  *value = (Value) { ValueKindList, { .list = nodes }, 0 };
   DA_APPEND(*stack, value);
 }
 
-void value_stack_push_list(ValueStack *stack, ListNode *nodes) {
-  Value value = { ValueKindList, { .list = nodes } };
-  DA_APPEND(*stack, value);
-}
-
-void value_stack_push_string(ValueStack *stack, Str string) {
-  Value value = {
+void value_stack_push_string(ValueStack *stack, RcArena *rc_arena, Str string) {
+  Value *value = rc_arena_alloc(rc_arena, sizeof(Value));
+  *value = (Value) {
     ValueKindString,
     { .string = { { string.ptr, string.len }, (Str *) string.ptr } },
+    0,
   };
   DA_APPEND(*stack, value);
 }
 
-void value_stack_push_int(ValueStack *stack, i64 _int) {
-  Value value = { ValueKindInt, { ._int = _int } };
+void value_stack_push_int(ValueStack *stack, RcArena *rc_arena, i64 _int) {
+  Value *value = rc_arena_alloc(rc_arena, sizeof(Value));
+  *value = (Value) { ValueKindInt, { ._int = _int }, 0 };
   DA_APPEND(*stack, value);
 }
 
-void value_stack_push_float(ValueStack *stack, f64 _float) {
-  Value value = { ValueKindFloat, { ._float = _float } };
+void value_stack_push_float(ValueStack *stack, RcArena *rc_arena, f64 _float) {
+  Value *value = rc_arena_alloc(rc_arena, sizeof(Value));
+  *value = (Value) { ValueKindFloat, { ._float = _float }, 0 };
   DA_APPEND(*stack, value);
 }
 
-void value_stack_push_bool(ValueStack *stack, bool _bool) {
-  Value value = { ValueKindBool, { ._bool = _bool } };
+void value_stack_push_bool(ValueStack *stack, RcArena *rc_arena, bool _bool) {
+  Value *value = rc_arena_alloc(rc_arena, sizeof(Value));
+  *value = (Value) { ValueKindBool, { ._bool = _bool }, 0 };
   DA_APPEND(*stack, value);
 }
 
-void value_stack_push_dict(ValueStack *stack, Dict dict) {
-  Value value = { ValueKindDict, { .dict = dict } };
+void value_stack_push_dict(ValueStack *stack, RcArena *rc_arena, Dict dict) {
+  Value *value = rc_arena_alloc(rc_arena, sizeof(Value));
+  *value = (Value) { ValueKindDict, { .dict = dict }, 0 };
   DA_APPEND(*stack, value);
 }
 
-Value value_stack_pop(ValueStack *stack) {
-  if (stack->len > 0)
+Value *value_stack_pop(ValueStack *stack) {
+  if (stack->len > 0) {
+    ++stack->items[stack->len - 1]->refs_count;
     return stack->items[--stack->len];
-  return (Value) { ValueKindUnit, {} };
+  }
+
+  return &unit_value;
 }
 
-Value *value_stack_get(ValueStack *stack, u32 index) {
-  return stack->items + index;
-}
+Value *value_clone(RcArena *rc_arena, Value *value) {
+  Value *copy = rc_arena_alloc(rc_arena, sizeof(Value));
+  *copy = *value;
+  copy->refs_count = 0;
 
-void free_value(Value *value, RcArena *rc_arena) {
   if (value->kind == ValueKindList) {
-    ListNode *node = value->as.list;
-    while (node && !node->is_static) {
-      ListNode *next_node = node->next;
-      rc_arena_free(rc_arena, node);
-      node = next_node;
-    }
+    copy->as.list = list_clone(rc_arena, value->as.list);
   } else if (value->kind == ValueKindString) {
-    rc_arena_free(rc_arena, value->as.string.begin);
+    copy->as.string.str.ptr = rc_arena_alloc(rc_arena, value->as.string.str.len);
+    copy->as.string.begin = (Str *)(copy->as.string.str.ptr +
+                                    (u64) (char *) value->as.string.begin -
+                                    (u64) value->as.string.str.ptr);
   } else if (value->kind == ValueKindDict) {
     for (u32 i = 0; i < value->as.dict.len; ++i)
-      free_value(&value->as.dict.items[i].value, rc_arena);
+      value_free(value->as.dict.items[i].value, rc_arena);
+  }
+
+  return copy;
+}
+
+void value_free(Value *value, RcArena *rc_arena) {
+  if (value->refs_count > 0)
+    --value->refs_count;
+
+  if (value->refs_count == 0) {
+    if (value->kind == ValueKindList) {
+      ListNode *node = value->as.list;
+      while (node && !node->is_static) {
+        ListNode *next_node = node->next;
+        rc_arena_free(rc_arena, node);
+        node = next_node;
+      }
+    } else if (value->kind == ValueKindString) {
+      rc_arena_free(rc_arena, value->as.string.begin);
+    } else if (value->kind == ValueKindDict) {
+      for (u32 i = 0; i < value->as.dict.len; ++i)
+        value_free(value->as.dict.items[i].value, rc_arena);
+    }
+
+    if (value->kind != ValueKindUnit)
+      rc_arena_free(rc_arena, value);
   }
 }
 
@@ -172,9 +220,8 @@ static ExecState catch_vars(Vm *vm, Strs *local_names,
     CATCH_VARS(vm, local_names, catched_values, expr->as.set.src);
   } break;
 
-  case IrExprKindField: {
-    if (expr->as.field.is_set)
-      CATCH_VARS(vm, local_names, catched_values, expr->as.field.expr);
+  case IrExprKindGet: {
+    CATCH_VARS(vm, local_names, catched_values, expr->as.get.key);
   } break;
 
   case IrExprKindRet: {
@@ -226,6 +273,13 @@ static ExecState catch_vars(Vm *vm, Strs *local_names,
     for (u32 i = 0; i < expr->as.self_call.args.len; ++i)
       CATCH_VARS(vm, local_names, catched_values, expr->as.self_call.args.items[i]);
   } break;
+
+  case IrExprKindSetIn: {
+    for (u32 i = 0; i < expr->as.set_in.fields.len; ++i) {
+      CATCH_VARS(vm, local_names, catched_values, expr->as.set_in.fields.items[i].key);
+      CATCH_VARS(vm, local_names, catched_values, expr->as.set_in.fields.items[i].expr);
+    }
+  } break;
   }
 
   return ExecStateContinue;
@@ -240,21 +294,87 @@ static ExecState catch_vars_block(Vm *vm, Strs *local_names,
   return ExecStateContinue;
 }
 
-bool value_list_matches_kinds(u32 len, Value *values, ValueKind *kinds) {
+static bool value_eq(Value *a, Value *b) {
+  if (a->kind != b->kind)
+    return false;
+
+  switch (a->kind) {
+  case ValueKindUnit: {
+    return true;
+  }
+
+  case ValueKindList: {
+    ListNode *a_node = a->as.list->next;
+    ListNode *b_node = b->as.list->next;
+
+    while (a_node && b_node) {
+      if (!value_eq(a_node->value, b_node->value))
+        return false;
+
+      a_node = a_node->next;
+      b_node = b_node->next;
+    }
+
+    return a_node == NULL && b_node == NULL;
+  }
+
+  case ValueKindString: {
+    return str_eq(a->as.string.str, b->as.string.str);
+  }
+
+  case ValueKindInt: {
+    return a->as._int == b->as._int;
+  } break;
+
+  case ValueKindFloat: {
+    return a->as._float == b->as._float;
+  }
+
+  case ValueKindBool: {
+    return a->as._bool == b->as._bool;
+  }
+
+  case ValueKindDict: {
+    if (a->as.dict.len != b->as.dict.len)
+      return false;
+
+    for (u32 i = 0; i < a->as.dict.len; ++i)
+      if (!value_eq(a->as.dict.items[i].key, b->as.dict.items[i].key) ||
+          !value_eq(a->as.dict.items[i].value, b->as.dict.items[i].value))
+        return false;
+
+    return true;
+  }
+
+  case ValueKindFunc: {
+    if (a->as.func.intrinsic_name.len > 0)
+      return str_eq(a->as.func.intrinsic_name, b->as.func.intrinsic_name);
+
+    return false;
+  }
+
+  default: {
+    return false;
+  }
+  }
+}
+
+bool value_list_matches_kinds(u32 len, Value **values, ValueKind *kinds) {
   for (u32 i = 0; i < len; ++i)
-    if (values[i].kind != kinds[i] && kinds[i] != ValueKindUnit)
+    if (values[i]->kind != kinds[i] && kinds[i] != ValueKindUnit)
       return false;
 
   return true;
 }
 
-static Intrinsic *get_intrinsic(Vm *vm, Str name, u32 args_count, Value *args) {
+static Intrinsic *get_intrinsic(Vm *vm, Str name, u32 args_count, Value **args) {
   for (u32 i = 0; i < vm->intrinsics.len; ++i) {
-    if (str_eq(vm->intrinsics.items[i].name, name) &&
-        vm->intrinsics.items[i].args_count == args_count &&
-        value_list_matches_kinds(args_count, args,
-                                 vm->intrinsics.items[i].arg_kinds)) {
-      return vm->intrinsics.items + i;
+    Intrinsic *intrinsic = vm->intrinsics.items + i;
+
+    if (str_eq(intrinsic->name, name) &&
+        intrinsic->args_count == args_count &&
+        value_list_matches_kinds(args_count, args, intrinsic->arg_kinds)) {
+      return intrinsic;
     }
   }
 
@@ -262,11 +382,6 @@ static Intrinsic *get_intrinsic(Vm *vm, Str name, u32 args_count, Value *args) {
 }
 
 ExecState execute_func(Vm *vm, Func *func, bool value_expected) {
-  if (vm->stack.len < func->args.len) {
-    ERROR("Not enough values on the stack for function call\n");
-    exit(1);
-  }
-
   if (func->intrinsic_name.len > 0) {
     Intrinsic *intrinsic = get_intrinsic(vm, func->intrinsic_name, func->args.len,
                                          vm->stack.items + vm->stack.len - func->args.len);
@@ -319,7 +434,7 @@ ExecState execute_func(Vm *vm, Func *func, bool value_expected) {
   ExecState result = execute_block(vm, &func->body, value_expected);
 
   for (u32 i = prev_stack_len; i < vm->stack.len - value_expected; ++i)
-    free_value(vm->stack.items + i, vm->rc_arena);
+    value_free(vm->stack.items[i], vm->rc_arena);
 
   if (vm->local_vars.items)
     free(vm->local_vars.items);
@@ -345,22 +460,23 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   case IrExprKindFuncCall: {
     EXECUTE_EXPR(vm, expr->as.func_call.func, true);
 
-    Value func_value = value_stack_pop(&vm->stack);
-    if (func_value.kind != ValueKindFunc) {
+    Value *func_value = value_stack_pop(&vm->stack);
+    if (func_value->kind != ValueKindFunc) {
       ERROR("Value is not callable\n");
       return ExecStateExit;
     }
 
-    if (expr->as.func_call.args.len != func_value.as.func.args.len) {
-      ERROR("Wrong arguments count: %u, expected %u\n", expr->as.func_call.args.len,
-            func_value.as.func.args.len);
+    if (expr->as.func_call.args.len != func_value->as.func.args.len) {
+      ERROR("Wrong arguments count: %u, expected %u\n",
+            expr->as.func_call.args.len,
+            func_value->as.func.args.len);
       return ExecStateExit;
     }
 
     for (u32 i = 0; i < expr->as.func_call.args.len; ++i)
       EXECUTE_EXPR(vm, expr->as.func_call.args.items[i], true);
 
-    EXECUTE_FUNC(vm, &func_value.as.func, value_expected);
+    EXECUTE_FUNC(vm, &func_value->as.func, value_expected);
   } break;
 
   case IrExprKindVarDef: {
@@ -368,7 +484,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     Var *prev_var = get_var(vm, expr->as.var_def.name);
     if (prev_var) {
-      free_value(&prev_var->value, vm->rc_arena);
+      value_free(prev_var->value, vm->rc_arena);
       prev_var->value = value_stack_pop(&vm->stack);
 
       if (value_expected)
@@ -394,18 +510,18 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   case IrExprKindIf: {
     EXECUTE_EXPR(vm, expr->as._if.cond, true);
 
-    Value cond = value_stack_pop(&vm->stack);
-    if (cond.kind != ValueKindBool &&
-        cond.kind != ValueKindUnit &&
-        cond.kind != ValueKindList) {
+    Value *cond = value_stack_pop(&vm->stack);
+    if (cond->kind != ValueKindBool &&
+        cond->kind != ValueKindUnit &&
+        cond->kind != ValueKindList) {
       ERROR("Only boolean, unit or list value can be used as a condition\n");
       vm->exit_code = 1;
       return ExecStateExit;
     }
 
-    if (cond.kind != ValueKindUnit &&
-        ((cond.kind == ValueKindBool && cond.as._bool) ||
-         (cond.kind == ValueKindList && cond.as.list->next))) {
+    if (cond->kind != ValueKindUnit &&
+        ((cond->kind == ValueKindBool && cond->as._bool) ||
+         (cond->kind == ValueKindList && cond->as.list->next))) {
       EXECUTE_BLOCK(vm, &expr->as._if.if_body, value_expected);
       break;
     }
@@ -416,17 +532,17 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       EXECUTE_EXPR(vm, expr->as._if.elifs.items[i].cond, true);
 
       cond = value_stack_pop(&vm->stack);
-      if (cond.kind != ValueKindBool &&
-          cond.kind != ValueKindUnit &&
-          cond.kind != ValueKindList) {
+      if (cond->kind != ValueKindBool &&
+          cond->kind != ValueKindUnit &&
+          cond->kind != ValueKindList) {
         ERROR("Only boolean, unit or list value can be used as a condition\n");
         vm->exit_code = 1;
         return false;
       }
 
-      if (cond.kind != ValueKindUnit &&
-          ((cond.kind == ValueKindBool && cond.as._bool) ||
-           (cond.kind == ValueKindList && cond.as.list->next != NULL))) {
+      if (cond->kind != ValueKindUnit &&
+          ((cond->kind == ValueKindBool && cond->as._bool) ||
+           (cond->kind == ValueKindList && cond->as.list->next != NULL))) {
         EXECUTE_BLOCK(vm, &expr->as._if.elifs.items[i].body, value_expected);
         executed_elif = true;
         break;
@@ -445,18 +561,18 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     while (true) {
       EXECUTE_EXPR(vm, expr->as._while.cond, true);
 
-      Value cond = value_stack_pop(&vm->stack);
-      if (cond.kind != ValueKindBool &&
-          cond.kind != ValueKindUnit &&
-          cond.kind != ValueKindList) {
+      Value *cond = value_stack_pop(&vm->stack);
+      if (cond->kind != ValueKindBool &&
+          cond->kind != ValueKindUnit &&
+          cond->kind != ValueKindList) {
         ERROR("Only boolean, unit or list value can be used as a condition\n");
         vm->exit_code = 1;
         return ExecStateExit;
       }
 
-      if (cond.kind == ValueKindUnit ||
-          ((cond.kind == ValueKindBool && !cond.as._bool) ||
-           (cond.kind == ValueKindList && cond.as.list->next == NULL)))
+      if (cond->kind == ValueKindUnit ||
+          ((cond->kind == ValueKindBool && !cond->as._bool) ||
+           (cond->kind == ValueKindList && cond->as.list->next == NULL)))
         break;
 
       EXECUTE_BLOCK(vm, &expr->as._while.body, false);
@@ -475,60 +591,83 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       return ExecStateExit;
     }
 
-    free_value(&var->value, vm->rc_arena);
+    Value *prev_value = var->value;
+
     EXECUTE_EXPR(vm, expr->as.set.src, true);
     var->value = value_stack_pop(&vm->stack);
+
+    value_free(prev_value, vm->rc_arena);
+
+    if (var->value->refs_count > 1)
+      var->value = value_clone(vm->rc_arena, var->value);
 
     if (value_expected)
       value_stack_push_unit(&vm->stack);
   } break;
 
-  case IrExprKindField: {
-    EXECUTE_EXPR(vm, expr->as.field.dict, true);
-
-    Value value = value_stack_pop(&vm->stack);
-    if (value.kind != ValueKindDict) {
-      ERROR("Only dicts have fields\n");
+  case IrExprKindGet: {
+    Var *var = get_var(vm, expr->as.get.src);
+    if (!var) {
+      ERROR("Symbol "STR_FMT" was not defined before usage\n",
+            STR_ARG(expr->as.set.dest));
       vm->exit_code = 1;
       return ExecStateExit;
     }
 
-    NamedValue *field = NULL;
-
-    for (u32 i = 0; i < value.as.dict.len; ++i) {
-      NamedValue *temp_field = value.as.dict.items + i;
-
-      if (str_eq(temp_field->name, expr->as.field.field)) {
-        field = temp_field;
-        break;
-      }
-    }
-
-    if (!field) {
-      ERROR("Field `"STR_FMT"` was not found in given dict\n",
-            STR_ARG(expr->as.field.field));
+    if (var->value->kind != ValueKindList &&
+        var->value->kind != ValueKindDict) {
+      ERROR("Only lists and dictionaries can be indexed\n");
+      vm->exit_code = 1;
       return ExecStateExit;
     }
 
-    if (expr->as.field.is_set) {
-      free_value(&field->value, vm->rc_arena);
+    EXECUTE_EXPR(vm, expr->as.get.key, true);
+    Value *key = value_stack_pop(&vm->stack);
 
-      EXECUTE_EXPR(vm, expr->as.field.expr, true);
-      field->value = value_stack_pop(&vm->stack);
-      if (value_expected)
-        value_stack_push_unit(&vm->stack);
-    } else if (value_expected) {
-      if (!field) {
-        ERROR("Field `"STR_FMT"` was not found in given dict\n",
-              STR_ARG(expr->as.field.field));
+    if (var->value->kind == ValueKindList) {
+      if (key->kind != ValueKindInt) {
+        ERROR("Lists can be indexed only with integers\n");
+        vm->exit_code = 1;
+        return ExecStateExit;
       }
 
-      DA_APPEND(vm->stack, field->value);
+      ListNode *node = key->as.list->next;
+      u32 i = 0;
+      while (node && i < key->as._int) {
+        node = node->next;
+        ++i;
+      }
+
+      if (!node || i < key->as._int) {
+        ERROR("Out of bounds\n");
+        vm->exit_code = 1;
+        return ExecStateExit;
+      }
+
+      DA_APPEND(vm->stack, node->value);
+    } else if (var->value->kind == ValueKindDict) {
+      bool assigned = false;
+
+      for (u32 i = 0; i < var->value->as.dict.len; ++i) {
+        DictValue *dict_value = var->value->as.dict.items + i;
+
+        if (value_eq(dict_value->key, key)) {
+          DA_APPEND(vm->stack, dict_value->value);
+
+          assigned = true;
+
+          break;
+        }
+      }
+
+      if (!assigned)
+        value_stack_push_unit(&vm->stack);
     }
   } break;
 
   case IrExprKindRet: {
-    EXECUTE_EXPR(vm, expr->as.ret.expr, true);
+    if (expr->as.ret.has_expr)
+      EXECUTE_EXPR(vm, expr->as.ret.expr, true);
 
     return ExecStateReturn;
   } break;
@@ -555,7 +694,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       }
     }
 
-    value_stack_push_list(&vm->stack, list);
+    value_stack_push_list(&vm->stack, vm->rc_arena, list);
   } break;
 
   case IrExprKindIdent: {
@@ -577,22 +716,22 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
   case IrExprKindString: {
     if (value_expected)
-      value_stack_push_string(&vm->stack, expr->as.string.lit);
+      value_stack_push_string(&vm->stack, vm->rc_arena, expr->as.string.lit);
   } break;
 
   case IrExprKindInt: {
     if (value_expected)
-      value_stack_push_int(&vm->stack, expr->as._int._int);
+      value_stack_push_int(&vm->stack, vm->rc_arena, expr->as._int._int);
   } break;
 
   case IrExprKindFloat: {
     if (value_expected)
-      value_stack_push_float(&vm->stack, expr->as._float._float);
+      value_stack_push_float(&vm->stack, vm->rc_arena, expr->as._float._float);
   } break;
 
   case IrExprKindBool: {
     if (value_expected)
-      value_stack_push_bool(&vm->stack, expr->as._bool._bool);
+      value_stack_push_bool(&vm->stack, vm->rc_arena, expr->as._bool._bool);
   } break;
 
   case IrExprKindLambda: {
@@ -605,7 +744,8 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     CATCH_VARS_BLOCK(vm, &local_names, &catched_values, &expr->as.lambda.body);
 
     if (value_expected) {
-      Value func_value = {
+      Value *func_value = rc_arena_alloc(vm->rc_arena, sizeof(Value));
+      *func_value = (Value) {
         ValueKindFunc,
         {
           .func = {
@@ -615,6 +755,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
             expr->as.lambda.intrinsic_name,
           },
         },
+        0,
       };
       DA_APPEND(vm->stack, func_value);
     }
@@ -628,15 +769,16 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     for (u32 i = 0; i < expr->as.dict.len; ++i) {
       EXECUTE_EXPR(vm, expr->as.dict.items[i].expr, true);
+      EXECUTE_EXPR(vm, expr->as.dict.items[i].key, true);
 
-      NamedValue field;
-      field.name = expr->as.dict.items[i].name;
+      DictValue field;
+      field.key = value_stack_pop(&vm->stack);
       field.value = value_stack_pop(&vm->stack);
 
       DA_APPEND(dict, field);
     }
 
-    value_stack_push_dict(&vm->stack, dict);
+    value_stack_push_dict(&vm->stack, vm->rc_arena, dict);
   } break;
 
   case IrExprKindSelfCall: {
@@ -644,6 +786,59 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       EXECUTE_EXPR(vm, expr->as.self_call.args.items[i], true);
 
     EXECUTE_FUNC(vm, &vm->current_func_value, value_expected);
+  } break;
+
+  case IrExprKindSetIn: {
+    Var *var = get_var(vm, expr->as.set_in.dict);
+    if (!var) {
+      ERROR("Symbol "STR_FMT" was not defined before usage\n",
+            STR_ARG(expr->as.set.dest));
+      vm->exit_code = 1;
+      return ExecStateExit;
+    }
+
+    if (var->value->kind != ValueKindDict) {
+      ERROR("Only dictionaries have fields\n");
+      vm->exit_code = 1;
+      return ExecStateExit;
+    }
+
+    Dict *dict = &var->value->as.dict;
+
+    for (u32 i = 0; i < expr->as.set_in.fields.len; ++i) {
+      EXECUTE_EXPR(vm, expr->as.set_in.fields.items[i].expr, true);
+      EXECUTE_EXPR(vm, expr->as.set_in.fields.items[i].key, true);
+
+      DictValue field;
+      field.key = value_stack_pop(&vm->stack);
+      field.value = value_stack_pop(&vm->stack);
+
+      bool found_field = false;
+
+      for (u32 j = 0; j < dict->len; ++j) {
+        if (value_eq(dict->items[j].key, field.key)) {
+          Value *prev_value = dict->items[j].value;
+
+          dict->items[j].value = field.value;
+
+          value_free(prev_value, vm->rc_arena);
+
+          Value **field_value = &dict->items[j].value;
+          if ((*field_value)->refs_count > 1)
+            *field_value = value_clone(vm->rc_arena, *field_value);
+
+          found_field = true;
+
+          break;
+        }
+      }
+
+      if (!found_field)
+        DA_APPEND(*dict, field);
+    }
+
+    if (value_expected)
+      value_stack_push_unit(&vm->stack);
   } break;
   }
 
@@ -668,7 +863,7 @@ static void intrinsics_append(Intrinsics *a, Intrinsic *b, u32 b_len) {
 }
 
 u32 execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena,
-            Intrinsics *intrinsics, Value *result_value) {
+            Intrinsics *intrinsics, Value **result_value) {
   Vm vm = {0};
   vm.rc_arena = rc_arena;
 
@@ -690,9 +885,11 @@ u32 execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena,
     memcpy(buffer, argv[i], len);
 
     ListNode *new_arg = rc_arena_alloc(rc_arena, sizeof(ListNode));
-    new_arg->value = (Value) {
+    new_arg->value = rc_arena_alloc(rc_arena, sizeof(Value));
+    *new_arg->value = (Value) {
       ValueKindString,
       { .string = { { buffer, len }, (Str *) buffer } },
+      0,
     };
     new_arg->is_static = true;
 
@@ -717,15 +914,15 @@ u32 execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena,
 
 void cleanup(Vm *vm) {
   for (u32 i = 0; i < vm->stack.len; ++i)
-    free_value(vm->stack.items + i, vm->rc_arena);
+    value_free(vm->stack.items[i], vm->rc_arena);
   free(vm->stack.items);
 
   for (u32 i = 0; i < vm->global_vars.len; ++i)
-    free_value(&vm->global_vars.items[i].value, vm->rc_arena);
+    value_free(vm->global_vars.items[i].value, vm->rc_arena);
   free(vm->global_vars.items);
 
   for (u32 i = 0; i < vm->local_vars.len; ++i)
-    free_value(&vm->local_vars.items[i].value, vm->rc_arena);
+    value_free(vm->local_vars.items[i].value, vm->rc_arena);
   free(vm->local_vars.items);
 
   free(vm->intrinsics.items);

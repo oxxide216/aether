@@ -21,12 +21,15 @@ typedef struct {
 
 typedef Da(Token) Tokens;
 
+typedef Da(Str) FilePaths;
+
 typedef struct {
-  Tokens  tokens;
-  u32     index;
-  Macros *macros;
-  char   *file_path;
-  Ir      ir;
+  Tokens     tokens;
+  u32        index;
+  Macros    *macros;
+  char      *file_path;
+  FilePaths  included_files;
+  Ir         ir;
 } Parser;
 
 static char *token_names[] = {
@@ -41,9 +44,11 @@ static char *token_names[] = {
   "while",
   "use",
   "set",
+  "get",
   "field",
   "ret",
   "import",
+  "set-in",
   "`(`",
   "`)`",
   "`[`",
@@ -55,11 +60,11 @@ static char *token_names[] = {
   "->",
   "<->",
   "<>",
+  ":",
   "int",
   "float",
   "bool",
   "identifier",
-  "key",
 };
 
 static char escape_char(char _char) {
@@ -210,7 +215,6 @@ Ir parse_with_macros(Str code, char *file_path, Macros *macros) {
   parser.macros = macros;
   parser.file_path = file_path;
   parser.ir = parser_parse_block(&parser, 0);
-  expand_macros_block(&parser.ir, parser.macros, NULL, NULL, false);
 
   return parser.ir;
 }
@@ -230,6 +234,9 @@ static void parser_parse_macro_def(Parser *parser) {
       macro.has_unpack = true;
 
       arg_token = parser_expect_token(parser, MASK(TT_IDENT));
+      DA_APPEND(macro.arg_names, arg_token->lexeme);
+
+      break;
     }
 
     DA_APPEND(macro.arg_names, arg_token->lexeme);
@@ -254,10 +261,8 @@ static IrExprDict parser_parse_dict(Parser *parser) {
 
   Token *token;
   while ((token = parser_peek_token(parser))->id != TT_CCURLY) {
-    Token *key_token = parser_expect_token(parser, MASK(TT_KEY));
-    Str key = key_token->lexeme;
-    --key.len;
-
+    IrExpr *key = parser_parse_expr(parser);
+    parser_expect_token(parser, MASK(TT_COLON));
     IrExpr *expr = parser_parse_expr(parser);
 
     IrField field = { key, expr };
@@ -298,12 +303,36 @@ static IrExprLambda parser_parse_lambda(Parser *parser) {
                                              MASK(TT_CBRACKET) |
                                              MASK(TT_RHOMBUS));
 
-    token = parser_peek_token(parser);
-    if (token && token->id == TT_RHOMBUS)
+    if (parser_peek_token(parser)->id == TT_RHOMBUS)
       parser_next_token(parser);
   }
 
   return lambda;
+}
+
+static IrExprSetIn parser_parse_set_in(Parser *parser) {
+  IrExprSetIn set_in = {0};
+  set_in.dict = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
+
+  Token *token = parser_peek_token(parser);
+  if (token && token->id != TT_CPAREN) {
+    while (token && token->id != TT_CPAREN) {
+      IrField field = {0};
+      field.key = parser_parse_expr(parser);
+      parser_expect_token(parser, MASK(TT_COLON));
+      field.expr = parser_parse_expr(parser);
+
+      DA_APPEND(set_in.fields, field);
+
+      token = parser_peek_token(parser);
+      if (token->id == TT_CPAREN)
+        break;
+    }
+  }
+
+  parser_expect_token(parser, MASK(TT_CPAREN));
+
+  return set_in;
 }
 
 static char *str_to_cstr(Str str) {
@@ -369,14 +398,14 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   } break;
 
   case TT_OBRACKET: {
-    u32 index = parser->index;
+    u32 prev_index = parser->index;
 
     IrBlock block = parser_parse_block(parser, MASK(TT_CBRACKET));
+
     parser_expect_token(parser, MASK(TT_CBRACKET));
 
-    token = parser_peek_token(parser);
-    if (token->id == TT_RIGHT_ARROW) {
-      parser->index = index;
+    if (parser_peek_token(parser)->id == TT_RIGHT_ARROW) {
+      parser->index = prev_index;
 
       expr->kind = IrExprKindLambda;
       expr->as.lambda = parser_parse_lambda(parser);
@@ -463,16 +492,6 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     parser_expect_token(parser, MASK(TT_CPAREN));
   } break;
 
-  case TT_SET: {
-    parser_next_token(parser);
-
-    expr->kind = IrExprKindSet;
-    expr->as.set.dest = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
-    expr->as.set.src = parser_parse_expr(parser);
-
-    parser_expect_token(parser, MASK(TT_CPAREN));
-  } break;
-
   case TT_USE: {
     parser_next_token(parser);
 
@@ -488,23 +507,39 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     char *prefix = str_to_cstr(get_file_dir(current_file_path));
     char *include_paths[] = INCLUDE_PATHS(prefix);
     StringBuilder path_sb = {0};
-    char *path = NULL;
+    char *path_cstr = NULL;
     Str code;
 
     for (u32 i = 0; i < ARRAY_LEN(include_paths); ++i) {
-      if (path) {
-        free(path);
-        path = NULL;
+      if (path_cstr) {
+        free(path_cstr);
+        path_cstr = NULL;
       }
 
       sb_push(&path_sb, include_paths[i]);
       sb_push_str(&path_sb, new_file_path);
+      Str path = sb_to_str(path_sb);
 
-      path = str_to_cstr(sb_to_str(path_sb));
-      code = read_file(path);
+      bool already_included = false;
+      for (u32 j = 0; j < parser->included_files.len; ++j) {
+        if (str_eq(parser->included_files.items[j], path)) {
+          already_included = true;
 
-      if (code.len != (u32) -1)
+          break;
+        }
+      }
+
+      if (already_included)
         break;
+
+      path_cstr = str_to_cstr(path);
+      code = read_file(path_cstr);
+
+      if (code.len != (u32) -1) {
+        DA_APPEND(parser->included_files, path);
+
+        break;
+      }
 
       path_sb.len = 0;
     }
@@ -517,7 +552,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     Macros macros = {0};
 
     expr->kind = IrExprKindBlock;
-    expr->as.block = parse_with_macros(code, path, &macros);
+    expr->as.block = parse_with_macros(code, path_cstr, &macros);
 
     if (parser->macros->cap < parser->macros->len + macros.len) {
       parser->macros->cap = parser->macros->len + macros.len;
@@ -533,20 +568,25 @@ static IrExpr *parser_parse_expr(Parser *parser) {
 
     free(prefix);
     free(path_sb.buffer);
-    free(path);
+    free(path_cstr);
   } break;
 
-  case TT_FIELD: {
+  case TT_SET: {
     parser_next_token(parser);
 
-    expr->kind = IrExprKindField;
-    expr->as.field.dict = parser_parse_expr(parser);
-    expr->as.field.field = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
+    expr->kind = IrExprKindSet;
+    expr->as.set.dest = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
+    expr->as.set.src = parser_parse_expr(parser);
 
-    if (parser_peek_token(parser)->id != TT_CPAREN) {
-      expr->as.field.is_set = true;
-      expr->as.field.expr = parser_parse_expr(parser);
-    }
+    parser_expect_token(parser, MASK(TT_CPAREN));
+  } break;
+
+  case TT_GET: {
+    parser_next_token(parser);
+
+    expr->kind = IrExprKindGet;
+    expr->as.get.src = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
+    expr->as.get.key = parser_parse_expr(parser);
 
     parser_expect_token(parser, MASK(TT_CPAREN));
   } break;
@@ -561,6 +601,13 @@ static IrExpr *parser_parse_expr(Parser *parser) {
       expr->as.ret.expr = parser_parse_expr(parser);
 
     parser_expect_token(parser, MASK(TT_CPAREN));
+  } break;
+
+  case TT_SET_IN: {
+    parser_next_token(parser);
+
+    expr->kind = IrExprKindSetIn;
+    expr->as.set_in = parser_parse_set_in(parser);
   } break;
 
   default: {
@@ -605,5 +652,8 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
 
 Ir parse(Str code, char *file_path) {
   Macros macros = {0};
-  return parse_with_macros(code, file_path, &macros);
+  Ir ir = parse_with_macros(code, file_path, &macros);
+  expand_macros_block(&ir, &macros, NULL, NULL, true);
+
+  return ir;
 }

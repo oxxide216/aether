@@ -16,7 +16,6 @@ void expand_macros_block(IrBlock *block, Macros *macros,
                          IrArgs *arg_names, IrBlock *args,
                          bool unpack);
 void expand_macros(IrExpr *expr, Macros *macros,
-                   IrArgs *arg_names, IrBlock *args,
-                   bool unpack);
+                   IrArgs *arg_names, IrBlock *args);
 
 #endif // MACROS_H

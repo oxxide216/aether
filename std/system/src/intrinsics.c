@@ -28,10 +28,10 @@ static void print_value(ValueStack *stack, Value *value, u32 level) {
       if (node != value->as.list->next)
         fputc(' ', stdout);
 
-      if (node->value.kind == ValueKindString)
+      if (node->value->kind == ValueKindString)
         fputc('\'', stdout);
-      print_value(stack, &node->value, level);
-      if (node->value.kind == ValueKindString)
+      print_value(stack, node->value, level);
+      if (node->value->kind == ValueKindString)
         fputc('\'', stdout);
 
       node = node->next;
@@ -73,49 +73,43 @@ static void print_value(ValueStack *stack, Value *value, u32 level) {
   } break;
 
   case ValueKindDict: {
-    fputs("\n{\n", stdout);
+    fputs("{\n", stdout);
 
     for (u32 i = 0; i < value->as.dict.len; ++i) {
       for (u32 j = 0; j < level + 1; ++j)
         fputs("  ", stdout);
 
-      str_print(value->as.dict.items[i].name);
+      print_value(stack, value->as.dict.items[i].key, level + 1);
       fputs(": ", stdout);
-      print_value(stack, &value->as.dict.items[i].value, level + 1);
+      print_value(stack, value->as.dict.items[i].value, level + 1);
 
       fputc('\n', stdout);
     }
 
     for (u32 j = 0; j < level; ++j)
       fputs("  ", stdout);
-    fputs("}\n", stdout);
+    fputs("}", stdout);
   } break;
   }
 }
 
 bool print_intrinsic(Vm *vm) {
-  Value value = value_stack_pop(&vm->stack);
-  print_value(&vm->stack, &value, 0);
-
-  return true;
-}
-
-bool println_intrinsic(Vm *vm) {
-  print_intrinsic(vm);
-  fputc('\n', stdout);
+  Value *value = value_stack_pop(&vm->stack);
+  print_value(&vm->stack, value, 0);
+  fflush(stdout);
 
   return true;
 }
 
 bool input_size_intrinsic(Vm *vm) {
-  Value size = value_stack_pop(&vm->stack);
+  Value *size = value_stack_pop(&vm->stack);
 
   Str buffer;
-  buffer.len = size.as._int;
+  buffer.len = size->as._int;
   buffer.ptr = rc_arena_alloc(vm->rc_arena, buffer.len);
   read(0, buffer.ptr, buffer.len);
 
-  value_stack_push_string(&vm->stack, buffer);
+  value_stack_push_string(&vm->stack, vm->rc_arena, buffer);
 
   return true;
 }
@@ -141,7 +135,7 @@ bool input_intrinsic(Vm *vm) {
     buffer[len++] = ch;
   }
 
-  value_stack_push_string(&vm->stack, STR(buffer, len));
+  value_stack_push_string(&vm->stack, vm->rc_arena, STR(buffer, len));
 
   return true;
 }
@@ -163,13 +157,13 @@ bool block_input_intrinsic(Vm *vm) {
 }
 
 bool file_exists_intrinsic(Vm *vm) {
-  Value path = value_stack_pop(&vm->stack);
+  Value *path = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path.as.string.str.len + 1);
-  memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
-  path_cstring[path.as.string.str.len] = '\0';
+  char *path_cstring = malloc(path->as.string.str.len + 1);
+  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
+  path_cstring[path->as.string.str.len] = '\0';
 
-  value_stack_push_bool(&vm->stack, access(path_cstring, F_OK) == 0);
+  value_stack_push_bool(&vm->stack, vm->rc_arena, access(path_cstring, F_OK) == 0);
 
   free(path_cstring);
 
@@ -177,17 +171,17 @@ bool file_exists_intrinsic(Vm *vm) {
 }
 
 bool read_file_intrinsic(Vm *vm) {
-  Value path = value_stack_pop(&vm->stack);
+  Value *path = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path.as.string.str.len + 1);
-  memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
-  path_cstring[path.as.string.str.len] = '\0';
+  char *path_cstring = malloc(path->as.string.str.len + 1);
+  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
+  path_cstring[path->as.string.str.len] = '\0';
 
   Str content = read_file(path_cstring);
   if (content.len == (u32) -1)
     value_stack_push_unit(&vm->stack);
   else
-    value_stack_push_string(&vm->stack, content);
+    value_stack_push_string(&vm->stack, vm->rc_arena, content);
 
   free(path_cstring);
 
@@ -195,14 +189,14 @@ bool read_file_intrinsic(Vm *vm) {
 }
 
 bool write_file_intrinsic(Vm *vm) {
-  Value path = value_stack_pop(&vm->stack);
-  Value content = value_stack_pop(&vm->stack);
+  Value *path = value_stack_pop(&vm->stack);
+  Value *content = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path.as.string.str.len + 1);
-  memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
-  path_cstring[path.as.string.str.len] = '\0';
+  char *path_cstring = malloc(path->as.string.str.len + 1);
+  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
+  path_cstring[path->as.string.str.len] = '\0';
 
-  write_file(path_cstring, content.as.string.str);
+  write_file(path_cstring, content->as.string.str);
 
   free(path_cstring);
 
@@ -210,11 +204,11 @@ bool write_file_intrinsic(Vm *vm) {
 }
 
 bool delete_file_intrinsic(Vm *vm) {
-  Value path = value_stack_pop(&vm->stack);
+  Value *path = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path.as.string.str.len + 1);
-  memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
-  path_cstring[path.as.string.str.len] = '\0';
+  char *path_cstring = malloc(path->as.string.str.len + 1);
+  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
+  path_cstring[path->as.string.str.len] = '\0';
 
   remove(path_cstring);
 
@@ -227,17 +221,17 @@ bool get_current_path_intrinsic(Vm *vm) {
   char *path = rc_arena_alloc(vm->rc_arena, PATH_MAX);
   getcwd(path, PATH_MAX);
 
-  value_stack_push_string(&vm->stack, STR(path, strlen(path)));
+  value_stack_push_string(&vm->stack, vm->rc_arena, STR(path, strlen(path)));
 
   return true;
 }
 
 bool set_current_path_intrinsic(Vm *vm) {
-  Value path = value_stack_pop(&vm->stack);
+  Value *path = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path.as.string.str.len + 1);
-  memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
-  path_cstring[path.as.string.str.len] = '\0';
+  char *path_cstring = malloc(path->as.string.str.len + 1);
+  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
+  path_cstring[path->as.string.str.len] = '\0';
 
   chdir(path_cstring);
 
@@ -247,16 +241,16 @@ bool set_current_path_intrinsic(Vm *vm) {
 }
 
 bool get_absolute_path_intrinsic(Vm *vm) {
-  Value path = value_stack_pop(&vm->stack);
+  Value *path = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path.as.string.str.len + 1);
-  memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
-  path_cstring[path.as.string.str.len] = '\0';
+  char *path_cstring = malloc(path->as.string.str.len + 1);
+  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
+  path_cstring[path->as.string.str.len] = '\0';
 
   char *absolute_path = rc_arena_alloc(vm->rc_arena, PATH_MAX);
   realpath(path_cstring, absolute_path);
 
-  value_stack_push_string(&vm->stack, STR(absolute_path, strlen(absolute_path)));
+  value_stack_push_string(&vm->stack, vm->rc_arena, STR(absolute_path, strlen(absolute_path)));
 
   free(path_cstring);
 
@@ -264,14 +258,14 @@ bool get_absolute_path_intrinsic(Vm *vm) {
 }
 
 bool list_directory_intrinsic(Vm *vm) {
-  Value path = value_stack_pop(&vm->stack);
+  Value *path = value_stack_pop(&vm->stack);
 
   ListNode *list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
   ListNode *list_end = list;
 
-  char *path_cstring = malloc(path.as.string.str.len + 1);
-  memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
-  path_cstring[path.as.string.str.len] = '\0';
+  char *path_cstring = malloc(path->as.string.str.len + 1);
+  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
+  path_cstring[path->as.string.str.len] = '\0';
 
   DIR *dir = opendir(path_cstring);
   if (dir) {
@@ -285,26 +279,29 @@ bool list_directory_intrinsic(Vm *vm) {
 
       list_end->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
       list_end = list_end->next;
-      list_end->value.kind = ValueKindString;
-      list_end->value.as.string = (String) { path, (Str *) path.ptr };
+      list_end->value = rc_arena_alloc(vm->rc_arena, sizeof(Value));
+      list_end->value->kind = ValueKindString;
+      list_end->value->as.string = (String) { path, (Str *) path.ptr };
     }
 
     closedir(dir);
   }
 
-  value_stack_push_list(&vm->stack, list);
+  value_stack_push_list(&vm->stack, vm->rc_arena, list);
+
+  free(path_cstring);
 
   return true;
 }
 
 bool get_args_intrinsic(Vm *vm) {
-  value_stack_push_list(&vm->stack, vm->args);
+  value_stack_push_list(&vm->stack, vm->rc_arena, vm->args);
 
   return true;
 }
 
 bool create_server_intrinsic(Vm *vm) {
-  Value port = value_stack_pop(&vm->stack);
+  Value *port = value_stack_pop(&vm->stack);
 
   i32 server_socket = socket(AF_INET, SOCK_STREAM, 0);
   if (server_socket < 0) {
@@ -321,7 +318,7 @@ bool create_server_intrinsic(Vm *vm) {
   struct sockaddr_in address = {0};
   address.sin_family = AF_INET;
   address.sin_addr.s_addr = INADDR_ANY;
-  address.sin_port = htons(port.as._int);
+  address.sin_port = htons(port->as._int);
 
   if (bind(server_socket, (struct sockaddr*) &address,
            sizeof(address)) < 0) {
@@ -334,14 +331,14 @@ bool create_server_intrinsic(Vm *vm) {
     return true;
   }
 
-  value_stack_push_int(&vm->stack, server_socket);
+  value_stack_push_int(&vm->stack, vm->rc_arena, server_socket);
 
   return true;
 }
 
 bool create_client_intrinsic(Vm *vm) {
-  Value port = value_stack_pop(&vm->stack);
-  Value server_ip_address = value_stack_pop(&vm->stack);
+  Value *port = value_stack_pop(&vm->stack);
+  Value *server_ip_address = value_stack_pop(&vm->stack);
 
   i32 client_socket = socket(AF_INET, SOCK_STREAM, 0);
   if (client_socket < 0) {
@@ -355,13 +352,13 @@ bool create_client_intrinsic(Vm *vm) {
 
   struct sockaddr_in server_address;
   server_address.sin_family = AF_INET;
-  server_address.sin_port = htons(port.as._int);
+  server_address.sin_port = htons(port->as._int);
 
-  char *server_ip_address_cstr = malloc(server_ip_address.as.string.str.len + 1);
+  char *server_ip_address_cstr = malloc(server_ip_address->as.string.str.len + 1);
   memcpy(server_ip_address_cstr,
-         server_ip_address.as.string.str.ptr,
-         server_ip_address.as.string.str.len);
-  server_ip_address_cstr[server_ip_address.as.string.str.len] = '\0';
+         server_ip_address->as.string.str.ptr,
+         server_ip_address->as.string.str.len);
+  server_ip_address_cstr[server_ip_address->as.string.str.len] = '\0';
 
   if (inet_pton(AF_INET,
                 server_ip_address_cstr,
@@ -382,23 +379,23 @@ bool create_client_intrinsic(Vm *vm) {
     return true;
   }
 
-  value_stack_push_int(&vm->stack, client_socket);
+  value_stack_push_int(&vm->stack, vm->rc_arena, client_socket);
 
   free(server_ip_address_cstr);
   return true;
 }
 
 bool accept_connection_intrinsic(Vm *vm) {
-  Value port = value_stack_pop(&vm->stack);
-  Value server_socket = value_stack_pop(&vm->stack);
+  Value *port = value_stack_pop(&vm->stack);
+  Value *server_socket = value_stack_pop(&vm->stack);
 
   struct sockaddr_in address;
   address.sin_family = AF_INET;
   address.sin_addr.s_addr = INADDR_ANY;
-  address.sin_port = htons(port.as._int);
+  address.sin_port = htons(port->as._int);
 
   socklen_t address_size = sizeof(address);
-  i32 client_socket = accept(server_socket.as._int,
+  i32 client_socket = accept(server_socket->as._int,
                              (struct sockaddr*) &address,
                              &address_size);
   if (client_socket < 0) {
@@ -410,45 +407,45 @@ bool accept_connection_intrinsic(Vm *vm) {
   i32 enable = 1;
   setsockopt(client_socket, SOL_TCP, TCP_NODELAY, &enable, sizeof(enable));
 
-  value_stack_push_int(&vm->stack, client_socket);
+  value_stack_push_int(&vm->stack, vm->rc_arena, client_socket);
 
   return true;
 }
 
 bool close_connection_intrinsic(Vm *vm) {
-  Value client_socket = value_stack_pop(&vm->stack);
+  Value *client_socket = value_stack_pop(&vm->stack);
 
-  close(client_socket.as._int);
+  close(client_socket->as._int);
 
   return true;
 }
 
 bool send_intrinsic(Vm *vm) {
-  Value message = value_stack_pop(&vm->stack);
-  Value receiver = value_stack_pop(&vm->stack);
+  Value *message = value_stack_pop(&vm->stack);
+  Value *receiver = value_stack_pop(&vm->stack);
 
-  send(receiver.as._int, message.as.string.str.ptr,
-       message.as.string.str.len, 0);
+  send(receiver->as._int, message->as.string.str.ptr,
+       message->as.string.str.len, 0);
 
   return true;
 }
 
 bool receive_size_intrinsic(Vm *vm) {
-  Value size = value_stack_pop(&vm->stack);
-  Value receiver = value_stack_pop(&vm->stack);
+  Value *size = value_stack_pop(&vm->stack);
+  Value *receiver = value_stack_pop(&vm->stack);
 
   Str buffer;
-  buffer.len = size.as._int;
+  buffer.len = size->as._int;
   buffer.ptr = rc_arena_alloc(vm->rc_arena, buffer.len);
-  recv(receiver.as._int, buffer.ptr, buffer.len, 0);
+  recv(receiver->as._int, buffer.ptr, buffer.len, 0);
 
-  value_stack_push_string(&vm->stack, buffer);
+  value_stack_push_string(&vm->stack, vm->rc_arena, buffer);
 
   return true;
 }
 
 bool receive_intrinsic(Vm *vm) {
-  Value receiver = value_stack_pop(&vm->stack);
+  Value *receiver = value_stack_pop(&vm->stack);
 
   u32 cap = DEFAULT_RECEIVE_BUFFER_SIZE;
 
@@ -456,7 +453,7 @@ bool receive_intrinsic(Vm *vm) {
   buffer.ptr = rc_arena_alloc(vm->rc_arena, cap);
 
   i32 len = 0;
-  while ((len = recv(receiver.as._int,
+  while ((len = recv(receiver->as._int,
                      buffer.ptr + buffer.len,
                      cap - buffer.len, MSG_DONTWAIT)) > 0) {
     buffer.len += (u32) len;
@@ -479,19 +476,19 @@ bool receive_intrinsic(Vm *vm) {
     return true;
   }
 
-  value_stack_push_string(&vm->stack, buffer);
+  value_stack_push_string(&vm->stack, vm->rc_arena, buffer);
 
   return true;
 }
 
 bool run_command_intrinsic(Vm *vm) {
-  Value path = value_stack_pop(&vm->stack);
+  Value *path = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path.as.string.str.len + 1);
-  memcpy(path_cstring, path.as.string.str.ptr, path.as.string.str.len);
-  path_cstring[path.as.string.str.len] = '\0';
+  char *path_cstring = malloc(path->as.string.str.len + 1);
+  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
+  path_cstring[path->as.string.str.len] = '\0';
 
-  value_stack_push_int(&vm->stack, system(path_cstring));
+  value_stack_push_int(&vm->stack, vm->rc_arena, system(path_cstring));
 
   free(path_cstring);
 
@@ -499,9 +496,9 @@ bool run_command_intrinsic(Vm *vm) {
 }
 
 bool sleep_intrinsic(Vm *vm) {
-  Value time = value_stack_pop(&vm->stack);
+  Value *time = value_stack_pop(&vm->stack);
 
-  usleep((i64) (time.as._float * 1000000.0));
+  usleep((i64) (time->as._float * 1000000.0));
 
   return true;
 }
@@ -509,7 +506,6 @@ bool sleep_intrinsic(Vm *vm) {
 Intrinsic system_intrinsics[] = {
   // Io
   { STR_LIT("print"), false, 1, { ValueKindUnit }, &print_intrinsic },
-  { STR_LIT("println"), false, 1, { ValueKindUnit }, &println_intrinsic },
   { STR_LIT("input-size"), true, 1, { ValueKindInt }, &input_size_intrinsic },
   { STR_LIT("input"), true, 0, {}, &input_intrinsic },
   { STR_LIT("unblock-input"), false, 0, {}, &unblock_input_intrinsic },

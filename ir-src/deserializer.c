@@ -57,15 +57,9 @@ static void get_expr_data_size(u8 *data, u32 *size) {
     get_expr_data_size(data, size);
   } break;
 
-  case IrExprKindField: {
-    get_expr_data_size(data, size);
+  case IrExprKindGet: {
     get_str_data_size(data, size);
-
-    bool is_set = *(bool *) (data + *size);
-    *size += sizeof(bool);
-
-    if (is_set)
-      get_expr_data_size(data, size);
+    get_expr_data_size(data, size);
   } break;
 
   case IrExprKindRet: {
@@ -119,6 +113,18 @@ static void get_expr_data_size(u8 *data, u32 *size) {
 
   case IrExprKindSelfCall: {
     get_block_data_size(data, size);
+  } break;
+
+  case IrExprKindSetIn: {
+    get_str_data_size(data, size);
+
+    u32 len = *(u32 *) (data + *size);
+    *size += sizeof(u32);
+
+    for (u32 i = 0; i < len; ++i) {
+      get_expr_data_size(data, size);
+      get_expr_data_size(data, size);
+    }
   } break;
   }
 }
@@ -207,20 +213,11 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
     load_expr_data(expr->as.set.src, data, end, rc_arena);
   } break;
 
-  case IrExprKindField: {
-    expr->as.field.dict = aalloc(sizeof(IrExpr));
+  case IrExprKindGet: {
+    expr->as.get.key = aalloc(sizeof(IrExpr));
 
-    load_expr_data(expr->as.field.dict, data, end, rc_arena);
-    load_str_data(&expr->as.field.field, data, end, rc_arena);
-
-    expr->as.field.is_set = *(bool *) (data + *end);
-    *end += sizeof(bool);
-
-    if (expr->as.field.is_set) {
-      expr->as.field.expr = aalloc(sizeof(IrExpr));
-
-      load_expr_data(expr->as.field.expr, data, end, rc_arena);
-    }
+    load_str_data(&expr->as.get.src, data, end, rc_arena);
+    load_expr_data(expr->as.get.key, data, end, rc_arena);
   } break;
 
   case IrExprKindRet: {
@@ -282,15 +279,32 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
 
     expr->as.dict.items = malloc(expr->as.dict.len * sizeof(IrField));
     for (u32 i = 0; i < expr->as.dict.len; ++i) {
+      expr->as.dict.items[i].key = aalloc(sizeof(IrExpr));
       expr->as.dict.items[i].expr = aalloc(sizeof(IrExpr));
 
-      load_str_data(&expr->as.dict.items[i].name, data, end, rc_arena);
+      load_expr_data(expr->as.dict.items[i].key, data, end, rc_arena);
       load_expr_data(expr->as.dict.items[i].expr, data, end, rc_arena);
     }
   } break;
 
   case IrExprKindSelfCall: {
     load_block_data(&expr->as.self_call.args, data, end, rc_arena);
+  } break;
+
+  case IrExprKindSetIn: {
+    load_str_data(&expr->as.set_in.dict, data, end, rc_arena);
+
+    expr->as.set_in.fields.len = *(u32 *) (data + *end);
+    *end += sizeof(u32);
+
+    expr->as.set_in.fields.items = malloc(expr->as.set_in.fields.len * sizeof(IrField));
+    for (u32 i = 0; i < expr->as.set_in.fields.len; ++i) {
+      expr->as.set_in.fields.items[i].key = aalloc(sizeof(IrExpr));
+      expr->as.set_in.fields.items[i].expr = aalloc(sizeof(IrExpr));
+
+      load_expr_data(expr->as.set_in.fields.items[i].key, data, end, rc_arena);
+      load_expr_data(expr->as.set_in.fields.items[i].expr, data, end, rc_arena);
+    }
   } break;
   }
 }

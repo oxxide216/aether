@@ -54,11 +54,13 @@ typedef struct {
 
 typedef struct ListNode ListNode;
 
-typedef struct NamedValue NamedValue;
+typedef struct DictValue DictValue;
+
+typedef Da(DictValue) Dict;
+
+typedef struct NamedValue  NamedValue;
 
 typedef Da(NamedValue) NamedValues;
-
-typedef NamedValues Dict;
 
 typedef struct {
   IrArgs      args;
@@ -80,17 +82,23 @@ typedef union {
 typedef struct {
   ValueKind kind;
   ValueAs   as;
+  u32       refs_count;
 } Value;
 
 struct ListNode {
-  Value     value;
+  Value    *value;
   bool      is_static;
   ListNode *next;
 };
 
+struct DictValue {
+  Value *key;
+  Value *value;
+};
+
 struct NamedValue {
-  Str   name;
-  Value value;
+  Str    name;
+  Value *value;
 };
 
 typedef enum {
@@ -101,12 +109,12 @@ typedef enum {
 
 typedef struct Vm Vm;
 
-typedef Da(Value) ValueStack;
+typedef Da(Value *) ValueStack;
 
 typedef struct {
-  Str   name;
-  Value value;
-  bool  is_global;
+  Str    name;
+  Value *value;
+  bool   is_global;
 } Var;
 
 typedef Da(Var) Vars;
@@ -137,26 +145,28 @@ struct Vm {
 
 void      list_use(RcArena *rc_arena, ListNode *list);
 ListNode *list_clone(RcArena *rc_arena, ListNode *list);
+Dict      dict_clone(RcArena *rc_arena, Dict *dict);
 
 void value_stack_push_unit(ValueStack *stack);
-void value_stack_push_list(ValueStack *stack, ListNode *list);
-void value_stack_push_string(ValueStack *stack, Str string);
-void value_stack_push_int(ValueStack *stack, i64 _int);
-void value_stack_push_float(ValueStack *stack, f64 _float);
-void value_stack_push_bool(ValueStack *stack, bool _bool);
-void value_stack_push_dict(ValueStack *stack, Dict record);
-void value_stack_push_func(ValueStack *stack, Func func);
+void value_stack_push_list(ValueStack *stack, RcArena *rc_arena, ListNode *list);
+void value_stack_push_string(ValueStack *stack, RcArena *rc_arena, Str string);
+void value_stack_push_int(ValueStack *stack, RcArena *rc_arena, i64 _int);
+void value_stack_push_float(ValueStack *stack, RcArena *rc_arena, f64 _float);
+void value_stack_push_bool(ValueStack *stack, RcArena *rc_arena, bool _bool);
+void value_stack_push_dict(ValueStack *stack, RcArena *rc_arena, Dict dict);
+void value_stack_push_func(ValueStack *stack, RcArena *rc_arena, Func func);
 
-Value value_stack_pop(ValueStack *stack);
+Value *value_stack_pop(ValueStack *stack);
 Value *value_stack_get(ValueStack *stack, u32 index);
 
-void free_value(Value *value, RcArena *rc_arena);
+Value *value_clone(RcArena *rc_arena, Value *value);
+void   value_free(Value *value, RcArena *rc_arena);
 
 ExecState execute_func(Vm *vm, Func *func, bool value_expected);
 ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected);
 ExecState execute_block(Vm *vm, IrBlock *block, bool value_expected);
 u32       execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena,
-                  Intrinsics *intrinsics, Value *result_value);
+                  Intrinsics *intrinsics, Value **result_value);
 
 void cleanup(Vm *vm);
 
