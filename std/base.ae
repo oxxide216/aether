@@ -8,7 +8,8 @@
 (let get-range [list begin end] -> import 'get-range')
 (let exit [exit-code] -> import 'exit')
 (let compile [code] -> import 'compile')
-(let eval [bytecode] -> import 'eval')
+(let eval-compiled [bytecode] -> import 'eval-compiled')
+(let eval [code] -> import 'eval')
 
 ;; Functional stuff
 (let map [func list] -> import 'map')

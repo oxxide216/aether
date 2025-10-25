@@ -4,6 +4,9 @@
 #include "aether/parser.h"
 #include "aether/serializer.h"
 #include "aether/deserializer.h"
+#include "aether/misc.h"
+
+static Value unit_value = { ValueKindUnit, {}, 0 };
 
 bool head_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
@@ -154,7 +157,7 @@ bool compile_intrinsic(Vm *vm) {
   return true;
 }
 
-bool eval_intrinsic(Vm *vm) {
+bool eval_compiled_intrinsic(Vm *vm) {
   Value *bytecode = value_stack_pop(&vm->stack);
 
   Ir ir = deserialize((u8 *) bytecode->as.string.str.ptr,
@@ -164,7 +167,23 @@ bool eval_intrinsic(Vm *vm) {
   i32 argc = 1;
   char *argv[] = { "aether", "eval", NULL };
   Intrinsics intrinsics = {0};
-  Value *result_value;
+  Value *result_value = &unit_value;
+  execute(&ir, argc, argv, vm->rc_arena, &intrinsics, &result_value);
+
+  DA_APPEND(vm->stack, result_value);
+
+  return true;
+}
+
+bool eval_intrinsic(Vm *vm) {
+  Value *code = value_stack_pop(&vm->stack);
+
+  Ir ir = parse(code->as.string.str, "eval");
+
+  i32 argc = 1;
+  char *argv[] = { "aether", "eval", NULL };
+  Intrinsics intrinsics = {0};
+  Value *result_value = &unit_value;
   execute(&ir, argc, argv, vm->rc_arena, &intrinsics, &result_value);
 
   DA_APPEND(vm->stack, result_value);
@@ -910,23 +929,6 @@ bool ge_intrinsic(Vm *vm) {
   return true;
 }
 
-static bool value_to_bool(Value *value) {
-  if (value->kind == ValueKindUnit)
-    return false;
-  else if (value->kind == ValueKindList)
-    return value->as.list->next != NULL;
-  else if (value->kind == ValueKindString)
-    return value->as.string.str.len != 0;
-  else if (value->kind == ValueKindInt)
-    return value->as._int != 0;
-  else if (value->kind == ValueKindFloat)
-    return value->as._float != 0.0;
-  else if (value->kind == ValueKindBool)
-    return value->as._bool;
-  else
-    return true;
-}
-
 bool and_intrinsic(Vm *vm) {
   Value *b = value_stack_pop(&vm->stack);
   Value *a = value_stack_pop(&vm->stack);
@@ -1118,7 +1120,8 @@ Intrinsic base_intrinsics[] = {
     &get_range_intrinsic },
   { STR_LIT("exit"), false, 1, { ValueKindInt }, &exit_intrinsic },
   { STR_LIT("compile"), true, 1, { ValueKindString }, &compile_intrinsic },
-  { STR_LIT("eval"), false, 1, { ValueKindString }, &eval_intrinsic },
+  { STR_LIT("eval-compiled"), true, 1, { ValueKindString }, &eval_compiled_intrinsic },
+  { STR_LIT("eval"), true, 1, { ValueKindString }, &eval_intrinsic },
   // Functional stuff
   { STR_LIT("map"), true, 2, { ValueKindFunc, ValueKindList }, &map_intrinsic },
   { STR_LIT("filter"), true, 2, { ValueKindFunc, ValueKindList }, &filter_intrinsic },

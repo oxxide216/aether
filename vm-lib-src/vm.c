@@ -1,4 +1,5 @@
 #include "aether/vm.h"
+#include "aether/misc.h"
 #include "shl/shl-str.h"
 #include "shl/shl-log.h"
 #include "shl/shl-arena.h"
@@ -513,17 +514,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     EXECUTE_EXPR(vm, expr->as._if.cond, true);
 
     Value *cond = value_stack_pop(&vm->stack);
-    if (cond->kind != ValueKindBool &&
-        cond->kind != ValueKindUnit &&
-        cond->kind != ValueKindList) {
-      ERROR("Only boolean, unit or list value can be used as a condition\n");
-      vm->exit_code = 1;
-      return ExecStateExit;
-    }
-
-    if (cond->kind != ValueKindUnit &&
-        ((cond->kind == ValueKindBool && cond->as._bool) ||
-         (cond->kind == ValueKindList && cond->as.list->next))) {
+    if (value_to_bool(cond)) {
       EXECUTE_BLOCK(vm, &expr->as._if.if_body, value_expected);
       break;
     }
@@ -534,17 +525,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       EXECUTE_EXPR(vm, expr->as._if.elifs.items[i].cond, true);
 
       cond = value_stack_pop(&vm->stack);
-      if (cond->kind != ValueKindBool &&
-          cond->kind != ValueKindUnit &&
-          cond->kind != ValueKindList) {
-        ERROR("Only boolean, unit or list value can be used as a condition\n");
-        vm->exit_code = 1;
-        return false;
-      }
-
-      if (cond->kind != ValueKindUnit &&
-          ((cond->kind == ValueKindBool && cond->as._bool) ||
-           (cond->kind == ValueKindList && cond->as.list->next != NULL))) {
+      if (value_to_bool(cond)) {
         EXECUTE_BLOCK(vm, &expr->as._if.elifs.items[i].body, value_expected);
         executed_elif = true;
         break;
@@ -564,17 +545,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       EXECUTE_EXPR(vm, expr->as._while.cond, true);
 
       Value *cond = value_stack_pop(&vm->stack);
-      if (cond->kind != ValueKindBool &&
-          cond->kind != ValueKindUnit &&
-          cond->kind != ValueKindList) {
-        ERROR("Only boolean, unit or list value can be used as a condition\n");
-        vm->exit_code = 1;
-        return ExecStateExit;
-      }
-
-      if (cond->kind == ValueKindUnit ||
-          ((cond->kind == ValueKindBool && !cond->as._bool) ||
-           (cond->kind == ValueKindList && cond->as.list->next == NULL)))
+      if (!value_to_bool(cond))
         break;
 
       EXECUTE_BLOCK(vm, &expr->as._while.body, false);
