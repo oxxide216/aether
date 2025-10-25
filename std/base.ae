@@ -117,14 +117,7 @@
 (macro lor [...args] ->
   (-op -lor [args]))
 
-;(macro for [list element ...body] ->
-  ;([rest] ->
-    ;(if (> (len rest) 0)
-      ;(let element (head rest))
-      ;body
-      ;(<-> (tail rest)) <> list))
-
-(macro for [list element ...body] ->
+(macro for [element in list ...body] ->
   (let -list list)
   (while -list
     (let element (head -list))

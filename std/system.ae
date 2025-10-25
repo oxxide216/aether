@@ -36,7 +36,7 @@
 (let sleep [time] -> import 'sleep')
 
 (let printf [args] ->
-  (for args arg
+  (for arg in args
     (-print arg)))
 
 (macro print [...args] ->
