@@ -1,0 +1,59 @@
+(let term/keys {
+  'up':        '\e[A'
+  'down':      '\e[B'
+  'right':     '\e[C'
+  'left':      '\e[D'
+  'enter':     '\n'
+  'escape':    '\e'
+  ;'backspace': '\x7f'
+})
+
+(let term/reset      '\e[0m')
+
+(let term/bold       '\e[1m')
+(let term/faint      '\e[2m')
+(let term/italic     '\e[3m')
+(let term/underline  '\e[4m')
+
+(let term/fg-black   '\e[30m')
+(let term/fg-red     '\e[31m')
+(let term/fg-green   '\e[32m')
+(let term/fg-yellow  '\e[33m')
+(let term/fg-blue    '\e[34m')
+(let term/fg-magenta '\e[35m')
+(let term/fg-cyan    '\e[36m')
+(let term/fg-white   '\e[37m')
+
+(let term/bg-black   '\e[40m')
+(let term/bg-red     '\e[41m')
+(let term/bg-green   '\e[42m')
+(let term/bg-yellow  '\e[43m')
+(let term/bg-blue    '\e[44m')
+(let term/bg-magenta '\e[45m')
+(let term/bg-cyan    '\e[46m')
+(let term/bg-white   '\e[47m')
+
+(let term/clear      '\e[2J')
+(let term/full-clear '\e[3J')
+(let term/clear-line '\e[2K')
+
+(let term/save-pos   '\e[s')
+(let term/load-pos   '\e[u')
+(let term/hide       '\e[?25l')
+(let term/show       '\e[?25h')
+
+(let term/up         '\e[1A')
+(let term/down       '\e[1B')
+(let term/forward    '\e[1C')
+(let term/back       '\e[1D')
+
+(let term/up-n         [n] ->  (+ '\e[' n 'A'))
+(let term/down-n       [n] ->  (+ '\e[' n 'B'))
+(let term/forward-n    [n] ->  (+ '\e[' n 'C'))
+(let term/back-n       [n] ->  (+ '\e[' n 'D'))
+
+(let term/goto         [x y] -> (+ '\e[' y ';' x 'H'))
+
+(let term/get-size     [] -> import 'term/get-size')
+(let term/raw-mode-on  [] -> import 'term/raw-mode-on')
+(let term/raw-mode-off [] -> import 'term/raw-mode-off')

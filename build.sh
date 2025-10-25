@@ -14,8 +14,8 @@ LIB_SRC=""
 STD_SRC="$(find std/base/src -name "*.c")"
 
 if [ "$NOSYSTEM" == "" ]; then
-  CFLAGS="$CFLAGS -Istd/system/include"
-  STD_SRC="$STD_SRC $(find std/system/src -name "*.c")"
+  CFLAGS="$CFLAGS -Istd/system/include -Istd/term/include"
+  STD_SRC="$STD_SRC $(find std/system/src std/term/src -name "*.c")"
 else
   CFLAGS="$CFLAGS -DNOSYSTEM"
 fi

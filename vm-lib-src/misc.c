@@ -16,3 +16,22 @@ bool value_to_bool(Value *value) {
   else
     return true;
 }
+
+void dict_push_value(Dict *dict, Value *key, Value *value) {
+  DictValue dict_value = { key, value };
+  DA_APPEND(*dict, dict_value);
+}
+
+void dict_push_value_str_key(RcArena *rc_arena, Dict *dict,
+                             Str key, Value *value) {
+  Value *string = rc_arena_alloc(rc_arena, sizeof(Value));
+  *string = (Value) {
+    ValueKindString,
+    {
+      .string = { key, (Str *) key.ptr },
+    },
+    0,
+  };
+  DictValue dict_value = { string, value };
+  DA_APPEND(*dict, dict_value);
+}

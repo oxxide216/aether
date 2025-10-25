@@ -74,6 +74,7 @@ static char escape_char(char _char) {
   case 't': return '\t';
   case 'v': return '\v';
   case 'e': return '\e';
+  case 'b': return '\b';
   default:  return _char;
   }
 }

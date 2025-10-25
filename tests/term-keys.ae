@@ -1,0 +1,11 @@
+(use 'std/system.ae')
+(use 'std/term.ae')
+
+(term/raw-mode-on)
+
+(let key (input-size 1))
+(while (!= key (get term/keys 'enter'))
+  (print key '\r')
+  (set key (input-size 1)))
+
+(term/raw-mode-off)

@@ -6,6 +6,7 @@
 #include "base/intrinsics.h"
 #ifndef NOSYSTEM
 #include "system/intrinsics.h"
+#include "term/intrinsics.h"
 #endif
 #ifndef NOIUI
 #include "iui/intrinsics.h"
@@ -843,6 +844,7 @@ u32 execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena,
   intrinsics_append(intrinsics, base_intrinsics, base_intrinsics_len);
 #ifndef NOSYSTEM
   intrinsics_append(intrinsics, system_intrinsics, system_intrinsics_len);
+  intrinsics_append(intrinsics, term_intrinsics, term_intrinsics_len);
 #endif
 #ifndef NOIUI
   intrinsics_append(intrinsics, iui_intrinsics, iui_intrinsics_len);
