@@ -44,13 +44,13 @@
 
 (let term/up         '\e[1A')
 (let term/down       '\e[1B')
-(let term/forward    '\e[1C')
-(let term/back       '\e[1D')
+(let term/right      '\e[1C')
+(let term/left       '\e[1D')
 
 (let term/up-n         [n] ->  (+ '\e[' n 'A'))
 (let term/down-n       [n] ->  (+ '\e[' n 'B'))
-(let term/forward-n    [n] ->  (+ '\e[' n 'C'))
-(let term/back-n       [n] ->  (+ '\e[' n 'D'))
+(let term/right-n      [n] ->  (+ '\e[' n 'C'))
+(let term/left-n       [n] ->  (+ '\e[' n 'D'))
 
 (let term/goto         [x y] -> (+ '\e[' y ';' x 'H'))
 
