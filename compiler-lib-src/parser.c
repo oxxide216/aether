@@ -4,8 +4,8 @@
 #include "lexgen/runtime-src/runtime.h"
 #define LEXGEN_TRANSITION_TABLE_IMPLEMENTATION
 #include "grammar.h"
-#include "shl_log.h"
-#include "shl_arena.h"
+#include "shl/shl-log.h"
+#include "shl/shl-arena.h"
 
 #define STD_PREFIX "/usr/include/aether/"
 #define INCLUDE_PATHS(current_file_path) { current_file_path, STD_PREFIX }

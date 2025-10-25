@@ -1,7 +1,7 @@
 #ifndef RC_ARENA_H
 #define RC_ARENA_H
 
-#include "../../ir-src/shl_defs.h"
+#include "shl/shl-defs.h"
 
 #define RC_ARENA_REGION_CAP 256
 

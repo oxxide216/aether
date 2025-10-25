@@ -1,5 +1,5 @@
 #include "macros.h"
-#include "shl_arena.h"
+#include "shl/shl-arena.h"
 
 static void clone_block(IrBlock *block);
 

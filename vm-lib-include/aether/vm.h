@@ -3,9 +3,9 @@
 
 #include "aether/ir.h"
 #include "aether/rc-arena.h"
-#include "shl_defs.h"
-#include "shl_str.h"
-#include "shl_log.h"
+#include "shl/shl-defs.h"
+#include "shl/shl-str.h"
+#include "shl/shl-log.h"
 
 #define MAX_INTRINSIC_ARGS_COUNT 8
 

@@ -1,7 +1,7 @@
 #include "aether/vm.h"
-#include "shl_str.h"
-#include "shl_log.h"
-#include "shl_arena.h"
+#include "shl/shl-str.h"
+#include "shl/shl-log.h"
+#include "shl/shl-arena.h"
 #include "base/intrinsics.h"
 #ifndef NOSYSTEM
 #include "system/intrinsics.h"

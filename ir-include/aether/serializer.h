@@ -2,7 +2,7 @@
 #define SERIALIZER_H
 
 #include "aether/ir.h"
-#include "../../ir-src/shl_defs.h"
+#include "shl/shl-defs.h"
 
 u8 *serialize(Ir *ir, u32 *size);
 

@@ -1,6 +1,6 @@
 #include "aether/deserializer.h"
-#include "shl_log.h"
-#include "shl_arena.h"
+#include "shl/shl-log.h"
+#include "shl/shl-arena.h"
 
 static void get_block_data_size(u8 *data, u32 *size);
 

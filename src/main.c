@@ -3,12 +3,12 @@
 #include "aether/vm.h"
 #include "aether/serializer.h"
 #include "aether/deserializer.h"
-#include "shl_defs.h"
-#include "shl_log.h"
+#include "shl/shl-defs.h"
+#include "shl/shl-log.h"
 #define SHL_ARENA_IMPLEMENTATION
-#include "shl_arena.h"
+#include "shl/shl-arena.h"
 #define SHL_STR_IMPLEMENTATION
-#include "shl_str.h"
+#include "shl/shl-str.h"
 
 typedef struct {
   u32   flags_end;
