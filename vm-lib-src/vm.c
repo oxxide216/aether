@@ -115,6 +115,8 @@ Value *value_clone(RcArena *rc_arena, Value *value) {
     copy->as.list = list_clone(rc_arena, value->as.list);
   } else if (value->kind == ValueKindString) {
     copy->as.string.str.ptr = rc_arena_alloc(rc_arena, value->as.string.str.len);
+    copy->as.string.str.len = value->as.string.str.len;
+    memcpy(copy->as.string.str.ptr, value->as.string.str.ptr, copy->as.string.str.len);
     copy->as.string.begin = (Str *)(copy->as.string.str.ptr +
                                     (u64) (char *) value->as.string.begin -
                                     (u64) value->as.string.str.ptr);
@@ -903,9 +905,6 @@ u32 execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena,
   }
 
   execute_block(&vm, ir, result_value != NULL);
-
-  if (result_value)
-    --vm.stack.len;
 
   cleanup(&vm);
 
