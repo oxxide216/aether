@@ -1,11 +1,10 @@
-(use '../std/base.ae')
-(use '../std/system.ae')
+(use 'std/core.ae')
 
 (let print-list [list] ->
   (let print-list-rec [list] ->
-    (if (! (is-empty list))
+    (if list
       (print (head list))
-      (if (! (is-empty (tail list)))
+      (if tail list
         (print ' '))
       (<-> (tail list))))
   (print '[')

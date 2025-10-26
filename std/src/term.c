@@ -1,11 +1,11 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 
-#include "term/intrinsics.h"
+#include "aether/vm.h"
 #include "aether/misc.h"
 
 static struct termios default_term_state = {0};
-bool is_term_state_initialized = false;
+static bool is_term_state_initialized = false;
 
 bool get_size_intrinsic(Vm *vm) {
   struct winsize _size;

@@ -1,5 +1,5 @@
 #include "widgets.h"
-#include "shl_defs.h"
+#include "shl/shl-defs.h"
 
 static void iui_widget_recompute_layout(IuiWidget *widget, Vec4 bounds, bool *is_dirty) {
   if (!*is_dirty)

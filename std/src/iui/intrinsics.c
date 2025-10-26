@@ -1,7 +1,18 @@
-#include "iui/intrinsics.h"
 #include "renderer.h"
 #include "winx/event.h"
-#include "shl_log.h"
+#include "shl/shl-log.h"
+#include "aether/vm.h"
+#include "aether/misc.h"
+
+typedef Da(WinxEvent) IuiEvents;
+
+typedef struct {
+  Winx        winx;
+  WinxWindow  window;
+  IuiEvents   events;
+  IuiWidgets  widgets;
+  IuiRenderer renderer;
+} Iui;
 
 static Iui iui = {0};
 
@@ -60,14 +71,14 @@ static void init_styles(Iui *iui) {
 }
 
 bool iui_main_loop_intrinsic(Vm *vm) {
-  Value body = value_stack_pop(&vm->stack);
-  Value height = value_stack_pop(&vm->stack);
-  Value width = value_stack_pop(&vm->stack);
-  Value title = value_stack_pop(&vm->stack);
+  Value *body = value_stack_pop(&vm->stack);
+  Value *height = value_stack_pop(&vm->stack);
+  Value *width = value_stack_pop(&vm->stack);
+  Value *title = value_stack_pop(&vm->stack);
 
   iui.winx = winx_init();
-  iui.window = winx_init_window(&iui.winx, title.as.string.str,
-                                width.as._int, height.as._int,
+  iui.window = winx_init_window(&iui.winx, title->as.string.str,
+                                width->as._int, height->as._int,
                                 WinxGraphicsModeOpenGL,
                                 NULL);
   iui.renderer = iui_init_renderer();
@@ -87,27 +98,19 @@ bool iui_main_loop_intrinsic(Vm *vm) {
 
     Dict window_size = {0};
 
-    NamedValue width = {
-      STR_LIT("x"),
-      {
-        ValueKindFloat,
-        { ._float = iui.window.width },
-      }
-    };
-    DA_APPEND(window_size, width);
+    Value *x = rc_arena_alloc(vm->rc_arena, sizeof(Value));
+    *x = (Value) { ValueKindFloat, { ._float = iui.window.width }, 0 };
+    dict_push_value_str_key(vm->rc_arena, &window_size,
+                            STR_LIT("x"), x);
 
-    NamedValue height = {
-      STR_LIT("y"),
-      {
-        ValueKindFloat,
-        { ._float =  iui.window.height },
-      }
-    };
-    DA_APPEND(window_size, height);
+    Value *y = rc_arena_alloc(vm->rc_arena, sizeof(Value));
+    *y = (Value) { ValueKindFloat, { ._float = iui.window.height }, 0 };
+    dict_push_value_str_key(vm->rc_arena, &window_size,
+                            STR_LIT("y"), y);
 
-    value_stack_push_dict(&vm->stack, window_size);
+    value_stack_push_dict(&vm->stack, vm->rc_arena, window_size);
 
-    EXECUTE_FUNC(vm, &body.as.func, false);
+    EXECUTE_FUNC(vm, &body->as.func, false);
 
     Vec4 bounds = { 0.0, 0.0, iui.window.width, iui.window.height };
     iui_widgets_recompute_layout(&iui.widgets, bounds);
@@ -121,15 +124,15 @@ bool iui_main_loop_intrinsic(Vm *vm) {
 }
 
 bool iui_vbox_intrinsic(Vm *vm) {
-  Value body = value_stack_pop(&vm->stack);
-  Value spacing = value_stack_pop(&vm->stack);
-  Value margin_y = value_stack_pop(&vm->stack);
-  Value margin_x = value_stack_pop(&vm->stack);
+  Value *body = value_stack_pop(&vm->stack);
+  Value *spacing = value_stack_pop(&vm->stack);
+  Value *margin_y = value_stack_pop(&vm->stack);
+  Value *margin_x = value_stack_pop(&vm->stack);
 
-  iui_widgets_push_box_begin(&iui.widgets, vec2(margin_x.as._float, margin_y.as._float),
-                             spacing.as._float, IuiBoxDirectionVertical);
+  iui_widgets_push_box_begin(&iui.widgets, vec2(margin_x->as._float, margin_y->as._float),
+                             spacing->as._float, IuiBoxDirectionVertical);
 
-  EXECUTE_FUNC(vm, &body.as.func, false);
+  EXECUTE_FUNC(vm, &body->as.func, false);
 
   iui_widgets_push_box_end(&iui.widgets);
 
@@ -137,15 +140,15 @@ bool iui_vbox_intrinsic(Vm *vm) {
 }
 
 bool iui_hbox_intrinsic(Vm *vm) {
-  Value body = value_stack_pop(&vm->stack);
-  Value spacing = value_stack_pop(&vm->stack);
-  Value margin_y = value_stack_pop(&vm->stack);
-  Value margin_x = value_stack_pop(&vm->stack);
+  Value *body = value_stack_pop(&vm->stack);
+  Value *spacing = value_stack_pop(&vm->stack);
+  Value *margin_y = value_stack_pop(&vm->stack);
+  Value *margin_x = value_stack_pop(&vm->stack);
 
-  iui_widgets_push_box_begin(&iui.widgets, vec2(margin_x.as._float, margin_y.as._float),
-                             spacing.as._float, IuiBoxDirectionHorizontal);
+  iui_widgets_push_box_begin(&iui.widgets, vec2(margin_x->as._float, margin_y->as._float),
+                             spacing->as._float, IuiBoxDirectionHorizontal);
 
-  EXECUTE_FUNC(vm, &body.as.func, false);
+  EXECUTE_FUNC(vm, &body->as.func, false);
 
   iui_widgets_push_box_end(&iui.widgets);
 
@@ -153,12 +156,12 @@ bool iui_hbox_intrinsic(Vm *vm) {
 }
 
 bool iui_button_intrinsic(Vm *vm) {
-  Value on_click = value_stack_pop(&vm->stack);
-  Value text = value_stack_pop(&vm->stack);
+  Value *on_click = value_stack_pop(&vm->stack);
+  Value *text = value_stack_pop(&vm->stack);
 
   IuiWidget *button = iui_widgets_push_button(&iui.widgets,
-                                              text.as.string.str,
-                                              on_click.as.func);
+                                              text->as.string.str,
+                                              on_click->as.func);
 
   for (u32 i = 0; i < iui.events.len; ++i) {
     WinxEvent *event = iui.events.items + i;
@@ -176,7 +179,7 @@ bool iui_button_intrinsic(Vm *vm) {
         if (event->kind == WinxEventKindButtonPress)
           button->as.button.pressed = true;
         else
-          EXECUTE_FUNC(vm, &on_click.as.func, false);
+          EXECUTE_FUNC(vm, &on_click->as.func, false);
         break;
       }
     }
@@ -186,25 +189,25 @@ bool iui_button_intrinsic(Vm *vm) {
 }
 
 bool iui_text_intrinsic(Vm *vm) {
-  Value left_padding = value_stack_pop(&vm->stack);
-  Value center_y = value_stack_pop(&vm->stack);
-  Value center_x = value_stack_pop(&vm->stack);
-  Value text = value_stack_pop(&vm->stack);
+  Value *left_padding = value_stack_pop(&vm->stack);
+  Value *center_y = value_stack_pop(&vm->stack);
+  Value *center_x = value_stack_pop(&vm->stack);
+  Value *text = value_stack_pop(&vm->stack);
 
-  iui_widgets_push_text(&iui.widgets, text.as.string.str,
-                        center_x.as._bool, center_y.as._bool,
-                        left_padding.as._float);
+  iui_widgets_push_text(&iui.widgets, text->as.string.str,
+                        center_x->as._bool, center_y->as._bool,
+                        left_padding->as._float);
 
   return true;
 }
 
 bool iui_input_intrinsic(Vm *vm) {
-  Value on_submit = value_stack_pop(&vm->stack);
-  Value left_padding = value_stack_pop(&vm->stack);
-  Value placeholder = value_stack_pop(&vm->stack);
+  Value *on_submit = value_stack_pop(&vm->stack);
+  Value *left_padding = value_stack_pop(&vm->stack);
+  Value *placeholder = value_stack_pop(&vm->stack);
 
-  IuiWidget *input = iui_widgets_push_input(&iui.widgets, placeholder.as.string.str,
-                                            left_padding.as._float, on_submit.as.func);
+  IuiWidget *input = iui_widgets_push_input(&iui.widgets, placeholder->as.string.str,
+                                            left_padding->as._float, on_submit->as.func);
 
   for (u32 i = 0; i < iui.events.len; ++i) {
     WinxEvent *event = iui.events.items + i;
@@ -231,9 +234,9 @@ bool iui_input_intrinsic(Vm *vm) {
           input->as.input.buffer.items,
           input->as.input.buffer.len,
         };
-        value_stack_push_string(&vm->stack, content);
+        value_stack_push_string(&vm->stack, vm->rc_arena, content);
 
-        EXECUTE_FUNC(vm, &on_submit.as.func, false);
+        EXECUTE_FUNC(vm, &on_submit->as.func, false);
       } break;
 
       case WinxKeyCodeBackspace: {
@@ -281,16 +284,16 @@ bool iui_input_intrinsic(Vm *vm) {
 }
 
 bool iui_abs_bounds_intrinsic(Vm *vm) {
-  Value height = value_stack_pop(&vm->stack);
-  Value width = value_stack_pop(&vm->stack);
-  Value y = value_stack_pop(&vm->stack);
-  Value x = value_stack_pop(&vm->stack);
+  Value *height = value_stack_pop(&vm->stack);
+  Value *width = value_stack_pop(&vm->stack);
+  Value *y = value_stack_pop(&vm->stack);
+  Value *x = value_stack_pop(&vm->stack);
 
   Vec4 bounds = {
-    x.as._float,
-    y.as._float,
-    width.as._float,
-    height.as._float,
+    x->as._float,
+    y->as._float,
+    width->as._float,
+    height->as._float,
   };
   iui_widgets_abs_bounds(&iui.widgets, bounds);
 

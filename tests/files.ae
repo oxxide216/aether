@@ -1,11 +1,12 @@
-(use '../std/system.ae')
+(use 'std/core.ae')
+(use 'std/io.ae')
 
 (let path 'text.txt')
 
 (if (file-exists? path)
   (print (read-file path))
   (delete-file path)
-  (println 'Deleted!')
+  ;(println 'Deleted!')
  else
   (write-file 'Hello, World!\n' path)
   (println 'Wrote!'))

@@ -1,5 +1,5 @@
-(use '../std/base.ae')
-(use '../std/system.ae')
+(use 'std/core.ae')
+(use 'std/str.ae')
 
 (let todos [])
 
@@ -12,16 +12,16 @@
 (let print-todos [left] ->
   (if left
     (println (head left))
-    (print-todos (tail left))))
+    (<-> (tail left))))
 
 (while true
   (print '>> ')
 
   (let command (split (input) ' '))
 
-  (if (&& (== (head command) 'add') (tail command))
+  (if (land (== (head command) 'add') (tail command))
     (add-todo (nth command 1))
-   elif (&& (== (head command) 'remove') (tail command))
+   elif (land (== (head command) 'remove') (tail command))
     (remove-todo (head (tail command)))
    elif (== (head command) 'list')
     (print-todos todos)

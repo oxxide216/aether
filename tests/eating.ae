@@ -1,5 +1,5 @@
-(use '../std/base.ae')
-(use '../std/system.ae')
+(use 'std/core.ae')
+(use 'std/str.ae')
 
 (let str 'hi!')
 (println str)

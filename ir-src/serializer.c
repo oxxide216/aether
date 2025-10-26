@@ -73,14 +73,13 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
   } break;
 
   case IrExprKindSet: {
-    save_expr_data(expr->as.set.src, data, data_size, end);
-    save_expr_data(expr->as.set.src, data, data_size, end);
+    save_str_data(expr->as.set.dest, data, data_size, end);
     save_expr_data(expr->as.set.src, data, data_size, end);
   } break;
 
   case IrExprKindGet: {
-    save_expr_data(expr->as.set.src, data, data_size, end);
-    save_expr_data(expr->as.set.src, data, data_size, end);
+    save_str_data(expr->as.get.src, data, data_size, end);
+    save_expr_data(expr->as.get.key, data, data_size, end);
   } break;
 
   case IrExprKindRet: {

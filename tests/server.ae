@@ -1,5 +1,6 @@
-(use '../std/base.ae')
-(use '../std/system.ae')
+(use 'std/core.ae')
+(use 'std/net.ae')
+(use 'std/system.ae')
 
 (let server (create-server 8080))
 (if (unit? server)

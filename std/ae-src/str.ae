@@ -1,0 +1,8 @@
+(let split [str delimiter] -> import 'split')
+(let sub-str [str begin end] -> import 'sub-str')
+(let join [str filler] -> import 'join')
+(let eat-str [str pattern] -> import 'eat-str')
+(let eat-byte-64 [str] -> import 'eat-byte-64')
+(let eat-byte-32 [str] -> import 'eat-byte-32')
+(let eat-byte-16 [str] -> import 'eat-byte-16')
+(let eat-byte-8 [str] -> import 'eat-byte-8')

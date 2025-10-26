@@ -1,0 +1,6 @@
+(let abs [num] -> import 'abs')
+(let min [num] -> import 'min')
+(let max [num] -> import 'max')
+(let pow [num pow] -> import 'pow')
+(let sqrt [num] -> import 'sqrt')
+(let round [num] -> import 'round')

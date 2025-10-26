@@ -4,7 +4,7 @@
 #include "widgets.h"
 #include "glass/glass.h"
 #include "glass/math.h"
-#include "shl_defs.h"
+#include "shl/shl-defs.h"
 #include "stb_truetype.h"
 
 typedef struct {

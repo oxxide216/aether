@@ -4,7 +4,7 @@
 #include "widgets.h"
 #include "glass/glass.h"
 #include "glass/params.h"
-#include "iui/fonts/JetBrainsMono-Regular.h"
+#include "fonts/JetBrainsMono-Regular.h"
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
@@ -12,7 +12,7 @@
 #define TEXT_QUALITY_MULTIPLIER 2.0
 #define INPUT_CURSOR_WIDTH      2.0
 
-#define DEFAULT_FONT std_iui_fonts_JetBrainsMono_Regular_ttf
+#define DEFAULT_FONT std_src_iui_fonts_JetBrainsMono_Regular_ttf
 
 static Str general_vertex_shader_src = STR_LIT(
   "#version 330 core\n"
@@ -104,8 +104,10 @@ IuiRenderer iui_init_renderer(void) {
 
   stbtt_InitFont(&renderer.default_font.info, (u8 *) DEFAULT_FONT, 0);
 
-  stbtt_GetFontVMetrics(&renderer.default_font.info, &renderer.default_font.ascent,
-                        &renderer.default_font.descent, &renderer.default_font.line_gap);
+  stbtt_GetFontVMetrics(&renderer.default_font.info,
+                        &renderer.default_font.ascent,
+                        &renderer.default_font.descent,
+                        &renderer.default_font.line_gap);
 
   return renderer;
 }
@@ -373,7 +375,8 @@ static IuiGlyph *iui_renderer_get_glyph(IuiRenderer *renderer,
 
   size.x *= TEXT_SIZE_MULTIPLIER / TEXT_QUALITY_MULTIPLIER;
   size.y *= TEXT_SIZE_MULTIPLIER / TEXT_QUALITY_MULTIPLIER;
-  f32 baseline = (renderer->default_font.ascent + renderer->default_font.descent) *
+  f32 baseline = (renderer->default_font.ascent +
+                  renderer->default_font.descent) *
                  scale * TEXT_SIZE_MULTIPLIER / TEXT_QUALITY_MULTIPLIER;
   f32 bearing_y = -y0 * TEXT_SIZE_MULTIPLIER / TEXT_QUALITY_MULTIPLIER;
 

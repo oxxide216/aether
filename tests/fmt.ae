@@ -1,5 +1,4 @@
-(use '../std/base.ae')
-(use '../std/system.ae')
+(use 'std/core.ae')
 
 (let fmt [args] ->
   (if (is-empty (tail args))

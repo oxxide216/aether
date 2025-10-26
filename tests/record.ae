@@ -1,15 +1,14 @@
-(use '../std/base.ae')
-(use '../std/system.ae')
+(use 'std/core.ae')
 
 (let user {
-  name: 'John'
-  surname: 'Doe'
-  age: 18
+  'name': 'John'
+  'surname': 'Doe'
+  'age': 18
 })
 
 (println user)
-(println (field user name))
-(field user name 'Paul')
-(field user age (+ 1 (field user age)))
-(println (field user name))
+(println (get user 'name'))
+(set-in user 'name': 'Paul')
+(set-in user 'age': (+ 1 (get user 'age')))
+(println (get user 'name'))
 (println user)

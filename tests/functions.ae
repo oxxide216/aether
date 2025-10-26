@@ -1,5 +1,7 @@
 (let print [arg] -> import 'print')
-(let println [arg] -> import 'println')
+(let println [arg] ->
+  (print arg)
+  (print '\n'))
 
 (let test [] -> (println 'test!'))
 

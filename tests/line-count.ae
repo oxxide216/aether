@@ -1,5 +1,6 @@
-(use '../std/base.ae')
-(use '../std/system.ae')
+(use 'std/core.ae')
+(use 'std/str.ae')
+(use 'std/io.ae')
 
 (if (< (len (get-args)) 3)
   (println 'ERROR: input file was not provided')

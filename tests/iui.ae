@@ -1,8 +1,7 @@
-(use '../std/base.ae')
-(use '../std/system.ae')
-(use '../std/iui.ae')
+(use 'std/core.ae')
+(use 'std/iui.ae')
 
-(let menu-size { x: 350.0 y: 250.0 })
+(let menu-size { 'x': 350.0 'y': 250.0 })
 
 (let main-loop [window-size] ->
   (iui-center window-size menu-size)

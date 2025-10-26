@@ -1,6 +1,6 @@
-(use 'std/base.ae')
-(use 'std/system.ae')
+(use 'std/core.ae')
+(use 'std/io.ae')
 
 (let code (read-file 'tests/eval-test.ae'))
 (let bytecode (compile code))
-(eval bytecode)
+(eval-compiled bytecode)

@@ -3,14 +3,7 @@
 #include "shl/shl-str.h"
 #include "shl/shl-log.h"
 #include "shl/shl-arena.h"
-#include "base/intrinsics.h"
-#ifndef NOSYSTEM
-#include "system/intrinsics.h"
-#include "term/intrinsics.h"
-#endif
-#ifndef NOIUI
-#include "iui/intrinsics.h"
-#endif
+#include "intrinsics.h"
 
 typedef Da(Str) Strs;
 
@@ -388,7 +381,9 @@ static Intrinsic *get_intrinsic(Vm *vm, Str name, u32 args_count, Value **args) 
 ExecState execute_func(Vm *vm, Func *func, bool value_expected) {
   if (func->intrinsic_name.len > 0) {
     Intrinsic *intrinsic = get_intrinsic(vm, func->intrinsic_name, func->args.len,
-                                         vm->stack.items + vm->stack.len - func->args.len);
+                                         vm->stack.items + vm->stack.len -
+                                         func->args.len);
+
     if (!intrinsic) {
       ERROR("Intrinsic `"STR_FMT"` with such signature was not found\n",
             STR_ARG(func->intrinsic_name));
@@ -841,12 +836,17 @@ u32 execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena,
   Vm vm = {0};
   vm.rc_arena = rc_arena;
 
-  intrinsics_append(intrinsics, base_intrinsics, base_intrinsics_len);
+  intrinsics_append(intrinsics, core_intrinsics, core_intrinsics_len);
+  intrinsics_append(intrinsics, math_intrinsics, math_intrinsics_len);
+  intrinsics_append(intrinsics, str_intrinsics, str_intrinsics_len);
 #ifndef NOSYSTEM
-  intrinsics_append(intrinsics, system_intrinsics, system_intrinsics_len);
+  intrinsics_append(intrinsics, io_intrinsics, io_intrinsics_len);
+  intrinsics_append(intrinsics, path_intrinsics, path_intrinsics_len);
+  intrinsics_append(intrinsics, net_intrinsics, net_intrinsics_len);
   intrinsics_append(intrinsics, term_intrinsics, term_intrinsics_len);
+  intrinsics_append(intrinsics, system_intrinsics, system_intrinsics_len);
 #endif
-#ifndef NOIUI
+#ifdef IUI
   intrinsics_append(intrinsics, iui_intrinsics, iui_intrinsics_len);
 #endif
 

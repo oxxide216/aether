@@ -1,0 +1,16 @@
+; Standard input stream
+(let unblock-input [] -> import 'unblock-input')
+(let block-input [] -> import 'block-input')
+
+; Files
+; TODO: file data
+(let file-exists? [path] -> import 'file-exists')
+(let read-file [path] -> import 'read-file')
+(let write-file [content path] -> import 'write-file')
+(let delete-file [path] -> import 'delete-file')
+(let list-directory [path] -> import 'list-directory')
+
+;; Processes
+(let run-command [command] -> import 'run-command')
+
+(let sleep [time] -> import 'sleep')
