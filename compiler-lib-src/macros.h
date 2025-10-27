@@ -13,8 +13,10 @@ typedef struct {
 typedef Da(Macro) Macros;
 
 void expand_macros_block(IrBlock *block, Macros *macros,
-                         IrArgs *arg_names, IrBlock *args);
+                         IrArgs *arg_names, IrBlock *args,
+                         bool unpack);
 void expand_macros(IrExpr *expr, Macros *macros,
-                   IrArgs *arg_names, IrBlock *args);
+                   IrArgs *arg_names, IrBlock *args,
+                   bool unpack);
 
 #endif // MACROS_H

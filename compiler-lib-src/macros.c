@@ -253,17 +253,20 @@ static void try_replace_macro_arg_ident(Str *ident, IrArgs *arg_names, IrBlock *
 }
 
 static bool try_inline_macro_arg(IrExpr **expr, IrArgs *arg_names,
-                                 IrBlock *args, IrBlock *dest);
+                                 IrBlock *args, IrBlock *dest,
+                                 bool unpack);
 
 static void append_macro_arg(u32 index, IrArgs *arg_names,
-                             IrBlock *args, IrBlock *dest) {
+                             IrBlock *args, IrBlock *dest,
+                             bool unpack) {
   IrExpr *arg = args->items[index];
 
-  if (args->len > arg_names->len) {
-    for (u32 i = arg_names->len - 1; i < args->len; ++i) {
-      IrExpr *new_arg = args->items[i];
+  if (unpack) {
+    IrBlock *variadic_args = &args->items[args->len - 1]->as.list.content;
+    for (u32 i = 0; i < variadic_args->len; ++i) {
+      IrExpr *new_arg = variadic_args->items[i];
 
-      if (!try_inline_macro_arg(&new_arg, arg_names, args, dest)) {
+      if (!try_inline_macro_arg(&new_arg, arg_names, args, dest, unpack)) {
         clone_expr(&new_arg);
         DA_APPEND(*dest, new_arg);
       }
@@ -275,7 +278,8 @@ static void append_macro_arg(u32 index, IrArgs *arg_names,
 }
 
 static bool try_inline_macro_arg(IrExpr **expr, IrArgs *arg_names,
-                                 IrBlock *args, IrBlock *dest) {
+                                 IrBlock *args, IrBlock *dest,
+                                 bool unpack) {
   if (!arg_names || !args)
     return false;
 
@@ -301,7 +305,7 @@ static bool try_inline_macro_arg(IrExpr **expr, IrArgs *arg_names,
     u32 arg_index = get_macro_arg_index((*expr)->as.ident.ident, arg_names);
     if (arg_index != (u32) -1) {
       if (dest) {
-        append_macro_arg(arg_index, arg_names, args, dest);
+        append_macro_arg(arg_index, arg_names, args, dest, unpack);
       } else {
         IrExpr *arg = args->items[arg_index];
         clone_expr(&arg);
@@ -316,40 +320,42 @@ static bool try_inline_macro_arg(IrExpr **expr, IrArgs *arg_names,
 }
 
 void expand_macros_block(IrBlock *block, Macros *macros,
-                         IrArgs *arg_names, IrBlock *args) {
+                         IrArgs *arg_names, IrBlock *args,
+                         bool unpack) {
   IrBlock new_block = {0};
 
   for (u32 i = 0; i < block->len; ++i) {
     IrExpr *new_expr = block->items[i];
 
-    if (!try_inline_macro_arg(&new_expr, arg_names, args, &new_block)) {
+    if (!try_inline_macro_arg(&new_expr, arg_names, args, &new_block, unpack)) {
       clone_expr(&new_expr);
       DA_APPEND(new_block, new_expr);
     }
   }
 
   for (u32 i = 0; i < new_block.len; ++i)
-    expand_macros(new_block.items[i], macros, arg_names, args);
+    expand_macros(new_block.items[i], macros, arg_names, args, unpack);
 
   *block = new_block;
 }
 
-#define INLINE_THEN_EXPAND(expr)                          \
-  do {                                                    \
-    try_inline_macro_arg(&(expr), arg_names, args, NULL); \
-    expand_macros(expr, macros, arg_names, args);         \
+#define INLINE_THEN_EXPAND(expr)                                  \
+  do {                                                            \
+    try_inline_macro_arg(&(expr), arg_names, args, NULL, unpack); \
+    expand_macros(expr, macros, arg_names, args, unpack);         \
   } while (0)
 
 void expand_macros(IrExpr *expr, Macros *macros,
-                   IrArgs *arg_names, IrBlock *args) {
+                   IrArgs *arg_names, IrBlock *args,
+                   bool unpack) {
   switch (expr->kind) {
   case IrExprKindBlock: {
-    expand_macros_block(&expr->as.block, macros, arg_names, args);
+    expand_macros_block(&expr->as.block, macros, arg_names, args, unpack);
   } break;
 
   case IrExprKindFuncCall: {
     INLINE_THEN_EXPAND(expr->as.func_call.func);
-    expand_macros_block(&expr->as.func_call.args, macros, arg_names, args);
+    expand_macros_block(&expr->as.func_call.args, macros, arg_names, args, unpack);
 
     if (expr->as.func_call.func->kind == IrExprKindIdent) {
       Str name = expr->as.func_call.func->as.ident.ident;
@@ -357,6 +363,22 @@ void expand_macros(IrExpr *expr, Macros *macros,
 
       if (macro) {
         IrBlock new_args = expr->as.func_call.args;
+        new_args.len = macro->arg_names.len;
+
+        if (macro->has_unpack) {
+          --new_args.len;
+
+          IrBlock variadic_block = {0};
+
+          for (u32 i = new_args.len; i < expr->as.func_call.args.len; ++i)
+            DA_APPEND(variadic_block, expr->as.func_call.args.items[i]);
+
+          IrExpr *variadic_args = aalloc(sizeof(IrExpr));
+          variadic_args->kind = IrExprKindList;
+          variadic_args->as.list.content = variadic_block;
+          DA_APPEND(new_args, variadic_args);
+        }
+
         clone_block(&new_args);
 
         IrArgs new_arg_names = {0};
@@ -377,7 +399,8 @@ void expand_macros(IrExpr *expr, Macros *macros,
 
         rename_args_block(&expr->as.block, &macro->arg_names, &new_arg_names);
         expand_macros_block(&expr->as.block, macros,
-                            &new_arg_names, &new_args);
+                            &new_arg_names, &new_args,
+                            macro->has_unpack);
       }
     }
   } break;
@@ -388,20 +411,21 @@ void expand_macros(IrExpr *expr, Macros *macros,
 
   case IrExprKindIf: {
     INLINE_THEN_EXPAND(expr->as._if.cond);
-    expand_macros_block(&expr->as._if.if_body, macros, arg_names, args);
+    expand_macros_block(&expr->as._if.if_body, macros, arg_names, args, unpack);
 
     for (u32 i = 0; i < expr->as._if.elifs.len; ++i) {
       INLINE_THEN_EXPAND(expr->as._if.elifs.items[i].cond);
-      expand_macros_block(&expr->as._if.elifs.items[i].body, macros, arg_names, args);
+      expand_macros_block(&expr->as._if.elifs.items[i].body, macros,
+                          arg_names, args, unpack);
     }
 
     if (expr->as._if.has_else)
-      expand_macros_block(&expr->as._if.else_body, macros, arg_names, args);
+      expand_macros_block(&expr->as._if.else_body, macros, arg_names, args, unpack);
   } break;
 
   case IrExprKindWhile: {
     INLINE_THEN_EXPAND(expr->as._while.cond);
-    expand_macros_block(&expr->as._while.body, macros, arg_names, args);
+    expand_macros_block(&expr->as._while.body, macros, arg_names, args, unpack);
   } break;
 
   case IrExprKindSet: {
@@ -413,7 +437,7 @@ void expand_macros(IrExpr *expr, Macros *macros,
   } break;
 
   case IrExprKindList: {
-    expand_macros_block(&expr->as.list.content, macros, arg_names, args);
+    expand_macros_block(&expr->as.list.content, macros, arg_names, args, unpack);
   } break;
 
   case IrExprKindIdent:  break;
@@ -423,7 +447,7 @@ void expand_macros(IrExpr *expr, Macros *macros,
   case IrExprKindBool:   break;
 
   case IrExprKindLambda: {
-    expand_macros_block(&expr->as.lambda.body, macros, arg_names, args);
+    expand_macros_block(&expr->as.lambda.body, macros, arg_names, args, unpack);
   } break;
 
   case IrExprKindDict: {
@@ -437,7 +461,7 @@ void expand_macros(IrExpr *expr, Macros *macros,
   } break;
 
   case IrExprKindSelfCall: {
-    expand_macros_block(&expr->as.self_call.args, macros, arg_names, args);
+    expand_macros_block(&expr->as.self_call.args, macros, arg_names, args, unpack);
   } break;
 
   case IrExprKindSetIn: {

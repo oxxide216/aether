@@ -28,7 +28,7 @@ typedef struct {
   u32        index;
   Macros    *macros;
   char      *file_path;
-  FilePaths  included_files;
+  FilePaths *included_files;
   Ir         ir;
 } Parser;
 
@@ -210,11 +210,12 @@ static Token *parser_expect_token(Parser *parser, u64 id_mask) {
 
 static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask);
 
-Ir parse_with_macros(Str code, char *file_path, Macros *macros) {
+Ir parse_internal(Str code, char *file_path, Macros *macros, FilePaths *included_files) {
   Parser parser = {0};
 
   parser.tokens = lex(code, file_path);
   parser.macros = macros;
+  parser.included_files = included_files;
   parser.file_path = file_path;
   parser.ir = parser_parse_block(&parser, 0);
 
@@ -506,11 +507,14 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     new_file_path.ptr += 1;
     new_file_path.len -= 2;
 
+    parser_expect_token(parser, MASK(TT_CPAREN));
+
     char *prefix = str_to_cstr(get_file_dir(current_file_path));
     char *include_paths[] = INCLUDE_PATHS(prefix);
-    StringBuilder path_sb = {0};
     char *path_cstr = NULL;
+    Str path;
     Str code;
+    bool already_included = false;
 
     for (u32 i = 0; i < ARRAY_LEN(include_paths); ++i) {
       if (path_cstr) {
@@ -518,13 +522,15 @@ static IrExpr *parser_parse_expr(Parser *parser) {
         path_cstr = NULL;
       }
 
+      StringBuilder path_sb = {0};
       sb_push(&path_sb, include_paths[i]);
       sb_push_str(&path_sb, new_file_path);
-      Str path = sb_to_str(path_sb);
+      path = sb_to_str(path_sb);
+      path_cstr = str_to_cstr(path);
 
-      bool already_included = false;
-      for (u32 j = 0; j < parser->included_files.len; ++j) {
-        if (str_eq(parser->included_files.items[j], path)) {
+      already_included = false;
+      for (u32 j = 0; j < parser->included_files->len; ++j) {
+        if (str_eq(parser->included_files->items[j], path)) {
           already_included = true;
 
           break;
@@ -534,17 +540,17 @@ static IrExpr *parser_parse_expr(Parser *parser) {
       if (already_included)
         break;
 
-      path_cstr = str_to_cstr(path);
       code = read_file(path_cstr);
 
       if (code.len != (u32) -1) {
-        DA_APPEND(parser->included_files, path);
+        DA_APPEND(*parser->included_files, path);
 
         break;
       }
-
-      path_sb.len = 0;
     }
+
+    if (already_included)
+      break;
 
     if (code.len == (u32) -1) {
       ERROR("File "STR_FMT" was not found\n", STR_ARG(new_file_path));
@@ -554,7 +560,8 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     Macros macros = {0};
 
     expr->kind = IrExprKindBlock;
-    expr->as.block = parse_with_macros(code, path_cstr, &macros);
+    expr->as.block = parse_internal(code, path_cstr, &macros,
+                                    parser->included_files);
 
     if (parser->macros->cap < parser->macros->len + macros.len) {
       parser->macros->cap = parser->macros->len + macros.len;
@@ -566,11 +573,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
       free(macros.items);
     }
 
-    parser_expect_token(parser, MASK(TT_CPAREN));
-
     free(prefix);
-    free(path_sb.buffer);
-    free(path_cstr);
   } break;
 
   case TT_SET: {
@@ -654,8 +657,9 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
 
 Ir parse(Str code, char *file_path) {
   Macros macros = {0};
-  Ir ir = parse_with_macros(code, file_path, &macros);
-  expand_macros_block(&ir, &macros, NULL, NULL);
+  FilePaths included_files = {0};
+  Ir ir = parse_internal(code, file_path, &macros, &included_files);
+  expand_macros_block(&ir, &macros, NULL, NULL, false);
 
   return ir;
 }
