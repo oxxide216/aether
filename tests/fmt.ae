@@ -1,13 +1,12 @@
 (use 'std/core.ae')
 
 (let fmt [args] ->
-  (if (is-empty (tail args))
-    (if args
-      (head args)
-     else
-      [])
+  (if (== (len args) 0)
+    ''
+   elif (== (len args) 1)
+    (head args)
    else
-    (+ (head args) (fmt (tail args)))))
+    (+ (head args) (<-> (tail args)))))
 
 (let title 'Hello world')
 (println (fmt ['<title>' title '</title>']))

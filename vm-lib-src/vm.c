@@ -107,7 +107,8 @@ Value *value_clone(RcArena *rc_arena, Value *value) {
   copy->refs_count = 0;
 
   if (value->kind == ValueKindList) {
-    copy->as.list = list_clone(rc_arena, value->as.list);
+    copy->as.list = rc_arena_alloc(rc_arena, sizeof(ListNode));
+    copy->as.list->next = list_clone(rc_arena, value->as.list->next);
   } else if (value->kind == ValueKindString) {
     copy->as.string.str.ptr = rc_arena_alloc(rc_arena, value->as.string.str.len);
     copy->as.string.str.len = value->as.string.str.len;

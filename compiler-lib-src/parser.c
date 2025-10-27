@@ -655,7 +655,7 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
 Ir parse(Str code, char *file_path) {
   Macros macros = {0};
   Ir ir = parse_with_macros(code, file_path, &macros);
-  expand_macros_block(&ir, &macros, NULL, NULL, true);
+  expand_macros_block(&ir, &macros, NULL, NULL);
 
   return ir;
 }

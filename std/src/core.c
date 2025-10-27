@@ -389,7 +389,8 @@ bool add_intrinsic(Vm *vm) {
 
     value_stack_push_list(&vm->stack, vm->rc_arena, new_list);
   } else if (a->kind == ValueKindList) {
-    ListNode *new_list = list_clone(vm->rc_arena, a->as.list);
+    ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+    new_list->next = list_clone(vm->rc_arena, a->as.list->next);
     ListNode *node = new_list;
 
     while (node && node->next)
@@ -1008,7 +1009,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("or"), true, 2, { ValueKindBool, ValueKindBool }, &or_intrinsic },
   { STR_LIT("and"), true, 2, { ValueKindInt, ValueKindInt }, &xor_intrinsic },
   { STR_LIT("and"), true, 2, { ValueKindBool, ValueKindBool }, &xor_intrinsic },
-  { STR_LIT("not"), true, 1, { ValueKindBool }, &not_intrinsic },
+  { STR_LIT("not"), true, 1, { ValueKindUnit }, &not_intrinsic },
   // Logical
   { STR_LIT("logical-and"), true, 2, { ValueKindUnit, ValueKindUnit }, &logical_and_intrinsic },
   { STR_LIT("logical-or"), true, 2, { ValueKindUnit, ValueKindUnit }, &logical_or_intrinsic },
