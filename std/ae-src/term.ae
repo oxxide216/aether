@@ -5,7 +5,7 @@
   'left':      '\e[D'
   'enter':     '\n'
   'escape':    '\e'
-  ;'backspace': 127
+  'backspace': (byte-8-to-str 127)
 })
 
 (let term/reset      '\e[0m')
