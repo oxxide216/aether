@@ -1,3 +1,3 @@
 #!/usr/bin/sh
 
-./build.sh && ./aether ${@:1}
+./build.sh && ./install.sh && ./aether ${@:1}

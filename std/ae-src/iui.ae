@@ -1,4 +1,4 @@
-(let iui-main-loop [title width height body] -> import 'iui-main-loop')
+(let -iui-main-loop [title width height body] -> import 'iui-main-loop')
 (let iui-abs-bounds [x y width height] -> import 'iui-abs-bounds')
 
 (let -iui-vbox [margin-x margin-y spacing body] -> import 'iui-vbox')
@@ -6,6 +6,9 @@
 (let -iui-button [text on-click] -> import 'iui-button')
 (let -iui-text [title center-x center-y left-padding] -> import 'iui-text')
 (let -iui-input [placeholder left-padding on-submit] -> import 'iui-input')
+
+(macro iui-main-loop [title width height ...body] ->
+  (-iui-main-loop title width height [window-size] -> body))
 
 (macro iui-vbox [margin-x margin-y spacing ...body] ->
   (-iui-vbox margin-x margin-y spacing [] -> body))

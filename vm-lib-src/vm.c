@@ -237,14 +237,7 @@ static ExecState catch_vars(Vm *vm, Strs *local_names,
         return ExecStateContinue;
 
     Var *var = get_var(vm, expr->as.ident.ident);
-    if (!var) {
-      ERROR("Symbol "STR_FMT" was not defined before usage\n",
-            STR_ARG(expr->as.ident.ident));
-      vm->exit_code = 1;
-      return ExecStateExit;
-    }
-
-    if (!var->is_global) {
+    if (var && !var->is_global) {
       NamedValue value = { var->name, var->value };
       DA_APPEND(*catched_values, value);
     }
@@ -705,6 +698,9 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   } break;
 
   case IrExprKindLambda: {
+    if (!value_expected)
+      break;
+
     Strs local_names = {0};
     NamedValues catched_values = {0};
 
@@ -713,22 +709,20 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     CATCH_VARS_BLOCK(vm, &local_names, &catched_values, &expr->as.lambda.body);
 
-    if (value_expected) {
-      Value *func_value = rc_arena_alloc(vm->rc_arena, sizeof(Value));
-      *func_value = (Value) {
-        ValueKindFunc,
-        {
-          .func = {
-            expr->as.lambda.args,
-            expr->as.lambda.body,
-            catched_values,
-            expr->as.lambda.intrinsic_name,
-          },
+    Value *func_value = rc_arena_alloc(vm->rc_arena, sizeof(Value));
+    *func_value = (Value) {
+      ValueKindFunc,
+      {
+        .func = {
+          expr->as.lambda.args,
+          expr->as.lambda.body,
+          catched_values,
+          expr->as.lambda.intrinsic_name,
         },
-        0,
-      };
-      DA_APPEND(vm->stack, func_value);
-    }
+      },
+      0,
+    };
+    DA_APPEND(vm->stack, func_value);
   } break;
 
   case IrExprKindDict: {

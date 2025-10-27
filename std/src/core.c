@@ -796,8 +796,7 @@ static void print_value(ValueStack *stack, Value *value, u32 level) {
   } break;
 
   case ValueKindFunc: {
-    fputs("(fun [", stdout);
-    fputs(" [", stdout);
+    fputs("[", stdout);
 
     for (u32 i = 0; i < value->as.func.args.len; ++i) {
       if (i > 0)
@@ -805,7 +804,7 @@ static void print_value(ValueStack *stack, Value *value, u32 level) {
       str_print(value->as.func.args.items[i]);
     }
 
-    fputs("])", stdout);
+    fputs("] -> ...", stdout);
   } break;
 
   case ValueKindDict: {

@@ -261,7 +261,7 @@ static void append_macro_arg(u32 index, IrArgs *arg_names,
                              bool unpack) {
   IrExpr *arg = args->items[index];
 
-  if (unpack) {
+  if (unpack && index + 1 == arg_names->len) {
     IrBlock *variadic_args = &args->items[args->len - 1]->as.list.content;
     for (u32 i = 0; i < variadic_args->len; ++i) {
       IrExpr *new_arg = variadic_args->items[i];

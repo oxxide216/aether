@@ -14,4 +14,5 @@
     (iui-button 'clickme'
       (println 'clicked'))))
 
-(iui-main-loop 'IUI window' 640 480 main-loop)
+(iui-main-loop 'IUI window' 640 480
+  (main-loop window-size))
