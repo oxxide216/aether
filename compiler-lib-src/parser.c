@@ -1,5 +1,5 @@
 #include "aether/parser.h"
-#include "macros.h"
+#include "aether/macros.h"
 #include "io.h"
 #include "lexgen/runtime-src/runtime.h"
 #define LEXGEN_TRANSITION_TABLE_IMPLEMENTATION
@@ -20,8 +20,6 @@ typedef struct {
 } Token;
 
 typedef Da(Token) Tokens;
-
-typedef Da(Str) FilePaths;
 
 typedef struct {
   Tokens     tokens;
@@ -210,7 +208,8 @@ static Token *parser_expect_token(Parser *parser, u64 id_mask) {
 
 static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask);
 
-Ir parse_internal(Str code, char *file_path, Macros *macros, FilePaths *included_files) {
+Ir parse_ex(Str code, char *file_path, Macros *macros,
+            FilePaths *included_files) {
   Parser parser = {0};
 
   parser.tokens = lex(code, file_path);
@@ -560,8 +559,8 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     Macros macros = {0};
 
     expr->kind = IrExprKindBlock;
-    expr->as.block = parse_internal(code, path_cstr, &macros,
-                                    parser->included_files);
+    expr->as.block = parse_ex(code, path_cstr, &macros,
+                              parser->included_files);
 
     if (parser->macros->cap < parser->macros->len + macros.len) {
       parser->macros->cap = parser->macros->len + macros.len;
@@ -658,7 +657,7 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
 Ir parse(Str code, char *file_path) {
   Macros macros = {0};
   FilePaths included_files = {0};
-  Ir ir = parse_internal(code, file_path, &macros, &included_files);
+  Ir ir = parse_ex(code, file_path, &macros, &included_files);
   expand_macros_block(&ir, &macros, NULL, NULL, false);
 
   return ir;

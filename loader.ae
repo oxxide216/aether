@@ -1,0 +1,31 @@
+(use 'std/core.ae')
+(use 'std/term.ae')
+(use 'std/str.ae')
+(use 'std/io.ae')
+
+(macro error [...messages] ->
+  (println term/fg-red term/bold 'ERROR'
+           term/reset ': ' (join [messages] ' ')))
+
+(let args (get-args))
+
+(if (< (len args) 2)
+  (error 'Input file was not provided')
+  (exit 1))
+
+(let path (nth args 1))
+(let content (read-file path))
+(if (not content)
+  (error 'Could not open input file' path)
+  (exit 1))
+
+(let core-path '/usr/include/aether/std/core.ae')
+(let core-content (read-file core-path))
+(if (not core-content)
+  (error 'Could not load core module')
+  (exit 1))
+
+(let compiled (compile [{ 'code': core-content 'file-path': core-path }
+                        { 'code': content 'file-path': path }]))
+
+(eval-compiled compiled)

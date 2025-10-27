@@ -2,7 +2,12 @@
 #define COMPILER_H
 
 #include "aether/ir.h"
+#include "macros.h"
 
+typedef Da(Str) FilePaths;
+
+Ir parse_ex(Str code, char *file_path, Macros *macros,
+            FilePaths *included_files);
 Ir parse(Str code, char *input_file_name);
 
 #endif // COMPILER_H

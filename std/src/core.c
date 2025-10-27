@@ -5,6 +5,8 @@
 #include "aether/serializer.h"
 #include "aether/deserializer.h"
 #include "aether/misc.h"
+#include "aether/macros.h"
+#include "shl/shl-arena.h"
 
 static Value unit_value = { ValueKindUnit, {}, 0 };
 
@@ -881,10 +883,61 @@ bool get_args_intrinsic(Vm *vm) {
   return true;
 }
 
-bool compile_intrinsic(Vm *vm) {
-  Value *code = value_stack_pop(&vm->stack);
+static Value *get_dict_field_value(Dict *dict, Str name) {
+  for (u32 i = 0; dict->len; ++i) {
+    DictValue *field = dict->items + i;
 
-  Ir ir = parse(code->as.string.str, "eval");
+    if (field->key->kind == ValueKindString &&
+        str_eq(field->key->as.string.str, name))
+      return field->value;
+  }
+
+  return NULL;
+}
+
+bool compile_intrinsic(Vm *vm) {
+  Value *file_codes = value_stack_pop(&vm->stack);
+
+  Ir ir = {0};
+
+  Macros macros = {0};
+  FilePaths included_files = {0};
+
+  ListNode *file_code = file_codes->as.list->next;
+  while (file_code) {
+    if (file_code->value->kind != ValueKindDict)
+      PANIC("compile: wrong argument kind\n");
+
+    Value *code = get_dict_field_value(&file_code->value->as.dict,
+                                       STR_LIT("code"));
+    if (!code || code->kind != ValueKindString)
+      PANIC("compile: wrong argument kind\n");
+
+    Value *file_path = get_dict_field_value(&file_code->value->as.dict,
+                                            STR_LIT("file-path"));
+    if (!file_path || file_path->kind != ValueKindString)
+      PANIC("compile: wrong argument kind\n");
+
+    char *file_path_cstr = malloc(file_path->as.string.str.len + 1);
+    memcpy(file_path_cstr, file_path->as.string.str.ptr,
+           file_path->as.string.str.len);
+    file_path_cstr[file_path->as.string.str.len] = '\0';
+
+    //IrBlock block = parse(code->as.string.str, file_path_cstr);
+
+    IrBlock block = parse_ex(code->as.string.str, file_path_cstr,
+                             &macros, &included_files);
+    expand_macros_block(&block, &macros, NULL, NULL, false);
+
+    for (u32 i = 0; i < block.len; ++i)
+      DA_APPEND(ir, block.items[i]);
+
+    free(block.items);
+    free(file_path_cstr);
+
+    file_code = file_code->next;
+  }
+
   Str bytecode = {0};
   bytecode.ptr = (char *) serialize(&ir, &bytecode.len);
 
@@ -1028,7 +1081,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("input"), true, 0, {}, &input_intrinsic },
   // Other
   { STR_LIT("get-args"), true, 0, {}, &get_args_intrinsic },
-  { STR_LIT("compile"), true, 1, { ValueKindString }, &compile_intrinsic },
+  { STR_LIT("compile"), true, 1, { ValueKindList }, &compile_intrinsic },
   { STR_LIT("eval-compiled"), true, 1, { ValueKindString }, &eval_compiled_intrinsic },
   { STR_LIT("eval"), true, 1, { ValueKindString }, &eval_intrinsic },
   { STR_LIT("exit"), false, 1, { ValueKindInt }, &exit_intrinsic },

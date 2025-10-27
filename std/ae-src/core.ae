@@ -64,7 +64,7 @@
 (let input [] -> import 'input')
 
 (let get-args [] -> import 'get-args')
-(let compile [code] -> import 'compile')
+(let compile [file_codes] -> import 'compile')
 (let eval-compiled [bytecode] -> import 'eval-compiled')
 (let eval [code] -> import 'eval')
 (let exit [exit-code] -> import 'exit')
