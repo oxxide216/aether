@@ -37,7 +37,6 @@
 (let term/bg-white   '\e[47m')
 
 (let term/clear      '\e[2J')
-(let term/full-clear '\e[3J')
 (let term/clear-line '\e[2K')
 
 (let term/save-pos   '\e[s')
