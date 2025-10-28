@@ -60,19 +60,26 @@ bool last_intrinsic(Vm *vm) {
 
 bool nth_intrinsic(Vm *vm) {
   Value *index = value_stack_pop(&vm->stack);
-  Value *list = value_stack_pop(&vm->stack);
+  Value *collection = value_stack_pop(&vm->stack);
 
-  ListNode *node = list->as.list->next;
-  u32 i = 0;
-  while (node && i < index->as._int) {
-    node = node->next;
-    ++i;
+  if (collection->kind == ValueKindList) {
+    ListNode *node = collection->as.list->next;
+    u32 i = 0;
+    while (node && i < index->as._int) {
+      node = node->next;
+      ++i;
+    }
+
+    if (node)
+      DA_APPEND(vm->stack, node->value);
+    else
+      value_stack_push_unit(&vm->stack);
+  } else {
+    Str result = collection->as.string.str;
+    result.ptr += index->as._int;
+    result.len = 1;
+    value_stack_push_string(&vm->stack, vm->rc_arena, result);
   }
-
-  if (node)
-    DA_APPEND(vm->stack, node->value);
-  else
-    value_stack_push_unit(&vm->stack);
 
   return true;
 }
@@ -993,6 +1000,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("tail"), true, 1, { ValueKindList }, &tail_intrinsic },
   { STR_LIT("last"), true, 1, { ValueKindList }, &last_intrinsic },
   { STR_LIT("nth"), true, 2, { ValueKindList, ValueKindInt }, &nth_intrinsic },
+  { STR_LIT("nth"), true, 2, { ValueKindString, ValueKindInt }, &nth_intrinsic },
   { STR_LIT("len"), true, 1, { ValueKindList }, &len_intrinsic },
   { STR_LIT("len"), true, 1, { ValueKindString }, &len_intrinsic },
   { STR_LIT("get-range"), true, 3,
