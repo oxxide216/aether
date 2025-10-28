@@ -54,7 +54,8 @@
 (let term/right-n      [n] ->  (+ '\e[' n 'C'))
 (let term/left-n       [n] ->  (+ '\e[' n 'D'))
 
-(let term/goto         [x y] -> (+ '\e[' y ';' x 'H'))
+(let term/goto         [x y] -> (+ '\e[' (int-to-str y) ';'
+                                         (int-to-str x) 'H'))
 
 (let term/get-size     [] -> import 'term/get-size')
 (let term/raw-mode-on  [] -> import 'term/raw-mode-on')
