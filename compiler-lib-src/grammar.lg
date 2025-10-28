@@ -9,12 +9,10 @@ else=else
 macro=macro
 while=while
 set=set
-get_in=get\-in
 use=use
 field=field
 ret=ret
 import=import
-set_in=set\-in
 
 oparen=\(
 cparen=\)
