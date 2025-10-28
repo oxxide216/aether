@@ -93,11 +93,8 @@ void value_stack_push_dict(ValueStack *stack, RcArena *rc_arena, Dict dict) {
 }
 
 Value *value_stack_pop(ValueStack *stack) {
-  if (stack->len > 0) {
-    ++stack->items[stack->len - 1]->refs_count;
+  if (stack->len > 0)
     return stack->items[--stack->len];
-  }
-
   return &unit_value;
 }
 
@@ -480,6 +477,8 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       value_free(prev_var->value, vm->rc_arena);
       prev_var->value = value_stack_pop(&vm->stack);
 
+      ++prev_var->value->refs_count;
+
       if (value_expected)
         value_stack_push_unit(&vm->stack);
 
@@ -490,6 +489,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     var.name = expr->as.var_def.name;
     var.value = value_stack_pop(&vm->stack);
     var.is_global = !vm->is_inside_of_func;
+    ++var.value->refs_count;
 
     if (var.is_global)
       DA_APPEND(vm->global_vars, var);
@@ -558,6 +558,8 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     EXECUTE_EXPR(vm, expr->as.set.src, true);
     var->value = value_stack_pop(&vm->stack);
+
+    ++var->value->refs_count;
 
     value_free(prev_value, vm->rc_arena);
 
