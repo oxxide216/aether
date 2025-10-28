@@ -1,3 +1,5 @@
+(use 'std/core.ae')
+
 (let term/keys {
   'up':        '\e[A'
   'down':      '\e[B'
@@ -57,3 +59,13 @@
 (let term/get-size     [] -> import 'term/get-size')
 (let term/raw-mode-on  [] -> import 'term/raw-mode-on')
 (let term/raw-mode-off [] -> import 'term/raw-mode-off')
+
+(let term/get-key [] ->
+  (let key (input-size 1))
+  (if (== key '\e')
+    (let char (input-size 1))
+    (set key (+ key char))
+    (if (== char '[')
+      (let char (input-size 1))
+      (set key (+ key char))))
+  key)
