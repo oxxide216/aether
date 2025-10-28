@@ -15,7 +15,6 @@ typedef enum {
   IrExprKindIf,
   IrExprKindWhile,
   IrExprKindSet,
-  IrExprKindGetIn,
   IrExprKindList,
   IrExprKindIdent,
   IrExprKindString,
@@ -26,7 +25,6 @@ typedef enum {
   IrExprKindDict,
   IrExprKindRet,
   IrExprKindSelfCall,
-  IrExprKindSetIn,
 } IrExprKind;
 
 typedef Da(Str) IrArgs;
@@ -62,14 +60,9 @@ typedef struct {
 } IrExprWhile;
 
 typedef struct {
-  Str     dest;
+  IrExpr *dest;
   IrExpr *src;
 } IrExprSet;
-
-typedef struct {
-  Str     src;
-  IrExpr *key;
-} IrExprGetIn;
 
 typedef struct {
   IrBlock content;
@@ -119,11 +112,6 @@ typedef struct {
 
 typedef Da(IrField) IrFields;
 
-typedef struct {
-  Str      dict;
-  IrFields fields;
-} IrExprSetIn;
-
 typedef union {
   IrBlock        block;
   IrExprFuncCall func_call;
@@ -131,7 +119,6 @@ typedef union {
   IrExprIf       _if;
   IrExprWhile    _while;
   IrExprSet      set;
-  IrExprGetIn      get_in;
   IrExprList     list;
   IrExprIdent    ident;
   IrExprString   string;
@@ -142,7 +129,6 @@ typedef union {
   IrExprDict     dict;
   IrExprRet      ret;
   IrExprSelfCall self_call;
-  IrExprSetIn    set_in;
 } IrExprAs;
 
 struct IrExpr {

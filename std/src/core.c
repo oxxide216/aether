@@ -84,6 +84,23 @@ bool nth_intrinsic(Vm *vm) {
   return true;
 }
 
+bool at_intrinsic(Vm *vm) {
+  Value *key = value_stack_pop(&vm->stack);
+  Value *dict = value_stack_pop(&vm->stack);
+
+  for (u32 i = 0; i < dict->as.dict.len; ++i) {
+    if (value_eq(dict->as.dict.items[i].key, key)) {
+      DA_APPEND(vm->stack, dict->as.dict.items[i].value);
+
+      return true;
+    }
+  }
+
+  value_stack_push_unit(&vm->stack);
+
+  return true;
+}
+
 bool len_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
   if (value->kind == ValueKindList) {
@@ -211,7 +228,7 @@ bool fold_intrinsic(Vm *vm) {
     DA_APPEND(vm->stack, node->value);
     EXECUTE_FUNC(vm, &func->as.func, true);
 
-    value_free(accumulator, vm->rc_arena);
+    value_free(accumulator, vm->rc_arena, true);
     accumulator = value_stack_pop(&vm->stack);
 
     node = node->next;
@@ -488,23 +505,7 @@ bool eq_intrinsic(Vm *vm) {
   Value *b = value_stack_pop(&vm->stack);
   Value *a = value_stack_pop(&vm->stack);
 
-  if (a->kind == ValueKindList &&
-      b->kind == ValueKindList)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as.list->next == b->as.list->next);
-  else if (a->kind == ValueKindString &&
-           b->kind == ValueKindString)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, str_eq(a->as.string.str, b->as.string.str));
-  else if (a->kind == ValueKindInt &&
-           b->kind == ValueKindInt)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._int == b->as._int);
-  else if (a->kind == ValueKindFloat &&
-           b->kind == ValueKindFloat)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._float == b->as._float);
-  else if (a->kind == ValueKindBool &&
-           b->kind == ValueKindBool)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._bool == b->as._bool);
-  else
-    value_stack_push_bool(&vm->stack, vm->rc_arena, false);
+  value_stack_push_bool(&vm->stack, vm->rc_arena, value_eq(a, b));
 
   return true;
 }
@@ -513,23 +514,7 @@ bool ne_intrinsic(Vm *vm) {
   Value *b = value_stack_pop(&vm->stack);
   Value *a = value_stack_pop(&vm->stack);
 
-  if (a->kind == ValueKindList &&
-      b->kind == ValueKindList)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as.list->next != b->as.list->next);
-  else if (a->kind == ValueKindString &&
-           b->kind == ValueKindString)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, !str_eq(a->as.string.str, b->as.string.str));
-  else if (a->kind == ValueKindInt &&
-           b->kind == ValueKindInt)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._int != b->as._int);
-  else if (a->kind == ValueKindFloat &&
-           b->kind == ValueKindFloat)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._float != b->as._float);
-  else if (a->kind == ValueKindBool &&
-           b->kind == ValueKindBool)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._bool != b->as._bool);
-  else
-    value_stack_push_bool(&vm->stack, vm->rc_arena, true);
+  value_stack_push_bool(&vm->stack, vm->rc_arena, !value_eq(a, b));
 
   return true;
 }
@@ -1001,6 +986,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("last"), true, 1, { ValueKindList }, &last_intrinsic },
   { STR_LIT("nth"), true, 2, { ValueKindList, ValueKindInt }, &nth_intrinsic },
   { STR_LIT("nth"), true, 2, { ValueKindString, ValueKindInt }, &nth_intrinsic },
+  { STR_LIT("at"), true, 2, { ValueKindDict, ValueKindUnit }, &at_intrinsic },
   { STR_LIT("len"), true, 1, { ValueKindList }, &len_intrinsic },
   { STR_LIT("len"), true, 1, { ValueKindString }, &len_intrinsic },
   { STR_LIT("get-range"), true, 3,

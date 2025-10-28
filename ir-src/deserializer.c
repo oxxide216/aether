@@ -53,12 +53,7 @@ static void get_in_expr_data_size(u8 *data, u32 *size) {
   } break;
 
   case IrExprKindSet: {
-    get_in_str_data_size(data, size);
     get_in_expr_data_size(data, size);
-  } break;
-
-  case IrExprKindGetIn: {
-    get_in_str_data_size(data, size);
     get_in_expr_data_size(data, size);
   } break;
 
@@ -113,18 +108,6 @@ static void get_in_expr_data_size(u8 *data, u32 *size) {
 
   case IrExprKindSelfCall: {
     get_in_block_data_size(data, size);
-  } break;
-
-  case IrExprKindSetIn: {
-    get_in_str_data_size(data, size);
-
-    u32 len = *(u32 *) (data + *size);
-    *size += sizeof(u32);
-
-    for (u32 i = 0; i < len; ++i) {
-      get_in_expr_data_size(data, size);
-      get_in_expr_data_size(data, size);
-    }
   } break;
   }
 }
@@ -207,17 +190,11 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
   } break;
 
   case IrExprKindSet: {
+    expr->as.set.dest = aalloc(sizeof(IrExpr));
     expr->as.set.src = aalloc(sizeof(IrExpr));
 
-    load_str_data(&expr->as.set.dest, data, end, rc_arena);
+    load_expr_data(expr->as.set.dest, data, end, rc_arena);
     load_expr_data(expr->as.set.src, data, end, rc_arena);
-  } break;
-
-  case IrExprKindGetIn: {
-    expr->as.get_in.key = aalloc(sizeof(IrExpr));
-
-    load_str_data(&expr->as.get_in.src, data, end, rc_arena);
-    load_expr_data(expr->as.get_in.key, data, end, rc_arena);
   } break;
 
   case IrExprKindRet: {
@@ -289,22 +266,6 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
 
   case IrExprKindSelfCall: {
     load_block_data(&expr->as.self_call.args, data, end, rc_arena);
-  } break;
-
-  case IrExprKindSetIn: {
-    load_str_data(&expr->as.set_in.dict, data, end, rc_arena);
-
-    expr->as.set_in.fields.len = *(u32 *) (data + *end);
-    *end += sizeof(u32);
-
-    expr->as.set_in.fields.items = malloc(expr->as.set_in.fields.len * sizeof(IrField));
-    for (u32 i = 0; i < expr->as.set_in.fields.len; ++i) {
-      expr->as.set_in.fields.items[i].key = aalloc(sizeof(IrExpr));
-      expr->as.set_in.fields.items[i].expr = aalloc(sizeof(IrExpr));
-
-      load_expr_data(expr->as.set_in.fields.items[i].key, data, end, rc_arena);
-      load_expr_data(expr->as.set_in.fields.items[i].expr, data, end, rc_arena);
-    }
   } break;
   }
 }

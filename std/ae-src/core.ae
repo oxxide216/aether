@@ -3,6 +3,7 @@
 (let tail [list] -> import 'tail')
 (let last [list] -> import 'last')
 (let nth [list index] -> import 'nth')
+(let at [dict key] -> import 'at')
 (let len [collection] -> import 'len')
 (let get-range [list begin end] -> import 'get-range')
 (let map [func list] -> import 'map')

@@ -73,13 +73,8 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
   } break;
 
   case IrExprKindSet: {
-    save_str_data(expr->as.set.dest, data, data_size, end);
+    save_expr_data(expr->as.set.dest, data, data_size, end);
     save_expr_data(expr->as.set.src, data, data_size, end);
-  } break;
-
-  case IrExprKindGetIn: {
-    save_str_data(expr->as.get_in.src, data, data_size, end);
-    save_expr_data(expr->as.get_in.key, data, data_size, end);
   } break;
 
   case IrExprKindRet: {
@@ -146,19 +141,6 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
 
   case IrExprKindSelfCall: {
     save_block_data(&expr->as.self_call.args, data, data_size, end);
-  } break;
-
-  case IrExprKindSetIn: {
-    save_str_data(expr->as.set_in.dict, data, data_size, end);
-
-    reserve_space(sizeof(u32), data, data_size, end);
-    *(u32 *) (*data + *end) = expr->as.set_in.fields.len;
-    *end += sizeof(u32);
-
-    for (u32 i = 0; i < expr->as.set_in.fields.len; ++i) {
-      save_expr_data(expr->as.set_in.fields.items[i].key, data, data_size, end);
-      save_expr_data(expr->as.set_in.fields.items[i].expr, data, data_size, end);
-    }
   } break;
   }
 }

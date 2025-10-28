@@ -160,7 +160,8 @@ Value *value_stack_pop(ValueStack *stack);
 Value *value_stack_get(ValueStack *stack, u32 index);
 
 Value *value_clone(RcArena *rc_arena, Value *value);
-void   value_free(Value *value, RcArena *rc_arena);
+void   value_free(Value *value, RcArena *rc_arena, bool free_ptr);
+bool   value_eq(Value *a, Value *b);
 
 ExecState execute_func(Vm *vm, Func *func, bool value_expected);
 ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected);

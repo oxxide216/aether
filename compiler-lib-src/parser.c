@@ -313,31 +313,6 @@ static IrExprLambda parser_parse_lambda(Parser *parser) {
   return lambda;
 }
 
-static IrExprSetIn parser_parse_set_in(Parser *parser) {
-  IrExprSetIn set_in = {0};
-  set_in.dict = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
-
-  Token *token = parser_peek_token(parser);
-  if (token && token->id != TT_CPAREN) {
-    while (token && token->id != TT_CPAREN) {
-      IrField field = {0};
-      field.key = parser_parse_expr(parser);
-      parser_expect_token(parser, MASK(TT_COLON));
-      field.expr = parser_parse_expr(parser);
-
-      DA_APPEND(set_in.fields, field);
-
-      token = parser_peek_token(parser);
-      if (token->id == TT_CPAREN)
-        break;
-    }
-  }
-
-  parser_expect_token(parser, MASK(TT_CPAREN));
-
-  return set_in;
-}
-
 static char *str_to_cstr(Str str) {
   char *result = malloc((str.len + 1) * sizeof(char));
   memcpy(result, str.ptr, str.len * sizeof(char));
@@ -580,18 +555,8 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     parser_next_token(parser);
 
     expr->kind = IrExprKindSet;
-    expr->as.set.dest = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
+    expr->as.set.dest = parser_parse_expr(parser);
     expr->as.set.src = parser_parse_expr(parser);
-
-    parser_expect_token(parser, MASK(TT_CPAREN));
-  } break;
-
-  case TT_GET_IN: {
-    parser_next_token(parser);
-
-    expr->kind = IrExprKindGetIn;
-    expr->as.get_in.src = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
-    expr->as.get_in.key = parser_parse_expr(parser);
 
     parser_expect_token(parser, MASK(TT_CPAREN));
   } break;
@@ -606,13 +571,6 @@ static IrExpr *parser_parse_expr(Parser *parser) {
       expr->as.ret.expr = parser_parse_expr(parser);
 
     parser_expect_token(parser, MASK(TT_CPAREN));
-  } break;
-
-  case TT_SET_IN: {
-    parser_next_token(parser);
-
-    expr->kind = IrExprKindSetIn;
-    expr->as.set_in = parser_parse_set_in(parser);
   } break;
 
   default: {

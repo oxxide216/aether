@@ -41,11 +41,8 @@ static void clone_expr(IrExpr **expr) {
   } break;
 
   case IrExprKindSet: {
+    clone_expr(&new_expr->as.set.dest);
     clone_expr(&new_expr->as.set.src);
-  } break;
-
-  case IrExprKindGetIn: {
-    clone_expr(&new_expr->as.get_in.key);
   } break;
 
   case IrExprKindList: {
@@ -74,13 +71,6 @@ static void clone_expr(IrExpr **expr) {
 
   case IrExprKindSelfCall: {
     clone_block(&new_expr->as.self_call.args);
-  } break;
-
-  case IrExprKindSetIn: {
-    for (u32 i = 0; i < new_expr->as.set_in.fields.len; ++i) {
-      clone_expr(&new_expr->as.set_in.fields.items[i].key);
-      clone_expr(&new_expr->as.set_in.fields.items[i].expr);
-    }
   } break;
   }
 }
@@ -156,27 +146,8 @@ static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names, IrArgs *new_a
   } break;
 
   case IrExprKindSet: {
-    for (u32 i = 0; i < prev_arg_names->len; ++i) {
-      if (str_eq(expr->as.set.dest, prev_arg_names->items[i])) {
-        expr->as.set.dest = new_arg_names->items[i];
-
-        break;
-      }
-    }
-
+    rename_args_expr(expr->as.set.dest, prev_arg_names, new_arg_names);
     rename_args_expr(expr->as.set.src, prev_arg_names, new_arg_names);
-  } break;
-
-  case IrExprKindGetIn: {
-    for (u32 i = 0; i < prev_arg_names->len; ++i) {
-      if (str_eq(expr->as.get_in.src, prev_arg_names->items[i])) {
-        expr->as.get_in.src = new_arg_names->items[i];
-
-        break;
-      }
-    }
-
-    rename_args_expr(expr->as.get_in.key, prev_arg_names, new_arg_names);
   } break;
 
   case IrExprKindList: {
@@ -214,21 +185,6 @@ static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names, IrArgs *new_a
 
   case IrExprKindSelfCall: {
     rename_args_block(&expr->as.self_call.args, prev_arg_names, new_arg_names);
-  } break;
-
-  case IrExprKindSetIn: {
-    for (u32 i = 0; i < prev_arg_names->len; ++i) {
-      if (str_eq(expr->as.set_in.dict, prev_arg_names->items[i])) {
-        expr->as.set_in.dict = new_arg_names->items[i];
-
-        break;
-      }
-    }
-
-    for (u32 i = 0; i < expr->as.set_in.fields.len; ++i) {
-      rename_args_expr(expr->as.set_in.fields.items[i].key, prev_arg_names, new_arg_names);
-      rename_args_expr(expr->as.set_in.fields.items[i].expr, prev_arg_names, new_arg_names);
-    }
   } break;
   }
 }
@@ -285,18 +241,6 @@ static bool try_inline_macro_arg(IrExpr **expr, IrArgs *arg_names,
 
   if ((*expr)->kind == IrExprKindVarDef) {
     try_replace_macro_arg_ident(&(*expr)->as.var_def.name, arg_names, args);
-
-    return false;
-  } else if ((*expr)->kind == IrExprKindSet) {
-    try_replace_macro_arg_ident(&(*expr)->as.set.dest, arg_names, args);
-
-    return false;
-  } else if ((*expr)->kind == IrExprKindGetIn) {
-    try_replace_macro_arg_ident(&(*expr)->as.get_in.src, arg_names, args);
-
-    return false;
-  } else if ((*expr)->kind == IrExprKindSetIn) {
-    try_replace_macro_arg_ident(&(*expr)->as.set_in.dict, arg_names, args);
 
     return false;
   }
@@ -429,11 +373,8 @@ void expand_macros(IrExpr *expr, Macros *macros,
   } break;
 
   case IrExprKindSet: {
+    INLINE_THEN_EXPAND(expr->as.set.dest);
     INLINE_THEN_EXPAND(expr->as.set.src);
-  } break;
-
-  case IrExprKindGetIn: {
-    INLINE_THEN_EXPAND(expr->as.get_in.key);
   } break;
 
   case IrExprKindList: {
@@ -462,13 +403,6 @@ void expand_macros(IrExpr *expr, Macros *macros,
 
   case IrExprKindSelfCall: {
     expand_macros_block(&expr->as.self_call.args, macros, arg_names, args, unpack);
-  } break;
-
-  case IrExprKindSetIn: {
-    for (u32 i = 0; i < expr->as.set_in.fields.len; ++i) {
-      INLINE_THEN_EXPAND(expr->as.set_in.fields.items[i].key);
-      INLINE_THEN_EXPAND(expr->as.set_in.fields.items[i].expr);
-    }
   } break;
   }
 }
