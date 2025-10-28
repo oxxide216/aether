@@ -15,7 +15,7 @@ typedef enum {
   IrExprKindIf,
   IrExprKindWhile,
   IrExprKindSet,
-  IrExprKindGet,
+  IrExprKindGetIn,
   IrExprKindList,
   IrExprKindIdent,
   IrExprKindString,
@@ -69,7 +69,7 @@ typedef struct {
 typedef struct {
   Str     src;
   IrExpr *key;
-} IrExprGet;
+} IrExprGetIn;
 
 typedef struct {
   IrBlock content;
@@ -131,7 +131,7 @@ typedef union {
   IrExprIf       _if;
   IrExprWhile    _while;
   IrExprSet      set;
-  IrExprGet      get;
+  IrExprGetIn      get_in;
   IrExprList     list;
   IrExprIdent    ident;
   IrExprString   string;

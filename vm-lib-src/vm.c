@@ -215,8 +215,8 @@ static ExecState catch_vars(Vm *vm, Strs *local_names,
     CATCH_VARS(vm, local_names, catched_values, expr->as.set.src);
   } break;
 
-  case IrExprKindGet: {
-    CATCH_VARS(vm, local_names, catched_values, expr->as.get.key);
+  case IrExprKindGetIn: {
+    CATCH_VARS(vm, local_names, catched_values, expr->as.get_in.key);
   } break;
 
   case IrExprKindRet: {
@@ -570,11 +570,11 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       value_stack_push_unit(&vm->stack);
   } break;
 
-  case IrExprKindGet: {
-    Var *var = get_var(vm, expr->as.get.src);
+  case IrExprKindGetIn: {
+    Var *var = get_var(vm, expr->as.get_in.src);
     if (!var) {
       ERROR("Symbol "STR_FMT" was not defined before usage\n",
-            STR_ARG(expr->as.set.dest));
+            STR_ARG(expr->as.get_in.src));
       vm->exit_code = 1;
       return ExecStateExit;
     }
@@ -586,7 +586,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       return ExecStateExit;
     }
 
-    EXECUTE_EXPR(vm, expr->as.get.key, true);
+    EXECUTE_EXPR(vm, expr->as.get_in.key, true);
     Value *key = value_stack_pop(&vm->stack);
 
     if (var->value->kind == ValueKindList) {
@@ -876,7 +876,8 @@ u32 execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena,
 
   execute_block(&vm, ir, result_value != NULL);
 
-  *result_value = vm.stack.items[--vm.stack.len];
+  if (result_value)
+    *result_value = vm.stack.items[--vm.stack.len];
 
   cleanup(&vm);
 

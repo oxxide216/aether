@@ -11,7 +11,7 @@
 #define TT_MACRO 7
 #define TT_WHILE 8
 #define TT_SET 9
-#define TT_GET 10
+#define TT_GET_IN 10
 #define TT_USE 11
 #define TT_FIELD 12
 #define TT_RET 13
@@ -102,10 +102,13 @@ TransitionCol table_col_set[] = {
   { 3, 't', 't', 0 },
 };
 
-TransitionCol table_col_get[] = {
+TransitionCol table_col_get_in[] = {
   { 1, 'g', 'g', 2 },
   { 2, 'e', 'e', 3 },
-  { 3, 't', 't', 0 },
+  { 3, 't', 't', 4 },
+  { 4, '-', '-', 5 },
+  { 5, 'i', 'i', 6 },
+  { 6, 'n', 'n', 0 },
 };
 
 TransitionCol table_col_use[] = {
@@ -285,7 +288,7 @@ TransitionRow table_rows[] = {
   { table_col_macro, sizeof(table_col_macro) / sizeof(TransitionCol) },
   { table_col_while, sizeof(table_col_while) / sizeof(TransitionCol) },
   { table_col_set, sizeof(table_col_set) / sizeof(TransitionCol) },
-  { table_col_get, sizeof(table_col_get) / sizeof(TransitionCol) },
+  { table_col_get_in, sizeof(table_col_get_in) / sizeof(TransitionCol) },
   { table_col_use, sizeof(table_col_use) / sizeof(TransitionCol) },
   { table_col_field, sizeof(table_col_field) / sizeof(TransitionCol) },
   { table_col_ret, sizeof(table_col_ret) / sizeof(TransitionCol) },

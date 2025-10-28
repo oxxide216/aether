@@ -7,8 +7,8 @@
 })
 
 (println user)
-(println (get user 'name'))
+(println (get-in user 'name'))
 (set-in user 'name': 'Paul')
-(set-in user 'age': (+ 1 (get user 'age')))
-(println (get user 'name'))
+(set-in user 'age': (+ 1 (get-in user 'age')))
+(println (get-in user 'name'))
 (println user)

@@ -586,12 +586,12 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     parser_expect_token(parser, MASK(TT_CPAREN));
   } break;
 
-  case TT_GET: {
+  case TT_GET_IN: {
     parser_next_token(parser);
 
-    expr->kind = IrExprKindGet;
-    expr->as.get.src = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
-    expr->as.get.key = parser_parse_expr(parser);
+    expr->kind = IrExprKindGetIn;
+    expr->as.get_in.src = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
+    expr->as.get_in.key = parser_parse_expr(parser);
 
     parser_expect_token(parser, MASK(TT_CPAREN));
   } break;

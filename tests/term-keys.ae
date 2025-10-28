@@ -4,7 +4,7 @@
 (term/raw-mode-on)
 
 (let key (input-size 1))
-(while (!= key (get term/keys 'enter'))
+(while (!= key (get-in term/keys 'enter'))
   (print key '\r')
   (set key (input-size 1)))
 
