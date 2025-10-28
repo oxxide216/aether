@@ -876,6 +876,8 @@ u32 execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena,
 
   execute_block(&vm, ir, result_value != NULL);
 
+  *result_value = vm.stack.items[--vm.stack.len];
+
   cleanup(&vm);
 
   return vm.exit_code;
