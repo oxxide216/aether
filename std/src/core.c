@@ -111,7 +111,7 @@ bool get_range_intrinsic(Vm *vm) {
   len_intrinsic(vm);
   Value *len = value_stack_pop(&vm->stack);
 
-  if (begin->as._int < 0 || begin->as._int >= len->as._int ||
+  if (begin->as._int < 0 || begin->as._int > len->as._int ||
       end->as._int < 0 || end->as._int > len->as._int ||
       begin->as._int > end->as._int) {
     value_stack_push_unit(&vm->stack);
