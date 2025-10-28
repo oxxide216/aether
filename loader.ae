@@ -15,13 +15,13 @@
 
 (let path (nth args 1))
 (let content (read-file path))
-(if (not content)
+(if (unit? content)
   (error 'Could not open input file' path)
   (exit 1))
 
 (let core-path '/usr/include/aether/std/core.ae')
 (let core-content (read-file core-path))
-(if (not core-content)
+(if (unit? core-content)
   (error 'Could not load core module')
   (exit 1))
 
