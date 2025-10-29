@@ -14,7 +14,7 @@ bool head_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
 
   if (!value->as.list->next) {
-    value_stack_push_unit(&vm->stack);
+    value_stack_push_unit(&vm->stack, vm->rc_arena);
     return true;
   }
 
@@ -27,7 +27,7 @@ bool tail_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
 
   if (!value->as.list->next) {
-    value_stack_push_unit(&vm->stack);
+    value_stack_push_unit(&vm->stack, vm->rc_arena);
 
     return true;
   }
@@ -45,7 +45,7 @@ bool last_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
 
   if (!value->as.list->next) {
-    value_stack_push_unit(&vm->stack);
+    value_stack_push_unit(&vm->stack, vm->rc_arena);
     return true;
   }
 
@@ -58,7 +58,8 @@ bool last_intrinsic(Vm *vm) {
   return true;
 }
 
-bool nth_intrinsic(Vm *vm) {
+bool set_nth_intrinsic(Vm *vm) {
+  Value *value = value_stack_pop(&vm->stack);
   Value *index = value_stack_pop(&vm->stack);
   Value *collection = value_stack_pop(&vm->stack);
 
@@ -70,33 +71,103 @@ bool nth_intrinsic(Vm *vm) {
       ++i;
     }
 
-    if (node)
-      DA_APPEND(vm->stack, node->value);
-    else
-      value_stack_push_unit(&vm->stack);
+    if (!node)
+      PANIC("set-nth: out of bounds\n");
+
+    value_free(node->value, vm->rc_arena, true);
+    node->value = value;
   } else {
-    Str result = collection->as.string.str;
-    result.ptr += index->as._int;
-    result.len = 1;
-    value_stack_push_string(&vm->stack, vm->rc_arena, result);
+    if (index->as._int >= collection->as.string.len)
+      PANIC("set-nth: out of bounds\n");
+
+    if (value->as.string.len != 1)
+      PANIC("set-nth: only one-sized string can be assigned\n");
+
+    collection->as.string.ptr[index->as._int] = value->as.string.ptr[0];
   }
 
   return true;
 }
 
-bool at_intrinsic(Vm *vm) {
+bool get_at_intrinsic(Vm *vm) {
   Value *key = value_stack_pop(&vm->stack);
-  Value *dict = value_stack_pop(&vm->stack);
+  Value *collection = value_stack_pop(&vm->stack);
 
-  for (u32 i = 0; i < dict->as.dict.len; ++i) {
-    if (value_eq(dict->as.dict.items[i].key, key)) {
-      DA_APPEND(vm->stack, dict->as.dict.items[i].value);
-
-      return true;
+  if (collection->kind == ValueKindList) {
+    ListNode *node = collection->as.list->next;
+    u32 i = 0;
+    while (node && i < key->as._int) {
+      node = node->next;
+      ++i;
     }
+
+    if (!node)
+      PANIC("get-at: out of bounds\n");
+
+    DA_APPEND(vm->stack, node->value);
+  } else if (collection->kind == ValueKindString) {
+    if (key->as._int >= collection->as.string.len) {
+      value_stack_push_unit(&vm->stack, vm->rc_arena);
+    } else {
+      Str result = collection->as.string;
+      result.ptr += key->as._int;
+      result.len = 1;
+      value_stack_push_string(&vm->stack, vm->rc_arena, result);
+    }
+  } else if (collection->kind == ValueKindDict) {
+    for (u32 i = 0; i < collection->as.dict.len; ++i) {
+      if (value_eq(collection->as.dict.items[i].key, key)) {
+        DA_APPEND(vm->stack, collection->as.dict.items[i].value);
+
+        return true;
+      }
+    }
+
+    value_stack_push_unit(&vm->stack, vm->rc_arena);
   }
 
-  value_stack_push_unit(&vm->stack);
+  return true;
+}
+
+bool set_at_intrinsic(Vm *vm) {
+  Value *value = value_stack_pop(&vm->stack);
+  Value *key = value_stack_pop(&vm->stack);
+  Value *collection = value_stack_pop(&vm->stack);
+
+  if (collection->kind == ValueKindList) {
+    ListNode *node = collection->as.list->next;
+    u32 i = 0;
+    while (node && i < key->as._int) {
+      node = node->next;
+      ++i;
+    }
+
+    if (!node)
+      PANIC("set-at: out of bounds\n");
+
+    value_free(node->value, vm->rc_arena, true);
+    node->value = value;
+  } else if (collection->kind == ValueKindString) {
+    if (key->as._int >= collection->as.string.len)
+      PANIC("set-at: out of bounds\n");
+
+    if (value->as.string.len != 1)
+      PANIC("set-nth: only one-sized string can be assigned\n");
+
+    collection->as.string.ptr[key->as._int] = value->as.string.ptr[0];
+  } else if (collection->kind == ValueKindDict) {
+    for (u32 i = 0; i < collection->as.dict.len; ++i) {
+      if (value_eq(collection->as.dict.items[i].key, key)) {
+        value_free(collection->as.dict.items[i].value, vm->rc_arena, true);
+        collection->as.dict.items[i].value = value;
+
+        return true;
+      }
+    }
+
+    DictValue dict_value = { key, value };
+    DA_APPEND(collection->as.dict, dict_value);
+  }
 
   return true;
 }
@@ -113,7 +184,7 @@ bool len_intrinsic(Vm *vm) {
 
     value_stack_push_int(&vm->stack, vm->rc_arena, len);
   } else if (value->kind == ValueKindString) {
-    value_stack_push_int(&vm->stack, vm->rc_arena, value->as.string.str.len);
+    value_stack_push_int(&vm->stack, vm->rc_arena, value->as.string.len);
   }
 
   return true;
@@ -128,12 +199,17 @@ bool get_range_intrinsic(Vm *vm) {
   len_intrinsic(vm);
   Value *len = value_stack_pop(&vm->stack);
 
-  if (begin->as._int < 0 || begin->as._int > len->as._int ||
-      end->as._int < 0 || end->as._int > len->as._int ||
-      begin->as._int > end->as._int) {
-    value_stack_push_unit(&vm->stack);
-    return true;
-  }
+  if (begin->as._int < 0)
+    begin->as._int = 0;
+
+  if (begin->as._int > len->as._int)
+    begin->as._int = len->as._int;
+
+  if (end->as._int > len->as._int)
+    end->as._int = len->as._int;
+
+  if (end->as._int < begin->as._int)
+    end->as._int = begin->as._int;
 
   if (value->kind == ValueKindList) {
     ListNode *node = value->as.list->next;
@@ -154,7 +230,7 @@ bool get_range_intrinsic(Vm *vm) {
     value_stack_push_list(&vm->stack, vm->rc_arena, sub_list);
   } else {
     Str sub_string = {
-      value->as.string.str.ptr + begin->as._int,
+      value->as.string.ptr + begin->as._int,
       end->as._int - begin->as._int,
     };
 
@@ -242,7 +318,7 @@ bool fold_intrinsic(Vm *vm) {
 bool str_to_int_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
 
-  value_stack_push_int(&vm->stack, vm->rc_arena, str_to_i64(value->as.string.str));
+  value_stack_push_int(&vm->stack, vm->rc_arena, str_to_i64(value->as.string));
 
   return true;
 }
@@ -250,7 +326,7 @@ bool str_to_int_intrinsic(Vm *vm) {
 bool str_to_float_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
 
-  value_stack_push_float(&vm->stack, vm->rc_arena, str_to_f64(value->as.string.str));
+  value_stack_push_float(&vm->stack, vm->rc_arena, str_to_f64(value->as.string));
 
   return true;
 }
@@ -391,8 +467,8 @@ bool add_intrinsic(Vm *vm) {
   } else if (a->kind == ValueKindString &&
              b->kind == ValueKindString) {
     StringBuilder sb = {0};
-    sb_push_str(&sb, a->as.string.str);
-    sb_push_str(&sb, b->as.string.str);
+    sb_push_str(&sb, a->as.string);
+    sb_push_str(&sb, b->as.string);
 
     Str new_string;
     new_string.len = sb.len;
@@ -464,7 +540,7 @@ bool mul_intrinsic(Vm *vm) {
   } else if (a->kind == ValueKindString) {
     StringBuilder sb = {0};
     for (u32 i = 0; i < b->as._int; ++i)
-      sb_push_str(&sb, a->as.string.str);
+      sb_push_str(&sb, a->as.string);
 
     Str result = {
       rc_arena_alloc(vm->rc_arena, sb.len),
@@ -618,30 +694,6 @@ bool not_intrinsic(Vm *vm) {
   return true;
 }
 
-bool logical_and_intrinsic(Vm *vm) {
-  Value *b = value_stack_pop(&vm->stack);
-  Value *a = value_stack_pop(&vm->stack);
-
-  if (!value_to_bool(a))
-    value_stack_push_bool(&vm->stack, vm->rc_arena, false);
-  else
-    value_stack_push_bool(&vm->stack, vm->rc_arena, value_to_bool(b));
-
-  return true;
-}
-
-bool logical_or_intrinsic(Vm *vm) {
-  Value *b = value_stack_pop(&vm->stack);
-  Value *a = value_stack_pop(&vm->stack);
-
-  if (value_to_bool(a))
-    value_stack_push_bool(&vm->stack, vm->rc_arena, true);
-  else
-    value_stack_push_bool(&vm->stack, vm->rc_arena, value_to_bool(b));
-
-  return true;
-}
-
 bool type_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
 
@@ -771,7 +823,7 @@ static void print_value(ValueStack *stack, Value *value, u32 level) {
   } break;
 
   case ValueKindString: {
-    str_print(value->as.string.str);
+    str_print(value->as.string);
   } break;
 
   case ValueKindInt: {
@@ -825,6 +877,13 @@ static void print_value(ValueStack *stack, Value *value, u32 level) {
 bool print_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
   print_value(&vm->stack, value, 0);
+
+  return true;
+}
+
+bool flush_intrinsic(Vm *vm) {
+  (void) vm;
+
   fflush(stdout);
 
   return true;
@@ -880,7 +939,7 @@ static Value *get_dict_field_value(Dict *dict, Str name) {
     DictValue *field = dict->items + i;
 
     if (field->key->kind == ValueKindString &&
-        str_eq(field->key->as.string.str, name))
+        str_eq(field->key->as.string, name))
       return field->value;
   }
 
@@ -910,14 +969,12 @@ bool compile_intrinsic(Vm *vm) {
     if (!file_path || file_path->kind != ValueKindString)
       PANIC("compile: wrong argument kind\n");
 
-    char *file_path_cstr = malloc(file_path->as.string.str.len + 1);
-    memcpy(file_path_cstr, file_path->as.string.str.ptr,
-           file_path->as.string.str.len);
-    file_path_cstr[file_path->as.string.str.len] = '\0';
+    char *file_path_cstr = malloc(file_path->as.string.len + 1);
+    memcpy(file_path_cstr, file_path->as.string.ptr,
+           file_path->as.string.len);
+    file_path_cstr[file_path->as.string.len] = '\0';
 
-    //IrBlock block = parse(code->as.string.str, file_path_cstr);
-
-    IrBlock block = parse_ex(code->as.string.str, file_path_cstr,
+    IrBlock block = parse_ex(code->as.string, file_path_cstr,
                              &macros, &included_files);
     expand_macros_block(&block, &macros, NULL, NULL, false);
 
@@ -941,8 +998,8 @@ bool compile_intrinsic(Vm *vm) {
 bool eval_compiled_intrinsic(Vm *vm) {
   Value *bytecode = value_stack_pop(&vm->stack);
 
-  Ir ir = deserialize((u8 *) bytecode->as.string.str.ptr,
-                       bytecode->as.string.str.len,
+  Ir ir = deserialize((u8 *) bytecode->as.string.ptr,
+                       bytecode->as.string.len,
                        vm->rc_arena);
 
   i32 argc = 1;
@@ -959,7 +1016,7 @@ bool eval_compiled_intrinsic(Vm *vm) {
 bool eval_intrinsic(Vm *vm) {
   Value *code = value_stack_pop(&vm->stack);
 
-  Ir ir = parse(code->as.string.str, "eval");
+  Ir ir = parse(code->as.string, "eval");
 
   i32 argc = 1;
   char *argv[] = { "aether", "eval", NULL };
@@ -984,9 +1041,18 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("head"), true, 1, { ValueKindList }, &head_intrinsic },
   { STR_LIT("tail"), true, 1, { ValueKindList }, &tail_intrinsic },
   { STR_LIT("last"), true, 1, { ValueKindList }, &last_intrinsic },
-  { STR_LIT("nth"), true, 2, { ValueKindList, ValueKindInt }, &nth_intrinsic },
-  { STR_LIT("nth"), true, 2, { ValueKindString, ValueKindInt }, &nth_intrinsic },
-  { STR_LIT("at"), true, 2, { ValueKindDict, ValueKindUnit }, &at_intrinsic },
+  { STR_LIT("get-at"), true, 2, { ValueKindList, ValueKindInt }, &get_at_intrinsic },
+  { STR_LIT("get-at"), true, 2, { ValueKindString, ValueKindInt }, &get_at_intrinsic },
+  { STR_LIT("get-at"), true, 2, { ValueKindDict, ValueKindUnit }, &get_at_intrinsic },
+  { STR_LIT("set-at"), false, 3,
+    { ValueKindList, ValueKindInt, ValueKindUnit },
+    &set_at_intrinsic },
+  { STR_LIT("set-at"), false, 3,
+    { ValueKindString, ValueKindInt, ValueKindString },
+    &set_at_intrinsic },
+  { STR_LIT("set-at"), false, 3,
+    { ValueKindDict, ValueKindUnit, ValueKindUnit },
+    &set_at_intrinsic },
   { STR_LIT("len"), true, 1, { ValueKindList }, &len_intrinsic },
   { STR_LIT("len"), true, 1, { ValueKindString }, &len_intrinsic },
   { STR_LIT("get-range"), true, 3,
@@ -1056,9 +1122,6 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("and"), true, 2, { ValueKindInt, ValueKindInt }, &xor_intrinsic },
   { STR_LIT("and"), true, 2, { ValueKindBool, ValueKindBool }, &xor_intrinsic },
   { STR_LIT("not"), true, 1, { ValueKindUnit }, &not_intrinsic },
-  // Logical
-  { STR_LIT("logical-and"), true, 2, { ValueKindUnit, ValueKindUnit }, &logical_and_intrinsic },
-  { STR_LIT("logical-or"), true, 2, { ValueKindUnit, ValueKindUnit }, &logical_or_intrinsic },
   // Types
   { STR_LIT("type"), true, 1, { ValueKindUnit }, &type_intrinsic },
   { STR_LIT("is-unit"), true, 1, { ValueKindUnit }, &is_unit_intrinsic },
@@ -1071,6 +1134,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("is-dict"), true, 1, { ValueKindUnit }, &is_dict_intrinsic },
   // Base io
   { STR_LIT("print"), false, 1, { ValueKindUnit }, &print_intrinsic },
+  { STR_LIT("flush"), false, 0, {}, &flush_intrinsic },
   { STR_LIT("input-size"), true, 1, { ValueKindInt }, &input_size_intrinsic },
   { STR_LIT("input"), true, 0, {}, &input_intrinsic },
   // Other

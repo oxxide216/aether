@@ -77,7 +77,7 @@ bool iui_main_loop_intrinsic(Vm *vm) {
   Value *title = value_stack_pop(&vm->stack);
 
   iui.winx = winx_init();
-  iui.window = winx_init_window(&iui.winx, title->as.string.str,
+  iui.window = winx_init_window(&iui.winx, title->as.string,
                                 width->as._int, height->as._int,
                                 WinxGraphicsModeOpenGL,
                                 NULL);
@@ -160,7 +160,7 @@ bool iui_button_intrinsic(Vm *vm) {
   Value *text = value_stack_pop(&vm->stack);
 
   IuiWidget *button = iui_widgets_push_button(&iui.widgets,
-                                              text->as.string.str,
+                                              text->as.string,
                                               on_click->as.func);
 
   for (u32 i = 0; i < iui.events.len; ++i) {
@@ -194,7 +194,7 @@ bool iui_text_intrinsic(Vm *vm) {
   Value *center_x = value_stack_pop(&vm->stack);
   Value *text = value_stack_pop(&vm->stack);
 
-  iui_widgets_push_text(&iui.widgets, text->as.string.str,
+  iui_widgets_push_text(&iui.widgets, text->as.string,
                         center_x->as._bool, center_y->as._bool,
                         left_padding->as._float);
 
@@ -206,7 +206,7 @@ bool iui_input_intrinsic(Vm *vm) {
   Value *left_padding = value_stack_pop(&vm->stack);
   Value *placeholder = value_stack_pop(&vm->stack);
 
-  IuiWidget *input = iui_widgets_push_input(&iui.widgets, placeholder->as.string.str,
+  IuiWidget *input = iui_widgets_push_input(&iui.widgets, placeholder->as.string,
                                             left_padding->as._float, on_submit->as.func);
 
   for (u32 i = 0; i < iui.events.len; ++i) {

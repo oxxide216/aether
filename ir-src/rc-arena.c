@@ -14,6 +14,7 @@ void *rc_arena_alloc(RcArena *arena, u32 size) {
       ++region->refs_count;
       void *ptr = region->data + region->len;
       region->len += size;
+
       return ptr;
     }
 

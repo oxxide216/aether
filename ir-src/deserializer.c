@@ -2,59 +2,59 @@
 #include "shl/shl-log.h"
 #include "shl/shl-arena.h"
 
-static void get_in_block_data_size(u8 *data, u32 *size);
+static void get_block_data_size(u8 *data, u32 *size);
 
-static void get_in_str_data_size(u8 *data, u32 *size) {
+static void get_str_data_size(u8 *data, u32 *size) {
   u32 len = *(u32 *) (data + *size);
   *size += sizeof(u32) + len * sizeof(char);
 }
 
-static void get_in_expr_data_size(u8 *data, u32 *size) {
+static void get_expr_data_size(u8 *data, u32 *size) {
   IrExprKind kind = *(IrExprKind *) (data + *size);
   *size += sizeof(IrExprKind);
 
   switch (kind) {
   case IrExprKindBlock: {
-    get_in_block_data_size(data, size);
+    get_block_data_size(data, size);
   } break;
 
   case IrExprKindFuncCall: {
-    get_in_expr_data_size(data, size);
-    get_in_block_data_size(data, size);
+    get_expr_data_size(data, size);
+    get_block_data_size(data, size);
   } break;
 
   case IrExprKindVarDef: {
-    get_in_str_data_size(data, size);
-    get_in_expr_data_size(data, size);
+    get_str_data_size(data, size);
+    get_expr_data_size(data, size);
   } break;
 
   case IrExprKindIf: {
-    get_in_expr_data_size(data, size);
-    get_in_block_data_size(data, size);
+    get_expr_data_size(data, size);
+    get_block_data_size(data, size);
 
     u32 elifs_len = *(u32 *) (data + *size);
     *size += sizeof(u32);
 
     for (u32 i = 0; i < elifs_len; ++i) {
-      get_in_expr_data_size(data, size);
-      get_in_block_data_size(data, size);
+      get_expr_data_size(data, size);
+      get_block_data_size(data, size);
     }
 
     bool has_else = *(bool *) (data + *size);
     *size += sizeof(bool);
 
     if (has_else)
-      get_in_block_data_size(data, size);
+      get_block_data_size(data, size);
   } break;
 
   case IrExprKindWhile: {
-    get_in_expr_data_size(data, size);
-    get_in_block_data_size(data, size);
+    get_expr_data_size(data, size);
+    get_block_data_size(data, size);
   } break;
 
   case IrExprKindSet: {
-    get_in_expr_data_size(data, size);
-    get_in_expr_data_size(data, size);
+    get_str_data_size(data, size);
+    get_expr_data_size(data, size);
   } break;
 
   case IrExprKindRet: {
@@ -62,16 +62,16 @@ static void get_in_expr_data_size(u8 *data, u32 *size) {
     *size += sizeof(bool);
 
     if (has_expr)
-      get_in_expr_data_size(data, size);
+      get_expr_data_size(data, size);
   } break;
 
   case IrExprKindList: {
-    get_in_block_data_size(data, size);
+    get_block_data_size(data, size);
   } break;
 
   case IrExprKindIdent:
   case IrExprKindString: {
-    get_in_str_data_size(data, size);
+    get_str_data_size(data, size);
   } break;
 
   case IrExprKindInt: {
@@ -90,8 +90,8 @@ static void get_in_expr_data_size(u8 *data, u32 *size) {
     u32 len = *(u32 *) (data + *size);
     *size += sizeof(u32) + len * sizeof(Str);
 
-    get_in_block_data_size(data, size);
-    get_in_str_data_size(data, size);
+    get_block_data_size(data, size);
+    get_str_data_size(data, size);
   } break;
 
   case IrExprKindDict: {
@@ -99,25 +99,25 @@ static void get_in_expr_data_size(u8 *data, u32 *size) {
     *size += sizeof(u32);
 
     for (u32 i = 0; i < len; ++i) {
-      get_in_str_data_size(data, size);
-      get_in_expr_data_size(data, size);
+      get_str_data_size(data, size);
+      get_expr_data_size(data, size);
     }
 
-    get_in_str_data_size(data, size);
+    get_str_data_size(data, size);
   } break;
 
   case IrExprKindSelfCall: {
-    get_in_block_data_size(data, size);
+    get_block_data_size(data, size);
   } break;
   }
 }
 
-static void get_in_block_data_size(u8 *data, u32 *size) {
+static void get_block_data_size(u8 *data, u32 *size) {
   u32 len = *(u32 *) (data + *size);
   *size += sizeof(u32);
 
   for (u32 i = 0; i < len; ++i)
-    get_in_expr_data_size(data, size);
+    get_expr_data_size(data, size);
 }
 
 static void load_block_data(IrBlock *block, u8 *data, u32 *end, RcArena *rc_arena);
@@ -190,10 +190,9 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
   } break;
 
   case IrExprKindSet: {
-    expr->as.set.dest = aalloc(sizeof(IrExpr));
     expr->as.set.src = aalloc(sizeof(IrExpr));
 
-    load_expr_data(expr->as.set.dest, data, end, rc_arena);
+    load_str_data(&expr->as.set.dest, data, end, rc_arena);
     load_expr_data(expr->as.set.src, data, end, rc_arena);
   } break;
 

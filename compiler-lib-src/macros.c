@@ -41,7 +41,6 @@ static void clone_expr(IrExpr **expr) {
   } break;
 
   case IrExprKindSet: {
-    clone_expr(&new_expr->as.set.dest);
     clone_expr(&new_expr->as.set.src);
   } break;
 
@@ -146,8 +145,15 @@ static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names, IrArgs *new_a
   } break;
 
   case IrExprKindSet: {
-    rename_args_expr(expr->as.set.dest, prev_arg_names, new_arg_names);
     rename_args_expr(expr->as.set.src, prev_arg_names, new_arg_names);
+
+    for (u32 i = 0; i < prev_arg_names->len; ++i) {
+      if (str_eq(expr->as.set.dest, prev_arg_names->items[i])) {
+        expr->as.set.dest = new_arg_names->items[i];
+
+        break;
+      }
+    }
   } break;
 
   case IrExprKindList: {
@@ -241,6 +247,10 @@ static bool try_inline_macro_arg(IrExpr **expr, IrArgs *arg_names,
 
   if ((*expr)->kind == IrExprKindVarDef) {
     try_replace_macro_arg_ident(&(*expr)->as.var_def.name, arg_names, args);
+
+    return false;
+  } else if ((*expr)->kind == IrExprKindSet) {
+    try_replace_macro_arg_ident(&(*expr)->as.set.dest, arg_names, args);
 
     return false;
   }
@@ -373,7 +383,6 @@ void expand_macros(IrExpr *expr, Macros *macros,
   } break;
 
   case IrExprKindSet: {
-    INLINE_THEN_EXPAND(expr->as.set.dest);
     INLINE_THEN_EXPAND(expr->as.set.src);
   } break;
 

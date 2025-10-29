@@ -47,11 +47,6 @@ typedef enum {
   ValueKindFunc,
 } ValueKind;
 
-typedef struct {
-  Str  str;
-  Str *begin;
-} String;
-
 typedef struct ListNode ListNode;
 
 typedef struct DictValue DictValue;
@@ -71,7 +66,7 @@ typedef struct {
 
 typedef union {
   ListNode *list;
-  String    string;
+  Str       string;
   i64       _int;
   f64       _float;
   bool      _bool;
@@ -147,7 +142,7 @@ void      list_use(RcArena *rc_arena, ListNode *list);
 ListNode *list_clone(RcArena *rc_arena, ListNode *list);
 Dict      dict_clone(RcArena *rc_arena, Dict *dict);
 
-void value_stack_push_unit(ValueStack *stack);
+void value_stack_push_unit(ValueStack *stack, RcArena *rc_arena);
 void value_stack_push_list(ValueStack *stack, RcArena *rc_arena, ListNode *list);
 void value_stack_push_string(ValueStack *stack, RcArena *rc_arena, Str string);
 void value_stack_push_int(ValueStack *stack, RcArena *rc_arena, i64 _int);

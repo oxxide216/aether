@@ -42,11 +42,9 @@ static char *token_names[] = {
   "while",
   "use",
   "set",
-  "get",
   "field",
   "ret",
   "import",
-  "set-in",
   "`(`",
   "`)`",
   "`[`",
@@ -556,7 +554,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     parser_next_token(parser);
 
     expr->kind = IrExprKindSet;
-    expr->as.set.dest = parser_parse_expr(parser);
+    expr->as.set.dest = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
     expr->as.set.src = parser_parse_expr(parser);
 
     parser_expect_token(parser, MASK(TT_CPAREN));

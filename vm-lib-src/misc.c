@@ -13,7 +13,7 @@ bool value_to_bool(Value *value) {
   else if (value->kind == ValueKindList)
     return value->as.list->next != NULL;
   else if (value->kind == ValueKindString)
-    return value->as.string.str.len != 0;
+    return value->as.string.len != 0;
   else if (value->kind == ValueKindInt)
     return value->as._int != 0;
   else if (value->kind == ValueKindFloat)
@@ -34,9 +34,7 @@ void dict_push_value_str_key(RcArena *rc_arena, Dict *dict,
   Value *string = rc_arena_alloc(rc_arena, sizeof(Value));
   *string = (Value) {
     ValueKindString,
-    {
-      .string = { key, (Str *) key.ptr },
-    },
+    { .string = key },
     0,
   };
   DictValue dict_value = { string, value };

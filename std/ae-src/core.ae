@@ -2,8 +2,10 @@
 (let head [list] -> import 'head')
 (let tail [list] -> import 'tail')
 (let last [list] -> import 'last')
-(let nth [list index] -> import 'nth')
-(let at [dict key] -> import 'at')
+(let get-nth [collection index] -> import 'get-nth')
+(let set-nth [collection index value] -> import 'set-nth')
+(let get-at [dict key] -> import 'get-at')
+(let set-at [dict key value] -> import 'set-at')
 (let len [collection] -> import 'len')
 (let get-range [list begin end] -> import 'get-range')
 (let map [func list] -> import 'map')
@@ -44,10 +46,6 @@
 (let binary-or [a b] -> import 'or')
 (let binary-xor [a b] -> import 'xor')
 (let not [value] -> import 'not')
-
-; Logical
-(let logical-and [a b] -> import 'logical-and')
-(let logical-or [a b] -> import 'logical-or')
 
 ; Types
 (let type [value] -> import 'type')
@@ -97,12 +95,6 @@
 (macro xor [...args] ->
   (fold-op binary-xor [args]))
 
-(macro land [...args] ->
-  (fold-op logical-and [args]))
-
-(macro lor [...args] ->
-  (fold-op logical-or [args]))
-
 (macro for [element in list ...body] ->
   (let -list list)
   (while -list
@@ -112,7 +104,8 @@
 
 (let printf [args] ->
   (for arg in args
-    (print-raw arg)))
+    (print-raw arg))
+  (flush))
 
 (macro print [...args] ->
   (printf [args]))

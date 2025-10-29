@@ -15,7 +15,7 @@ bool create_server_intrinsic(Vm *vm) {
 
   i32 server_socket = socket(AF_INET, SOCK_STREAM, 0);
   if (server_socket < 0) {
-    value_stack_push_unit(&vm->stack);
+    value_stack_push_unit(&vm->stack, vm->rc_arena);
     return true;
   }
 
@@ -32,12 +32,12 @@ bool create_server_intrinsic(Vm *vm) {
 
   if (bind(server_socket, (struct sockaddr*) &address,
            sizeof(address)) < 0) {
-    value_stack_push_unit(&vm->stack);
+    value_stack_push_unit(&vm->stack, vm->rc_arena);
     return true;
   }
 
   if (listen(server_socket, 3) < 0) {
-    value_stack_push_unit(&vm->stack);
+    value_stack_push_unit(&vm->stack, vm->rc_arena);
     return true;
   }
 
@@ -52,7 +52,7 @@ bool create_client_intrinsic(Vm *vm) {
 
   i32 client_socket = socket(AF_INET, SOCK_STREAM, 0);
   if (client_socket < 0) {
-    value_stack_push_unit(&vm->stack);
+    value_stack_push_unit(&vm->stack, vm->rc_arena);
 
     return true;
   }
@@ -64,16 +64,16 @@ bool create_client_intrinsic(Vm *vm) {
   server_address.sin_family = AF_INET;
   server_address.sin_port = htons(port->as._int);
 
-  char *server_ip_address_cstr = malloc(server_ip_address->as.string.str.len + 1);
+  char *server_ip_address_cstr = malloc(server_ip_address->as.string.len + 1);
   memcpy(server_ip_address_cstr,
-         server_ip_address->as.string.str.ptr,
-         server_ip_address->as.string.str.len);
-  server_ip_address_cstr[server_ip_address->as.string.str.len] = '\0';
+         server_ip_address->as.string.ptr,
+         server_ip_address->as.string.len);
+  server_ip_address_cstr[server_ip_address->as.string.len] = '\0';
 
   if (inet_pton(AF_INET,
                 server_ip_address_cstr,
                 &server_address.sin_addr) < 0) {
-    value_stack_push_unit(&vm->stack);
+    value_stack_push_unit(&vm->stack, vm->rc_arena);
 
     free(server_ip_address_cstr);
     return true;
@@ -83,7 +83,7 @@ bool create_client_intrinsic(Vm *vm) {
                           (struct sockaddr*) &server_address,
                           sizeof(server_address));
   if (connected < 0 && errno != EINPROGRESS) {
-    value_stack_push_unit(&vm->stack);
+    value_stack_push_unit(&vm->stack, vm->rc_arena);
 
     free(server_ip_address_cstr);
     return true;
@@ -109,7 +109,7 @@ bool accept_connection_intrinsic(Vm *vm) {
                              (struct sockaddr*) &address,
                              &address_size);
   if (client_socket < 0) {
-    value_stack_push_unit(&vm->stack);
+    value_stack_push_unit(&vm->stack, vm->rc_arena);
 
     return true;
   }
@@ -134,8 +134,8 @@ bool send_intrinsic(Vm *vm) {
   Value *message = value_stack_pop(&vm->stack);
   Value *receiver = value_stack_pop(&vm->stack);
 
-  send(receiver->as._int, message->as.string.str.ptr,
-       message->as.string.str.len, 0);
+  send(receiver->as._int, message->as.string.ptr,
+       message->as.string.len, 0);
 
   return true;
 }
@@ -181,7 +181,7 @@ bool receive_intrinsic(Vm *vm) {
 
   if (buffer.len == 0) {
     rc_arena_free(vm->rc_arena, buffer.ptr);
-    value_stack_push_unit(&vm->stack);
+    value_stack_push_unit(&vm->stack, vm->rc_arena);
 
     return true;
   }

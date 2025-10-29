@@ -7,8 +7,6 @@
 
 typedef Da(Str) Strs;
 
-static Value unit_value = (Value) { ValueKindUnit, {}, 0 };
-
 void list_use(RcArena *rc_arena, ListNode *list) {
   while (list) {
     rc_arena_clone(rc_arena, list);
@@ -42,14 +40,18 @@ Dict dict_clone(RcArena *rc_arena, Dict *dict) {
     dict->len,
   };
 
-  for (u32 i = 0; i < copy.len; ++i)
+  for (u32 i = 0; i < copy.len; ++i) {
+    copy.items[i].key = value_clone(rc_arena, dict->items[i].key);
     copy.items[i].value = value_clone(rc_arena, dict->items[i].value);
+  }
 
   return copy;
 }
 
-void value_stack_push_unit(ValueStack *stack) {
-  DA_APPEND(*stack, &unit_value);
+void value_stack_push_unit(ValueStack *stack, RcArena *rc_arena) {
+  Value *value = rc_arena_alloc(rc_arena, sizeof(Value));
+  value->kind = ValueKindUnit;
+  DA_APPEND(*stack, value);
 }
 
 void value_stack_push_list(ValueStack *stack, RcArena *rc_arena, ListNode *nodes) {
@@ -62,7 +64,7 @@ void value_stack_push_string(ValueStack *stack, RcArena *rc_arena, Str string) {
   Value *value = rc_arena_alloc(rc_arena, sizeof(Value));
   *value = (Value) {
     ValueKindString,
-    { .string = { { string.ptr, string.len }, (Str *) string.ptr } },
+    { .string = string },
     0,
   };
   DA_APPEND(*stack, value);
@@ -95,7 +97,9 @@ void value_stack_push_dict(ValueStack *stack, RcArena *rc_arena, Dict dict) {
 Value *value_stack_pop(ValueStack *stack) {
   if (stack->len > 0)
     return stack->items[--stack->len];
-  return &unit_value;
+
+  ERROR("Not enough values on the stack\n");
+  exit(1);
 }
 
 Value *value_clone(RcArena *rc_arena, Value *value) {
@@ -107,17 +111,11 @@ Value *value_clone(RcArena *rc_arena, Value *value) {
     copy->as.list = rc_arena_alloc(rc_arena, sizeof(ListNode));
     copy->as.list->next = list_clone(rc_arena, value->as.list->next);
   } else if (value->kind == ValueKindString) {
-    copy->as.string.str.ptr = rc_arena_alloc(rc_arena, value->as.string.str.len);
-    copy->as.string.str.len = value->as.string.str.len;
-    memcpy(copy->as.string.str.ptr, value->as.string.str.ptr, copy->as.string.str.len);
-    copy->as.string.begin = (Str *)(copy->as.string.str.ptr +
-                                    (u64) (char *) value->as.string.begin -
-                                    (u64) value->as.string.str.ptr);
+    copy->as.string.len = value->as.string.len;
+    copy->as.string.ptr = rc_arena_alloc(rc_arena, copy->as.string.len);
+    memcpy(copy->as.string.ptr, value->as.string.ptr, copy->as.string.len);
   } else if (value->kind == ValueKindDict) {
-    for (u32 i = 0; i < value->as.dict.len; ++i) {
-      value_clone(rc_arena, value->as.dict.items[i].key);
-      value_clone(rc_arena, value->as.dict.items[i].value);
-    }
+    copy->as.dict = dict_clone(rc_arena, &value->as.dict);
   }
 
   return copy;
@@ -136,15 +134,19 @@ void value_free(Value *value, RcArena *rc_arena, bool free_ptr) {
         rc_arena_free(rc_arena, node);
         node = next_node;
       }
-      rc_arena_free(rc_arena, value->as.list);
+
+      if (!value->as.list->is_static)
+        rc_arena_free(rc_arena, value->as.list);
     } else if (value->kind == ValueKindString) {
-      rc_arena_free(rc_arena, value->as.string.begin);
+      rc_arena_free(rc_arena, value->as.string.ptr);
     } else if (value->kind == ValueKindDict) {
-      for (u32 i = 0; i < value->as.dict.len; ++i)
+      for (u32 i = 0; i < value->as.dict.len; ++i) {
+        value_free(value->as.dict.items[i].key, rc_arena, true);
         value_free(value->as.dict.items[i].value, rc_arena, true);
+      }
     }
 
-    if (free_ptr && value->kind != ValueKindUnit)
+    if (free_ptr)
       rc_arena_free(rc_arena, value);
   }
 }
@@ -174,7 +176,7 @@ bool value_eq(Value *a, Value *b) {
   }
 
   case ValueKindString: {
-    return str_eq(a->as.string.str, b->as.string.str);
+    return str_eq(a->as.string, b->as.string);
   }
 
   case ValueKindInt: {
@@ -281,7 +283,6 @@ static ExecState catch_vars(Vm *vm, Strs *local_names,
   } break;
 
   case IrExprKindSet: {
-    CATCH_VARS(vm, local_names, catched_values, expr->as.set.dest);
     CATCH_VARS(vm, local_names, catched_values, expr->as.set.src);
   } break;
 
@@ -372,6 +373,7 @@ ExecState execute_func(Vm *vm, Func *func, bool value_expected) {
     if (!intrinsic) {
       ERROR("Intrinsic `"STR_FMT"` with such signature was not found\n",
             STR_ARG(func->intrinsic_name));
+      vm->exit_code = 1;
       return ExecStateExit;
     }
 
@@ -379,7 +381,7 @@ ExecState execute_func(Vm *vm, Func *func, bool value_expected) {
       return ExecStateExit;
 
     if (value_expected && !intrinsic->has_return_value)
-      value_stack_push_unit(&vm->stack);
+      value_stack_push_unit(&vm->stack, vm->rc_arena);
     else if (!value_expected && intrinsic->has_return_value)
       --vm->stack.len;
 
@@ -447,6 +449,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Value *func_value = value_stack_pop(&vm->stack);
     if (func_value->kind != ValueKindFunc) {
       ERROR("Value is not callable\n");
+      vm->exit_code = 1;
       return ExecStateExit;
     }
 
@@ -454,6 +457,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       ERROR("Wrong arguments count: %u, expected %u\n",
             expr->as.func_call.args.len,
             func_value->as.func.args.len);
+      vm->exit_code = 1;
       return ExecStateExit;
     }
 
@@ -465,25 +469,26 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
   case IrExprKindVarDef: {
     EXECUTE_EXPR(vm, expr->as.var_def.expr, true);
+    Value *value = value_stack_pop(&vm->stack);
+    ++value->refs_count;
 
     Var *prev_var = get_var(vm, expr->as.var_def.name);
     if (prev_var) {
-      value_free(prev_var->value, vm->rc_arena, true);
-      prev_var->value = value_stack_pop(&vm->stack);
-
-      ++prev_var->value->refs_count;
+      if (prev_var->value != value) {
+        value_free(prev_var->value, vm->rc_arena, true);
+        prev_var->value = value;
+      }
 
       if (value_expected)
-        value_stack_push_unit(&vm->stack);
+        value_stack_push_unit(&vm->stack, vm->rc_arena);
 
       break;
     }
 
     Var var = {0};
     var.name = expr->as.var_def.name;
-    var.value = value_stack_pop(&vm->stack);
+    var.value = value;
     var.is_global = !vm->is_inside_of_func;
-    ++var.value->refs_count;
 
     if (var.is_global)
       DA_APPEND(vm->global_vars, var);
@@ -491,7 +496,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       DA_APPEND(vm->local_vars, var);
 
     if (value_expected)
-      value_stack_push_unit(&vm->stack);
+      value_stack_push_unit(&vm->stack, vm->rc_arena);
   } break;
 
   case IrExprKindIf: {
@@ -520,7 +525,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       if (expr->as._if.has_else)
         EXECUTE_BLOCK(vm, &expr->as._if.else_body, value_expected);
       else
-        value_stack_push_unit(&vm->stack);
+        value_stack_push_unit(&vm->stack, vm->rc_arena);
     }
   } break;
 
@@ -536,32 +541,32 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     }
 
     if (value_expected)
-      value_stack_push_unit(&vm->stack);
+      value_stack_push_unit(&vm->stack, vm->rc_arena);
   } break;
 
   case IrExprKindSet: {
-    EXECUTE_EXPR(vm, expr->as.set.dest, true);
-    Value *dest = value_stack_pop(&vm->stack);
+    Var *dest_var = get_var(vm, expr->as.set.dest);
 
     EXECUTE_EXPR(vm, expr->as.set.src, true);
     Value *src = value_stack_pop(&vm->stack);
 
-    if (dest->refs_count == 0 || dest == src)
+    if (dest_var->value == src)
       break;
 
-    value_free(dest, vm->rc_arena, false);
+    value_free(dest_var->value, vm->rc_arena, false);
 
     if (src->refs_count == 0) {
-      *dest = *src;
+      *dest_var->value = *src;
       rc_arena_free(vm->rc_arena, src);
     } else {
-      *dest = *value_clone(vm->rc_arena, src);
+      Value *new_value = value_clone(vm->rc_arena, src);
+      *dest_var->value = *new_value;
+      rc_arena_free(vm->rc_arena, new_value);
     }
-
-    dest->refs_count = 1;
+    dest_var->value->refs_count = 1;
 
     if (value_expected)
-      value_stack_push_unit(&vm->stack);
+      value_stack_push_unit(&vm->stack, vm->rc_arena);
   } break;
 
   case IrExprKindRet: {
@@ -603,7 +608,8 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     Var *var = get_var(vm, expr->as.ident.ident);
     if (var) {
-      DA_APPEND(vm->stack, var->value);
+      Value *copy = value_clone(vm->rc_arena, var->value);
+      DA_APPEND(vm->stack, copy);
 
       return ExecStateContinue;
     }
@@ -744,7 +750,7 @@ u32 execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena,
     new_arg->value = rc_arena_alloc(rc_arena, sizeof(Value));
     *new_arg->value = (Value) {
       ValueKindString,
-      { .string = { { buffer, len }, (Str *) buffer } },
+      { .string = { buffer, len } },
       0,
     };
     new_arg->is_static = true;

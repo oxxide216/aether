@@ -60,7 +60,7 @@ typedef struct {
 } IrExprWhile;
 
 typedef struct {
-  IrExpr *dest;
+  Str     dest;
   IrExpr *src;
 } IrExprSet;
 

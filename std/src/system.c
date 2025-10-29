@@ -5,9 +5,9 @@
 bool run_command_intrinsic(Vm *vm) {
   Value *path = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path->as.string.str.len + 1);
-  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
-  path_cstring[path->as.string.str.len] = '\0';
+  char *path_cstring = malloc(path->as.string.len + 1);
+  memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
+  path_cstring[path->as.string.len] = '\0';
 
   value_stack_push_int(&vm->stack, vm->rc_arena, system(path_cstring));
 

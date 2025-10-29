@@ -24,9 +24,9 @@ bool block_input_intrinsic(Vm *vm) {
 bool file_exists_intrinsic(Vm *vm) {
   Value *path = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path->as.string.str.len + 1);
-  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
-  path_cstring[path->as.string.str.len] = '\0';
+  char *path_cstring = malloc(path->as.string.len + 1);
+  memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
+  path_cstring[path->as.string.len] = '\0';
 
   value_stack_push_bool(&vm->stack, vm->rc_arena, access(path_cstring, F_OK) == 0);
 
@@ -38,13 +38,13 @@ bool file_exists_intrinsic(Vm *vm) {
 bool read_file_intrinsic(Vm *vm) {
   Value *path = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path->as.string.str.len + 1);
-  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
-  path_cstring[path->as.string.str.len] = '\0';
+  char *path_cstring = malloc(path->as.string.len + 1);
+  memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
+  path_cstring[path->as.string.len] = '\0';
 
   Str content = read_file(path_cstring);
   if (content.len == (u32) -1)
-    value_stack_push_unit(&vm->stack);
+    value_stack_push_unit(&vm->stack, vm->rc_arena);
   else
     value_stack_push_string(&vm->stack, vm->rc_arena, content);
 
@@ -57,11 +57,11 @@ bool write_file_intrinsic(Vm *vm) {
   Value *path = value_stack_pop(&vm->stack);
   Value *content = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path->as.string.str.len + 1);
-  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
-  path_cstring[path->as.string.str.len] = '\0';
+  char *path_cstring = malloc(path->as.string.len + 1);
+  memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
+  path_cstring[path->as.string.len] = '\0';
 
-  write_file(path_cstring, content->as.string.str);
+  write_file(path_cstring, content->as.string);
 
   free(path_cstring);
 
@@ -71,9 +71,9 @@ bool write_file_intrinsic(Vm *vm) {
 bool delete_file_intrinsic(Vm *vm) {
   Value *path = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path->as.string.str.len + 1);
-  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
-  path_cstring[path->as.string.str.len] = '\0';
+  char *path_cstring = malloc(path->as.string.len + 1);
+  memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
+  path_cstring[path->as.string.len] = '\0';
 
   remove(path_cstring);
 
@@ -88,9 +88,9 @@ bool list_directory_intrinsic(Vm *vm) {
   ListNode *list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
   ListNode *list_end = list;
 
-  char *path_cstring = malloc(path->as.string.str.len + 1);
-  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
-  path_cstring[path->as.string.str.len] = '\0';
+  char *path_cstring = malloc(path->as.string.len + 1);
+  memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
+  path_cstring[path->as.string.len] = '\0';
 
   DIR *dir = opendir(path_cstring);
   if (dir) {
@@ -106,7 +106,7 @@ bool list_directory_intrinsic(Vm *vm) {
       list_end = list_end->next;
       list_end->value = rc_arena_alloc(vm->rc_arena, sizeof(Value));
       list_end->value->kind = ValueKindString;
-      list_end->value->as.string = (String) { path, (Str *) path.ptr };
+      list_end->value->as.string = path;
     }
 
     closedir(dir);

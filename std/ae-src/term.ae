@@ -1,13 +1,11 @@
-(let term/keys {
-  'up':        '\e[A'
-  'down':      '\e[B'
-  'right':     '\e[C'
-  'left':      '\e[D'
-  'enter':     '\n'
-  'escape':    '\e'
-  'backspace': (byte-8-to-str 127)
-  'delete':    '\e[P'
-})
+(let term/up        '\e[A')
+(let term/down      '\e[B')
+(let term/right     '\e[C')
+(let term/left      '\e[D')
+(let term/enter     '\n')
+(let term/escape    '\e')
+(let term/backspace (byte-8-to-str 127))
+(let term/delete    '\e[P')
 
 (let term/reset      '\e[0m')
 
@@ -42,17 +40,17 @@
 (let term/hide       '\e[?25l')
 (let term/show       '\e[?25h')
 
-(let term/up         '\e[1A')
-(let term/down       '\e[1B')
-(let term/right      '\e[1C')
-(let term/left       '\e[1D')
+(let term/go-up      '\e[1A')
+(let term/go-down    '\e[1B')
+(let term/go-right   '\e[1C')
+(let term/go-left    '\e[1D')
 
 (let term/up-n         [n] ->  (+ '\e[' n 'A'))
 (let term/down-n       [n] ->  (+ '\e[' n 'B'))
 (let term/right-n      [n] ->  (+ '\e[' n 'C'))
 (let term/left-n       [n] ->  (+ '\e[' n 'D'))
 
-(let term/goto         [x y] -> (+ '\e[' (int-to-str y) ';'
+(let term/go-to        [x y] -> (+ '\e[' (int-to-str y) ';'
                                          (int-to-str x) 'H'))
 
 (let term/get-size     [] -> import 'term/get-size')
