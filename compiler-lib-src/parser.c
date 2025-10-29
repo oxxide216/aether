@@ -306,7 +306,8 @@ static IrExprLambda parser_parse_lambda(Parser *parser) {
                                              MASK(TT_CBRACKET) |
                                              MASK(TT_RHOMBUS));
 
-    if (parser_peek_token(parser)->id == TT_RHOMBUS)
+    if (parser_peek_token(parser) &&
+        parser_peek_token(parser)->id == TT_RHOMBUS)
       parser_next_token(parser);
   }
 
