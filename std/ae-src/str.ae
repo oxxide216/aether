@@ -6,3 +6,12 @@
 (let eat-byte-32 [str] -> import 'eat-byte-32')
 (let eat-byte-16 [str] -> import 'eat-byte-16')
 (let eat-byte-8 [str] -> import 'eat-byte-8')
+
+(let str-insert [str sub at] ->
+  (+ (get-range str 0 at) sub (get-range str at (len str))))
+
+(let str-remove [str amount at] ->
+  (+ (get-range str 0 at) (get-range str (+ at amount) (len str))))
+
+(let str-replace [str sub at] ->
+  (+ (get-range str 0 at) sub (get-range str (+ at (len sub)) (len str))))
