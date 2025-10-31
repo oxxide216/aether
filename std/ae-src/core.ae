@@ -2,8 +2,6 @@
 (let head [list] -> import 'head')
 (let tail [list] -> import 'tail')
 (let last [list] -> import 'last')
-(let get-nth [collection index] -> import 'get-nth')
-(let set-nth [collection index value] -> import 'set-nth')
 (let get-at [dict key] -> import 'get-at')
 (let set-at [dict key value] -> import 'set-at')
 (let len [collection] -> import 'len')
@@ -13,18 +11,13 @@
 (let fold [func accumulator list] -> import 'fold')
 
 ; Conversions
-(let str-to-int [str] -> import 'str-to-int')
-(let str-to-float [str] -> import 'str-to-float')
-(let int-to-float [int] -> import 'int-to-float')
-(let int-to-str [int] -> import 'int-to-str')
-(let bool-to-int [bool] -> import 'bool-to-int')
-(let bool-to-str [bool] -> import 'bool-to-str')
-(let float-to-int [float] -> import 'float-to-int')
-(let float-to-str [float] -> import 'float-to-str')
+(let to-str [value] -> import 'to-str')
 (let byte-64-to-str [int] -> import 'byte-64-to-str')
 (let byte-32-to-str [int] -> import 'byte-32-to-str')
 (let byte-16-to-str [int] -> import 'byte-16-to-str')
 (let byte-8-to-str [int] -> import 'byte-8-to-str')
+(let to-int [str] -> import 'to-int')
+(let to-float [int] -> import 'to-float')
 
 ; Math
 (let add [a b] -> import 'add')

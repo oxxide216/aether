@@ -60,37 +60,6 @@ bool last_intrinsic(Vm *vm) {
   return true;
 }
 
-bool set_nth_intrinsic(Vm *vm) {
-  Value *value = value_stack_pop(&vm->stack);
-  Value *index = value_stack_pop(&vm->stack);
-  Value *collection = value_stack_pop(&vm->stack);
-
-  if (collection->kind == ValueKindList) {
-    ListNode *node = collection->as.list->next;
-    u32 i = 0;
-    while (node && i < index->as._int) {
-      node = node->next;
-      ++i;
-    }
-
-    if (!node)
-      PANIC("set-nth: out of bounds\n");
-
-    value_free(node->value, &vm->rc_arena, true);
-    node->value = value;
-  } else {
-    if (index->as._int >= collection->as.string.len)
-      PANIC("set-nth: out of bounds\n");
-
-    if (value->as.string.len != 1)
-      PANIC("set-nth: only one-sized string can be assigned\n");
-
-    collection->as.string.ptr[index->as._int] = value->as.string.ptr[0];
-  }
-
-  return true;
-}
-
 bool get_at_intrinsic(Vm *vm) {
   Value *key = value_stack_pop(&vm->stack);
   Value *collection = value_stack_pop(&vm->stack);
