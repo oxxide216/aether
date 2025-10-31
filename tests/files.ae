@@ -2,11 +2,14 @@
 (use 'std/io.ae')
 
 (let path 'text.txt')
+(let info (get-file-info path))
 
-(if (file-exists? path)
+(if info
+  (println info)
+
   (print (read-file path))
   (delete-file path)
-  ;(println 'Deleted!')
+  (println 'Deleted!')
  else
   (write-file 'Hello, World!\n' path)
   (println 'Wrote!'))

@@ -5,7 +5,7 @@
 
 ; Files
 ; TODO: file data
-(let file-exists? [path] -> import 'file-exists')
+(let get-file-info [path] -> import 'get-file-info')
 (let read-file [path] -> import 'read-file')
 (let write-file [content path] -> import 'write-file')
 (let delete-file [path] -> import 'delete-file')

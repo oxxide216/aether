@@ -3,8 +3,11 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <ftw.h>
+#include <sys/stat.h>
+#include <errno.h>
 
 #include "aether/vm.h"
+#include "aether/misc.h"
 #include "io.h"
 
 bool unblock_input_intrinsic(Vm *vm) {
@@ -23,14 +26,51 @@ bool block_input_intrinsic(Vm *vm) {
   return true;
 }
 
-bool file_exists_intrinsic(Vm *vm) {
+static char *str_to_cstr(Str str) {
+  char *cstr = malloc(str.len + 1);
+  memcpy(cstr, str.ptr, str.len);
+  cstr[str.len] = '\0';
+
+  return cstr;
+}
+
+bool get_file_info_intrinsic(Vm *vm) {
   Value *path = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path->as.string.len + 1);
-  memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
-  path_cstring[path->as.string.len] = '\0';
+  char *path_cstring = str_to_cstr(path->as.string);
 
-  value_stack_push_bool(&vm->stack, &vm->rc_arena, access(path_cstring, F_OK) == 0);
+  if (access(path_cstring, F_OK) != 0) {
+    value_stack_push_unit(&vm->stack, &vm->rc_arena);
+    free(path_cstring);
+
+    return true;
+  }
+
+  Dict info = {0};
+
+  DIR *directory = opendir(path_cstring);
+
+  Value *is_directory = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
+  is_directory->kind = ValueKindBool;
+  is_directory->as._bool = directory != NULL || errno != ENOTDIR;
+  dict_push_value_str_key(&vm->rc_arena, &info,
+                          STR_LIT("is-directory"),
+                          is_directory);
+
+  if (directory)
+    closedir(directory);
+
+  struct stat st;
+  stat(path_cstring, &st);
+
+  Value *size = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
+  size->kind = ValueKindInt;
+  size->as._int = st.st_size;
+  dict_push_value_str_key(&vm->rc_arena, &info,
+                          STR_LIT("size"),
+                          size);
+
+  value_stack_push_dict(&vm->stack, &vm->rc_arena, info);
 
   free(path_cstring);
 
@@ -40,9 +80,7 @@ bool file_exists_intrinsic(Vm *vm) {
 bool read_file_intrinsic(Vm *vm) {
   Value *path = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path->as.string.len + 1);
-  memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
-  path_cstring[path->as.string.len] = '\0';
+  char *path_cstring = str_to_cstr(path->as.string);
 
   Str content = read_file(path_cstring);
   if (content.len == (u32) -1)
@@ -59,9 +97,7 @@ bool write_file_intrinsic(Vm *vm) {
   Value *path = value_stack_pop(&vm->stack);
   Value *content = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path->as.string.len + 1);
-  memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
-  path_cstring[path->as.string.len] = '\0';
+  char *path_cstring = str_to_cstr(path->as.string);
 
   write_file(path_cstring, content->as.string);
 
@@ -73,9 +109,7 @@ bool write_file_intrinsic(Vm *vm) {
 bool delete_file_intrinsic(Vm *vm) {
   Value *path = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path->as.string.len + 1);
-  memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
-  path_cstring[path->as.string.len] = '\0';
+  char *path_cstring = str_to_cstr(path->as.string);
 
   remove(path_cstring);
 
@@ -96,9 +130,7 @@ static i32 unlink_dir_callback(const char *fpath, const struct stat *sb,
 bool delete_directory_intrinsic(Vm *vm) {
   Value *path = value_stack_pop(&vm->stack);
 
-  char *path_cstring = malloc(path->as.string.len + 1);
-  memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
-  path_cstring[path->as.string.len] = '\0';
+  char *path_cstring = str_to_cstr(path->as.string);
 
   nftw(path_cstring, unlink_dir_callback, 64, FTW_DEPTH | FTW_PHYS);
 
@@ -111,9 +143,7 @@ bool list_directory_intrinsic(Vm *vm) {
   ListNode *list = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
   ListNode *list_end = list;
 
-  char *path_cstring = malloc(path->as.string.len + 1);
-  memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
-  path_cstring[path->as.string.len] = '\0';
+  char *path_cstring = str_to_cstr(path->as.string);
 
   DIR *dir = opendir(path_cstring);
   if (dir) {
@@ -146,7 +176,7 @@ Intrinsic io_intrinsics[] = {
   { STR_LIT("unblock-input"), false, 0, {}, &unblock_input_intrinsic },
   { STR_LIT("block-input"), false, 0, {}, &block_input_intrinsic },
   // Files
-  { STR_LIT("file-exists"), true, 1, { ValueKindString }, &file_exists_intrinsic },
+  { STR_LIT("get-file-info"), true, 1, { ValueKindString }, &get_file_info_intrinsic },
   { STR_LIT("read-file"), true, 1, { ValueKindString }, &read_file_intrinsic },
   { STR_LIT("write-file"), false, 2,
     { ValueKindString, ValueKindString },
