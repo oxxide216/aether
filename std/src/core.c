@@ -860,10 +860,8 @@ bool get_args_intrinsic(Vm *vm) {
 }
 
 bool make_env_intrinsic(Vm *vm) {
-  i32 argc = 2;
-  char *argv[] = { "aether", "env", NULL };
   Intrinsics intrinsics = {0};
-  Vm new_vm = vm_create(argc, argv, &intrinsics);
+  Vm new_vm = vm_create(vm->argc, vm->argv, &intrinsics);
 
   value_stack_push_env(&vm->stack, &vm->rc_arena, new_vm);
 

@@ -93,15 +93,17 @@ typedef struct {
 typedef Da(Intrinsic) Intrinsics;
 
 struct Vm {
-  ValueStack  stack;
-  Vars        global_vars;
-  Vars        local_vars;
-  Intrinsics  intrinsics;
-  RcArena     rc_arena;
-  ListNode   *args;
-  i64         exit_code;
-  bool        is_inside_of_func;
-  Func        current_func_value;
+  ValueStack   stack;
+  Vars         global_vars;
+  Vars         local_vars;
+  Intrinsics   intrinsics;
+  RcArena      rc_arena;
+  i32          argc;
+  char       **argv;
+  ListNode    *args;
+  i64          exit_code;
+  bool         is_inside_of_func;
+  Func         current_func_value;
 };
 
 typedef struct {

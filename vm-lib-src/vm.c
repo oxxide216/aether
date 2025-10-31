@@ -758,6 +758,8 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
 
   vm.intrinsics = *intrinsics;
 
+  vm.argc = argc;
+  vm.argv = argv;
   vm.args = rc_arena_alloc(&vm.rc_arena, sizeof(ListNode));
   ListNode *args_end = vm.args;
   for (u32 i = 0; i < (u32) argc; ++i) {
