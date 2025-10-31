@@ -1,3 +1,6 @@
+(use 'std/str.ae')
+(use 'std/term.ae')
+
 (macro error [...messages] ->
   (println term/fg-red term/bold '[ERROR]'
            term/reset ' ' (join [messages] ' ')))
