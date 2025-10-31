@@ -337,6 +337,10 @@ static IrExpr *parser_parse_expr(Parser *parser) {
                                              MASK(TT_FLOAT) | MASK(TT_BOOL) |
                                              MASK(TT_OCURLY) | MASK(TT_OBRACKET));
 
+  expr->meta.file_path = STR(token->file_path, strlen(token->file_path));
+  expr->meta.row = token->row;
+  expr->meta.col = token->col;
+
   switch (token->id) {
   case TT_STR: {
     expr->kind = IrExprKindString;

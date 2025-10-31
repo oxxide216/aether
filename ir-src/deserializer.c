@@ -110,6 +110,9 @@ static void get_expr_data_size(u8 *data, u32 *size) {
     get_block_data_size(data, size);
   } break;
   }
+
+  get_str_data_size(data, size);
+  *size += 2 * sizeof(u32);
 }
 
 static void get_block_data_size(u8 *data, u32 *size) {
@@ -267,6 +270,12 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
     load_block_data(&expr->as.self_call.args, data, end, rc_arena);
   } break;
   }
+
+  load_str_data(&expr->meta.file_path, data, end, rc_arena);
+  expr->meta.row = *(u32 *) (data + *end);
+  *end += sizeof(u32);
+  expr->meta.col = *(u32 *) (data + *end);
+  *end += sizeof(u32);
 }
 
 static void load_block_data(IrBlock *block, u8 *data, u32 *end, RcArena *rc_arena) {

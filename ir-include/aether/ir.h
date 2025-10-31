@@ -131,9 +131,15 @@ typedef union {
   IrExprSelfCall self_call;
 } IrExprAs;
 
+typedef struct {
+  Str file_path;
+  u32 row, col;
+} IrMetaData;
+
 struct IrExpr {
   IrExprKind kind;
   IrExprAs   as;
+  IrMetaData meta;
 };
 
 typedef IrBlock Ir;

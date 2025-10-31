@@ -5,6 +5,9 @@
 #include "shl/shl-arena.h"
 #include "intrinsics.h"
 
+#define META_FMT STR_FMT":%u:%u: "
+#define META_ARG(meta) STR_ARG((meta).file_path), (meta).row + 1, (meta).col + 1
+
 typedef Da(Str) Strs;
 
 void list_use(RcArena *rc_arena, ListNode *list) {
@@ -377,15 +380,19 @@ static Intrinsic *get_intrinsic(Vm *vm, Str name, u32 args_count, Value **args) 
   return NULL;
 }
 
-ExecState execute_func(Vm *vm, Func *func, bool value_expected) {
+ExecState execute_func(Vm *vm, Func *func, IrMetaData *meta, bool value_expected) {
   if (func->intrinsic_name.len > 0) {
     Intrinsic *intrinsic = get_intrinsic(vm, func->intrinsic_name, func->args.len,
                                          vm->stack.items + vm->stack.len -
                                          func->args.len);
 
     if (!intrinsic) {
-      ERROR("Intrinsic `"STR_FMT"` with such signature was not found\n",
-            STR_ARG(func->intrinsic_name));
+      if (meta)
+        PERROR(META_FMT, "Intrinsic `"STR_FMT"` with such signature was not found\n",
+               META_ARG(*meta), STR_ARG(func->intrinsic_name));
+      else
+        ERROR("Intrinsic `"STR_FMT"` with such signature was not found\n",
+              STR_ARG(func->intrinsic_name));
       vm->exit_code = 1;
       return ExecStateExit;
     }
@@ -461,14 +468,15 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     Value *func_value = value_stack_pop(&vm->stack);
     if (func_value->kind != ValueKindFunc) {
-      ERROR("Value is not callable\n");
+      PERROR(META_FMT, "Value is not callable\n",
+             META_ARG(expr->meta));
       vm->exit_code = 1;
       return ExecStateExit;
     }
 
     if (expr->as.func_call.args.len != func_value->as.func.args.len) {
-      ERROR("Wrong arguments count: %u, expected %u\n",
-            expr->as.func_call.args.len,
+      PERROR(META_FMT, "Wrong arguments count: %u, expected %u\n",
+            META_ARG(expr->meta), expr->as.func_call.args.len,
             func_value->as.func.args.len);
       vm->exit_code = 1;
       return ExecStateExit;
@@ -477,7 +485,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     for (u32 i = 0; i < expr->as.func_call.args.len; ++i)
       EXECUTE_EXPR(vm, expr->as.func_call.args.items[i], true);
 
-    EXECUTE_FUNC(vm, &func_value->as.func, value_expected);
+    EXECUTE_FUNC(vm, &func_value->as.func, &expr->meta, value_expected);
   } break;
 
   case IrExprKindVarDef: {
@@ -627,8 +635,8 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       return ExecStateContinue;
     }
 
-    ERROR("Symbol "STR_FMT" was not defined before usage\n",
-          STR_ARG(expr->as.ident.ident));
+    PERROR(META_FMT, "Symbol "STR_FMT" was not defined before usage\n",
+          META_ARG(expr->meta), STR_ARG(expr->as.ident.ident));
     vm->exit_code = 1;
     return ExecStateExit;
   } break;
@@ -707,7 +715,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     for (u32 i = 0; i < expr->as.self_call.args.len; ++i)
       EXECUTE_EXPR(vm, expr->as.self_call.args.items[i], true);
 
-    EXECUTE_FUNC(vm, &vm->current_func_value, value_expected);
+    EXECUTE_FUNC(vm, &vm->current_func_value, &expr->meta, value_expected);
   } break;
   }
 

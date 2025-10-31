@@ -10,11 +10,11 @@
 
 #define MAX_INTRINSIC_ARGS_COUNT 8
 
-#define EXECUTE_FUNC(vm, func, value_expected)                \
-  do {                                                        \
-    ExecState state = execute_func(vm, func, value_expected); \
-    if (state != ExecStateContinue)                           \
-      return state;                                           \
+#define EXECUTE_FUNC(vm, func, meta, value_expected)                \
+  do {                                                              \
+    ExecState state = execute_func(vm, func, meta, value_expected); \
+    if (state != ExecStateContinue)                                 \
+      return state;                                                 \
   } while (0)
 
 #define EXECUTE_EXPR(vm, expr, value_expected)                \
@@ -170,7 +170,7 @@ Value *value_clone(RcArena *rc_arena, Value *value);
 void   value_free(Value *value, RcArena *rc_arena, bool free_ptr);
 bool   value_eq(Value *a, Value *b);
 
-ExecState execute_func(Vm *vm, Func *func, bool value_expected);
+ExecState execute_func(Vm *vm, Func *func, IrMetaData *meta, bool value_expected);
 ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected);
 ExecState execute_block(Vm *vm, IrBlock *block, bool value_expected);
 u32       execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena,

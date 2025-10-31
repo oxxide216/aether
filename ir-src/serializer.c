@@ -143,6 +143,14 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
     save_block_data(&expr->as.self_call.args, data, data_size, end);
   } break;
   }
+
+  save_str_data(expr->meta.file_path, data, data_size, end);
+
+  reserve_space(2 * sizeof(u32), data, data_size, end);
+  *(u32 *) (*data + *end) = expr->meta.row;
+  *end += sizeof(u32);
+  *(u32 *) (*data + *end) = expr->meta.col;
+  *end += sizeof(u32);
 }
 
 static void save_block_data(IrBlock *block, u8 **data, u32 *data_size, u32 *end) {
