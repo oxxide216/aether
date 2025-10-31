@@ -3,15 +3,15 @@
 
 (macro error [...messages] ->
   (println term/fg-red term/bold '[ERROR]'
-           term/reset ' ' (join [messages] ' ')))
+           term/reset ' ' (join [messages] '')))
 
 (macro warn [...messages] ->
   (println term/fg-yellow term/bold '[WARN]'
-           term/reset ' ' (join [messages] ' ')))
+           term/reset ' ' (join [messages] '')))
 
 (macro info [...messages] ->
   (println term/fg-white term/bold '[INFO]'
-           term/reset ' ' (join [messages] ' ')))
+           term/reset ' ' (join [messages] '')))
 
 (macro panic [...messages] ->
   (error messages)
