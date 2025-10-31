@@ -31,7 +31,7 @@ bool str_remove_intrinsic(Vm *vm) {
   new_string.ptr = rc_arena_alloc(&vm->rc_arena, new_string.len);
   memcpy(new_string.ptr, string->as.string.ptr, index->as._int);
   memcpy(new_string.ptr + index->as._int,
-         string->as.string.ptr + index->as._int,
+         string->as.string.ptr + index->as._int + 1,
          string->as.string.len - index->as._int - amount->as._int);
 
   value_stack_push_string(&vm->stack, &vm->rc_arena, new_string);
