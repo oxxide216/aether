@@ -1,6 +1,8 @@
+#define _XOPEN_SOURCE 500
 #include <unistd.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <ftw.h>
 
 #include "aether/vm.h"
 #include "io.h"
@@ -82,6 +84,27 @@ bool delete_file_intrinsic(Vm *vm) {
   return true;
 }
 
+static i32 unlink_dir_callback(const char *fpath, const struct stat *sb,
+                               i32 typeflag, struct FTW *ftwbuf) {
+  (void) sb;
+  (void) typeflag;
+  (void) ftwbuf;
+
+  return remove(fpath);
+}
+
+bool delete_directory_intrinsic(Vm *vm) {
+  Value *path = value_stack_pop(&vm->stack);
+
+  char *path_cstring = malloc(path->as.string.len + 1);
+  memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
+  path_cstring[path->as.string.len] = '\0';
+
+  nftw(path_cstring, unlink_dir_callback, 64, FTW_DEPTH | FTW_PHYS);
+
+  return true;
+}
+
 bool list_directory_intrinsic(Vm *vm) {
   Value *path = value_stack_pop(&vm->stack);
 
@@ -129,6 +152,7 @@ Intrinsic io_intrinsics[] = {
     { ValueKindString, ValueKindString },
     &write_file_intrinsic },
   { STR_LIT("delete-file"), false, 1, { ValueKindString }, &delete_file_intrinsic },
+  { STR_LIT("delete-directory"), false, 1, { ValueKindString }, &delete_directory_intrinsic },
   { STR_LIT("list-directory"), true, 1, { ValueKindString }, &list_directory_intrinsic },
 };
 

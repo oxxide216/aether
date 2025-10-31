@@ -9,6 +9,7 @@
 (let read-file [path] -> import 'read-file')
 (let write-file [content path] -> import 'write-file')
 (let delete-file [path] -> import 'delete-file')
+(let delete-directory [path] -> import 'delete-directory')
 (let list-directory [path] -> import 'list-directory')
 
 ;; Processes
