@@ -545,12 +545,13 @@ static IrExpr *parser_parse_expr(Parser *parser) {
       parser->macros->cap = parser->macros->len + macros.len;
       parser->macros->items = realloc(parser->macros->items,
                                       parser->macros->cap * sizeof(Macro));
-      memcpy(parser->macros->items + parser->macros->len,
-             macros.items, macros.len * sizeof(Macro));
-      parser->macros->len += macros.len;
-      free(macros.items);
     }
 
+    memcpy(parser->macros->items + parser->macros->len,
+           macros.items, macros.len * sizeof(Macro));
+    parser->macros->len += macros.len;
+
+    free(macros.items);
     free(prefix);
   } break;
 
