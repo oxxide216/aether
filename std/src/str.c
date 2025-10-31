@@ -7,7 +7,7 @@ bool str_insert_intrinsic(Vm *vm) {
 
   Str new_string;
   new_string.len = string->as.string.len + sub_string->as.string.len;
-  new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
+  new_string.ptr = rc_arena_alloc(&vm->rc_arena, new_string.len);
   memcpy(new_string.ptr, string->as.string.ptr, index->as._int);
   memcpy(new_string.ptr + index->as._int,
          sub_string->as.string.ptr,
@@ -16,7 +16,7 @@ bool str_insert_intrinsic(Vm *vm) {
          string->as.string.ptr + index->as._int,
          string->as.string.len - index->as._int);
 
-  value_stack_push_string(&vm->stack, vm->rc_arena, new_string);
+  value_stack_push_string(&vm->stack, &vm->rc_arena, new_string);
 
   return true;
 }
@@ -28,13 +28,13 @@ bool str_remove_intrinsic(Vm *vm) {
 
   Str new_string;
   new_string.len = string->as.string.len - amount->as._int;
-  new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
+  new_string.ptr = rc_arena_alloc(&vm->rc_arena, new_string.len);
   memcpy(new_string.ptr, string->as.string.ptr, index->as._int);
   memcpy(new_string.ptr + index->as._int,
          string->as.string.ptr + index->as._int,
          string->as.string.len - index->as._int - amount->as._int);
 
-  value_stack_push_string(&vm->stack, vm->rc_arena, new_string);
+  value_stack_push_string(&vm->stack, &vm->rc_arena, new_string);
 
   return true;
 }
@@ -46,7 +46,7 @@ bool str_replace_intrinsic(Vm *vm) {
 
   Str new_string;
   new_string.len = string->as.string.len - sub_string->as.string.len - index->as._int;
-  new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
+  new_string.ptr = rc_arena_alloc(&vm->rc_arena, new_string.len);
   memcpy(new_string.ptr, string->as.string.ptr, index->as._int);
   memcpy(new_string.ptr + index->as._int,
          sub_string->as.string.ptr,
@@ -55,7 +55,7 @@ bool str_replace_intrinsic(Vm *vm) {
          string->as.string.ptr + index->as._int + sub_string->as.string.len,
          string->as.string.len - index->as._int - sub_string->as.string.len);
 
-  value_stack_push_string(&vm->stack, vm->rc_arena, new_string);
+  value_stack_push_string(&vm->stack, &vm->rc_arena, new_string);
 
   return true;
 }
@@ -64,7 +64,7 @@ bool split_intrinsic(Vm *vm) {
   Value *delimeter = value_stack_pop(&vm->stack);
   Value *string = value_stack_pop(&vm->stack);
 
-  ListNode *list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  ListNode *list = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
   ListNode *node = list;
   u32 index = 0, i = 0;
 
@@ -79,12 +79,12 @@ bool split_intrinsic(Vm *vm) {
     }
 
     if (found) {
-      node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-      node->next->value = rc_arena_alloc(vm->rc_arena, sizeof(Value));
+      node->next = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
+      node->next->value = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
 
       Str new_string;
       new_string.len = i - index;
-      new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
+      new_string.ptr = rc_arena_alloc(&vm->rc_arena, new_string.len);
       memcpy(new_string.ptr, string->as.string.ptr + index, new_string.len);
 
       *node->next->value = (Value) {
@@ -93,7 +93,7 @@ bool split_intrinsic(Vm *vm) {
         0,
       };
 
-      rc_arena_clone(vm->rc_arena, string->as.string.ptr);
+      rc_arena_clone(&vm->rc_arena, string->as.string.ptr);
 
       index = i + 1;
       node = node->next;
@@ -101,12 +101,12 @@ bool split_intrinsic(Vm *vm) {
   }
 
   if (i > 0) {
-    node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-    node->next->value = rc_arena_alloc(vm->rc_arena, sizeof(Value));
+    node->next = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
+    node->next->value = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
 
     Str new_string;
     new_string.len = i - index;
-    new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
+    new_string.ptr = rc_arena_alloc(&vm->rc_arena, new_string.len);
     memcpy(new_string.ptr, string->as.string.ptr + index, new_string.len);
 
     *node->next->value = (Value) {
@@ -116,7 +116,7 @@ bool split_intrinsic(Vm *vm) {
     };
   }
 
-  value_stack_push_list(&vm->stack, vm->rc_arena, list);
+  value_stack_push_list(&vm->stack, &vm->rc_arena, list);
 
   return true;
 }
@@ -128,7 +128,7 @@ bool sub_str_intrinsic(Vm *vm) {
 
   if (begin->as._int >= end->as._int ||
       end->as._int > string->as.string.len) {
-    value_stack_push_unit(&vm->stack, vm->rc_arena);
+    value_stack_push_unit(&vm->stack, &vm->rc_arena);
 
     return true;
   }
@@ -138,9 +138,9 @@ bool sub_str_intrinsic(Vm *vm) {
     end->as._int - begin->as._int,
   };
 
-  rc_arena_clone(vm->rc_arena, string->as.string.ptr);
+  rc_arena_clone(&vm->rc_arena, string->as.string.ptr);
 
-  value_stack_push_string(&vm->stack, vm->rc_arena, sub_string);
+  value_stack_push_string(&vm->stack, &vm->rc_arena, sub_string);
 
   return true;
 }
@@ -165,14 +165,14 @@ bool join_intrinsic(Vm *vm) {
   }
 
   Str joined = {
-    rc_arena_alloc(vm->rc_arena, sb.len),
+    rc_arena_alloc(&vm->rc_arena, sb.len),
     sb.len,
   };
 
   memcpy(joined.ptr, sb.buffer, sb.len);
   free(sb.buffer);
 
-  value_stack_push_string(&vm->stack, vm->rc_arena, joined);
+  value_stack_push_string(&vm->stack, &vm->rc_arena, joined);
 
   return true;
 }
@@ -182,7 +182,7 @@ bool eat_str_intrinsic(Vm *vm) {
   Value *string = value_stack_pop(&vm->stack);
 
   if (string->as.string.len < pattern->as.string.len) {
-    value_stack_push_bool(&vm->stack, vm->rc_arena, false);
+    value_stack_push_bool(&vm->stack, &vm->rc_arena, false);
     return true;
   }
 
@@ -193,27 +193,27 @@ bool eat_str_intrinsic(Vm *vm) {
 
   bool matches = str_eq(string_begin, pattern->as.string);
 
-  ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  ListNode *new_list = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
 
-  new_list->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-  new_list->next->value = rc_arena_alloc(vm->rc_arena, sizeof(Value));
+  new_list->next = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
+  new_list->next->value = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
   *new_list->next->value = (Value) { ValueKindBool, { ._bool = matches }, 0 };
 
-  new_list->next->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  new_list->next->next = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
   Str new_string = {
     string->as.string.ptr + pattern->as.string.len,
     string->as.string.len - pattern->as.string.len,
   };
-  new_list->next->next->value = rc_arena_alloc(vm->rc_arena, sizeof(Value));
+  new_list->next->next->value = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
   *new_list->next->next->value = (Value) {
     ValueKindString,
     { .string = new_string },
     0,
   };
 
-  rc_arena_clone(vm->rc_arena, string->as.string.ptr);
+  rc_arena_clone(&vm->rc_arena, string->as.string.ptr);
 
-  value_stack_push_list(&vm->stack, vm->rc_arena, new_list);
+  value_stack_push_list(&vm->stack, &vm->rc_arena, new_list);
 
   return true;
 }
@@ -222,7 +222,7 @@ static bool eat_byte(Vm *vm, u32 size) {
   Value *string = value_stack_pop(&vm->stack);
 
   if (string->as.string.len < size) {
-    value_stack_push_unit(&vm->stack, vm->rc_arena);
+    value_stack_push_unit(&vm->stack, &vm->rc_arena);
     return true;
   }
 
@@ -234,27 +234,27 @@ static bool eat_byte(Vm *vm, u32 size) {
   case 1: _int = *(i8 *) string->as.string.ptr; break;
   }
 
-  ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  ListNode *new_list = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
 
-  new_list->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-  new_list->next->value = rc_arena_alloc(vm->rc_arena, sizeof(Value));
+  new_list->next = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
+  new_list->next->value = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
   *new_list->next->value = (Value) { ValueKindInt, { ._int = _int }, 0 };
 
-  new_list->next->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  new_list->next->next = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
   Str new_string = {
     string->as.string.ptr + size,
     string->as.string.len - size,
   };
-  new_list->next->next->value = rc_arena_alloc(vm->rc_arena, sizeof(Value));
+  new_list->next->next->value = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
   *new_list->next->next->value = (Value) {
     ValueKindString,
     { .string = new_string },
     0,
   };
 
-  rc_arena_clone(vm->rc_arena, string->as.string.ptr);
+  rc_arena_clone(&vm->rc_arena, string->as.string.ptr);
 
-  value_stack_push_list(&vm->stack, vm->rc_arena, new_list);
+  value_stack_push_list(&vm->stack, &vm->rc_arena, new_list);
 
   return true;
 }

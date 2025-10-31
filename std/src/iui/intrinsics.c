@@ -98,17 +98,17 @@ bool iui_main_loop_intrinsic(Vm *vm) {
 
     Dict window_size = {0};
 
-    Value *x = rc_arena_alloc(vm->rc_arena, sizeof(Value));
+    Value *x = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
     *x = (Value) { ValueKindFloat, { ._float = iui.window.width }, 0 };
-    dict_push_value_str_key(vm->rc_arena, &window_size,
+    dict_push_value_str_key(&vm->rc_arena, &window_size,
                             STR_LIT("x"), x);
 
-    Value *y = rc_arena_alloc(vm->rc_arena, sizeof(Value));
+    Value *y = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
     *y = (Value) { ValueKindFloat, { ._float = iui.window.height }, 0 };
-    dict_push_value_str_key(vm->rc_arena, &window_size,
+    dict_push_value_str_key(&vm->rc_arena, &window_size,
                             STR_LIT("y"), y);
 
-    value_stack_push_dict(&vm->stack, vm->rc_arena, window_size);
+    value_stack_push_dict(&vm->stack, &vm->rc_arena, window_size);
 
     EXECUTE_FUNC(vm, &body->as.func, false);
 
@@ -234,7 +234,7 @@ bool iui_input_intrinsic(Vm *vm) {
           input->as.input.buffer.items,
           input->as.input.buffer.len,
         };
-        value_stack_push_string(&vm->stack, vm->rc_arena, content);
+        value_stack_push_string(&vm->stack, &vm->rc_arena, content);
 
         EXECUTE_FUNC(vm, &on_submit->as.func, false);
       } break;

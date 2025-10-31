@@ -17,8 +17,13 @@ int main(i32 argc, char **argv) {
     exit(1);
   }
 
-  Ir ir = parse(code, loader_path);
-  RcArena rc_arena = {0};
   Intrinsics intrinsics = {0};
-  return execute(&ir, argc, argv, &rc_arena, &intrinsics, NULL);
+  Vm vm = vm_create(argc, argv, &intrinsics);
+
+  Ir ir = parse(code, loader_path);
+  execute_block(&vm, &ir, false);
+
+  vm_destroy(&vm);
+
+  return vm.exit_code;
 }

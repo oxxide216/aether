@@ -9,7 +9,7 @@ bool run_command_intrinsic(Vm *vm) {
   memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
   path_cstring[path->as.string.len] = '\0';
 
-  value_stack_push_int(&vm->stack, vm->rc_arena, system(path_cstring));
+  value_stack_push_int(&vm->stack, &vm->rc_arena, system(path_cstring));
 
   free(path_cstring);
 

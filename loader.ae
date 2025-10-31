@@ -8,15 +8,10 @@
            term/reset ': ' (join [messages] ' ')))
 
 (let args (get-args))
+(let env (make-env))
 
 (if (< (len args) 2)
   (error 'Input file was not provided')
-  (exit 1))
-
-(let path (get-at args 1))
-(let content (read-file path))
-(if (unit? content)
-  (error 'Could not open input file' path)
   (exit 1))
 
 (let core-path '/usr/include/aether/std/core.ae')
@@ -25,7 +20,14 @@
   (error 'Could not load core module')
   (exit 1))
 
-(let compiled (compile [{ 'code': core-content 'file-path': core-path }
-                        { 'code': content 'file-path': path }]))
+(let core-compiled (compile env core-content core-path))
+(eval-compiled env core-compiled)
 
-(eval-compiled compiled)
+(let path (get-at args 1))
+(let content (read-file path))
+(if (unit? content)
+  (error 'Could not open input file' path)
+  (exit 1))
+
+(let compiled (compile env content path))
+(eval-compiled env compiled)

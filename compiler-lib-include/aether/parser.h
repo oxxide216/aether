@@ -8,6 +8,6 @@ typedef Da(Str) FilePaths;
 
 Ir parse_ex(Str code, char *file_path, Macros *macros,
             FilePaths *included_files);
-Ir parse(Str code, char *input_file_name);
+Ir parse(Str code, char *file_path);
 
 #endif // COMPILER_H

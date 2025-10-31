@@ -58,14 +58,15 @@
 (let func? [value] -> import 'is-func')
 (let dict? [value] -> import 'is-dict')
 
-(let print-raw [arg] -> import 'print')
+(let printf [arg] -> import 'printf')
 (let input-size [size] -> import 'input-size')
 (let input [] -> import 'input')
 
 (let get-args [] -> import 'get-args')
-(let compile [file_codes] -> import 'compile')
-(let eval-compiled [bytecode] -> import 'eval-compiled')
-(let eval [code] -> import 'eval')
+(let make-env [] -> import 'make-env')
+(let compile [env code path] -> import 'compile')
+(let eval-compiled [env bytecode] -> import 'eval-compiled')
+(let eval [env code] -> import 'eval')
 (let exit [exit-code] -> import 'exit')
 
 (macro fold-op [op args] ->
@@ -101,11 +102,6 @@
     (let element (head -list))
     body
     (set -list (tail -list))))
-
-(let printf [args] ->
-  (for arg in args
-    (print-raw arg))
-  (flush))
 
 (macro print [...args] ->
   (printf [args]))

@@ -3,6 +3,7 @@
 
 #include "aether/ir.h"
 #include "aether/rc-arena.h"
+#include "aether/parser.h"
 #include "shl/shl-defs.h"
 #include "shl/shl-str.h"
 #include "shl/shl-log.h"
@@ -45,6 +46,7 @@ typedef enum {
   ValueKindBool,
   ValueKindDict,
   ValueKindFunc,
+  ValueKindEnv,
 } ValueKind;
 
 typedef struct ListNode ListNode;
@@ -64,45 +66,9 @@ typedef struct {
   Str         intrinsic_name;
 } Func;
 
-typedef union {
-  ListNode *list;
-  Str       string;
-  i64       _int;
-  f64       _float;
-  bool      _bool;
-  Dict      dict;
-  Func      func;
-} ValueAs;
-
-typedef struct {
-  ValueKind kind;
-  ValueAs   as;
-  u32       refs_count;
-} Value;
-
-struct ListNode {
-  Value    *value;
-  bool      is_static;
-  ListNode *next;
-};
-
-struct DictValue {
-  Value *key;
-  Value *value;
-};
-
-struct NamedValue {
-  Str    name;
-  Value *value;
-};
-
-typedef enum {
-  ExecStateContinue = 0,
-  ExecStateReturn,
-  ExecStateExit,
-} ExecState;
-
 typedef struct Vm Vm;
+
+typedef struct Value Value;
 
 typedef Da(Value *) ValueStack;
 
@@ -131,12 +97,57 @@ struct Vm {
   Vars        global_vars;
   Vars        local_vars;
   Intrinsics  intrinsics;
-  RcArena    *rc_arena;
+  RcArena     rc_arena;
   ListNode   *args;
   i64         exit_code;
   bool        is_inside_of_func;
   Func        current_func_value;
 };
+
+typedef struct {
+  Macros    macros;
+  FilePaths included_files;
+  Vm        vm;
+} Env;
+
+typedef union {
+  ListNode *list;
+  Str       string;
+  i64       _int;
+  f64       _float;
+  bool      _bool;
+  Dict      dict;
+  Func      func;
+  Env      *env;
+} ValueAs;
+
+struct Value {
+  ValueKind kind;
+  ValueAs   as;
+  u32       refs_count;
+};
+
+struct ListNode {
+  Value    *value;
+  bool      is_static;
+  ListNode *next;
+};
+
+struct DictValue {
+  Value *key;
+  Value *value;
+};
+
+struct NamedValue {
+  Str    name;
+  Value *value;
+};
+
+typedef enum {
+  ExecStateContinue = 0,
+  ExecStateReturn,
+  ExecStateExit,
+} ExecState;
 
 void      list_use(RcArena *rc_arena, ListNode *list);
 ListNode *list_clone(RcArena *rc_arena, ListNode *list);
@@ -150,6 +161,7 @@ void value_stack_push_float(ValueStack *stack, RcArena *rc_arena, f64 _float);
 void value_stack_push_bool(ValueStack *stack, RcArena *rc_arena, bool _bool);
 void value_stack_push_dict(ValueStack *stack, RcArena *rc_arena, Dict dict);
 void value_stack_push_func(ValueStack *stack, RcArena *rc_arena, Func func);
+void value_stack_push_env(ValueStack *stack, RcArena *rc_arena, Vm vm);
 
 Value *value_stack_pop(ValueStack *stack);
 Value *value_stack_get(ValueStack *stack, u32 index);
@@ -164,6 +176,7 @@ ExecState execute_block(Vm *vm, IrBlock *block, bool value_expected);
 u32       execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena,
                   Intrinsics *intrinsics, Value **result_value);
 
-void cleanup(Vm *vm);
+Vm   vm_create(i32 argc, char **argv, Intrinsics *intrinsics);
+void vm_destroy(Vm *vm);
 
 #endif // AETHER_VM

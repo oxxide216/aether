@@ -21,11 +21,11 @@ bool min_intrinsic(Vm *vm) {
   prepare_rwo_numbers(&a, &b, vm);
 
   if (a->kind == ValueKindInt)
-    value_stack_push_int(&vm->stack, vm->rc_arena, a->as._int <= b->as._int ?
+    value_stack_push_int(&vm->stack, &vm->rc_arena, a->as._int <= b->as._int ?
                                      a->as._int :
                                      b->as._int);
   else
-    value_stack_push_float(&vm->stack, vm->rc_arena, a->as._float <= b->as._float ?
+    value_stack_push_float(&vm->stack, &vm->rc_arena, a->as._float <= b->as._float ?
                                        a->as._float :
                                        b->as._float);
 
@@ -37,11 +37,11 @@ bool max_intrinsic(Vm *vm) {
   prepare_rwo_numbers(&a, &b, vm);
 
   if (a->kind == ValueKindInt)
-    value_stack_push_int(&vm->stack, vm->rc_arena, a->as._int >= b->as._int ?
+    value_stack_push_int(&vm->stack, &vm->rc_arena, a->as._int >= b->as._int ?
                                      a->as._int :
                                      b->as._int);
   else
-    value_stack_push_float(&vm->stack, vm->rc_arena, a->as._float >= b->as._float ?
+    value_stack_push_float(&vm->stack, &vm->rc_arena, a->as._float >= b->as._float ?
                                        a->as._float :
                                        b->as._float);
 
@@ -58,14 +58,14 @@ bool pow_intrinsic(Vm *vm) {
     for (u32 i = 0; i < pow->as._int; ++i)
       result *= value->as._int;
 
-    value_stack_push_int(&vm->stack, vm->rc_arena, result);
+    value_stack_push_int(&vm->stack, &vm->rc_arena, result);
   } else {
     f64 result = 1;
 
     for (u32 i = 0; i < pow->as._int; ++i)
       result *= value->as._float;
 
-    value_stack_push_float(&vm->stack, vm->rc_arena, result);
+    value_stack_push_float(&vm->stack, &vm->rc_arena, result);
   }
 
   return true;
@@ -74,7 +74,7 @@ bool pow_intrinsic(Vm *vm) {
 bool sqrt_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
 
-  value_stack_push_float(&vm->stack, vm->rc_arena, sqrt(value->as._float));
+  value_stack_push_float(&vm->stack, &vm->rc_arena, sqrt(value->as._float));
 
   return true;
 }
@@ -82,7 +82,7 @@ bool sqrt_intrinsic(Vm *vm) {
 bool round_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
 
-  value_stack_push_float(&vm->stack, vm->rc_arena, round(value->as._float));
+  value_stack_push_float(&vm->stack, &vm->rc_arena, round(value->as._float));
 
   return true;
 }

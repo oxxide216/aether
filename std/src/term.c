@@ -13,15 +13,15 @@ bool get_size_intrinsic(Vm *vm) {
 
   Dict size = {0};
 
-  Value *rows = rc_arena_alloc(vm->rc_arena, sizeof(Value));
+  Value *rows = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
   *rows = (Value) { ValueKindInt, { ._int = _size.ws_row }, 0 };
-  dict_push_value_str_key(vm->rc_arena, &size, STR_LIT("rows"), rows);
+  dict_push_value_str_key(&vm->rc_arena, &size, STR_LIT("rows"), rows);
 
-  Value *cols = rc_arena_alloc(vm->rc_arena, sizeof(Value));
+  Value *cols = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
   *cols = (Value) { ValueKindInt, { ._int = _size.ws_col }, 0 };
-  dict_push_value_str_key(vm->rc_arena, &size, STR_LIT("cols"), cols);
+  dict_push_value_str_key(&vm->rc_arena, &size, STR_LIT("cols"), cols);
 
-  value_stack_push_dict(&vm->stack, vm->rc_arena, size);
+  value_stack_push_dict(&vm->stack, &vm->rc_arena, size);
 
   return true;
 }

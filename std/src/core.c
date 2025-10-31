@@ -8,13 +8,15 @@
 #include "aether/macros.h"
 #include "shl/shl-arena.h"
 
-static Value unit_value = { ValueKindUnit, {}, 0 };
+#define DEFAULT_INPUT_BUFFER_SIZE   64
+
+static StringBuilder printf_sb = {0};
 
 bool head_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
 
   if (!value->as.list->next) {
-    value_stack_push_unit(&vm->stack, vm->rc_arena);
+    value_stack_push_unit(&vm->stack, &vm->rc_arena);
     return true;
   }
 
@@ -27,16 +29,16 @@ bool tail_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
 
   if (!value->as.list->next) {
-    value_stack_push_unit(&vm->stack, vm->rc_arena);
+    value_stack_push_unit(&vm->stack, &vm->rc_arena);
 
     return true;
   }
 
-  ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  ListNode *new_list = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
   new_list->next = value->as.list->next->next;
-  list_use(vm->rc_arena, new_list->next);
+  list_use(&vm->rc_arena, new_list->next);
 
-  value_stack_push_list(&vm->stack, vm->rc_arena, new_list);
+  value_stack_push_list(&vm->stack, &vm->rc_arena, new_list);
 
   return true;
 }
@@ -45,7 +47,7 @@ bool last_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
 
   if (!value->as.list->next) {
-    value_stack_push_unit(&vm->stack, vm->rc_arena);
+    value_stack_push_unit(&vm->stack, &vm->rc_arena);
     return true;
   }
 
@@ -74,7 +76,7 @@ bool set_nth_intrinsic(Vm *vm) {
     if (!node)
       PANIC("set-nth: out of bounds\n");
 
-    value_free(node->value, vm->rc_arena, true);
+    value_free(node->value, &vm->rc_arena, true);
     node->value = value;
   } else {
     if (index->as._int >= collection->as.string.len)
@@ -107,12 +109,12 @@ bool get_at_intrinsic(Vm *vm) {
     DA_APPEND(vm->stack, node->value);
   } else if (collection->kind == ValueKindString) {
     if (key->as._int >= collection->as.string.len) {
-      value_stack_push_unit(&vm->stack, vm->rc_arena);
+      value_stack_push_unit(&vm->stack, &vm->rc_arena);
     } else {
       Str result = collection->as.string;
       result.ptr += key->as._int;
       result.len = 1;
-      value_stack_push_string(&vm->stack, vm->rc_arena, result);
+      value_stack_push_string(&vm->stack, &vm->rc_arena, result);
     }
   } else if (collection->kind == ValueKindDict) {
     for (u32 i = 0; i < collection->as.dict.len; ++i) {
@@ -123,7 +125,7 @@ bool get_at_intrinsic(Vm *vm) {
       }
     }
 
-    value_stack_push_unit(&vm->stack, vm->rc_arena);
+    value_stack_push_unit(&vm->stack, &vm->rc_arena);
   }
 
   return true;
@@ -145,7 +147,7 @@ bool set_at_intrinsic(Vm *vm) {
     if (!node)
       PANIC("set-at: out of bounds\n");
 
-    value_free(node->value, vm->rc_arena, true);
+    value_free(node->value, &vm->rc_arena, true);
     node->value = value;
   } else if (collection->kind == ValueKindString) {
     if (key->as._int >= collection->as.string.len)
@@ -158,7 +160,7 @@ bool set_at_intrinsic(Vm *vm) {
   } else if (collection->kind == ValueKindDict) {
     for (u32 i = 0; i < collection->as.dict.len; ++i) {
       if (value_eq(collection->as.dict.items[i].key, key)) {
-        value_free(collection->as.dict.items[i].value, vm->rc_arena, true);
+        value_free(collection->as.dict.items[i].value, &vm->rc_arena, true);
         collection->as.dict.items[i].value = value;
 
         return true;
@@ -182,9 +184,9 @@ bool len_intrinsic(Vm *vm) {
       ++len;
     }
 
-    value_stack_push_int(&vm->stack, vm->rc_arena, len);
+    value_stack_push_int(&vm->stack, &vm->rc_arena, len);
   } else if (value->kind == ValueKindString) {
-    value_stack_push_int(&vm->stack, vm->rc_arena, value->as.string.len);
+    value_stack_push_int(&vm->stack, &vm->rc_arena, value->as.string.len);
   }
 
   return true;
@@ -213,28 +215,28 @@ bool get_range_intrinsic(Vm *vm) {
 
   if (value->kind == ValueKindList) {
     ListNode *node = value->as.list->next;
-    ListNode *sub_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+    ListNode *sub_list = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
     ListNode *sub_list_node = sub_list;
 
     for (u32 i = 0; i < begin->as._int; ++i)
       node = node->next;
 
     for (u32 i = 0; i < end->as._int - begin->as._int; ++i) {
-      sub_list_node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+      sub_list_node->next = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
       sub_list_node->next->value = node->value;
 
       node = node->next;
       sub_list_node = sub_list_node->next;
     }
 
-    value_stack_push_list(&vm->stack, vm->rc_arena, sub_list);
+    value_stack_push_list(&vm->stack, &vm->rc_arena, sub_list);
   } else {
     Str sub_string = {
       value->as.string.ptr + begin->as._int,
       end->as._int - begin->as._int,
     };
 
-    value_stack_push_string(&vm->stack, vm->rc_arena, sub_string);
+    value_stack_push_string(&vm->stack, &vm->rc_arena, sub_string);
   }
 
   return true;
@@ -244,21 +246,21 @@ bool map_intrinsic(Vm *vm) {
   Value *list = value_stack_pop(&vm->stack);
   Value *func = value_stack_pop(&vm->stack);
 
-  ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  ListNode *new_list = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
   ListNode **new_list_next = &new_list->next;
   ListNode *node = list->as.list->next;
   while (node) {
     DA_APPEND(vm->stack, node->value);
     EXECUTE_FUNC(vm, &func->as.func, true);
 
-    *new_list_next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+    *new_list_next = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
     (*new_list_next)->value = value_stack_pop(&vm->stack);
     new_list_next = &(*new_list_next)->next;
 
     node = node->next;
   }
 
-  value_stack_push_list(&vm->stack, vm->rc_arena, new_list);
+  value_stack_push_list(&vm->stack, &vm->rc_arena, new_list);
 
   return true;
 }
@@ -267,7 +269,7 @@ bool filter_intrinsic(Vm *vm) {
   Value *list = value_stack_pop(&vm->stack);
   Value *func = value_stack_pop(&vm->stack);
 
-  ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  ListNode *new_list = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
   ListNode **new_list_next = &new_list->next;
   ListNode *node = list->as.list->next;
   while (node) {
@@ -279,7 +281,7 @@ bool filter_intrinsic(Vm *vm) {
       PANIC("filter: wrong argument kinds\n");
 
     if (is_ok->as._bool) {
-      *new_list_next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+      *new_list_next = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
       (*new_list_next)->value = node->value;
       new_list_next = &(*new_list_next)->next;
     }
@@ -287,7 +289,7 @@ bool filter_intrinsic(Vm *vm) {
     node = node->next;
   }
 
-  value_stack_push_list(&vm->stack, vm->rc_arena, new_list);
+  value_stack_push_list(&vm->stack, &vm->rc_arena, new_list);
 
   return true;
 }
@@ -304,7 +306,7 @@ bool fold_intrinsic(Vm *vm) {
     DA_APPEND(vm->stack, node->value);
     EXECUTE_FUNC(vm, &func->as.func, true);
 
-    value_free(accumulator, vm->rc_arena, true);
+    value_free(accumulator, &vm->rc_arena, true);
     accumulator = value_stack_pop(&vm->stack);
 
     node = node->next;
@@ -315,98 +317,102 @@ bool fold_intrinsic(Vm *vm) {
   return true;
 }
 
-bool str_to_int_intrinsic(Vm *vm) {
-  Value *value = value_stack_pop(&vm->stack);
+static void sb_push_value(StringBuilder *sb, Value *value, u32 level) {
+  switch (value->kind) {
+  case ValueKindUnit: {
+    sb_push(sb, "unit");
+  } break;
 
-  value_stack_push_int(&vm->stack, vm->rc_arena, str_to_i64(value->as.string));
+  case ValueKindList: {
+    sb_push_char(sb, '[');
 
-  return true;
+    ListNode *node = value->as.list->next;
+    while (node) {
+      if (node != value->as.list->next)
+        sb_push_char(sb, ' ');
+
+      if (node->value->kind == ValueKindString)
+        sb_push_char(sb, '\'');
+      sb_push_value(sb, node->value, level);
+      if (node->value->kind == ValueKindString)
+        sb_push_char(sb, '\'');
+
+      node = node->next;
+    }
+
+    sb_push_char(sb, ']');
+  } break;
+
+  case ValueKindString: {
+    sb_push_str(sb, value->as.string);
+  } break;
+
+  case ValueKindInt: {
+    sb_push_i64(sb, value->as._int);
+  } break;
+
+  case ValueKindFloat: {
+    sb_push_f64(sb, value->as._float);
+  } break;
+
+  case ValueKindBool: {
+    if (value->as._bool)
+      sb_push(sb, "true");
+    else
+      sb_push(sb, "false");
+  } break;
+
+  case ValueKindFunc: {
+    sb_push_char(sb, '[');
+
+    for (u32 i = 0; i < value->as.func.args.len; ++i) {
+      if (i > 0)
+        sb_push_char(sb, ' ');
+      sb_push_str(sb, value->as.func.args.items[i]);
+    }
+
+    sb_push(sb, "] -> ...");
+  } break;
+
+  case ValueKindDict: {
+    sb_push(sb, "{\n");
+
+    for (u32 i = 0; i < value->as.dict.len; ++i) {
+      for (u32 j = 0; j < level + 1; ++j)
+        sb_push(sb, "  ");
+
+      sb_push_value(sb, value->as.dict.items[i].key, level + 1);
+      sb_push(sb, ": ");
+      sb_push_value(sb, value->as.dict.items[i].value, level + 1);
+
+      sb_push_char(sb, '\n');
+    }
+
+    for (u32 j = 0; j < level; ++j)
+      sb_push(sb, "  ");
+    sb_push_char(sb, '}');
+  } break;
+
+  case ValueKindEnv: {
+    sb_push(sb, "environment");
+  } break;
+  }
 }
 
-bool str_to_float_intrinsic(Vm *vm) {
-  Value *value = value_stack_pop(&vm->stack);
-
-  value_stack_push_float(&vm->stack, vm->rc_arena, str_to_f64(value->as.string));
-
-  return true;
-}
-
-bool int_to_float_intrinsic(Vm *vm) {
-  Value *value = value_stack_pop(&vm->stack);
-
-  value_stack_push_float(&vm->stack, vm->rc_arena, (f64) value->as._int);
-
-  return true;
-}
-
-bool int_to_str_intrinsic(Vm *vm) {
+bool to_str_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
 
   StringBuilder sb = {0};
-  sb_push_i64(&sb, value->as._int);
-
-  Str new_string;
-  new_string.len = sb.len;
-  new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
-  memcpy(new_string.ptr, sb.buffer, sb.len);
-  free(sb.buffer);
-
-  value_stack_push_string(&vm->stack, vm->rc_arena, new_string);
-
-  return true;
-}
-
-bool float_to_int_intrinsic(Vm *vm) {
-  Value *value = value_stack_pop(&vm->stack);
-
-  value_stack_push_int(&vm->stack, vm->rc_arena, (i64) value->as._float);
-
-  return true;
-}
-
-bool float_to_str_intrinsic(Vm *vm) {
-  Value *value = value_stack_pop(&vm->stack);
-
-  StringBuilder sb = {0};
-  sb_push_f64(&sb, value->as._int);
-
-  Str new_string;
-  new_string.len = sb.len;
-  new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
-  memcpy(new_string.ptr, sb.buffer, sb.len);
-  free(sb.buffer);
-
-  value_stack_push_string(&vm->stack, vm->rc_arena, new_string);
-
-  return true;
-}
-
-bool bool_to_str_intrinsic(Vm *vm) {
-  Value *value = value_stack_pop(&vm->stack);
+  sb_push_value(&sb, value, 0);
 
   Str string;
-  char *cstring;
+  string.len = sb.len;
+  string.ptr = rc_arena_alloc(&vm->rc_arena, sb.len);
+  memcpy(string.ptr, sb.buffer, string.len);
 
-  if (value->as._bool) {
-    string.len = 4;
-    cstring = "true";
-  } else {
-    string.len = 5;
-    cstring = "false";
-  }
+  value_stack_push_string(&vm->stack, &vm->rc_arena, string);
 
-  string.ptr = rc_arena_alloc(vm->rc_arena, string.len);
-  memcpy(string.ptr, cstring, string.len);
-
-  value_stack_push_string(&vm->stack, vm->rc_arena, string);
-
-  return true;
-}
-
-bool bool_to_int_intrinsic(Vm *vm) {
-  Value *value = value_stack_pop(&vm->stack);
-
-  value_stack_push_int(&vm->stack, vm->rc_arena, value->as._bool);
+  free(sb.buffer);
 
   return true;
 }
@@ -416,7 +422,7 @@ static bool byte_to_str(Vm *vm, u32 size) {
 
   Str new_string;
   new_string.len = size;
-  new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
+  new_string.ptr = rc_arena_alloc(&vm->rc_arena, new_string.len);
 
   switch (size) {
   case 8: *(i64 *) new_string.ptr = value->as._int; break;
@@ -425,7 +431,7 @@ static bool byte_to_str(Vm *vm, u32 size) {
   case 1: *(i8 *) new_string.ptr = value->as._int; break;
   }
 
-  value_stack_push_string(&vm->stack, vm->rc_arena, new_string);
+  value_stack_push_string(&vm->stack, &vm->rc_arena, new_string);
 
   return true;
 }
@@ -453,6 +459,30 @@ bool byte_8_to_str_intrinsic(Vm *vm) {
 
   return true;
 }
+bool to_int_intrinsic(Vm *vm) {
+  Value *value = value_stack_pop(&vm->stack);
+
+  if (value->kind == ValueKindString) {
+    value_stack_push_int(&vm->stack, &vm->rc_arena, str_to_i64(value->as.string));
+  } else if (value->kind == ValueKindBool) {
+    value_stack_push_int(&vm->stack, &vm->rc_arena, (i64) value->as._bool);
+  } else if (value->kind == ValueKindFloat) {
+    value_stack_push_int(&vm->stack, &vm->rc_arena, (i64) value->as._float);
+  }
+
+  return true;
+}
+
+bool to_float_intrinsic(Vm *vm) {
+  Value *value = value_stack_pop(&vm->stack);
+
+  if (value->kind == ValueKindInt)
+    value_stack_push_float(&vm->stack, &vm->rc_arena, (f64) value->as._int);
+  else if (value->kind == ValueKindString)
+    value_stack_push_float(&vm->stack, &vm->rc_arena, str_to_f64(value->as.string));
+
+  return true;
+}
 
 bool add_intrinsic(Vm *vm) {
   Value *b = value_stack_pop(&vm->stack);
@@ -460,10 +490,10 @@ bool add_intrinsic(Vm *vm) {
 
   if (a->kind == ValueKindInt &&
       b->kind == ValueKindInt) {
-    value_stack_push_int(&vm->stack, vm->rc_arena, a->as._int + b->as._int);
+    value_stack_push_int(&vm->stack, &vm->rc_arena, a->as._int + b->as._int);
   } else if (a->kind == ValueKindFloat &&
         b->kind == ValueKindFloat) {
-    value_stack_push_float(&vm->stack, vm->rc_arena, a->as._float + b->as._float);
+    value_stack_push_float(&vm->stack, &vm->rc_arena, a->as._float + b->as._float);
   } else if (a->kind == ValueKindString &&
              b->kind == ValueKindString) {
     StringBuilder sb = {0};
@@ -472,46 +502,46 @@ bool add_intrinsic(Vm *vm) {
 
     Str new_string;
     new_string.len = sb.len;
-    new_string.ptr = rc_arena_alloc(vm->rc_arena, new_string.len);
+    new_string.ptr = rc_arena_alloc(&vm->rc_arena, new_string.len);
     memcpy(new_string.ptr, sb.buffer, new_string.len);
     free(sb.buffer);
 
-    value_stack_push_string(&vm->stack, vm->rc_arena, new_string);
+    value_stack_push_string(&vm->stack, &vm->rc_arena, new_string);
   } else if (a->kind == ValueKindList &&
              b->kind == ValueKindList) {
-    ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-    new_list->next = list_clone(vm->rc_arena, a->as.list->next);
+    ListNode *new_list = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
+    new_list->next = list_clone(&vm->rc_arena, a->as.list->next);
 
     ListNode *node = new_list;
     while (node && node->next)
       node = node->next;
 
     if (node)
-      node->next = list_clone(vm->rc_arena, b->as.list->next);
+      node->next = list_clone(&vm->rc_arena, b->as.list->next);
 
-    value_stack_push_list(&vm->stack, vm->rc_arena, new_list);
+    value_stack_push_list(&vm->stack, &vm->rc_arena, new_list);
   } else if (a->kind == ValueKindList) {
-    ListNode *new_list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
-    new_list->next = list_clone(vm->rc_arena, a->as.list->next);
+    ListNode *new_list = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
+    new_list->next = list_clone(&vm->rc_arena, a->as.list->next);
     ListNode *node = new_list;
 
     while (node && node->next)
       node = node->next;
 
-    node->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+    node->next = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
     node->next->value = b;
     node->next->next = NULL;
 
-    value_stack_push_list(&vm->stack, vm->rc_arena, new_list);
+    value_stack_push_list(&vm->stack, &vm->rc_arena, new_list);
   } else if (b->kind == ValueKindList) {
-    ListNode *new_list = list_clone(vm->rc_arena, b->as.list);
+    ListNode *new_list = list_clone(&vm->rc_arena, b->as.list);
     ListNode *next = new_list->next;
 
-    new_list->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+    new_list->next = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
     new_list->next->value = a;
     new_list->next->next = next;
 
-    value_stack_push_list(&vm->stack, vm->rc_arena, b->as.list);
+    value_stack_push_list(&vm->stack, &vm->rc_arena, b->as.list);
   }
 
   return true;
@@ -522,9 +552,9 @@ bool sub_intrinsic(Vm *vm) {
   prepare_rwo_numbers(&a, &b, vm);
 
   if (a->kind == ValueKindInt)
-    value_stack_push_int(&vm->stack, vm->rc_arena, a->as._int - b->as._int);
+    value_stack_push_int(&vm->stack, &vm->rc_arena, a->as._int - b->as._int);
   else if (a->kind == ValueKindFloat)
-    value_stack_push_float(&vm->stack, vm->rc_arena, a->as._float - b->as._float);
+    value_stack_push_float(&vm->stack, &vm->rc_arena, a->as._float - b->as._float);
 
   return true;
 }
@@ -534,23 +564,23 @@ bool mul_intrinsic(Vm *vm) {
   Value *a = value_stack_pop(&vm->stack);
 
   if (a->kind == ValueKindInt) {
-    value_stack_push_int(&vm->stack, vm->rc_arena, a->as._int * b->as._int);
+    value_stack_push_int(&vm->stack, &vm->rc_arena, a->as._int * b->as._int);
   } else if (a->kind == ValueKindFloat) {
-    value_stack_push_float(&vm->stack, vm->rc_arena, a->as._float * b->as._float);
+    value_stack_push_float(&vm->stack, &vm->rc_arena, a->as._float * b->as._float);
   } else if (a->kind == ValueKindString) {
     StringBuilder sb = {0};
     for (u32 i = 0; i < b->as._int; ++i)
       sb_push_str(&sb, a->as.string);
 
     Str result = {
-      rc_arena_alloc(vm->rc_arena, sb.len),
+      rc_arena_alloc(&vm->rc_arena, sb.len),
       sb.len,
     };
     memcpy(result.ptr, sb.buffer, result.len);
 
     free(sb.buffer);
 
-    value_stack_push_string(&vm->stack, vm->rc_arena, result);
+    value_stack_push_string(&vm->stack, &vm->rc_arena, result);
   }
 
   return true;
@@ -561,9 +591,9 @@ bool div_intrinsic(Vm *vm) {
   prepare_rwo_numbers(&a, &b, vm);
 
   if (a->kind == ValueKindInt)
-    value_stack_push_int(&vm->stack, vm->rc_arena, a->as._int / b->as._int);
+    value_stack_push_int(&vm->stack, &vm->rc_arena, a->as._int / b->as._int);
   else if (a->kind == ValueKindFloat)
-    value_stack_push_float(&vm->stack, vm->rc_arena, a->as._float / b->as._float);
+    value_stack_push_float(&vm->stack, &vm->rc_arena, a->as._float / b->as._float);
 
   return true;
 }
@@ -572,7 +602,7 @@ bool mod_intrinsic(Vm *vm) {
   Value *b = value_stack_pop(&vm->stack);
   Value *a = value_stack_pop(&vm->stack);
 
-  value_stack_push_int(&vm->stack, vm->rc_arena, a->as._int % b->as._int);
+  value_stack_push_int(&vm->stack, &vm->rc_arena, a->as._int % b->as._int);
 
   return true;
 }
@@ -581,7 +611,7 @@ bool eq_intrinsic(Vm *vm) {
   Value *b = value_stack_pop(&vm->stack);
   Value *a = value_stack_pop(&vm->stack);
 
-  value_stack_push_bool(&vm->stack, vm->rc_arena, value_eq(a, b));
+  value_stack_push_bool(&vm->stack, &vm->rc_arena, value_eq(a, b));
 
   return true;
 }
@@ -590,7 +620,7 @@ bool ne_intrinsic(Vm *vm) {
   Value *b = value_stack_pop(&vm->stack);
   Value *a = value_stack_pop(&vm->stack);
 
-  value_stack_push_bool(&vm->stack, vm->rc_arena, !value_eq(a, b));
+  value_stack_push_bool(&vm->stack, &vm->rc_arena, !value_eq(a, b));
 
   return true;
 }
@@ -600,9 +630,9 @@ bool ls_intrinsic(Vm *vm) {
   prepare_rwo_numbers(&a, &b, vm);
 
   if (a->kind == ValueKindInt)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._int < b->as._int);
+    value_stack_push_bool(&vm->stack, &vm->rc_arena, a->as._int < b->as._int);
   else
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._float < b->as._float);
+    value_stack_push_bool(&vm->stack, &vm->rc_arena, a->as._float < b->as._float);
 
   return true;
 }
@@ -612,9 +642,9 @@ bool le_intrinsic(Vm *vm) {
   prepare_rwo_numbers(&a, &b, vm);
 
   if (a->kind == ValueKindInt)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._int <= b->as._int);
+    value_stack_push_bool(&vm->stack, &vm->rc_arena, a->as._int <= b->as._int);
   else
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._float <= b->as._float);
+    value_stack_push_bool(&vm->stack, &vm->rc_arena, a->as._float <= b->as._float);
 
   return true;
 }
@@ -624,9 +654,9 @@ bool gt_intrinsic(Vm *vm) {
   prepare_rwo_numbers(&a, &b, vm);
 
   if (a->kind == ValueKindInt)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._int > b->as._int);
+    value_stack_push_bool(&vm->stack, &vm->rc_arena, a->as._int > b->as._int);
   else
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._float > b->as._float);
+    value_stack_push_bool(&vm->stack, &vm->rc_arena, a->as._float > b->as._float);
 
   return true;
 }
@@ -636,9 +666,9 @@ bool ge_intrinsic(Vm *vm) {
   prepare_rwo_numbers(&a, &b, vm);
 
   if (a->kind == ValueKindInt)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._int >= b->as._int);
+    value_stack_push_bool(&vm->stack, &vm->rc_arena, a->as._int >= b->as._int);
   else
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._float >= b->as._float);
+    value_stack_push_bool(&vm->stack, &vm->rc_arena, a->as._float >= b->as._float);
 
   return true;
 }
@@ -649,10 +679,10 @@ bool and_intrinsic(Vm *vm) {
 
   if (a->kind == ValueKindInt &&
       b->kind == ValueKindInt)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._int & b->as._int);
+    value_stack_push_bool(&vm->stack, &vm->rc_arena, a->as._int & b->as._int);
   else if (a->kind == ValueKindBool &&
            b->kind == ValueKindBool)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._bool & b->as._bool);
+    value_stack_push_bool(&vm->stack, &vm->rc_arena, a->as._bool & b->as._bool);
 
   return true;
 }
@@ -663,10 +693,10 @@ bool or_intrinsic(Vm *vm) {
 
   if (a->kind == ValueKindInt &&
       b->kind == ValueKindInt)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._int | b->as._int);
+    value_stack_push_bool(&vm->stack, &vm->rc_arena, a->as._int | b->as._int);
   else if (a->kind == ValueKindBool &&
            b->kind == ValueKindBool)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._bool | b->as._bool);
+    value_stack_push_bool(&vm->stack, &vm->rc_arena, a->as._bool | b->as._bool);
 
   return true;
 }
@@ -677,10 +707,10 @@ bool xor_intrinsic(Vm *vm) {
 
   if (a->kind == ValueKindInt &&
       b->kind == ValueKindInt)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._int ^ b->as._int);
+    value_stack_push_bool(&vm->stack, &vm->rc_arena, a->as._int ^ b->as._int);
   else if (a->kind == ValueKindBool &&
            b->kind == ValueKindBool)
-    value_stack_push_bool(&vm->stack, vm->rc_arena, a->as._bool ^ b->as._bool);
+    value_stack_push_bool(&vm->stack, &vm->rc_arena, a->as._bool ^ b->as._bool);
 
 
   return true;
@@ -689,7 +719,7 @@ bool xor_intrinsic(Vm *vm) {
 bool not_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
 
-  value_stack_push_bool(&vm->stack, vm->rc_arena, !value_to_bool(value));
+  value_stack_push_bool(&vm->stack, &vm->rc_arena, !value_to_bool(value));
 
   return true;
 }
@@ -699,35 +729,35 @@ bool type_intrinsic(Vm *vm) {
 
   switch (value->kind) {
   case ValueKindUnit: {
-    value_stack_push_string(&vm->stack, vm->rc_arena, STR_LIT("unit"));
+    value_stack_push_string(&vm->stack, &vm->rc_arena, STR_LIT("unit"));
   } break;
 
   case ValueKindList: {
-    value_stack_push_string(&vm->stack, vm->rc_arena, STR_LIT("list"));
+    value_stack_push_string(&vm->stack, &vm->rc_arena, STR_LIT("list"));
   } break;
 
   case ValueKindString: {
-    value_stack_push_string(&vm->stack, vm->rc_arena, STR_LIT("string"));
+    value_stack_push_string(&vm->stack, &vm->rc_arena, STR_LIT("string"));
   } break;
 
   case ValueKindInt: {
-    value_stack_push_string(&vm->stack, vm->rc_arena, STR_LIT("int"));
+    value_stack_push_string(&vm->stack, &vm->rc_arena, STR_LIT("int"));
   } break;
 
   case ValueKindFloat: {
-    value_stack_push_string(&vm->stack, vm->rc_arena, STR_LIT("float"));
+    value_stack_push_string(&vm->stack, &vm->rc_arena, STR_LIT("float"));
   } break;
 
   case ValueKindBool: {
-    value_stack_push_string(&vm->stack, vm->rc_arena, STR_LIT("bool"));
+    value_stack_push_string(&vm->stack, &vm->rc_arena, STR_LIT("bool"));
   } break;
 
   case ValueKindFunc: {
-    value_stack_push_string(&vm->stack, vm->rc_arena, STR_LIT("func"));
+    value_stack_push_string(&vm->stack, &vm->rc_arena, STR_LIT("func"));
   } break;
 
   case ValueKindDict: {
-    value_stack_push_string(&vm->stack, vm->rc_arena, STR_LIT("dict"));
+    value_stack_push_string(&vm->stack, &vm->rc_arena, STR_LIT("dict"));
   } break;
 
   default: {
@@ -740,150 +770,73 @@ bool type_intrinsic(Vm *vm) {
 
 bool is_unit_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, vm->rc_arena, value->kind == ValueKindUnit);
+  value_stack_push_bool(&vm->stack, &vm->rc_arena, value->kind == ValueKindUnit);
 
   return true;
 }
 
 bool is_list_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, vm->rc_arena, value->kind == ValueKindList);
+  value_stack_push_bool(&vm->stack, &vm->rc_arena, value->kind == ValueKindList);
 
   return true;
 }
 
 bool is_string_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, vm->rc_arena, value->kind == ValueKindString);
+  value_stack_push_bool(&vm->stack, &vm->rc_arena, value->kind == ValueKindString);
 
   return true;
 }
 
 bool is_int_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, vm->rc_arena, value->kind == ValueKindInt);
+  value_stack_push_bool(&vm->stack, &vm->rc_arena, value->kind == ValueKindInt);
 
   return true;
 }
 
 bool is_float_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, vm->rc_arena, value->kind == ValueKindFloat);
+  value_stack_push_bool(&vm->stack, &vm->rc_arena, value->kind == ValueKindFloat);
 
   return true;
 }
 
 bool is_bool_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, vm->rc_arena, value->kind == ValueKindBool);
+  value_stack_push_bool(&vm->stack, &vm->rc_arena, value->kind == ValueKindBool);
 
   return true;
 }
 
 bool is_func_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, vm->rc_arena, value->kind == ValueKindFunc);
+  value_stack_push_bool(&vm->stack, &vm->rc_arena, value->kind == ValueKindFunc);
 
   return true;
 }
 
 bool is_dict_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
-  value_stack_push_bool(&vm->stack, vm->rc_arena, value->kind == ValueKindDict);
+  value_stack_push_bool(&vm->stack, &vm->rc_arena, value->kind == ValueKindDict);
 
   return true;
 }
 
-#define DEFAULT_INPUT_BUFFER_SIZE   64
-
-static void print_value(ValueStack *stack, Value *value, u32 level) {
-  switch (value->kind) {
-  case ValueKindUnit: {
-    fputs("unit", stdout);
-  } break;
-
-  case ValueKindList: {
-    fputc('[', stdout);
-
-    ListNode *node = value->as.list->next;
-    while (node) {
-      if (node != value->as.list->next)
-        fputc(' ', stdout);
-
-      if (node->value->kind == ValueKindString)
-        fputc('\'', stdout);
-      print_value(stack, node->value, level);
-      if (node->value->kind == ValueKindString)
-        fputc('\'', stdout);
-
-      node = node->next;
-    }
-
-    fputc(']', stdout);
-  } break;
-
-  case ValueKindString: {
-    str_print(value->as.string);
-  } break;
-
-  case ValueKindInt: {
-    printf("%ld", value->as._int);
-  } break;
-
-  case ValueKindFloat: {
-    printf("%f", value->as._float);
-  } break;
-
-  case ValueKindBool: {
-    if (value->as._bool)
-      fputs("true", stdout);
-    else
-      fputs("false", stdout);
-  } break;
-
-  case ValueKindFunc: {
-    fputs("[", stdout);
-
-    for (u32 i = 0; i < value->as.func.args.len; ++i) {
-      if (i > 0)
-        fputc(' ', stdout);
-      str_print(value->as.func.args.items[i]);
-    }
-
-    fputs("] -> ...", stdout);
-  } break;
-
-  case ValueKindDict: {
-    fputs("{\n", stdout);
-
-    for (u32 i = 0; i < value->as.dict.len; ++i) {
-      for (u32 j = 0; j < level + 1; ++j)
-        fputs("  ", stdout);
-
-      print_value(stack, value->as.dict.items[i].key, level + 1);
-      fputs(": ", stdout);
-      print_value(stack, value->as.dict.items[i].value, level + 1);
-
-      fputc('\n', stdout);
-    }
-
-    for (u32 j = 0; j < level; ++j)
-      fputs("  ", stdout);
-    fputs("}", stdout);
-  } break;
-  }
-}
-
-bool print_intrinsic(Vm *vm) {
+bool printf_intrinsic(Vm *vm) {
   Value *value = value_stack_pop(&vm->stack);
-  print_value(&vm->stack, value, 0);
 
-  return true;
-}
+  printf_sb.len = 0;
 
-bool flush_intrinsic(Vm *vm) {
-  (void) vm;
+  ListNode *node = value->as.list->next;
+  while (node) {
+    sb_push_value(&printf_sb, node->value, 0);
 
+    node = node->next;
+  }
+
+  str_print(STR(printf_sb.buffer, printf_sb.len));
   fflush(stdout);
 
   return true;
@@ -894,10 +847,10 @@ bool input_size_intrinsic(Vm *vm) {
 
   Str buffer;
   buffer.len = size->as._int;
-  buffer.ptr = rc_arena_alloc(vm->rc_arena, buffer.len);
+  buffer.ptr = rc_arena_alloc(&vm->rc_arena, buffer.len);
   read(0, buffer.ptr, buffer.len);
 
-  value_stack_push_string(&vm->stack, vm->rc_arena, buffer);
+  value_stack_push_string(&vm->stack, &vm->rc_arena, buffer);
 
   return true;
 }
@@ -906,7 +859,7 @@ bool input_intrinsic(Vm *vm) {
   (void) vm;
 
   u32 buffer_size = DEFAULT_INPUT_BUFFER_SIZE;
-  char *buffer = rc_arena_alloc(vm->rc_arena, buffer_size);
+  char *buffer = rc_arena_alloc(&vm->rc_arena, buffer_size);
   u32 len = 0;
 
   char ch;
@@ -915,116 +868,94 @@ bool input_intrinsic(Vm *vm) {
       buffer_size += DEFAULT_INPUT_BUFFER_SIZE;
 
       char *prev_buffer = buffer;
-      buffer = rc_arena_alloc(vm->rc_arena, buffer_size);
+      buffer = rc_arena_alloc(&vm->rc_arena, buffer_size);
       memcpy(buffer, prev_buffer, len);
-      rc_arena_free(vm->rc_arena, prev_buffer);
+      rc_arena_free(&vm->rc_arena, prev_buffer);
     }
 
     buffer[len++] = ch;
   }
 
-  value_stack_push_string(&vm->stack, vm->rc_arena, STR(buffer, len));
+  value_stack_push_string(&vm->stack, &vm->rc_arena, STR(buffer, len));
 
   return true;
 }
 
 bool get_args_intrinsic(Vm *vm) {
-  value_stack_push_list(&vm->stack, vm->rc_arena, vm->args);
+  value_stack_push_list(&vm->stack, &vm->rc_arena, vm->args);
 
   return true;
 }
 
-static Value *get_dict_field_value(Dict *dict, Str name) {
-  for (u32 i = 0; dict->len; ++i) {
-    DictValue *field = dict->items + i;
+bool make_env_intrinsic(Vm *vm) {
+  i32 argc = 2;
+  char *argv[] = { "aether", "env", NULL };
+  Intrinsics intrinsics = {0};
+  Vm new_vm = vm_create(argc, argv, &intrinsics);
 
-    if (field->key->kind == ValueKindString &&
-        str_eq(field->key->as.string, name))
-      return field->value;
-  }
+  value_stack_push_env(&vm->stack, &vm->rc_arena, new_vm);
 
-  return NULL;
+  return true;
 }
 
 bool compile_intrinsic(Vm *vm) {
-  Value *file_codes = value_stack_pop(&vm->stack);
+  Value *path = value_stack_pop(&vm->stack);
+  Value *code = value_stack_pop(&vm->stack);
+  Value *env = value_stack_pop(&vm->stack);
 
-  Ir ir = {0};
+  char *path_cstr = malloc(path->as.string.len + 1);
+  memcpy(path_cstr, path->as.string.ptr,
+         path->as.string.len);
+  path_cstr[path->as.string.len] = '\0';
 
-  Macros macros = {0};
-  FilePaths included_files = {0};
-
-  ListNode *file_code = file_codes->as.list->next;
-  while (file_code) {
-    if (file_code->value->kind != ValueKindDict)
-      PANIC("compile: wrong argument kind\n");
-
-    Value *code = get_dict_field_value(&file_code->value->as.dict,
-                                       STR_LIT("code"));
-    if (!code || code->kind != ValueKindString)
-      PANIC("compile: wrong argument kind\n");
-
-    Value *file_path = get_dict_field_value(&file_code->value->as.dict,
-                                            STR_LIT("file-path"));
-    if (!file_path || file_path->kind != ValueKindString)
-      PANIC("compile: wrong argument kind\n");
-
-    char *file_path_cstr = malloc(file_path->as.string.len + 1);
-    memcpy(file_path_cstr, file_path->as.string.ptr,
-           file_path->as.string.len);
-    file_path_cstr[file_path->as.string.len] = '\0';
-
-    IrBlock block = parse_ex(code->as.string, file_path_cstr,
-                             &macros, &included_files);
-    expand_macros_block(&block, &macros, NULL, NULL, false);
-
-    for (u32 i = 0; i < block.len; ++i)
-      DA_APPEND(ir, block.items[i]);
-
-    free(block.items);
-    free(file_path_cstr);
-
-    file_code = file_code->next;
-  }
+  Ir ir = parse_ex(code->as.string, path_cstr,
+                   &env->as.env->macros,
+                   &env->as.env->included_files);
+  expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false);
 
   Str bytecode = {0};
   bytecode.ptr = (char *) serialize(&ir, &bytecode.len);
 
-  value_stack_push_string(&vm->stack, vm->rc_arena, bytecode);
+  value_stack_push_string(&vm->stack, &vm->rc_arena, bytecode);
+
+  free(ir.items);
+  free(path_cstr);
 
   return true;
 }
 
 bool eval_compiled_intrinsic(Vm *vm) {
   Value *bytecode = value_stack_pop(&vm->stack);
+  Value *env = value_stack_pop(&vm->stack);
 
   Ir ir = deserialize((u8 *) bytecode->as.string.ptr,
                        bytecode->as.string.len,
-                       vm->rc_arena);
+                       &vm->rc_arena);
 
-  i32 argc = 1;
-  char *argv[] = { "aether", "eval", NULL };
-  Intrinsics intrinsics = {0};
-  Value *result_value = &unit_value;
-  execute(&ir, argc, argv, vm->rc_arena, &intrinsics, &result_value);
+  execute_block(&env->as.env->vm, &ir, true);
 
-  DA_APPEND(vm->stack, result_value);
+  if (env->as.env->vm.stack.len > 0)
+    DA_APPEND(vm->stack, env->as.env->vm.stack.items[env->as.env->vm.stack.len - 1]);
+  else
+    value_stack_push_unit(&vm->stack, &vm->rc_arena);
 
   return true;
 }
 
 bool eval_intrinsic(Vm *vm) {
   Value *code = value_stack_pop(&vm->stack);
+  Value *env = value_stack_pop(&vm->stack);
 
-  Ir ir = parse(code->as.string, "eval");
+  Ir ir = parse_ex(code->as.string, "eval", &env->as.env->macros,
+                   &env->as.env->included_files);
+  expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false);
 
-  i32 argc = 1;
-  char *argv[] = { "aether", "eval", NULL };
-  Intrinsics intrinsics = {0};
-  Value *result_value = &unit_value;
-  execute(&ir, argc, argv, vm->rc_arena, &intrinsics, &result_value);
+  execute_block(&env->as.env->vm, &ir, true);
 
-  DA_APPEND(vm->stack, result_value);
+  if (env->as.env->vm.stack.len > 0)
+    DA_APPEND(vm->stack, env->as.env->vm.stack.items[env->as.env->vm.stack.len - 1]);
+  else
+    value_stack_push_unit(&vm->stack, &vm->rc_arena);
 
   return true;
 }
@@ -1067,18 +998,16 @@ Intrinsic core_intrinsics[] = {
     { ValueKindFunc, ValueKindUnit, ValueKindList },
     &fold_intrinsic },
   // Conversions
-  { STR_LIT("str-to-int"), true, 1, { ValueKindString }, &str_to_int_intrinsic },
-  { STR_LIT("str-to-float"), true, 1, { ValueKindString }, &str_to_float_intrinsic },
-  { STR_LIT("int-to-str"), true, 1, { ValueKindInt }, &int_to_str_intrinsic },
-  { STR_LIT("int-to-str"), true, 1, { ValueKindInt }, &int_to_str_intrinsic },
-  { STR_LIT("bool-to-int"), true, 1, { ValueKindBool }, &bool_to_int_intrinsic },
-  { STR_LIT("bool-to-str"), true, 1, { ValueKindBool }, &bool_to_str_intrinsic },
-  { STR_LIT("float-to-int"), true, 1, { ValueKindFloat }, &int_to_str_intrinsic },
-  { STR_LIT("float-to-str"), true, 1, { ValueKindFloat }, &int_to_str_intrinsic },
+  { STR_LIT("to-str"), true, 1, { ValueKindUnit }, &to_str_intrinsic },
   { STR_LIT("byte-64-to-str"), true, 1, { ValueKindInt }, &byte_64_to_str_intrinsic },
   { STR_LIT("byte-32-to-str"), true, 1, { ValueKindInt }, &byte_32_to_str_intrinsic },
   { STR_LIT("byte-16-to-str"), true, 1, { ValueKindInt }, &byte_16_to_str_intrinsic },
   { STR_LIT("byte-8-to-str"), true, 1, { ValueKindInt }, &byte_8_to_str_intrinsic },
+  { STR_LIT("to-int"), true, 1, { ValueKindString }, &to_int_intrinsic },
+  { STR_LIT("to-int"), true, 1, { ValueKindBool }, &to_int_intrinsic },
+  { STR_LIT("to-int"), true, 1, { ValueKindFloat }, &to_int_intrinsic },
+  { STR_LIT("to-float"), true, 1, { ValueKindInt }, &to_float_intrinsic },
+  { STR_LIT("to-float"), true, 1, { ValueKindString }, &to_float_intrinsic },
   // Math
   { STR_LIT("add"), true, 2, { ValueKindInt, ValueKindInt }, &add_intrinsic },
   { STR_LIT("add"), true, 2, { ValueKindFloat, ValueKindFloat }, &add_intrinsic },
@@ -1133,15 +1062,19 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("is-func"), true, 1, { ValueKindUnit }, &is_func_intrinsic },
   { STR_LIT("is-dict"), true, 1, { ValueKindUnit }, &is_dict_intrinsic },
   // Base io
-  { STR_LIT("print"), false, 1, { ValueKindUnit }, &print_intrinsic },
-  { STR_LIT("flush"), false, 0, {}, &flush_intrinsic },
+  { STR_LIT("printf"), false, 1, { ValueKindList }, &printf_intrinsic },
   { STR_LIT("input-size"), true, 1, { ValueKindInt }, &input_size_intrinsic },
   { STR_LIT("input"), true, 0, {}, &input_intrinsic },
   // Other
   { STR_LIT("get-args"), true, 0, {}, &get_args_intrinsic },
-  { STR_LIT("compile"), true, 1, { ValueKindList }, &compile_intrinsic },
-  { STR_LIT("eval-compiled"), true, 1, { ValueKindString }, &eval_compiled_intrinsic },
-  { STR_LIT("eval"), true, 1, { ValueKindString }, &eval_intrinsic },
+  { STR_LIT("make-env"), true, 0, {}, &make_env_intrinsic },
+  { STR_LIT("compile"), true, 3,
+    { ValueKindEnv, ValueKindString, ValueKindString },
+    &compile_intrinsic },
+  { STR_LIT("eval-compiled"), true, 2,
+    { ValueKindEnv, ValueKindString },
+    &eval_compiled_intrinsic },
+  { STR_LIT("eval"), true, 2, { ValueKindEnv, ValueKindString }, &eval_intrinsic },
   { STR_LIT("exit"), false, 1, { ValueKindInt }, &exit_intrinsic },
 };
 

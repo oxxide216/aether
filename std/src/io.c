@@ -28,7 +28,7 @@ bool file_exists_intrinsic(Vm *vm) {
   memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
   path_cstring[path->as.string.len] = '\0';
 
-  value_stack_push_bool(&vm->stack, vm->rc_arena, access(path_cstring, F_OK) == 0);
+  value_stack_push_bool(&vm->stack, &vm->rc_arena, access(path_cstring, F_OK) == 0);
 
   free(path_cstring);
 
@@ -44,9 +44,9 @@ bool read_file_intrinsic(Vm *vm) {
 
   Str content = read_file(path_cstring);
   if (content.len == (u32) -1)
-    value_stack_push_unit(&vm->stack, vm->rc_arena);
+    value_stack_push_unit(&vm->stack, &vm->rc_arena);
   else
-    value_stack_push_string(&vm->stack, vm->rc_arena, content);
+    value_stack_push_string(&vm->stack, &vm->rc_arena, content);
 
   free(path_cstring);
 
@@ -85,7 +85,7 @@ bool delete_file_intrinsic(Vm *vm) {
 bool list_directory_intrinsic(Vm *vm) {
   Value *path = value_stack_pop(&vm->stack);
 
-  ListNode *list = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+  ListNode *list = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
   ListNode *list_end = list;
 
   char *path_cstring = malloc(path->as.string.len + 1);
@@ -99,12 +99,12 @@ bool list_directory_intrinsic(Vm *vm) {
     while ((entry = readdir(dir)) != NULL) {
       Str path;
       path.len = strlen(entry->d_name);
-      path.ptr = rc_arena_alloc(vm->rc_arena, path.len);
+      path.ptr = rc_arena_alloc(&vm->rc_arena, path.len);
       memcpy(path.ptr, entry->d_name, path.len);
 
-      list_end->next = rc_arena_alloc(vm->rc_arena, sizeof(ListNode));
+      list_end->next = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
       list_end = list_end->next;
-      list_end->value = rc_arena_alloc(vm->rc_arena, sizeof(Value));
+      list_end->value = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
       list_end->value->kind = ValueKindString;
       list_end->value->as.string = path;
     }
@@ -112,7 +112,7 @@ bool list_directory_intrinsic(Vm *vm) {
     closedir(dir);
   }
 
-  value_stack_push_list(&vm->stack, vm->rc_arena, list);
+  value_stack_push_list(&vm->stack, &vm->rc_arena, list);
 
   free(path_cstring);
 
