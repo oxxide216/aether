@@ -4,10 +4,6 @@
 (use 'std/io.ae')
 (use 'std/log.ae')
 
-(macro error [...messages] ->
-  (println term/fg-red term/bold 'ERROR'
-           term/reset ': ' (join [messages] ' ')))
-
 (let args (get-args))
 (let env (make-env))
 
