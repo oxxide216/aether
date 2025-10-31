@@ -37,6 +37,8 @@ bool create_server_intrinsic(Vm *vm) {
 
   i32 server_socket = socket(AF_INET, SOCK_STREAM, 0);
   if (server_socket < 0) {
+    ERROR("%s\n", strerror(errno));
+
     value_stack_push_unit(&vm->stack, &vm->rc_arena);
     return true;
   }
@@ -54,11 +56,15 @@ bool create_server_intrinsic(Vm *vm) {
 
   if (bind(server_socket, (struct sockaddr*) &address,
            sizeof(address)) < 0) {
+    ERROR("%s\n", strerror(errno));
+
     value_stack_push_unit(&vm->stack, &vm->rc_arena);
     return true;
   }
 
   if (listen(server_socket, 3) < 0) {
+    ERROR("%s\n", strerror(errno));
+
     value_stack_push_unit(&vm->stack, &vm->rc_arena);
     return true;
   }
@@ -90,16 +96,18 @@ bool create_client_intrinsic(Vm *vm) {
   struct addrinfo *result;
 
   if (getaddrinfo(server_ip_address_cstr, port_cstr, &hints, &result) < 0) {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
+    ERROR("%s\n", strerror(errno));
 
+    value_stack_push_unit(&vm->stack, &vm->rc_arena);
     free(server_ip_address_cstr);
     return true;
   }
 
   i32 client_socket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
   if (client_socket < 0) {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
+    ERROR("%s\n", strerror(errno));
 
+    value_stack_push_unit(&vm->stack, &vm->rc_arena);
     return true;
   }
 
@@ -107,11 +115,12 @@ bool create_client_intrinsic(Vm *vm) {
   setsockopt(client_socket, SOL_TCP, TCP_NODELAY, &enable, sizeof(enable));
 
   i32 connected = connect(client_socket, result->ai_addr, result->ai_addrlen);
-  if (connected < 0 && errno != EINPROGRESS) {
+  if (connected < 0 && errno != EAGAIN && errno != EINPROGRESS) {
+    ERROR("%s\n", strerror(errno));
+
     value_stack_push_unit(&vm->stack, &vm->rc_arena);
     free(server_ip_address_cstr);
     freeaddrinfo(result);
-
     return true;
   }
 
@@ -143,8 +152,9 @@ bool accept_connection_intrinsic(Vm *vm) {
                              (struct sockaddr*) &address,
                              &address_size);
   if (client_socket < 0) {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
+    ERROR("%s\n", strerror(errno));
 
+    value_stack_push_unit(&vm->stack, &vm->rc_arena);
     return true;
   }
 
@@ -197,10 +207,42 @@ bool receive_size_intrinsic(Vm *vm) {
   if (socket->kind != ValueKindInt)
     PANIC("receive-size: wrong argument kinds\n");
 
+  Value *is_non_blocking = dict_get_value_str_key(&vm->rc_arena,
+                                                  &receiver->as.dict,
+                                                  STR_LIT("is-non-blocking"));
+  if (is_non_blocking->kind != ValueKindBool)
+    PANIC("receive-size: wrong argument kind\n");
+
   Str buffer;
-  buffer.len = size->as._int;
-  buffer.ptr = rc_arena_alloc(&vm->rc_arena, buffer.len);
-  recv(socket->as._int, buffer.ptr, buffer.len, 0);
+  buffer.ptr = rc_arena_alloc(&vm->rc_arena, size->as._int);
+
+  if (is_non_blocking->as._bool)
+    buffer.len = recv(socket->as._int, buffer.ptr, size->as._int, MSG_DONTWAIT);
+  else
+    buffer.len = recv(socket->as._int, buffer.ptr, size->as._int, 0);
+
+  if ((i32) buffer.len < 0) {
+    if (is_non_blocking->as._bool) {
+      if (errno != EAGAIN && errno != EINPROGRESS) {
+        ERROR("%s\n", strerror(errno));
+
+        value_stack_push_unit(&vm->stack, &vm->rc_arena);
+        return true;
+      }
+    } else {
+      ERROR("%s\n", strerror(errno));
+
+      value_stack_push_unit(&vm->stack, &vm->rc_arena);
+      return true;
+    }
+  }
+
+  if (buffer.len == 0) {
+    value_stack_push_unit(&vm->stack, &vm->rc_arena);
+    rc_arena_free(&vm->rc_arena, buffer.ptr);
+
+    return true;
+  }
 
   value_stack_push_string(&vm->stack, &vm->rc_arena, buffer);
 
@@ -228,12 +270,31 @@ bool receive_intrinsic(Vm *vm) {
   buffer.ptr = rc_arena_alloc(&vm->rc_arena, cap);
 
   i32 len = 0;
-  while ((len = recv(socket->as._int,
-                     buffer.ptr + buffer.len,
-                     cap - buffer.len, MSG_DONTWAIT)) > 0 ||
-         (!is_non_blocking->as._bool && buffer.len == 0)) {
-    if (len <= 0)
-      continue;
+  while (true) {
+    len = recv(socket->as._int,
+               buffer.ptr + buffer.len,
+               cap - buffer.len, MSG_DONTWAIT);
+
+    if (len == 0 && is_non_blocking->as._bool)
+      break;
+
+    if (len < 0) {
+      if (is_non_blocking->as._bool) {
+        if (errno != EAGAIN && errno != EINPROGRESS) {
+          ERROR("%s\n", strerror(errno));
+
+          value_stack_push_unit(&vm->stack, &vm->rc_arena);
+          return true;
+        }
+      } else {
+        ERROR("%s\n", strerror(errno));
+
+        value_stack_push_unit(&vm->stack, &vm->rc_arena);
+        return true;
+      }
+
+      break;
+    }
 
     buffer.len += (u32) len;
 

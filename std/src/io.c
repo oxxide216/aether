@@ -61,7 +61,14 @@ bool get_file_info_intrinsic(Vm *vm) {
     closedir(directory);
 
   struct stat st;
-  stat(path_cstring, &st);
+
+  if (stat(path_cstring, &st) < 0) {
+    ERROR("%s\n", strerror(errno));
+
+    value_stack_push_unit(&vm->stack, &vm->rc_arena);
+    free(path_cstring);
+    return true;
+  }
 
   Value *size = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
   size->kind = ValueKindInt;
@@ -163,6 +170,11 @@ bool list_directory_intrinsic(Vm *vm) {
     }
 
     closedir(dir);
+  } else {
+    ERROR("%s\n", strerror(errno));
+
+    value_stack_push_unit(&vm->stack, &vm->rc_arena);
+    return true;
   }
 
   value_stack_push_list(&vm->stack, &vm->rc_arena, list);
