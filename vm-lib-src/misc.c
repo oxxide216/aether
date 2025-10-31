@@ -40,3 +40,14 @@ void dict_push_value_str_key(RcArena *rc_arena, Dict *dict,
   DictValue dict_value = { string, value };
   DA_APPEND(*dict, dict_value);
 }
+
+Value *dict_get_value_str_key(RcArena *rc_arena, Dict *dict, Str key) {
+  for (u32 i = 0; i < dict->len; ++i)
+    if (dict->items[i].key->kind == ValueKindString &&
+        str_eq(dict->items[i].key->as.string, key))
+      return dict->items[i].value;
+
+  Value *result = rc_arena_alloc(rc_arena, sizeof(Value));
+  result->kind = ValueKindUnit;
+  return result;
+}

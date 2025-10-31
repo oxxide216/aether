@@ -785,6 +785,11 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
     }
   }
 
+  Value *unit_value = rc_arena_alloc(&vm.rc_arena, sizeof(Value));
+  unit_value->kind = ValueKindUnit;
+  Var unit_var = { STR_LIT("unit"), unit_value, true };
+  DA_APPEND(vm.global_vars, unit_var);
+
   return vm;
 }
 

@@ -7,12 +7,19 @@
   (println 'ERROR: Could not create server')
   (exit 1))
 
+(let current-client unit)
+
 (while true
-  (let client (accept-connection server 8080))
-  (if (int? client)
-    (send client 'Hello, Network!')
-    (let response (receive client))
-    (println response)
-    (close-connection client))
+  (let new-client (accept-connection server 8080))
+  (if new-client
+    (set current-client new-client)
+    (send new-client 'Hello, Network!'))
+
+  (if current-client
+    (let request (receive current-client))
+    (if request
+      (println request)
+      (close-connection current-client)
+      (set current-client unit)))
 
   (sleep 0.01))

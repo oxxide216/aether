@@ -23,7 +23,7 @@
 (let path (get-at args 1))
 (let content (read-file path))
 (if (unit? content)
-  (error 'Could not open input file' path)
+  (error 'Could not open input file ' path)
   (exit 1))
 
 (let compiled (compile env content path))
