@@ -12,3 +12,12 @@
 (macro info [...messages] ->
   (println term/fg-white term/bold '[INFO]'
            term/reset ' ' (join [messages] ' ')))
+
+(macro panic [...messages] ->
+  (error messages)
+  (exit 1))
+
+(macro panic-if [expr ...messages] ->
+  (if expr
+    (error messages)
+    (exit 1)))
