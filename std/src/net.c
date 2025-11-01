@@ -269,11 +269,13 @@ bool receive_intrinsic(Vm *vm) {
   Str buffer = {0};
   buffer.ptr = rc_arena_alloc(&vm->rc_arena, cap);
 
+  i32 flags = is_non_blocking->as._bool ? MSG_DONTWAIT : 0;
+
   i32 len = 0;
   while (true) {
     len = recv(socket->as._int,
                buffer.ptr + buffer.len,
-               cap - buffer.len, MSG_DONTWAIT);
+               cap - buffer.len, flags);
 
     if (len == 0 && is_non_blocking->as._bool)
       break;
