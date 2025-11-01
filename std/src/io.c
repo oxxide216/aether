@@ -99,8 +99,8 @@ bool read_file_intrinsic(Vm *vm) {
 }
 
 bool write_file_intrinsic(Vm *vm) {
-  Value *path = value_stack_pop(&vm->stack);
   Value *content = value_stack_pop(&vm->stack);
+  Value *path = value_stack_pop(&vm->stack);
 
   char *path_cstring = str_to_cstr(path->as.string);
 

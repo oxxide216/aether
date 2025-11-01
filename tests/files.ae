@@ -10,5 +10,5 @@
   (delete-file path)
   (println 'Deleted!')
  else
-  (write-file 'Hello, World!\n' path)
+  (write-file path 'Hello, World!\n')
   (println 'Wrote!'))
