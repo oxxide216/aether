@@ -63,8 +63,6 @@ bool get_file_info_intrinsic(Vm *vm) {
   struct stat st;
 
   if (stat(path_cstring, &st) < 0) {
-    ERROR("%s\n", strerror(errno));
-
     value_stack_push_unit(&vm->stack, &vm->rc_arena);
     free(path_cstring);
     return true;
@@ -171,9 +169,8 @@ bool list_directory_intrinsic(Vm *vm) {
 
     closedir(dir);
   } else {
-    ERROR("%s\n", strerror(errno));
-
     value_stack_push_unit(&vm->stack, &vm->rc_arena);
+    free(path_cstring);
     return true;
   }
 
