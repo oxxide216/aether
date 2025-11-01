@@ -1,5 +1,3 @@
-(use 'std/core.ae')
-
 (macro println2 [arg0 arg1] ->
   (println arg0)
   (println arg1))

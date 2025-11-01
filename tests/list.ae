@@ -1,5 +1,3 @@
-(use 'std/core.ae')
-
 (let print-list [list] ->
   (let print-list-rec [list] ->
     (if list

@@ -1,5 +1,3 @@
-(use 'std/core.ae')
-
 (let print [arg] -> import 'print')
 (let println [arg] ->
   (print arg)

@@ -1,10 +1,9 @@
-(use 'std/core.ae')
 (use 'std/term.ae')
 
 (term/raw-mode-on)
 
 (let key (input-size 1))
-(while (!= key (get-in term/keys 'enter'))
+(while (!= key (get-at term/keys 'enter'))
   (print key '\r')
   (set key (input-size 1)))
 

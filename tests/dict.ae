@@ -1,5 +1,3 @@
-(use 'std/core.ae')
-
 (let user {
   'name': 'John'
   'surname': 'Doe'
@@ -7,8 +5,8 @@
 })
 
 (println user)
-(println (get-in user 'name'))
+(println (get-at user 'name'))
 (set-in user 'name': 'Paul')
-(set-in user 'age': (+ 1 (get-in user 'age')))
-(println (get-in user 'name'))
+(set-in user 'age': (+ 1 (get-at user 'age')))
+(println (get-at user 'name'))
 (println user)

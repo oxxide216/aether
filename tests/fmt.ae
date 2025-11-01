@@ -1,5 +1,3 @@
-(use 'std/core.ae')
-
 (let fmt [args] ->
   (if (== (len args) 0)
     ''

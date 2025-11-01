@@ -1,5 +1,3 @@
-(use 'std/core.ae')
-
 (let str 'Hello, World!')
 (print str)
 (print ':')

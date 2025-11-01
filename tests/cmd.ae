@@ -1,4 +1,3 @@
-(use 'std/core.ae')
-(use 'std/io.ae')
+(use 'std/system.ae')
 
 (println (run-command 'ls -la'))

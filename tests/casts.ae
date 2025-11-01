@@ -1,6 +1,3 @@
-(use 'std/base.ae')
-(use 'std/system.ae')
-
 (let input-str (input))
 (let input-num (str-to-int input-str))
 (println (int-to-str input-num))

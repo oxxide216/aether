@@ -1,3 +1,1 @@
-(use 'std/core.ae')
-
 (println 'Hello from evaluated bytecode!')

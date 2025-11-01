@@ -1,5 +1,3 @@
-(use 'std/core.ae')
-
 (let a (input))
 (let b (input))
 (let c (+ a b))
