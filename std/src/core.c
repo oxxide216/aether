@@ -289,6 +289,91 @@ bool fold_intrinsic(Vm *vm) {
   return true;
 }
 
+bool value_bigger(Value *a, Value *b) {
+  if (a->kind != b->kind)
+    return false;
+
+  switch (a->kind) {
+  case ValueKindString: {
+    Value *min_len_string = a->as.string.len < b->as.string.len ? a : b;
+    for (u32 i = 0; i < min_len_string->as.string.len; ++i)
+      if (a->as.string.ptr[i] > b->as.string.ptr[i])
+        return true;
+
+    return a->as.string.len > b->as.string.len;
+  }
+
+  case ValueKindInt: {
+    return a->as._int > b->as._int;
+  }
+
+  case ValueKindFloat: {
+    return a->as._float > b->as._float;
+  }
+
+  case ValueKindBool: {
+    return a->as._bool > b->as._bool;
+  }
+
+  case ValueKindUnit:
+  case ValueKindList:
+  case ValueKindDict:
+  case ValueKindFunc:
+  case ValueKindEnv: {
+    return false;
+  }
+  }
+
+  return false;
+}
+
+bool sort_intrinsic(Vm *vm) {
+  Value *list = value_stack_pop(&vm->stack);
+
+  DA_APPEND(vm->stack, list);
+  len_intrinsic(vm);
+  Value *len = value_stack_pop(&vm->stack);
+
+  Value **sorted = malloc(len->as._int * sizeof(Value *));
+
+  ListNode *node = list->as.list->next;
+  u32 i = 0;
+  while (node) {
+    sorted[i] = node->value;
+
+    node = node->next;
+    ++i;
+  }
+
+  u32 gaps[] = { 701, 301, 132, 57, 23, 10, 4, 1 };
+
+  for(u32 i = 0; i < ARRAY_LEN(gaps); ++i) {
+    for (u32 j = gaps[i]; j < len->as._int; ++j) {
+      Value *temp = sorted[j];
+      u32 k = j;
+
+      for (; (k >= gaps[i]) && (value_bigger(sorted[k - gaps[i]], temp)); k -= gaps[i])
+        sorted[k] = sorted[k - gaps[i]];
+
+      sorted[k] = temp;
+    }
+  }
+
+  ListNode *result = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
+
+  ListNode **next = &result->next;
+  for (u32 i = 0; i < len->as._int; ++i) {
+    *next = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
+    (*next)->value = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
+    (*next)->value = value_clone(&vm->rc_arena, sorted[i]);
+    next = &(*next)->next;
+  }
+
+  value_stack_push_list(&vm->stack, &vm->rc_arena, result);
+
+  return true;
+}
+
 static void sb_push_value(StringBuilder *sb, Value *value, u32 level) {
   switch (value->kind) {
   case ValueKindUnit: {
@@ -967,6 +1052,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("fold"), true, 3,
     { ValueKindFunc, ValueKindUnit, ValueKindList },
     &fold_intrinsic },
+  { STR_LIT("sort"), true, 1, { ValueKindList }, &sort_intrinsic },
   // Conversions
   { STR_LIT("to-str"), true, 1, { ValueKindUnit }, &to_str_intrinsic },
   { STR_LIT("byte-64-to-str"), true, 1, { ValueKindInt }, &byte_64_to_str_intrinsic },
