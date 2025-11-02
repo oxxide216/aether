@@ -568,6 +568,14 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   case IrExprKindSet: {
     Var *dest_var = get_var(vm, expr->as.set.dest);
 
+    if (!dest_var) {
+      PERROR(META_FMT, "Symbol "STR_FMT" was not defined before usage\n",
+        META_ARG(expr->meta), STR_ARG(expr->as.ident.ident));
+      vm->exit_code = 1;
+      return ExecStateExit;
+    }
+
+
     EXECUTE_EXPR(vm, expr->as.set.src, true);
     Value *src = value_stack_pop(&vm->stack);
 
@@ -628,17 +636,17 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       return ExecStateContinue;
 
     Var *var = get_var(vm, expr->as.ident.ident);
-    if (var) {
-      Value *copy = value_clone(&vm->rc_arena, var->value);
-      DA_APPEND(vm->stack, copy);
-
-      return ExecStateContinue;
+    if (!var) {
+      PERROR(META_FMT, "Symbol "STR_FMT" was not defined before usage\n",
+            META_ARG(expr->meta), STR_ARG(expr->as.ident.ident));
+      vm->exit_code = 1;
+      return ExecStateExit;
     }
 
-    PERROR(META_FMT, "Symbol "STR_FMT" was not defined before usage\n",
-          META_ARG(expr->meta), STR_ARG(expr->as.ident.ident));
-    vm->exit_code = 1;
-    return ExecStateExit;
+    Value *copy = value_clone(&vm->rc_arena, var->value);
+    DA_APPEND(vm->stack, copy);
+
+    return ExecStateContinue;
   } break;
 
   case IrExprKindString: {
