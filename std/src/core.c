@@ -296,9 +296,12 @@ bool value_bigger(Value *a, Value *b) {
   switch (a->kind) {
   case ValueKindString: {
     Value *min_len_string = a->as.string.len < b->as.string.len ? a : b;
-    for (u32 i = 0; i < min_len_string->as.string.len; ++i)
+    for (u32 i = 0; i < min_len_string->as.string.len; ++i) {
       if (a->as.string.ptr[i] > b->as.string.ptr[i])
         return true;
+      else if (a->as.string.ptr[i] < b->as.string.ptr[i])
+        return false;
+    }
 
     return a->as.string.len > b->as.string.len;
   }
@@ -327,6 +330,7 @@ bool value_bigger(Value *a, Value *b) {
   return false;
 }
 
+// Shellsort with Ciura gap sequence
 bool sort_intrinsic(Vm *vm) {
   Value *list = value_stack_pop(&vm->stack);
 
@@ -352,7 +356,7 @@ bool sort_intrinsic(Vm *vm) {
       Value *temp = sorted[j];
       u32 k = j;
 
-      for (; (k >= gaps[i]) && (value_bigger(sorted[k - gaps[i]], temp)); k -= gaps[i])
+      for (; (k >= gaps[i]) && value_bigger(sorted[k - gaps[i]], temp); k -= gaps[i])
         sorted[k] = sorted[k - gaps[i]];
 
       sorted[k] = temp;
