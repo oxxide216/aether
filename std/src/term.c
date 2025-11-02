@@ -1,11 +1,16 @@
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <signal.h>
 
 #include "aether/vm.h"
 #include "aether/misc.h"
 
+extern bool got_sigint;
+
 static struct termios default_term_state = {0};
 static bool is_term_state_initialized = false;
+
+static void (*default_sigint_handler)(i32) = NULL;
 
 bool get_size_intrinsic(Vm *vm) {
   struct winsize _size;
@@ -26,6 +31,12 @@ bool get_size_intrinsic(Vm *vm) {
   return true;
 }
 
+static void sigint_handler(i32 sig) {
+  (void) sig;
+
+  got_sigint = true;
+}
+
 bool raw_mode_on_intrinsic(Vm *vm) {
   (void) vm;
 
@@ -36,7 +47,12 @@ bool raw_mode_on_intrinsic(Vm *vm) {
 
   struct termios term_state = default_term_state;
   term_state.c_lflag &= ~(ECHO | ICANON);
-  tcsetattr(0, TCSAFLUSH, &term_state);
+  tcsetattr(0, TCSANOW, &term_state);
+
+  if (!default_sigint_handler)
+    default_sigint_handler = signal(SIGINT, sigint_handler);
+  else
+    signal(SIGINT, sigint_handler);
 
   return true;
 }
@@ -45,7 +61,10 @@ bool raw_mode_off_intrinsic(Vm *vm) {
   (void) vm;
 
   if (is_term_state_initialized)
-    tcsetattr(0, TCSAFLUSH, &default_term_state);
+    tcsetattr(0, TCSANOW, &default_term_state);
+
+  if (default_sigint_handler)
+    signal(SIGINT, default_sigint_handler);
 
   return true;
 }

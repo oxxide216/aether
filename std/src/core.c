@@ -10,6 +10,8 @@
 
 #define DEFAULT_INPUT_BUFFER_SIZE   64
 
+bool got_sigint = false;
+
 static StringBuilder printf_sb = {0};
 
 bool head_intrinsic(Vm *vm) {
@@ -909,7 +911,11 @@ bool input_size_intrinsic(Vm *vm) {
   Str buffer;
   buffer.len = size->as._int;
   buffer.ptr = rc_arena_alloc(&vm->rc_arena, buffer.len);
-  read(0, buffer.ptr, buffer.len);
+
+  if (got_sigint)
+    memset(buffer.ptr, 3, buffer.len);
+  else
+    read(0, buffer.ptr, buffer.len);
 
   value_stack_push_string(&vm->stack, &vm->rc_arena, buffer);
 
@@ -919,22 +925,32 @@ bool input_size_intrinsic(Vm *vm) {
 bool input_intrinsic(Vm *vm) {
   (void) vm;
 
-  u32 buffer_size = DEFAULT_INPUT_BUFFER_SIZE;
-  char *buffer = rc_arena_alloc(&vm->rc_arena, buffer_size);
+  char *buffer = NULL;
   u32 len = 0;
 
-  char ch;
-  while ((ch = getc(stdin)) != EOF && ch != '\n') {
-    if (len >= buffer_size) {
-      buffer_size += DEFAULT_INPUT_BUFFER_SIZE;
+  if (got_sigint) {
+    buffer = rc_arena_alloc(&vm->rc_arena, 1);
+    buffer[0] = 3;
+    len = 1;
 
-      char *prev_buffer = buffer;
-      buffer = rc_arena_alloc(&vm->rc_arena, buffer_size);
-      memcpy(buffer, prev_buffer, len);
-      rc_arena_free(&vm->rc_arena, prev_buffer);
+    got_sigint = false;
+  } else {
+    u32 buffer_size = DEFAULT_INPUT_BUFFER_SIZE;
+    buffer = rc_arena_alloc(&vm->rc_arena, buffer_size);
+
+    char ch;
+    while ((ch = getc(stdin)) != EOF && ch != '\n') {
+      if (len >= buffer_size) {
+        buffer_size += DEFAULT_INPUT_BUFFER_SIZE;
+
+        char *prev_buffer = buffer;
+        buffer = rc_arena_alloc(&vm->rc_arena, buffer_size);
+        memcpy(buffer, prev_buffer, len);
+        rc_arena_free(&vm->rc_arena, prev_buffer);
+      }
+
+      buffer[len++] = ch;
     }
-
-    buffer[len++] = ch;
   }
 
   value_stack_push_string(&vm->stack, &vm->rc_arena, STR(buffer, len));
