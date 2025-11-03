@@ -14,9 +14,9 @@ LIB_SRC=""
 STD_SRC="std/src/core.c std/src/math.c std/src/str.c"
 
 if [ "$NOSYSTEM" == "" ]; then
-  STD_SRC="$STD_SRC std/src/io.c std/src/net.c \
-                    std/src/path.c std/src/term.c \
-                    std/src/system.c"
+  STD_SRC="$STD_SRC std/src/base.c std/src/io.c \
+                    std/src/net.c std/src/path.c \
+                    std/src/term.c std/src/system.c"
 else
   CFLAGS="$CFLAGS -DNOSYSTEM"
 fi

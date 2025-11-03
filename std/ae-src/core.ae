@@ -53,15 +53,11 @@
 (let func? [value] -> import 'is-func')
 (let dict? [value] -> import 'is-dict')
 
-(let printf [arg] -> import 'printf')
-(let input-size [size] -> import 'input-size')
-(let input [] -> import 'input')
-
-(let get-args [] -> import 'get-args')
 (let make-env [] -> import 'make-env')
 (let compile [env code path] -> import 'compile')
 (let eval-compiled [env bytecode] -> import 'eval-compiled')
 (let eval [env code] -> import 'eval')
+
 (let exit [exit-code] -> import 'exit')
 
 (macro fold-op [op args] ->

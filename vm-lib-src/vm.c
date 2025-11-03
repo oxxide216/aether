@@ -754,6 +754,7 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
   intrinsics_append(intrinsics, math_intrinsics, math_intrinsics_len);
   intrinsics_append(intrinsics, str_intrinsics, str_intrinsics_len);
 #ifndef NOSYSTEM
+  intrinsics_append(intrinsics, base_intrinsics, base_intrinsics_len);
   intrinsics_append(intrinsics, io_intrinsics, io_intrinsics_len);
   intrinsics_append(intrinsics, path_intrinsics, path_intrinsics_len);
   intrinsics_append(intrinsics, net_intrinsics, net_intrinsics_len);

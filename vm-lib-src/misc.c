@@ -51,3 +51,85 @@ Value *dict_get_value_str_key(RcArena *rc_arena, Dict *dict, Str key) {
   result->kind = ValueKindUnit;
   return result;
 }
+
+void sb_push_value(StringBuilder *sb, Value *value, u32 level) {
+  switch (value->kind) {
+  case ValueKindUnit: {
+    sb_push(sb, "unit");
+  } break;
+
+  case ValueKindList: {
+    sb_push_char(sb, '[');
+
+    ListNode *node = value->as.list->next;
+    while (node) {
+      if (node != value->as.list->next)
+        sb_push_char(sb, ' ');
+
+      if (node->value->kind == ValueKindString)
+        sb_push_char(sb, '\'');
+      sb_push_value(sb, node->value, level);
+      if (node->value->kind == ValueKindString)
+        sb_push_char(sb, '\'');
+
+      node = node->next;
+    }
+
+    sb_push_char(sb, ']');
+  } break;
+
+  case ValueKindString: {
+    sb_push_str(sb, value->as.string);
+  } break;
+
+  case ValueKindInt: {
+    sb_push_i64(sb, value->as._int);
+  } break;
+
+  case ValueKindFloat: {
+    sb_push_f64(sb, value->as._float);
+  } break;
+
+  case ValueKindBool: {
+    if (value->as._bool)
+      sb_push(sb, "true");
+    else
+      sb_push(sb, "false");
+  } break;
+
+  case ValueKindFunc: {
+    sb_push_char(sb, '[');
+
+    for (u32 i = 0; i < value->as.func.args.len; ++i) {
+      if (i > 0)
+        sb_push_char(sb, ' ');
+      sb_push_str(sb, value->as.func.args.items[i]);
+    }
+
+    sb_push(sb, "] -> ...");
+  } break;
+
+  case ValueKindDict: {
+    sb_push(sb, "{\n");
+
+    for (u32 i = 0; i < value->as.dict.len; ++i) {
+      for (u32 j = 0; j < level + 1; ++j)
+        sb_push(sb, "  ");
+
+      sb_push_value(sb, value->as.dict.items[i].key, level + 1);
+      sb_push(sb, ": ");
+      sb_push_value(sb, value->as.dict.items[i].value, level + 1);
+
+      sb_push_char(sb, '\n');
+    }
+
+    for (u32 j = 0; j < level; ++j)
+      sb_push(sb, "  ");
+    sb_push_char(sb, '}');
+  } break;
+
+  case ValueKindEnv: {
+    sb_push(sb, "environment");
+  } break;
+  }
+}
