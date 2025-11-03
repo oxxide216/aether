@@ -9,3 +9,15 @@
 (let eat-byte-32 [str] -> import 'eat-byte-32')
 (let eat-byte-16 [str] -> import 'eat-byte-16')
 (let eat-byte-8 [str] -> import 'eat-byte-8')
+
+(let begins-with [str begin] ->
+  (if (< (len str) (len begin))
+    false
+   else
+    (== (get-range str 0 (len begin)) begin)))
+
+(let ends-with [str end] ->
+  (if (< (len str) (len end))
+    false
+   else
+    (== (get-range str (- (len str) (len end)) (len str)) end)))

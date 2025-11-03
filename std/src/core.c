@@ -78,14 +78,17 @@ bool get_at_intrinsic(Vm *vm) {
       PANIC("get-at: out of bounds\n");
 
     DA_APPEND(vm->stack, node->value);
+
+    return true;
   } else if (collection->kind == ValueKindString) {
-    if (key->as._int >= collection->as.string.len) {
-      value_stack_push_unit(&vm->stack, &vm->rc_arena);
-    } else {
+    if (key->as._int < collection->as.string.len) {
       Str result = collection->as.string;
       result.ptr += key->as._int;
       result.len = 1;
-      value_stack_push_string(&vm->stack, &vm->rc_arena, result);
+
+     value_stack_push_string(&vm->stack, &vm->rc_arena, result);
+
+      return true;
     }
   } else if (collection->kind == ValueKindDict) {
     for (u32 i = 0; i < collection->as.dict.len; ++i) {
@@ -95,9 +98,9 @@ bool get_at_intrinsic(Vm *vm) {
         return true;
       }
     }
-
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
   }
+
+  value_stack_push_unit(&vm->stack, &vm->rc_arena);
 
   return true;
 }
@@ -141,6 +144,41 @@ bool set_at_intrinsic(Vm *vm) {
     DictValue dict_value = { key, value };
     DA_APPEND(collection->as.dict, dict_value);
   }
+
+  return true;
+}
+
+bool get_index_intrinsic(Vm *vm) {
+  Value *item = value_stack_pop(&vm->stack);
+  Value *collection = value_stack_pop(&vm->stack);
+
+  if (collection->kind == ValueKindList) {
+    ListNode *node = collection->as.list->next;
+    u32 i = 0;
+    while (node) {
+      if (value_eq(node->value, item)) {
+        value_stack_push_int(&vm->stack, &vm->rc_arena, i);
+
+        return true;
+      }
+
+      node = node->next;
+      ++i;
+    }
+  } else if (collection->kind == ValueKindString) {
+    if (item->as.string.len != 1)
+      PANIC("get-index: item should be one-sized\n");
+
+    for (u32 i = 0; i < collection->as.string.len; ++i) {
+      if (collection->as.string.ptr[i] == item->as.string.ptr[0]) {
+        value_stack_push_int(&vm->stack, &vm->rc_arena, i);
+
+        return true;
+      }
+    }
+  }
+
+  value_stack_push_unit(&vm->stack, &vm->rc_arena);
 
   return true;
 }
@@ -1059,6 +1097,8 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("set-at"), false, 3,
     { ValueKindDict, ValueKindUnit, ValueKindUnit },
     &set_at_intrinsic },
+  { STR_LIT("get-index"), true, 2, { ValueKindList, ValueKindUnit }, &get_index_intrinsic },
+  { STR_LIT("get-index"), true, 2, { ValueKindString, ValueKindString }, &get_index_intrinsic },
   { STR_LIT("len"), true, 1, { ValueKindList }, &len_intrinsic },
   { STR_LIT("len"), true, 1, { ValueKindString }, &len_intrinsic },
   { STR_LIT("get-range"), true, 3,
