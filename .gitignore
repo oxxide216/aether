@@ -1,4 +1,5 @@
 ./aether
+libaether.so
 libs
 test.ac
 eval.ac

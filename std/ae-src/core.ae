@@ -7,6 +7,7 @@
 (let get-index [collection item] -> import 'get-index')
 (let len [collection] -> import 'len')
 (let get-range [list begin end] -> import 'get-range')
+(let gen-range [begin end] -> import 'gen-range')
 (let map [func list] -> import 'map')
 (let filter [func list] -> import 'filter')
 (let fold [func accumulator list] -> import 'fold')

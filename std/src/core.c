@@ -66,12 +66,11 @@ bool get_at_intrinsic(Vm *vm) {
       ++i;
     }
 
-    if (!node)
-      PANIC("get-at: out of bounds\n");
+    if (node) {
+      DA_APPEND(vm->stack, node->value);
 
-    DA_APPEND(vm->stack, node->value);
-
-    return true;
+      return true;
+    }
   } else if (collection->kind == ValueKindString) {
     if (key->as._int < collection->as.string.len) {
       Str result = collection->as.string;
@@ -239,6 +238,27 @@ bool get_range_intrinsic(Vm *vm) {
 
     value_stack_push_string(&vm->stack, &vm->rc_arena, sub_string);
   }
+
+  return true;
+}
+
+bool gen_range_intrinsic(Vm *vm) {
+  Value *end = value_stack_pop(&vm->stack);
+  Value *begin = value_stack_pop(&vm->stack);
+
+  ListNode *range = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
+
+  ListNode **next = &range->next;
+  for (i64 i = begin->as._int; i < end->as._int; ++i) {
+    (*next) = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
+    (*next)->value = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
+    (*next)->value->kind = ValueKindInt;
+    (*next)->value->as._int = i;
+
+    next = &(*next)->next;
+  }
+
+  value_stack_push_list(&vm->stack, &vm->rc_arena, range);
 
   return true;
 }
@@ -940,6 +960,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("get-range"), true, 3,
     { ValueKindString, ValueKindInt, ValueKindInt },
     &get_range_intrinsic },
+  { STR_LIT("gen-range"), true, 2, { ValueKindInt, ValueKindInt }, &gen_range_intrinsic },
   { STR_LIT("map"), true, 2, { ValueKindFunc, ValueKindList }, &map_intrinsic },
   { STR_LIT("filter"), true, 2, { ValueKindFunc, ValueKindList }, &filter_intrinsic },
   { STR_LIT("fold"), true, 3,
