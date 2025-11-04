@@ -33,5 +33,12 @@ if [ "$IUI" != "" ]; then
 fi
 
 lexgen compiler-lib-src/grammar.h compiler-lib-src/grammar.lg
-cc -o aether $CFLAGS $LDFLAGS $BUILD_FLAGS $SRC $COMPILER_SRC $VM_SRC \
-             $IR_SRC $LEXGEN_RUNTIME_SRC $LIB_SRC $STD_SRC
+
+if [ "$LIB" == "" ]; then
+  cc -o aether $CFLAGS $LDFLAGS $BUILD_FLAGS $SRC $COMPILER_SRC $VM_SRC \
+               $IR_SRC $LEXGEN_RUNTIME_SRC $LIB_SRC $STD_SRC
+else
+  cc -o libaether.so -shared -fpic -Wl,-z,noexecstack \
+     $CFLAGS $LDFLAGS $BUILD_FLAGS src/aether-main.c $COMPILER_SRC $VM_SRC \
+     $IR_SRC $LEXGEN_RUNTIME_SRC $LIB_SRC $STD_SRC
+fi
