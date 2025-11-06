@@ -1,0 +1,6 @@
+(let glass/run [title width height callback] -> import 'glass/run')
+(let glass/window-size [] -> import 'glass/window-size')
+
+(let glass/clear [r g b a] -> import 'glass/clear')
+(let glass/circle [x y radius] -> import 'glass/circle')
+(let glass/quad [x y width height] -> import 'glass/quad')

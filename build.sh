@@ -21,15 +21,12 @@ else
   CFLAGS="$CFLAGS -DNOSYSTEM"
 fi
 
-if [ "$IUI" != "" ]; then
-  CFLAGS="$CFLAGS -DIUI -Ilibs/winx/include -Ilibs/glass/include -Istd/iui/include"
+if [ "$GLASS" != "" ]; then
+  CFLAGS="$CFLAGS -DGLASS -Ilibs/winx/include -Ilibs/glass/include"
   LDFLAGS="$LDFLAGS -lX11 -lGL -lGLEW"
   LIB_SRC="$LIB_SRC $(find libs/winx/src -name "*.c" -not -name "io.c")"
   LIB_SRC="$LIB_SRC $(find libs/glass/src -name "*.c" -not -name "io.c")"
-  STD_SRC="$STD_SRC $(find std/src/iui -name "*.c")"
-
-  xxd -i std/src/iui/fonts/JetBrainsMono-Regular.ttf > \
-    std/src/iui/fonts/JetBrainsMono-Regular.h
+  STD_SRC="$STD_SRC std/src/glass.c"
 fi
 
 lexgen compiler-lib-src/grammar.h compiler-lib-src/grammar.lg

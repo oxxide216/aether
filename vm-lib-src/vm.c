@@ -761,8 +761,8 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
   intrinsics_append(intrinsics, term_intrinsics, term_intrinsics_len);
   intrinsics_append(intrinsics, system_intrinsics, system_intrinsics_len);
 #endif
-#ifdef IUI
-  intrinsics_append(intrinsics, iui_intrinsics, iui_intrinsics_len);
+#ifdef GLASS
+  intrinsics_append(intrinsics, glass_intrinsics, glass_intrinsics_len);
 #endif
 
   vm.intrinsics = *intrinsics;

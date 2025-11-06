@@ -14,6 +14,6 @@ MODULE(path);
 MODULE(net);
 MODULE(term);
 MODULE(system);
-MODULE(iui);
+MODULE(glass);
 
 #endif // INTRINSICS_H
