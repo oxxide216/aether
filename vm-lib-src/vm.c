@@ -1,3 +1,5 @@
+#include <time.h>
+
 #include "aether/vm.h"
 #include "aether/misc.h"
 #include "shl/shl-str.h"
@@ -7,6 +9,20 @@
 
 #define META_FMT STR_FMT":%u:%u: "
 #define META_ARG(meta) STR_ARG((meta).file_path), (meta).row + 1, (meta).col + 1
+
+#define CATCH_VARS(vm, local_names, catched_values, expr) \
+  do {                                                    \
+    catch_vars(vm, local_names, catched_values, expr);    \
+    if (vm->state != ExecStateContinue)                   \
+      return;                                             \
+  } while (0)
+
+#define CATCH_VARS_BLOCK(vm, local_names, catched_values, block) \
+  do {                                                           \
+    catch_vars_block(vm, local_names, catched_values, block);    \
+    if (vm->state != ExecStateContinue)                          \
+      return;                                                    \
+  } while (0)
 
 typedef Da(Str) Strs;
 
@@ -51,66 +67,54 @@ Dict dict_clone(RcArena *rc_arena, Dict *dict) {
   return copy;
 }
 
-void value_stack_push_unit(ValueStack *stack, RcArena *rc_arena) {
+Value *value_unit(RcArena *rc_arena) {
   Value *value = rc_arena_alloc(rc_arena, sizeof(Value));
   value->kind = ValueKindUnit;
-  DA_APPEND(*stack, value);
+  return value;
 }
 
-void value_stack_push_list(ValueStack *stack, RcArena *rc_arena, ListNode *nodes) {
+Value *value_list(RcArena *rc_arena, ListNode *nodes) {
   Value *value = rc_arena_alloc(rc_arena, sizeof(Value));
   *value = (Value) { ValueKindList, { .list = nodes }, 0 };
-  DA_APPEND(*stack, value);
+  return value;
 }
 
-void value_stack_push_string(ValueStack *stack, RcArena *rc_arena, Str string) {
+Value *value_string(RcArena *rc_arena, Str string) {
   Value *value = rc_arena_alloc(rc_arena, sizeof(Value));
-  *value = (Value) {
-    ValueKindString,
-    { .string = string },
-    0,
-  };
-  DA_APPEND(*stack, value);
+  *value = (Value) { ValueKindString, { .string = string }, 0 };
+  return value;
 }
 
-void value_stack_push_int(ValueStack *stack, RcArena *rc_arena, i64 _int) {
+Value *value_int(RcArena *rc_arena, i64 _int) {
   Value *value = rc_arena_alloc(rc_arena, sizeof(Value));
   *value = (Value) { ValueKindInt, { ._int = _int }, 0 };
-  DA_APPEND(*stack, value);
+  return value;
 }
 
-void value_stack_push_float(ValueStack *stack, RcArena *rc_arena, f64 _float) {
+Value *value_float(RcArena *rc_arena, f64 _float) {
   Value *value = rc_arena_alloc(rc_arena, sizeof(Value));
   *value = (Value) { ValueKindFloat, { ._float = _float }, 0 };
-  DA_APPEND(*stack, value);
+  return value;
 }
 
-void value_stack_push_bool(ValueStack *stack, RcArena *rc_arena, bool _bool) {
+Value *value_bool(RcArena *rc_arena, bool _bool) {
   Value *value = rc_arena_alloc(rc_arena, sizeof(Value));
   *value = (Value) { ValueKindBool, { ._bool = _bool }, 0 };
-  DA_APPEND(*stack, value);
+  return value;
 }
 
-void value_stack_push_dict(ValueStack *stack, RcArena *rc_arena, Dict dict) {
+Value *value_dict(RcArena *rc_arena, Dict dict) {
   Value *value = rc_arena_alloc(rc_arena, sizeof(Value));
   *value = (Value) { ValueKindDict, { .dict = dict }, 0 };
-  DA_APPEND(*stack, value);
+  return value;
 }
 
-void value_stack_push_env(ValueStack *stack, RcArena *rc_arena, Vm vm) {
+Value *value_env(RcArena *rc_arena, Vm vm) {
   Value *value = rc_arena_alloc(rc_arena, sizeof(Value));
   Env *env = malloc(sizeof(Env));
-  *env = (Env) { {}, {}, vm };
+  env->vm = vm;
   *value = (Value) { ValueKindEnv, { .env = env }, 0 };
-  DA_APPEND(*stack, value);
-}
-
-Value *value_stack_pop(ValueStack *stack) {
-  if (stack->len > 0)
-    return stack->items[--stack->len];
-
-  ERROR("Not enough values on the stack\n");
-  exit(1);
+  return value;
 }
 
 Value *value_clone(RcArena *rc_arena, Value *value) {
@@ -246,27 +250,13 @@ static Var *get_var(Vm *vm, Str name) {
   return NULL;
 }
 
-static ExecState catch_vars_block(Vm *vm, Strs *local_names,
-                                  NamedValues *catched_values,
-                                  IrBlock *block);
+static void catch_vars_block(Vm *vm, Strs *local_names,
+                             NamedValues *catched_values,
+                             IrBlock *block);
 
-#define CATCH_VARS(vm, local_names, catched_values, expr)                \
-  do {                                                                   \
-    ExecState state = catch_vars(vm, local_names, catched_values, expr); \
-    if (state != ExecStateContinue)                                      \
-      return state;                                                      \
-  } while (0)
-
-#define CATCH_VARS_BLOCK(vm, local_names, catched_values, block)                \
-  do {                                                                          \
-    ExecState state = catch_vars_block(vm, local_names, catched_values, block); \
-    if (state != ExecStateContinue)                                             \
-      return state;                                                             \
-  } while (0)
-
-static ExecState catch_vars(Vm *vm, Strs *local_names,
-                            NamedValues *catched_values,
-                            IrExpr *expr) {
+static void catch_vars(Vm *vm, Strs *local_names,
+                       NamedValues *catched_values,
+                       IrExpr *expr) {
   switch (expr->kind) {
   case IrExprKindBlock: {
     CATCH_VARS_BLOCK(vm, local_names, catched_values, &expr->as.block);
@@ -314,7 +304,7 @@ static ExecState catch_vars(Vm *vm, Strs *local_names,
   case IrExprKindIdent: {
     for (u32 i = 0; i < local_names->len; ++i)
       if (str_eq(expr->as.ident.ident, local_names->items[i]))
-        return ExecStateContinue;
+        return;
 
     Var *var = get_var(vm, expr->as.ident.ident);
     if (var && !var->is_global) {
@@ -345,17 +335,13 @@ static ExecState catch_vars(Vm *vm, Strs *local_names,
       CATCH_VARS(vm, local_names, catched_values, expr->as.self_call.args.items[i]);
   } break;
   }
-
-  return ExecStateContinue;
 }
 
-static ExecState catch_vars_block(Vm *vm, Strs *local_names,
-                                  NamedValues *catched_values,
-                                  IrBlock *block) {
+static void catch_vars_block(Vm *vm, Strs *local_names,
+                             NamedValues *catched_values,
+                             IrBlock *block) {
   for (u32 i = 0; i < block->len; ++i)
     CATCH_VARS(vm, local_names, catched_values, block->items[i]);
-
-  return ExecStateContinue;
 }
 
 bool value_list_matches_kinds(u32 len, Value **values, ValueKind *kinds) {
@@ -380,11 +366,9 @@ static Intrinsic *get_intrinsic(Vm *vm, Str name, u32 args_count, Value **args) 
   return NULL;
 }
 
-ExecState execute_func(Vm *vm, Func *func, IrMetaData *meta, bool value_expected) {
+Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool value_expected) {
   if (func->intrinsic_name.len > 0) {
-    Intrinsic *intrinsic = get_intrinsic(vm, func->intrinsic_name, func->args.len,
-                                         vm->stack.items + vm->stack.len -
-                                         func->args.len);
+    Intrinsic *intrinsic = get_intrinsic(vm, func->intrinsic_name, func->args.len, args);
 
     if (!intrinsic) {
       if (meta)
@@ -393,22 +377,20 @@ ExecState execute_func(Vm *vm, Func *func, IrMetaData *meta, bool value_expected
       else
         ERROR("Intrinsic `"STR_FMT"` with such signature was not found\n",
               STR_ARG(func->intrinsic_name));
+
+      vm->state = ExecStateExit;
       vm->exit_code = 1;
-      return ExecStateExit;
+
+      return NULL;
     }
 
-    if (!(*intrinsic->func)(vm))
-      return ExecStateExit;
+    Value *result = (*intrinsic->func)(vm, args);
+    if (vm->state != ExecStateContinue)
+      return NULL;
 
-    if (value_expected && !intrinsic->has_return_value)
-      value_stack_push_unit(&vm->stack, &vm->rc_arena);
-    else if (!value_expected && intrinsic->has_return_value)
-      --vm->stack.len;
-
-    return ExecStateContinue;
+    return result;
   }
 
-  u32 prev_stack_len = vm->stack.len;
   Vars prev_local_vars = vm->local_vars;
   bool prev_is_inside_of_func = vm->is_inside_of_func;
   Func prev_current_func_value = vm->current_func_value;
@@ -420,7 +402,7 @@ ExecState execute_func(Vm *vm, Func *func, IrMetaData *meta, bool value_expected
   for (u32 i = 0; i < func->args.len; ++i) {
     Var var = {
       func->args.items[i],
-      vm->stack.items[vm->stack.len - func->args.len + i],
+      args[i],
       false,
     };
 
@@ -437,10 +419,10 @@ ExecState execute_func(Vm *vm, Func *func, IrMetaData *meta, bool value_expected
     DA_APPEND(vm->local_vars, var);
   }
 
-  ExecState result = execute_block(vm, &func->body, value_expected);
+  Value *result = execute_block(vm, &func->body, value_expected);
 
-  for (u32 i = prev_stack_len; i < vm->stack.len - value_expected; ++i)
-    value_free(vm->stack.items[i], &vm->rc_arena, true);
+  for (u32 i = 0; i < func->args.len; ++i)
+    value_free(args[i], &vm->rc_arena, true);
 
   if (vm->local_vars.items)
     free(vm->local_vars.items);
@@ -448,49 +430,56 @@ ExecState execute_func(Vm *vm, Func *func, IrMetaData *meta, bool value_expected
   vm->is_inside_of_func = prev_is_inside_of_func;
   vm->current_func_value = prev_current_func_value;
 
-  if (value_expected)
-    vm->stack.items[prev_stack_len - func->args.len] = vm->stack.items[vm->stack.len - 1];
-  vm->stack.len = prev_stack_len - func->args.len + value_expected;
+  if (vm->state == ExecStateReturn)
+    vm->state = ExecStateContinue;
 
-  if (result == ExecStateExit)
-    return result;
-  return ExecStateContinue;
+  return result;
 }
 
-ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
+Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
+  Value *result = NULL;
+
   switch (expr->kind) {
   case IrExprKindBlock: {
     EXECUTE_BLOCK(vm, &expr->as.block, value_expected);
   } break;
 
   case IrExprKindFuncCall: {
-    EXECUTE_EXPR(vm, expr->as.func_call.func, true);
+    Value *func_value;
+    EXECUTE_EXPR_SET(vm, func_value, expr->as.func_call.func, true);
 
-    Value *func_value = value_stack_pop(&vm->stack);
     if (func_value->kind != ValueKindFunc) {
       PERROR(META_FMT, "Value is not callable\n",
              META_ARG(expr->meta));
+      vm->state = ExecStateExit;
       vm->exit_code = 1;
-      return ExecStateExit;
+
+      return NULL;
     }
 
     if (expr->as.func_call.args.len != func_value->as.func.args.len) {
       PERROR(META_FMT, "Wrong arguments count: %u, expected %u\n",
             META_ARG(expr->meta), expr->as.func_call.args.len,
             func_value->as.func.args.len);
+      vm->state = ExecStateExit;
       vm->exit_code = 1;
-      return ExecStateExit;
+
+      return NULL;
     }
 
-    for (u32 i = 0; i < expr->as.func_call.args.len; ++i)
-      EXECUTE_EXPR(vm, expr->as.func_call.args.items[i], true);
+    Value **func_args = malloc(expr->as.func_call.args.len * sizeof(Value *));
 
-    EXECUTE_FUNC(vm, &func_value->as.func, &expr->meta, value_expected);
+    for (u32 i = 0; i < expr->as.func_call.args.len; ++i)
+      EXECUTE_EXPR_SET(vm, func_args[i], expr->as.func_call.args.items[i], true);
+
+    EXECUTE_FUNC_SET(vm, result, func_args, &func_value->as.func, &expr->meta, value_expected);
+
+    free(func_args);
   } break;
 
   case IrExprKindVarDef: {
-    EXECUTE_EXPR(vm, expr->as.var_def.expr, true);
-    Value *value = value_stack_pop(&vm->stack);
+    Value *value;
+    EXECUTE_EXPR_SET(vm, value, expr->as.var_def.expr, true);
     ++value->refs_count;
 
     Var *prev_var = get_var(vm, expr->as.var_def.name);
@@ -499,9 +488,6 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         value_free(prev_var->value, &vm->rc_arena, true);
         prev_var->value = value;
       }
-
-      if (value_expected)
-        value_stack_push_unit(&vm->stack, &vm->rc_arena);
 
       break;
     }
@@ -515,54 +501,37 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       DA_APPEND(vm->global_vars, var);
     else
       DA_APPEND(vm->local_vars, var);
-
-    if (value_expected)
-      value_stack_push_unit(&vm->stack, &vm->rc_arena);
   } break;
 
   case IrExprKindIf: {
-    EXECUTE_EXPR(vm, expr->as._if.cond, true);
-
-    Value *cond = value_stack_pop(&vm->stack);
+    Value *cond;
+    EXECUTE_EXPR_SET(vm, cond, expr->as._if.cond, true);
     if (value_to_bool(cond)) {
-      EXECUTE_BLOCK(vm, &expr->as._if.if_body, value_expected);
-      break;
+      EXECUTE_BLOCK_SET(vm, result, &expr->as._if.if_body, value_expected);
+      return result;
     }
 
-    bool executed_elif = false;
-
     for (u32 i = 0; i < expr->as._if.elifs.len; ++i) {
-      EXECUTE_EXPR(vm, expr->as._if.elifs.items[i].cond, true);
-
-      cond = value_stack_pop(&vm->stack);
+      EXECUTE_EXPR_SET(vm, cond, expr->as._if.elifs.items[i].cond, true);
       if (value_to_bool(cond)) {
-        EXECUTE_BLOCK(vm, &expr->as._if.elifs.items[i].body, value_expected);
-        executed_elif = true;
-        break;
+        EXECUTE_BLOCK_SET(vm, result, &expr->as._if.elifs.items[i].body, value_expected);
+        return result;
       }
     }
 
-    if (!executed_elif) {
-      if (expr->as._if.has_else)
-        EXECUTE_BLOCK(vm, &expr->as._if.else_body, value_expected);
-      else
-        value_stack_push_unit(&vm->stack, &vm->rc_arena);
-    }
+    if (expr->as._if.has_else)
+      EXECUTE_BLOCK_SET(vm, result, &expr->as._if.else_body, value_expected);
   } break;
 
   case IrExprKindWhile: {
     while (true) {
-      EXECUTE_EXPR(vm, expr->as._while.cond, true);
-
-      Value *cond = value_stack_pop(&vm->stack);
+      Value *cond;
+      EXECUTE_EXPR_SET(vm, cond, expr->as._while.cond, true);
       if (!value_to_bool(cond))
         break;
 
       EXECUTE_BLOCK(vm, &expr->as._while.body, false);
     }
-
-    if (value_expected)
-      value_stack_push_unit(&vm->stack, &vm->rc_arena);
   } break;
 
   case IrExprKindSet: {
@@ -571,13 +540,14 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     if (!dest_var) {
       PERROR(META_FMT, "Symbol "STR_FMT" was not defined before usage\n",
         META_ARG(expr->meta), STR_ARG(expr->as.ident.ident));
+      vm->state = ExecStateExit;
       vm->exit_code = 1;
-      return ExecStateExit;
+
+      return NULL;
     }
 
-
-    EXECUTE_EXPR(vm, expr->as.set.src, true);
-    Value *src = value_stack_pop(&vm->stack);
+    Value *src;
+    EXECUTE_EXPR_SET(vm, src, expr->as.set.src, true);
 
     if (dest_var->value == src)
       break;
@@ -595,29 +565,29 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     dest_var->value->refs_count = 1;
 
     if (value_expected)
-      value_stack_push_unit(&vm->stack, &vm->rc_arena);
+      return value_unit(&vm->rc_arena);
   } break;
 
   case IrExprKindRet: {
-    if (expr->as.ret.has_expr)
-      EXECUTE_EXPR(vm, expr->as.ret.expr, true);
+    vm->state = ExecStateReturn;
 
-    return ExecStateReturn;
+    if (expr->as.ret.has_expr)
+      EXECUTE_EXPR_SET(vm, result, expr->as.ret.expr, true);
   } break;
 
   case IrExprKindList: {
     if (!value_expected)
       break;
+
     ListNode *list = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
     ListNode *list_end = list;
 
     for (u32 i = 0; i < expr->as.list.content.len; ++i) {
-      EXECUTE_EXPR(vm, expr->as.list.content.items[i], true);
-
       ListNode *new_node = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
-      new_node->value = value_stack_pop(&vm->stack);
-      ++new_node->value->refs_count;
       new_node->next = NULL;
+
+      EXECUTE_EXPR_SET(vm, new_node->value, expr->as.list.content.items[i], true);
+      ++new_node->value->refs_count;
 
       if (list_end) {
         list_end->next = new_node;
@@ -628,45 +598,44 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       }
     }
 
-    value_stack_push_list(&vm->stack, &vm->rc_arena, list);
+    result = value_list(&vm->rc_arena, list);
   } break;
 
   case IrExprKindIdent: {
     if (!value_expected)
-      return ExecStateContinue;
+      break;
 
     Var *var = get_var(vm, expr->as.ident.ident);
     if (!var) {
       PERROR(META_FMT, "Symbol "STR_FMT" was not defined before usage\n",
             META_ARG(expr->meta), STR_ARG(expr->as.ident.ident));
+      vm->state = ExecStateExit;
       vm->exit_code = 1;
-      return ExecStateExit;
+
+      return NULL;
     }
 
-    Value *copy = value_clone(&vm->rc_arena, var->value);
-    DA_APPEND(vm->stack, copy);
-
-    return ExecStateContinue;
+    result = value_clone(&vm->rc_arena, var->value);
   } break;
 
   case IrExprKindString: {
     if (value_expected)
-      value_stack_push_string(&vm->stack, &vm->rc_arena, expr->as.string.lit);
+      result = value_string(&vm->rc_arena, expr->as.string.lit);
   } break;
 
   case IrExprKindInt: {
     if (value_expected)
-      value_stack_push_int(&vm->stack, &vm->rc_arena, expr->as._int._int);
+      result = value_int(&vm->rc_arena, expr->as._int._int);
   } break;
 
   case IrExprKindFloat: {
     if (value_expected)
-      value_stack_push_float(&vm->stack, &vm->rc_arena, expr->as._float._float);
+      result = value_float(&vm->rc_arena, expr->as._float._float);
   } break;
 
   case IrExprKindBool: {
     if (value_expected)
-      value_stack_push_bool(&vm->stack, &vm->rc_arena, expr->as._bool._bool);
+      result = value_bool(&vm->rc_arena, expr->as._bool._bool);
   } break;
 
   case IrExprKindLambda: {
@@ -679,7 +648,7 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     for (u32 i = 0; i < expr->as.lambda.args.len; ++i)
       DA_APPEND(local_names, expr->as.lambda.args.items[i]);
 
-    CATCH_VARS_BLOCK(vm, &local_names, &catched_values, &expr->as.lambda.body);
+    catch_vars_block(vm, &local_names, &catched_values, &expr->as.lambda.body);
 
     Value *func_value = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
     *func_value = (Value) {
@@ -694,7 +663,8 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       },
       0,
     };
-    DA_APPEND(vm->stack, func_value);
+
+    result = func_value;
   } break;
 
   case IrExprKindDict: {
@@ -704,40 +674,49 @@ ExecState execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Dict dict = {0};
 
     for (u32 i = 0; i < expr->as.dict.len; ++i) {
-      EXECUTE_EXPR(vm, expr->as.dict.items[i].expr, true);
-      EXECUTE_EXPR(vm, expr->as.dict.items[i].key, true);
-
-      DictValue field;
-      field.key = value_stack_pop(&vm->stack);
-      field.value = value_stack_pop(&vm->stack);
+      DictValue field = {0};
       ++field.key->refs_count;
       ++field.value->refs_count;
+
+      EXECUTE_EXPR_SET(vm, field.value, expr->as.dict.items[i].expr, true);
+      EXECUTE_EXPR_SET(vm, field.key, expr->as.dict.items[i].key, true);
 
       DA_APPEND(dict, field);
     }
 
-    value_stack_push_dict(&vm->stack, &vm->rc_arena, dict);
+    result = value_dict(&vm->rc_arena, dict);
   } break;
 
   case IrExprKindSelfCall: {
-    for (u32 i = 0; i < expr->as.self_call.args.len; ++i)
-      EXECUTE_EXPR(vm, expr->as.self_call.args.items[i], true);
+    Value **func_args = malloc(expr->as.self_call.args.len * sizeof(Value *));
 
-    EXECUTE_FUNC(vm, &vm->current_func_value, &expr->meta, value_expected);
+    for (u32 i = 0; i < expr->as.self_call.args.len; ++i)
+      EXECUTE_EXPR_SET(vm, func_args[i], expr->as.self_call.args.items[i], true);
+
+    EXECUTE_FUNC_SET(vm, result, func_args, &vm->current_func_value,
+                     &expr->meta, value_expected);
+
+    free(func_args);
   } break;
   }
 
-  return ExecStateContinue;
+  if (value_expected && !result)
+    return value_unit(&vm->rc_arena);
+  return result;
 }
 
-ExecState execute_block(Vm *vm, IrBlock *block, bool value_expected) {
+Value *execute_block(Vm *vm, IrBlock *block, bool value_expected) {
   for (u32 i = 0; i + 1 < block->len; ++i)
     EXECUTE_EXPR(vm, block->items[i], false);
 
-  if (block->len > 0)
-    EXECUTE_EXPR(vm, block->items[block->len - 1], value_expected);
+  Value *result = NULL;
 
-  return ExecStateContinue;
+  if (block->len > 0)
+    EXECUTE_EXPR_SET(vm, result, block->items[block->len - 1], value_expected);
+  else if (value_expected)
+    result = value_unit(&vm->rc_arena);
+
+  return result;
 }
 
 static void intrinsics_append(Intrinsics *a, Intrinsic *b, u32 b_len) {
@@ -803,16 +782,12 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
 }
 
 void vm_destroy(Vm *vm) {
-  for (u32 i = 0; i < vm->stack.len; ++i)
-    value_free(vm->stack.items[i], &vm->rc_arena, true);
-
   for (u32 i = 0; i < vm->global_vars.len; ++i)
     value_free(vm->global_vars.items[i].value, &vm->rc_arena, true);
 
   for (u32 i = 0; i < vm->local_vars.len; ++i)
     value_free(vm->local_vars.items[i].value, &vm->rc_arena, true);
 
-  free(vm->stack.items);
   free(vm->global_vars.items);
   free(vm->local_vars.items);
 

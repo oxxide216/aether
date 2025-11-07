@@ -1,9 +1,9 @@
 #include "aether/vm.h"
 
-bool str_insert_intrinsic(Vm *vm) {
-  Value *index = value_stack_pop(&vm->stack);
-  Value *sub_string = value_stack_pop(&vm->stack);
-  Value *string = value_stack_pop(&vm->stack);
+Value *str_insert_intrinsic(Vm *vm, Value **args) {
+  Value *string = args[0];
+  Value *index = args[1];
+  Value *sub_string = args[2];
 
   Str new_string;
   new_string.len = string->as.string.len + sub_string->as.string.len;
@@ -16,15 +16,13 @@ bool str_insert_intrinsic(Vm *vm) {
          string->as.string.ptr + index->as._int,
          string->as.string.len - index->as._int);
 
-  value_stack_push_string(&vm->stack, &vm->rc_arena, new_string);
-
-  return true;
+  return value_string(&vm->rc_arena, new_string);
 }
 
-bool str_remove_intrinsic(Vm *vm) {
-  Value *index = value_stack_pop(&vm->stack);
-  Value *amount = value_stack_pop(&vm->stack);
-  Value *string = value_stack_pop(&vm->stack);
+Value *str_remove_intrinsic(Vm *vm, Value **args) {
+  Value *string = args[0];
+  Value *index = args[1];
+  Value *amount = args[2];
 
   Str new_string;
   new_string.len = string->as.string.len - amount->as._int;
@@ -34,15 +32,13 @@ bool str_remove_intrinsic(Vm *vm) {
          string->as.string.ptr + index->as._int + 1,
          string->as.string.len - index->as._int - amount->as._int);
 
-  value_stack_push_string(&vm->stack, &vm->rc_arena, new_string);
-
-  return true;
+  return value_string(&vm->rc_arena, new_string);
 }
 
-bool str_replace_intrinsic(Vm *vm) {
-  Value *index = value_stack_pop(&vm->stack);
-  Value *sub_string = value_stack_pop(&vm->stack);
-  Value *string = value_stack_pop(&vm->stack);
+Value *str_replace_intrinsic(Vm *vm, Value **args) {
+  Value *string = args[0];
+  Value *index = args[1];
+  Value *sub_string = args[2];
 
   Str new_string;
   new_string.len = string->as.string.len - sub_string->as.string.len - index->as._int;
@@ -55,14 +51,12 @@ bool str_replace_intrinsic(Vm *vm) {
          string->as.string.ptr + index->as._int + sub_string->as.string.len,
          string->as.string.len - index->as._int - sub_string->as.string.len);
 
-  value_stack_push_string(&vm->stack, &vm->rc_arena, new_string);
-
-  return true;
+  return value_string(&vm->rc_arena, new_string);
 }
 
-bool split_intrinsic(Vm *vm) {
-  Value *delimeter = value_stack_pop(&vm->stack);
-  Value *string = value_stack_pop(&vm->stack);
+Value *split_intrinsic(Vm *vm, Value **args) {
+  Value *string = args[0];
+  Value *delimeter = args[1];
 
   ListNode *list = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
   ListNode *node = list;
@@ -116,22 +110,17 @@ bool split_intrinsic(Vm *vm) {
     };
   }
 
-  value_stack_push_list(&vm->stack, &vm->rc_arena, list);
-
-  return true;
+  return value_list(&vm->rc_arena, list);
 }
 
-bool sub_str_intrinsic(Vm *vm) {
-  Value *end = value_stack_pop(&vm->stack);
-  Value *begin = value_stack_pop(&vm->stack);
-  Value *string = value_stack_pop(&vm->stack);
+Value *sub_str_intrinsic(Vm *vm, Value **args) {
+  Value *string = args[0];
+  Value *begin = args[1];
+  Value *end = args[2];
 
   if (begin->as._int >= end->as._int ||
-      end->as._int > string->as.string.len) {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
-
-    return true;
-  }
+      end->as._int > string->as.string.len)
+    return value_unit(&vm->rc_arena);
 
   Str sub_string = {
     string->as.string.ptr + begin->as._int,
@@ -140,14 +129,12 @@ bool sub_str_intrinsic(Vm *vm) {
 
   rc_arena_clone(&vm->rc_arena, string->as.string.ptr);
 
-  value_stack_push_string(&vm->stack, &vm->rc_arena, sub_string);
-
-  return true;
+  return value_string(&vm->rc_arena, sub_string);
 }
 
-bool join_intrinsic(Vm *vm) {
-  Value *filler = value_stack_pop(&vm->stack);
-  Value *parts = value_stack_pop(&vm->stack);
+Value *join_intrinsic(Vm *vm, Value **args) {
+  Value *parts = args[0];
+  Value *filler = args[1];
 
   StringBuilder sb = {0};
 
@@ -157,7 +144,7 @@ bool join_intrinsic(Vm *vm) {
       sb_push_str(&sb, filler->as.string);
 
     if (node->value->kind != ValueKindString)
-      PANIC("join: wrong part kinds\n");
+      PANIC(&vm->rc_arena, "join: wrong part kinds\n");
 
     sb_push_str(&sb, node->value->as.string);
 
@@ -172,19 +159,15 @@ bool join_intrinsic(Vm *vm) {
   memcpy(joined.ptr, sb.buffer, sb.len);
   free(sb.buffer);
 
-  value_stack_push_string(&vm->stack, &vm->rc_arena, joined);
-
-  return true;
+  return value_string(&vm->rc_arena, joined);
 }
 
-bool eat_str_intrinsic(Vm *vm) {
-  Value *pattern = value_stack_pop(&vm->stack);
-  Value *string = value_stack_pop(&vm->stack);
+Value *eat_str_intrinsic(Vm *vm, Value **args) {
+  Value *string = args[0];
+  Value *pattern = args[1];
 
-  if (string->as.string.len < pattern->as.string.len) {
-    value_stack_push_bool(&vm->stack, &vm->rc_arena, false);
-    return true;
-  }
+  if (string->as.string.len < pattern->as.string.len)
+    return value_bool(&vm->rc_arena, false);
 
   Str string_begin = {
     string->as.string.ptr,
@@ -213,18 +196,14 @@ bool eat_str_intrinsic(Vm *vm) {
 
   rc_arena_clone(&vm->rc_arena, string->as.string.ptr);
 
-  value_stack_push_list(&vm->stack, &vm->rc_arena, new_list);
-
-  return true;
+  return value_list(&vm->rc_arena, new_list);
 }
 
-static bool eat_byte(Vm *vm, u32 size) {
-  Value *string = value_stack_pop(&vm->stack);
+static Value *eat_byte(Vm *vm, Value **args, u32 size) {
+  Value *string = args[0];
 
-  if (string->as.string.len < size) {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
-    return true;
-  }
+  if (string->as.string.len < size)
+    return value_unit(&vm->rc_arena);
 
   i64 _int = 0;
   switch (size) {
@@ -254,25 +233,23 @@ static bool eat_byte(Vm *vm, u32 size) {
 
   rc_arena_clone(&vm->rc_arena, string->as.string.ptr);
 
-  value_stack_push_list(&vm->stack, &vm->rc_arena, new_list);
-
-  return true;
+  return value_list(&vm->rc_arena, new_list);
 }
 
-bool eat_byte_64_intrinsic(Vm *vm) {
-  return eat_byte(vm, 8);
+Value *eat_byte_64_intrinsic(Vm *vm, Value **args) {
+  return eat_byte(vm, args, 8);
 }
 
-bool eat_byte_32_intrinsic(Vm *vm) {
-  return eat_byte(vm, 4);
+Value *eat_byte_32_intrinsic(Vm *vm, Value **args) {
+  return eat_byte(vm, args, 4);
 }
 
-bool eat_byte_16_intrinsic(Vm *vm) {
-  return eat_byte(vm, 2);
+Value *eat_byte_16_intrinsic(Vm *vm, Value **args) {
+  return eat_byte(vm, args, 2);
 }
 
-bool eat_byte_8_intrinsic(Vm *vm) {
-  return eat_byte(vm, 1);
+Value *eat_byte_8_intrinsic(Vm *vm, Value **args) {
+  return eat_byte(vm, args, 1);
 }
 
 Intrinsic str_intrinsics[] = {

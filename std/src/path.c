@@ -3,17 +3,17 @@
 
 #include "aether/vm.h"
 
-bool get_current_path_intrinsic(Vm *vm) {
+Value *get_current_path_intrinsic(Vm *vm, Value **args) {
+  (void) args;
+
   char *path = rc_arena_alloc(&vm->rc_arena, PATH_MAX);
   getcwd(path, PATH_MAX);
 
-  value_stack_push_string(&vm->stack, &vm->rc_arena, STR(path, strlen(path)));
-
-  return true;
+  return value_string(&vm->rc_arena, STR(path, strlen(path)));
 }
 
-bool set_current_path_intrinsic(Vm *vm) {
-  Value *path = value_stack_pop(&vm->stack);
+Value *set_current_path_intrinsic(Vm *vm, Value **args) {
+  Value *path = args[0];
 
   char *path_cstring = malloc(path->as.string.len + 1);
   memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
@@ -23,11 +23,11 @@ bool set_current_path_intrinsic(Vm *vm) {
 
   free(path_cstring);
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
-bool get_absolute_path_intrinsic(Vm *vm) {
-  Value *path = value_stack_pop(&vm->stack);
+Value *get_absolute_path_intrinsic(Vm *vm, Value **args) {
+  Value *path = args[0];
 
   char *path_cstring = malloc(path->as.string.len + 1);
   memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
@@ -36,11 +36,9 @@ bool get_absolute_path_intrinsic(Vm *vm) {
   char *absolute_path = rc_arena_alloc(&vm->rc_arena, PATH_MAX);
   realpath(path_cstring, absolute_path);
 
-  value_stack_push_string(&vm->stack, &vm->rc_arena, STR(absolute_path, strlen(absolute_path)));
-
   free(path_cstring);
 
-  return true;
+  return value_string(&vm->rc_arena, STR(absolute_path, strlen(absolute_path)));
 }
 
 Intrinsic path_intrinsics[] = {

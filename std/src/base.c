@@ -5,12 +5,12 @@
 
 #define DEFAULT_INPUT_BUFFER_SIZE   64
 
-bool got_sigint = false;
+Value *got_sigint = false;
 
 static StringBuilder printf_sb = {0};
 
-bool printf_intrinsic(Vm *vm) {
-  Value *value = value_stack_pop(&vm->stack);
+Value *printf_intrinsic(Vm *vm, Value **args) {
+  Value *value = args[0];
 
   printf_sb.len = 0;
 
@@ -24,11 +24,11 @@ bool printf_intrinsic(Vm *vm) {
   str_print(STR(printf_sb.buffer, printf_sb.len));
   fflush(stdout);
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
-bool input_size_intrinsic(Vm *vm) {
-  Value *size = value_stack_pop(&vm->stack);
+Value *input_size_intrinsic(Vm *vm, Value **args) {
+  Value *size = args[0];
 
   Str buffer;
   buffer.len = size->as._int;
@@ -39,13 +39,11 @@ bool input_size_intrinsic(Vm *vm) {
   else
     read(0, buffer.ptr, buffer.len);
 
-  value_stack_push_string(&vm->stack, &vm->rc_arena, buffer);
-
-  return true;
+  return value_string(&vm->rc_arena, buffer);
 }
 
-bool input_intrinsic(Vm *vm) {
-  (void) vm;
+Value *input_intrinsic(Vm *vm, Value **args) {
+  (void) args;
 
   char *buffer = NULL;
   u32 len = 0;
@@ -75,15 +73,13 @@ bool input_intrinsic(Vm *vm) {
     }
   }
 
-  value_stack_push_string(&vm->stack, &vm->rc_arena, STR(buffer, len));
-
-  return true;
+  return value_string(&vm->rc_arena, STR(buffer, len));
 }
 
-bool get_args_intrinsic(Vm *vm) {
-  value_stack_push_list(&vm->stack, &vm->rc_arena, vm->args);
+Value *get_args_intrinsic(Vm *vm, Value **args) {
+  (void) args;
 
-  return true;
+    return value_list(&vm->rc_arena, vm->args);
 }
 
 Intrinsic base_intrinsics[] = {

@@ -13,14 +13,12 @@
 #define DEFAULT_RECEIVE_BUFFER_SIZE 64
 #define POLL_TIMEOUT_MS             10
 
-bool create_server_intrinsic(Vm *vm) {
-  Value *port = value_stack_pop(&vm->stack);
+Value *create_server_intrinsic(Vm *vm, Value **args) {
+  Value *port = args[0];
 
   i32 server_socket = socket(AF_INET, SOCK_STREAM, 0);
-  if (server_socket < 0) {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
-    return true;
-  }
+  if (server_socket < 0)
+    return value_unit(&vm->rc_arena);
 
   fcntl(server_socket, F_SETFL, O_NONBLOCK);
 
@@ -35,25 +33,23 @@ bool create_server_intrinsic(Vm *vm) {
 
   if (bind(server_socket, (struct sockaddr*) &address,
            sizeof(address)) < 0) {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
     close(server_socket);
-    return true;
+
+    return value_unit(&vm->rc_arena);
   }
 
   if (listen(server_socket, 3) < 0) {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
     close(server_socket);
-    return true;
+
+    return value_unit(&vm->rc_arena);
   }
 
-  value_stack_push_int(&vm->stack, &vm->rc_arena, server_socket);
-
-  return true;
+  return value_int(&vm->rc_arena, server_socket);
 }
 
-bool create_client_intrinsic(Vm *vm) {
-  Value *port = value_stack_pop(&vm->stack);
-  Value *server_ip_address = value_stack_pop(&vm->stack);
+Value *create_client_intrinsic(Vm *vm, Value **args) {
+  Value *server_ip_address = args[0];
+  Value *port = args[1];
 
   char *server_ip_address_cstr = malloc(server_ip_address->as.string.len + 1);
   memcpy(server_ip_address_cstr,
@@ -72,18 +68,18 @@ bool create_client_intrinsic(Vm *vm) {
   struct addrinfo *result;
 
   if (getaddrinfo(server_ip_address_cstr, port_cstr, &hints, &result) < 0) {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
     free(server_ip_address_cstr);
     free(port_cstr);
-    return true;
+
+    return value_unit(&vm->rc_arena);
   }
 
   i32 client_socket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
   if (client_socket < 0) {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
     free(server_ip_address_cstr);
     free(port_cstr);
-    return true;
+
+    return value_unit(&vm->rc_arena);
   }
 
   i32 enable = 1;
@@ -91,23 +87,22 @@ bool create_client_intrinsic(Vm *vm) {
 
   i32 connected = connect(client_socket, result->ai_addr, result->ai_addrlen);
   if (connected < 0) {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
     free(server_ip_address_cstr);
     free(port_cstr);
     freeaddrinfo(result);
-    return true;
+
+    return value_unit(&vm->rc_arena);
   }
 
-  value_stack_push_int(&vm->stack, &vm->rc_arena, client_socket);
   free(server_ip_address_cstr);
   freeaddrinfo(result);
 
-  return true;
+  return value_int(&vm->rc_arena, client_socket);
 }
 
-bool accept_connection_intrinsic(Vm *vm) {
-  Value *port = value_stack_pop(&vm->stack);
-  Value *server = value_stack_pop(&vm->stack);
+Value *accept_connection_intrinsic(Vm *vm, Value **args) {
+  Value *server = args[0];
+  Value *port = args[1];
 
   struct sockaddr_in address;
   address.sin_family = AF_INET;
@@ -118,40 +113,36 @@ bool accept_connection_intrinsic(Vm *vm) {
   i32 client_socket = accept(server->as._int,
                              (struct sockaddr*) &address,
                              &address_size);
-  if (client_socket < 0) {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
-    return true;
-  }
+  if (client_socket < 0)
+    return value_unit(&vm->rc_arena);
 
   i32 enable = 1;
   setsockopt(client_socket, SOL_TCP, TCP_NODELAY, &enable, sizeof(enable));
 
-  value_stack_push_int(&vm->stack, &vm->rc_arena, client_socket);
-
-  return true;
+  return value_int(&vm->rc_arena, client_socket);
 }
 
-bool close_connection_intrinsic(Vm *vm) {
-  Value *client = value_stack_pop(&vm->stack);
+Value *close_connection_intrinsic(Vm *vm, Value **args) {
+  Value *client = args[0];
 
   close(client->as._int);
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
-bool send_intrinsic(Vm *vm) {
-  Value *message = value_stack_pop(&vm->stack);
-  Value *receiver = value_stack_pop(&vm->stack);
+Value *send_intrinsic(Vm *vm, Value **args) {
+  Value *receiver = args[0];
+  Value *message = args[1];
 
   send(receiver->as._int, message->as.string.ptr,
        message->as.string.len, 0);
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
-bool receive_size_intrinsic(Vm *vm) {
-  Value *size = value_stack_pop(&vm->stack);
-  Value *receiver = value_stack_pop(&vm->stack);
+Value *receive_size_intrinsic(Vm *vm, Value **args) {
+  Value *receiver = args[0];
+  Value *size = args[1];
 
   Str buffer = { rc_arena_alloc(&vm->rc_arena, size->as._int), 0 };
 
@@ -164,19 +155,16 @@ bool receive_size_intrinsic(Vm *vm) {
     buffer.len = recv(receiver->as._int, buffer.ptr, size->as._int, 0);
 
   if (buffer.len == 0) {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
     rc_arena_free(&vm->rc_arena, buffer.ptr);
 
-    return true;
+    return value_unit(&vm->rc_arena);
   }
 
-  value_stack_push_string(&vm->stack, &vm->rc_arena, buffer);
-
-  return true;
+  return value_string(&vm->rc_arena, buffer);
 }
 
-bool receive_intrinsic(Vm *vm) {
-  Value *receiver = value_stack_pop(&vm->stack);
+Value *receive_intrinsic(Vm *vm, Value **args) {
+  Value *receiver = args[0];
 
   u32 cap = DEFAULT_RECEIVE_BUFFER_SIZE;
   Str buffer = { rc_arena_alloc(&vm->rc_arena, cap), 0 };
@@ -198,10 +186,8 @@ bool receive_intrinsic(Vm *vm) {
     if (len == 0)
       break;
 
-    if (len < 0) {
-      value_stack_push_unit(&vm->stack, &vm->rc_arena);
-      return true;
-    }
+    if (len < 0)
+      return value_unit(&vm->rc_arena);
 
     buffer.len += (u32) len;
 
@@ -217,15 +203,12 @@ bool receive_intrinsic(Vm *vm) {
   }
 
   if (buffer.len == 0) {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
     rc_arena_free(&vm->rc_arena, buffer.ptr);
 
-    return true;
+    return value_unit(&vm->rc_arena);
   }
 
-  value_stack_push_string(&vm->stack, &vm->rc_arena, buffer);
-
-  return true;
+  return value_string(&vm->rc_arena, buffer);
 }
 
 Intrinsic net_intrinsics[] = {

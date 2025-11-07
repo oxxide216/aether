@@ -10,20 +10,20 @@
 #include "aether/misc.h"
 #include "io.h"
 
-bool unblock_input_intrinsic(Vm *vm) {
-  (void) vm;
+Value *unblock_input_intrinsic(Vm *vm, Value **args) {
+  (void) args;
 
   fcntl(0, F_SETFL, fcntl(0, F_GETFL) | O_NONBLOCK);
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
-bool block_input_intrinsic(Vm *vm) {
-  (void) vm;
+Value *block_input_intrinsic(Vm *vm, Value **args) {
+  (void) args;
 
   fcntl(0, F_SETFL, fcntl(0, F_GETFL) ^ O_NONBLOCK);
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
 static char *str_to_cstr(Str str) {
@@ -34,16 +34,15 @@ static char *str_to_cstr(Str str) {
   return cstr;
 }
 
-bool get_file_info_intrinsic(Vm *vm) {
-  Value *path = value_stack_pop(&vm->stack);
+Value *get_file_info_intrinsic(Vm *vm, Value **args) {
+  Value *path = args[0];
 
   char *path_cstring = str_to_cstr(path->as.string);
 
   if (access(path_cstring, F_OK) != 0) {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
     free(path_cstring);
 
-    return true;
+    return value_unit(&vm->rc_arena);
   }
 
   Dict info = {0};
@@ -63,9 +62,9 @@ bool get_file_info_intrinsic(Vm *vm) {
   struct stat st;
 
   if (stat(path_cstring, &st) < 0) {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
     free(path_cstring);
-    return true;
+
+    return value_unit(&vm->rc_arena);
   }
 
   Value *size = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
@@ -75,32 +74,29 @@ bool get_file_info_intrinsic(Vm *vm) {
                           STR_LIT("size"),
                           size);
 
-  value_stack_push_dict(&vm->stack, &vm->rc_arena, info);
-
   free(path_cstring);
 
-  return true;
+  return value_dict(&vm->rc_arena, info);
 }
 
-bool read_file_intrinsic(Vm *vm) {
-  Value *path = value_stack_pop(&vm->stack);
+Value *read_file_intrinsic(Vm *vm, Value **args) {
+  Value *path = args[0];
 
   char *path_cstring = str_to_cstr(path->as.string);
 
   Str content = read_file(path_cstring);
-  if (content.len == (u32) -1)
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
-  else
-    value_stack_push_string(&vm->stack, &vm->rc_arena, content);
 
   free(path_cstring);
 
-  return true;
+  if (content.len == (u32) -1)
+    return value_unit(&vm->rc_arena);
+
+  return value_string(&vm->rc_arena, content);
 }
 
-bool write_file_intrinsic(Vm *vm) {
-  Value *content = value_stack_pop(&vm->stack);
-  Value *path = value_stack_pop(&vm->stack);
+Value *write_file_intrinsic(Vm *vm, Value **args) {
+  Value *path = args[0];
+  Value *content = args[1];
 
   char *path_cstring = str_to_cstr(path->as.string);
 
@@ -108,11 +104,11 @@ bool write_file_intrinsic(Vm *vm) {
 
   free(path_cstring);
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
-bool delete_file_intrinsic(Vm *vm) {
-  Value *path = value_stack_pop(&vm->stack);
+Value *delete_file_intrinsic(Vm *vm, Value **args) {
+  Value *path = args[0];
 
   char *path_cstring = str_to_cstr(path->as.string);
 
@@ -120,7 +116,7 @@ bool delete_file_intrinsic(Vm *vm) {
 
   free(path_cstring);
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
 static i32 unlink_dir_callback(const char *fpath, const struct stat *sb,
@@ -132,18 +128,20 @@ static i32 unlink_dir_callback(const char *fpath, const struct stat *sb,
   return remove(fpath);
 }
 
-bool delete_directory_intrinsic(Vm *vm) {
-  Value *path = value_stack_pop(&vm->stack);
+Value *delete_directory_intrinsic(Vm *vm, Value **args) {
+  (void) args;
+
+  Value *path = args[0];
 
   char *path_cstring = str_to_cstr(path->as.string);
 
   nftw(path_cstring, unlink_dir_callback, 64, FTW_DEPTH | FTW_PHYS);
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
-bool list_directory_intrinsic(Vm *vm) {
-  Value *path = value_stack_pop(&vm->stack);
+Value *list_directory_intrinsic(Vm *vm, Value **args) {
+  Value *path = args[0];
 
   ListNode *list = rc_arena_alloc(&vm->rc_arena, sizeof(ListNode));
   ListNode *list_end = list;
@@ -169,16 +167,14 @@ bool list_directory_intrinsic(Vm *vm) {
 
     closedir(dir);
   } else {
-    value_stack_push_unit(&vm->stack, &vm->rc_arena);
     free(path_cstring);
-    return true;
-  }
 
-  value_stack_push_list(&vm->stack, &vm->rc_arena, list);
+    return value_unit(&vm->rc_arena);
+  }
 
   free(path_cstring);
 
-  return true;
+  return value_list(&vm->rc_arena, list);
 }
 
 Intrinsic io_intrinsics[] = {

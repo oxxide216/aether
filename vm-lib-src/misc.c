@@ -1,12 +1,5 @@
 #include "aether/misc.h"
 
-bool prepare_rwo_numbers(Value **a, Value **b, Vm *vm) {
-  *b = value_stack_pop(&vm->stack);
-  *a = value_stack_pop(&vm->stack);
-
-  return true;
-}
-
 bool value_to_bool(Value *value) {
   if (value->kind == ValueKindUnit)
     return false;

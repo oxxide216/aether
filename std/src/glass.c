@@ -28,6 +28,8 @@ typedef struct {
   u32             width, height;
   Vertices        vertices;
   Indices         indices;
+  Vertices        alt_vertices;
+  Indices         alt_indices;
   GlassShader     shader;
   GlassObject     object;
   pthread_mutex_t geometry_mutex;
@@ -95,16 +97,11 @@ static u64 fnv_hash(u8 *data, u32 size) {
 }
 
 static void *logic_worker(void *arg) {
-  LogicData *data = (LogicData*) arg;
+  LogicData *data = (LogicData *) arg;
   u64 prev_hash = 0;
 
   while (*data->is_running) {
-    clock_t begin = clock();
-
-    execute_func(data->vm, &data->callback->as.func, NULL, false);
-
-    clock_t end = clock();
-    INFO("Elapsed: %f\n", (f32) (end - begin) / CLOCKS_PER_SEC);
+    execute_func(data->vm, NULL, &data->callback->as.func, NULL, false);
 
     pthread_mutex_lock(&glass.geometry_mutex);
 
@@ -122,28 +119,20 @@ static void *logic_worker(void *arg) {
                             true);
     }
 
-    glass.vertices.len = 0;
-    glass.indices.len = 0;
-
     pthread_mutex_unlock(&glass.geometry_mutex);
   }
 
   return NULL;
 }
 
-bool run_intrinsic(Vm *vm) {
-  Value *callback = value_stack_pop(&vm->stack);
-  Value *height = value_stack_pop(&vm->stack);
-  Value *width = value_stack_pop(&vm->stack);
-  Value *title = value_stack_pop(&vm->stack);
-
+Value *run_intrinsic(Vm *vm, Value **args) {
   if (!initialized) {
     initialized = true;
 
     glass.winx = winx_init();
-    glass.window = winx_init_window(&glass.winx, title->as.string,
-                                    width->as._int,
-                                    height->as._int,
+    glass.window = winx_init_window(&glass.winx, args[0]->as.string,
+                                    args[1]->as._int,
+                                    args[2]->as._int,
                                     WinxGraphicsModeOpenGL,
                                     NULL);
     glass_init();
@@ -164,7 +153,7 @@ bool run_intrinsic(Vm *vm) {
 
   pthread_mutex_init(&glass.geometry_mutex, NULL);
 
-  LogicData logic_data = { &is_running, vm, callback };
+  LogicData logic_data = { &is_running, vm, args[3] };
   pthread_t logic_thread;
   pthread_create(&logic_thread, NULL, logic_worker, &logic_data);
 
@@ -198,6 +187,13 @@ bool run_intrinsic(Vm *vm) {
     glass_clear_screen(clear_color.r, clear_color.g, clear_color.b, clear_color.a);
     glass_render_object(&glass.object, NULL, 0);
 
+    pthread_mutex_lock(&glass.geometry_mutex);
+
+    glass.vertices.len = 0;
+    glass.indices.len = 0;
+
+    pthread_mutex_unlock(&glass.geometry_mutex);
+
     winx_draw(&glass.window);
   }
 
@@ -206,12 +202,14 @@ bool run_intrinsic(Vm *vm) {
   winx_destroy_window(&glass.window);
   winx_cleanup(&glass.winx);
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
-bool window_size_intrinsic(Vm *vm) {
+Value *window_size_intrinsic(Vm *vm, Value **args) {
+  (void) args;
+
   if (!initialized)
-    return true;
+    return value_unit(&vm->rc_arena);
 
   Dict size = {0};
 
@@ -225,26 +223,19 @@ bool window_size_intrinsic(Vm *vm) {
   height->as._float = (f32) glass.window.height;
   dict_push_value_str_key(&vm->rc_arena, &size, STR_LIT("height"), height);
 
-  value_stack_push_dict(&vm->stack, &vm->rc_arena, size);
-
-  return true;
+  return value_dict(&vm->rc_arena, size);
 }
 
-bool clear_intrinsic(Vm *vm) {
-  Value *a = value_stack_pop(&vm->stack);
-  Value *b = value_stack_pop(&vm->stack);
-  Value *g = value_stack_pop(&vm->stack);
-  Value *r = value_stack_pop(&vm->stack);
-
+Value *clear_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
-    return true;
+    return value_unit(&vm->rc_arena);
 
-  clear_color.r = r->as._float;
-  clear_color.g = g->as._float;
-  clear_color.b = b->as._float;
-  clear_color.a = a->as._float;
+  clear_color.r = args[0]->as._float;
+  clear_color.g = args[1]->as._float;
+  clear_color.b = args[2]->as._float;
+  clear_color.a = args[3]->as._float;
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
 void push_primitive(f32 x, f32 y, f32 width, f32 height, i32 type) {
@@ -268,37 +259,32 @@ void push_primitive(f32 x, f32 y, f32 width, f32 height, i32 type) {
   DA_APPEND(glass.vertices, vertex3);
 }
 
-bool quad_intrinsic(Vm *vm) {
-  Value *height = value_stack_pop(&vm->stack);
-  Value *width = value_stack_pop(&vm->stack);
-  Value *y = value_stack_pop(&vm->stack);
-  Value *x = value_stack_pop(&vm->stack);
+Value *quad_intrinsic(Vm *vm, Value **args) {
+  (void) vm;
 
   if (!initialized)
-    return true;
+    return value_unit(&vm->rc_arena);
 
-  push_primitive(x->as._float, y->as._float,
-                 width->as._float,
-                 height->as._float,
+  push_primitive(args[0]->as._float, args[1]->as._float,
+                 args[2]->as._float,
+                 args[3]->as._float,
                  TYPE_BASE);
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
-bool circle_intrinsic(Vm *vm) {
-  Value *radius = value_stack_pop(&vm->stack);
-  Value *y = value_stack_pop(&vm->stack);
-  Value *x = value_stack_pop(&vm->stack);
+Value *circle_intrinsic(Vm *vm, Value **args) {
+  (void) vm;
 
   if (!initialized)
-    return true;
+    return value_unit(&vm->rc_arena);
 
-  push_primitive(x->as._float, y->as._float,
-                 radius->as._float,
-                 radius->as._float,
+  push_primitive(args[0]->as._float, args[1]->as._float,
+                 args[2]->as._float,
+                 args[2]->as._float,
                  TYPE_CIRCLE);
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
 Intrinsic glass_intrinsics[] = {

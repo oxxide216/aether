@@ -3,54 +3,49 @@
 #include "aether/vm.h"
 #include "aether/misc.h"
 
-bool abs_intrinsic(Vm *vm) {
-  Value *value = value_stack_pop(&vm->stack);
+Value *abs_intrinsic(Vm *vm, Value **args) {
+  Value *value = args[0];
 
   if (value->kind == ValueKindInt && value->as._int < 0)
-    value->as._int = -value->as._int;
-  else if (value->kind == ValueKindFloat && value->as._float < 0)
-    value->as._float = -value->as._float;
+    return value_int(&vm->rc_arena, -value->as._int);
+  else if (value->kind == ValueKindFloat && value->as._float < 0.0)
+    return value_float(&vm->rc_arena, -value->as._float);
 
-  DA_APPEND(vm->stack, value);
-
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
-bool min_intrinsic(Vm *vm) {
-  Value *a, *b;
-  prepare_rwo_numbers(&a, &b, vm);
+Value *min_intrinsic(Vm *vm, Value **args) {
+  Value *a = args[0];
+  Value *b = args[1];
 
   if (a->kind == ValueKindInt)
-    value_stack_push_int(&vm->stack, &vm->rc_arena, a->as._int <= b->as._int ?
-                                     a->as._int :
-                                     b->as._int);
-  else
-    value_stack_push_float(&vm->stack, &vm->rc_arena, a->as._float <= b->as._float ?
-                                       a->as._float :
-                                       b->as._float);
+    return value_int(&vm->rc_arena, a->as._int <=
+                                    b->as._int ? a->as._int : b->as._int);
+  else if (b->kind == ValueKindFloat)
+    return value_float(&vm->rc_arena,
+                       a->as._float <=
+                       b->as._float ? a->as._float : b->as._float);
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
-bool max_intrinsic(Vm *vm) {
-  Value *a, *b;
-  prepare_rwo_numbers(&a, &b, vm);
+Value *max_intrinsic(Vm *vm, Value **args) {
+  Value *a = args[0];
+  Value *b = args[1];
 
   if (a->kind == ValueKindInt)
-    value_stack_push_int(&vm->stack, &vm->rc_arena, a->as._int >= b->as._int ?
-                                     a->as._int :
-                                     b->as._int);
-  else
-    value_stack_push_float(&vm->stack, &vm->rc_arena, a->as._float >= b->as._float ?
-                                       a->as._float :
-                                       b->as._float);
+    return value_float(&vm->rc_arena, a->as._int >=
+                                      b->as._int ? a->as._int : b->as._int);
+  else if (a->kind == ValueKindFloat)
+    return value_float(&vm->rc_arena, a->as._float >=
+                                      b->as._float ? a->as._float : b->as._float);
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
-bool pow_intrinsic(Vm *vm) {
-  Value *pow = value_stack_pop(&vm->stack);
-  Value *value = value_stack_pop(&vm->stack);
+Value *pow_intrinsic(Vm *vm, Value **args) {
+  Value *value = args[0];
+  Value *pow = args[1];
 
   if (value->kind == ValueKindInt) {
     i64 result = 1;
@@ -58,33 +53,29 @@ bool pow_intrinsic(Vm *vm) {
     for (u32 i = 0; i < pow->as._int; ++i)
       result *= value->as._int;
 
-    value_stack_push_int(&vm->stack, &vm->rc_arena, result);
-  } else {
-    f64 result = 1;
+    return value_int(&vm->rc_arena, result);
+  } else if (value->kind == ValueKindFloat) {
+    f64 result = 1.0;
 
     for (u32 i = 0; i < pow->as._int; ++i)
       result *= value->as._float;
 
-    value_stack_push_float(&vm->stack, &vm->rc_arena, result);
+    return value_float(&vm->rc_arena, result);
   }
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
-bool sqrt_intrinsic(Vm *vm) {
-  Value *value = value_stack_pop(&vm->stack);
+Value *sqrt_intrinsic(Vm *vm, Value **args) {
+  Value *value = args[0];
 
-  value_stack_push_float(&vm->stack, &vm->rc_arena, sqrt(value->as._float));
-
-  return true;
+  return value_float(&vm->rc_arena, sqrt(value->as._float));
 }
 
-bool round_intrinsic(Vm *vm) {
-  Value *value = value_stack_pop(&vm->stack);
+Value *round_intrinsic(Vm *vm, Value **args) {
+  Value *value = args[0];
 
-  value_stack_push_float(&vm->stack, &vm->rc_arena, round(value->as._float));
-
-  return true;
+  return value_float(&vm->rc_arena, round(value->as._float));
 }
 
 Intrinsic math_intrinsics[] = {

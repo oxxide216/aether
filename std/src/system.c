@@ -2,26 +2,26 @@
 
 #include "aether/vm.h"
 
-bool run_command_intrinsic(Vm *vm) {
-  Value *path = value_stack_pop(&vm->stack);
+Value *run_command_intrinsic(Vm *vm, Value **args) {
+  Value *path = args[0];
 
   char *path_cstring = malloc(path->as.string.len + 1);
   memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
   path_cstring[path->as.string.len] = '\0';
 
-  value_stack_push_int(&vm->stack, &vm->rc_arena, system(path_cstring));
+  i64 exit_code = system(path_cstring);
 
   free(path_cstring);
 
-  return true;
+  return value_int(&vm->rc_arena, exit_code);
 }
 
-bool sleep_intrinsic(Vm *vm) {
-  Value *time = value_stack_pop(&vm->stack);
+Value *sleep_intrinsic(Vm *vm, Value **args) {
+  Value *time = args[0];
 
   usleep((i64) (time->as._float * 1000000.0));
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
 Intrinsic system_intrinsics[] = {

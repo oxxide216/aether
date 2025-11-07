@@ -12,7 +12,9 @@ static bool is_term_state_initialized = false;
 
 static void (*default_sigint_handler)(i32) = NULL;
 
-bool get_size_intrinsic(Vm *vm) {
+Value *get_size_intrinsic(Vm *vm, Value **args) {
+  (void) args;
+
   struct winsize _size;
   ioctl(0, TIOCGWINSZ, &_size);
 
@@ -26,9 +28,7 @@ bool get_size_intrinsic(Vm *vm) {
   *cols = (Value) { ValueKindInt, { ._int = _size.ws_col }, 0 };
   dict_push_value_str_key(&vm->rc_arena, &size, STR_LIT("cols"), cols);
 
-  value_stack_push_dict(&vm->stack, &vm->rc_arena, size);
-
-  return true;
+  return value_dict(&vm->rc_arena, size);
 }
 
 static void sigint_handler(i32 sig) {
@@ -37,8 +37,9 @@ static void sigint_handler(i32 sig) {
   got_sigint = true;
 }
 
-bool raw_mode_on_intrinsic(Vm *vm) {
+Value *raw_mode_on_intrinsic(Vm *vm, Value **args) {
   (void) vm;
+  (void) args;
 
   if (!is_term_state_initialized) {
     tcgetattr(0, &default_term_state);
@@ -54,11 +55,12 @@ bool raw_mode_on_intrinsic(Vm *vm) {
   else
     signal(SIGINT, sigint_handler);
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
-bool raw_mode_off_intrinsic(Vm *vm) {
+Value *raw_mode_off_intrinsic(Vm *vm, Value **args) {
   (void) vm;
+  (void) args;
 
   if (is_term_state_initialized)
     tcsetattr(0, TCSANOW, &default_term_state);
@@ -66,7 +68,7 @@ bool raw_mode_off_intrinsic(Vm *vm) {
   if (default_sigint_handler)
     signal(SIGINT, default_sigint_handler);
 
-  return true;
+  return value_unit(&vm->rc_arena);
 }
 
 Intrinsic term_intrinsics[] = {
