@@ -23,11 +23,11 @@
 (let to-float [int] -> import 'to-float')
 
 ; Math
-(let add [a b] -> import 'add')
-(let sub [a b] -> import 'sub')
-(let mul [a b] -> import 'mul')
-(let div [a b] -> import 'div')
-(let mod [a b] -> import 'mod')
+(let + [a b] -> import 'add')
+(let - [a b] -> import 'sub')
+(let * [a b] -> import 'mul')
+(let / [a b] -> import 'div')
+(let % [a b] -> import 'mod')
 
 ; Comparisons
 (let == [a b] -> import 'eq')
@@ -38,9 +38,9 @@
 (let >= [a b] -> import 'ge')
 
 ; Boolean
-(let binary-and [a b] -> import 'and')
-(let binary-or [a b] -> import 'or')
-(let binary-xor [a b] -> import 'xor')
+(let and [a b] -> import 'and')
+(let or [a b] -> import 'or')
+(let xor [a b] -> import 'xor')
 (let not [value] -> import 'not')
 
 ; Types
@@ -60,33 +60,6 @@
 (let eval [env code] -> import 'eval')
 
 (let exit [exit-code] -> import 'exit')
-
-(macro fold-op [op args] ->
-  (fold [acc elem] -> (op acc elem) <> (head args) (tail args)))
-
-(macro + [...args] ->
-  (fold-op add [args]))
-
-(macro - [...args] ->
-  (fold-op sub [args]))
-
-(macro * [...args] ->
-  (fold-op mul [args]))
-
-(macro / [...args] ->
-  (fold-op div [args]))
-
-(macro % [...args] ->
-  (fold-op mod [args]))
-
-(macro and [...args] ->
-  (fold-op binary-and [args]))
-
-(macro or [...args] ->
-  (fold-op binary-or [args]))
-
-(macro xor [...args] ->
-  (fold-op binary-xor [args]))
 
 (macro for [element in list ...body] ->
   (let -list list)
