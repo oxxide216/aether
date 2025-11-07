@@ -1,3 +1,5 @@
+#include <pthread.h>
+
 #include "aether/vm.h"
 #include "aether/misc.h"
 #include "winx/winx.h"
@@ -20,16 +22,26 @@ typedef Da(u32) Indices;
 typedef Da(WinxEvent) Events;
 
 typedef struct {
-  Winx        winx;
-  WinxWindow  window;
-  Events      events;
-  u32         width, height;
-  Vertices    vertices;
-  Indices     indices;
-  GlassShader shader;
-  GlassObject object;
-  u64         vertex_hash;
+  Winx            winx;
+  WinxWindow      window;
+  Events          events;
+  u32             width, height;
+  Vertices        vertices;
+  Indices         indices;
+  GlassShader     shader;
+  GlassObject     object;
+  pthread_mutex_t geometry_mutex;
 } Glass;
+
+typedef struct {
+  bool  *is_running;
+  Vm    *vm;
+  Value *callback;
+} LogicData;
+
+typedef struct {
+  f32 r, g, b, a;
+} Color;
 
 static Str vertex_src = STR_LIT(
   "#version 330 core\n"
@@ -69,6 +81,8 @@ static Str fragment_src = STR_LIT(
 static Glass glass = {0};
 static bool initialized = false;
 
+static Color clear_color = {0};
+
 static u64 fnv_hash(u8 *data, u32 size) {
   u64 hash = 14695981039346656037u;
 
@@ -78,6 +92,43 @@ static u64 fnv_hash(u8 *data, u32 size) {
   }
 
   return hash;
+}
+
+static void *logic_worker(void *arg) {
+  LogicData *data = (LogicData*) arg;
+  u64 prev_hash = 0;
+
+  while (*data->is_running) {
+    clock_t begin = clock();
+
+    execute_func(data->vm, &data->callback->as.func, NULL, false);
+
+    clock_t end = clock();
+    INFO("Elapsed: %f\n", (f32) (end - begin) / CLOCKS_PER_SEC);
+
+    pthread_mutex_lock(&glass.geometry_mutex);
+
+    u64 new_hash = fnv_hash((u8 *) glass.vertices.items,
+                            glass.vertices.len * sizeof(Vertex));
+    if (prev_hash != new_hash) {
+      prev_hash = new_hash;
+
+      glass_put_object_data(&glass.object,
+                            glass.vertices.items,
+                            glass.vertices.len * sizeof(Vertex),
+                            glass.indices.items,
+                            glass.indices.len * sizeof(u32),
+                            glass.indices.len,
+                            true);
+    }
+
+    glass.vertices.len = 0;
+    glass.indices.len = 0;
+
+    pthread_mutex_unlock(&glass.geometry_mutex);
+  }
+
+  return NULL;
 }
 
 bool run_intrinsic(Vm *vm) {
@@ -111,6 +162,12 @@ bool run_intrinsic(Vm *vm) {
 
   bool is_running = true;
 
+  pthread_mutex_init(&glass.geometry_mutex, NULL);
+
+  LogicData logic_data = { &is_running, vm, callback };
+  pthread_t logic_thread;
+  pthread_create(&logic_thread, NULL, logic_worker, &logic_data);
+
   while (is_running) {
     bool resized = false;
     u32 width = 0;
@@ -138,28 +195,13 @@ bool run_intrinsic(Vm *vm) {
                          vec2((f32) width, (f32) height));
     }
 
-    EXECUTE_FUNC(vm, &callback->as.func, NULL, false);
-
-    u64 vertex_hash = fnv_hash((u8 *) glass.vertices.items,
-                                glass.vertices.len * sizeof(Vertex));
-    if (glass.vertex_hash != vertex_hash) {
-      glass_put_object_data(&glass.object,
-                            glass.vertices.items,
-                            glass.vertices.len * sizeof(Vertex),
-                            glass.indices.items,
-                            glass.indices.len * sizeof(u32),
-                            glass.indices.len,
-                            true);
-
-      glass.vertex_hash = vertex_hash;
-    }
-
+    glass_clear_screen(clear_color.r, clear_color.g, clear_color.b, clear_color.a);
     glass_render_object(&glass.object, NULL, 0);
-    glass.vertices.len = 0;
-    glass.indices.len = 0;
 
     winx_draw(&glass.window);
   }
+
+  pthread_join(logic_thread, NULL);
 
   winx_destroy_window(&glass.window);
   winx_cleanup(&glass.winx);
@@ -197,8 +239,10 @@ bool clear_intrinsic(Vm *vm) {
   if (!initialized)
     return true;
 
-  glass_clear_screen(r->as._float, g->as._float,
-                     b->as._float, a->as._float);
+  clear_color.r = r->as._float;
+  clear_color.g = g->as._float;
+  clear_color.b = b->as._float;
+  clear_color.a = a->as._float;
 
   return true;
 }
