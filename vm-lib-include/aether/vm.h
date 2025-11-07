@@ -2,8 +2,8 @@
 #define AETHER_VM
 
 #include "aether/ir.h"
-#include "aether/rc-arena.h"
 #include "aether/parser.h"
+#include "arena.h"
 #include "shl/shl-defs.h"
 #include "shl/shl-str.h"
 #include "shl/shl-log.h"
@@ -52,10 +52,10 @@
       return NULL;                                         \
   } while (0)
 
-#define PANIC(rc_arena, ...)     \
+#define PANIC(arena, ...)     \
   do {                           \
     ERROR(__VA_ARGS__);          \
-    return value_unit(rc_arena); \
+    return value_unit(arena); \
   } while(0)
 
 typedef enum {
@@ -87,10 +87,16 @@ typedef struct Vm Vm;
 
 typedef struct Value Value;
 
+typedef enum {
+  VarKindLocal = 0,
+  VarKindGlobal,
+  VarKindCatched,
+} VarKind;
+
 typedef struct {
-  Str    name;
-  Value *value;
-  bool   is_global;
+  Str      name;
+  Value   *value;
+  VarKind  kind;
 } Var;
 
 typedef Da(Var) Vars;
@@ -117,7 +123,7 @@ struct Vm {
   Vars         global_vars;
   Vars         local_vars;
   Intrinsics   intrinsics;
-  RcArena      rc_arena;
+  Arena        arena;
   i32          argc;
   char       **argv;
   ListNode    *args;
@@ -147,7 +153,6 @@ typedef union {
 struct Value {
   ValueKind kind;
   ValueAs   as;
-  u32       refs_count;
 };
 
 struct ListNode {
@@ -166,29 +171,27 @@ struct NamedValue {
   Value *value;
 };
 
-void      list_use(RcArena *rc_arena, ListNode *list);
-ListNode *list_clone(RcArena *rc_arena, ListNode *list);
-Dict      dict_clone(RcArena *rc_arena, Dict *dict);
+ListNode *list_clone(Arena *arena, ListNode *list);
+Dict      dict_clone(Arena *arena, Dict *dict);
 
-Value *value_unit(RcArena *rc_arena);
-Value *value_list(RcArena *rc_arena, ListNode *list);
-Value *value_string(RcArena *rc_arena, Str string);
-Value *value_int(RcArena *rc_arena, i64 _int);
-Value *value_float(RcArena *rc_arena, f64 _float);
-Value *value_bool(RcArena *rc_arena, bool _bool);
-Value *value_dict(RcArena *rc_arena, Dict dict);
-Value *value_func(RcArena *rc_arena, Func func);
-Value *value_env(RcArena *rc_arena, Vm vm);
+Value *value_unit(Arena *arena);
+Value *value_list(Arena *arena, ListNode *list);
+Value *value_string(Arena *arena, Str string);
+Value *value_int(Arena *arena, i64 _int);
+Value *value_float(Arena *arena, f64 _float);
+Value *value_bool(Arena *arena, bool _bool);
+Value *value_dict(Arena *arena, Dict dict);
+Value *value_func(Arena *arena, Func func);
+Value *value_env(Arena *arena, Vm vm);
 
-Value *value_clone(RcArena *rc_arena, Value *value);
-void   value_free(Value *value, RcArena *rc_arena, bool free_ptr);
+Value *value_clone(Arena *arena, Value *value);
 bool   value_eq(Value *a, Value *b);
 
 Value *execute_func(Vm *vm, Value **args, Func *func,
                     IrMetaData *meta, bool value_expected);
 Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected);
 Value *execute_block(Vm *vm, IrBlock *block, bool value_expected);
-u32    execute(Ir *ir, i32 argc, char **argv, RcArena *rc_arena,
+u32    execute(Ir *ir, i32 argc, char **argv, Arena *arena,
                Intrinsics *intrinsics, Value **result_value);
 
 Vm   vm_create(i32 argc, char **argv, Intrinsics *intrinsics);

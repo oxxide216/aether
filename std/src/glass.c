@@ -1,5 +1,3 @@
-#include <pthread.h>
-
 #include "aether/vm.h"
 #include "aether/misc.h"
 #include "winx/winx.h"
@@ -22,24 +20,17 @@ typedef Da(u32) Indices;
 typedef Da(WinxEvent) Events;
 
 typedef struct {
-  Winx            winx;
-  WinxWindow      window;
-  Events          events;
-  u32             width, height;
-  Vertices        vertices;
-  Indices         indices;
-  Vertices        alt_vertices;
-  Indices         alt_indices;
-  GlassShader     shader;
-  GlassObject     object;
-  pthread_mutex_t geometry_mutex;
+  Winx        winx;
+  WinxWindow  window;
+  Events      events;
+  u32         width, height;
+  Vertices    vertices;
+  Indices     indices;
+  Vertices    alt_vertices;
+  Indices     alt_indices;
+  GlassShader shader;
+  GlassObject object;
 } Glass;
-
-typedef struct {
-  bool  *is_running;
-  Vm    *vm;
-  Value *callback;
-} LogicData;
 
 typedef struct {
   f32 r, g, b, a;
@@ -96,35 +87,6 @@ static u64 fnv_hash(u8 *data, u32 size) {
   return hash;
 }
 
-static void *logic_worker(void *arg) {
-  LogicData *data = (LogicData *) arg;
-  u64 prev_hash = 0;
-
-  while (*data->is_running) {
-    execute_func(data->vm, NULL, &data->callback->as.func, NULL, false);
-
-    pthread_mutex_lock(&glass.geometry_mutex);
-
-    u64 new_hash = fnv_hash((u8 *) glass.vertices.items,
-                            glass.vertices.len * sizeof(Vertex));
-    if (prev_hash != new_hash) {
-      prev_hash = new_hash;
-
-      glass_put_object_data(&glass.object,
-                            glass.vertices.items,
-                            glass.vertices.len * sizeof(Vertex),
-                            glass.indices.items,
-                            glass.indices.len * sizeof(u32),
-                            glass.indices.len,
-                            true);
-    }
-
-    pthread_mutex_unlock(&glass.geometry_mutex);
-  }
-
-  return NULL;
-}
-
 Value *run_intrinsic(Vm *vm, Value **args) {
   if (!initialized) {
     initialized = true;
@@ -150,12 +112,7 @@ Value *run_intrinsic(Vm *vm, Value **args) {
   }
 
   bool is_running = true;
-
-  pthread_mutex_init(&glass.geometry_mutex, NULL);
-
-  LogicData logic_data = { &is_running, vm, args[3] };
-  pthread_t logic_thread;
-  pthread_create(&logic_thread, NULL, logic_worker, &logic_data);
+  u64 prev_hash = 0;
 
   while (is_running) {
     bool resized = false;
@@ -184,58 +141,70 @@ Value *run_intrinsic(Vm *vm, Value **args) {
                          vec2((f32) width, (f32) height));
     }
 
-    glass_clear_screen(clear_color.r, clear_color.g, clear_color.b, clear_color.a);
-    glass_render_object(&glass.object, NULL, 0);
+    execute_func(vm, NULL, &args[3]->as.func, NULL, false);
+    if (vm->state != ExecStateContinue)
+      break;
 
-    pthread_mutex_lock(&glass.geometry_mutex);
+    u64 new_hash = fnv_hash((u8 *) glass.vertices.items,
+                            glass.vertices.len * sizeof(Vertex));
+    if (prev_hash != new_hash) {
+      prev_hash = new_hash;
+
+      glass_put_object_data(&glass.object,
+                            glass.vertices.items,
+                            glass.vertices.len * sizeof(Vertex),
+                            glass.indices.items,
+                            glass.indices.len * sizeof(u32),
+                            glass.indices.len,
+                            true);
+    }
 
     glass.vertices.len = 0;
     glass.indices.len = 0;
 
-    pthread_mutex_unlock(&glass.geometry_mutex);
+    glass_clear_screen(clear_color.r, clear_color.g, clear_color.b, clear_color.a);
+    glass_render_object(&glass.object, NULL, 0);
 
     winx_draw(&glass.window);
   }
 
-  pthread_join(logic_thread, NULL);
-
   winx_destroy_window(&glass.window);
   winx_cleanup(&glass.winx);
 
-  return value_unit(&vm->rc_arena);
+  return value_unit(&vm->arena);
 }
 
 Value *window_size_intrinsic(Vm *vm, Value **args) {
   (void) args;
 
   if (!initialized)
-    return value_unit(&vm->rc_arena);
+    return value_unit(&vm->arena);
 
   Dict size = {0};
 
-  Value *width = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
+  Value *width = arena_alloc(&vm->arena, sizeof(Value));
   width->kind = ValueKindFloat;
   width->as._float = (f32) glass.window.width;
-  dict_push_value_str_key(&vm->rc_arena, &size, STR_LIT("width"), width);
+  dict_push_value_str_key(&vm->arena, &size, STR_LIT("width"), width);
 
-  Value *height = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
+  Value *height = arena_alloc(&vm->arena, sizeof(Value));
   height->kind = ValueKindFloat;
   height->as._float = (f32) glass.window.height;
-  dict_push_value_str_key(&vm->rc_arena, &size, STR_LIT("height"), height);
+  dict_push_value_str_key(&vm->arena, &size, STR_LIT("height"), height);
 
-  return value_dict(&vm->rc_arena, size);
+  return value_dict(&vm->arena, size);
 }
 
 Value *clear_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
-    return value_unit(&vm->rc_arena);
+    return value_unit(&vm->arena);
 
   clear_color.r = args[0]->as._float;
   clear_color.g = args[1]->as._float;
   clear_color.b = args[2]->as._float;
   clear_color.a = args[3]->as._float;
 
-  return value_unit(&vm->rc_arena);
+  return value_unit(&vm->arena);
 }
 
 void push_primitive(f32 x, f32 y, f32 width, f32 height, i32 type) {
@@ -263,28 +232,28 @@ Value *quad_intrinsic(Vm *vm, Value **args) {
   (void) vm;
 
   if (!initialized)
-    return value_unit(&vm->rc_arena);
+    return value_unit(&vm->arena);
 
   push_primitive(args[0]->as._float, args[1]->as._float,
                  args[2]->as._float,
                  args[3]->as._float,
                  TYPE_BASE);
 
-  return value_unit(&vm->rc_arena);
+  return value_unit(&vm->arena);
 }
 
 Value *circle_intrinsic(Vm *vm, Value **args) {
   (void) vm;
 
   if (!initialized)
-    return value_unit(&vm->rc_arena);
+    return value_unit(&vm->arena);
 
   push_primitive(args[0]->as._float, args[1]->as._float,
                  args[2]->as._float,
                  args[2]->as._float,
                  TYPE_CIRCLE);
 
-  return value_unit(&vm->rc_arena);
+  return value_unit(&vm->arena);
 }
 
 Intrinsic glass_intrinsics[] = {

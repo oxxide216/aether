@@ -5,7 +5,6 @@
 #define LEXGEN_TRANSITION_TABLE_IMPLEMENTATION
 #include "grammar.h"
 #include "shl/shl-log.h"
-#include "shl/shl-arena.h"
 
 #define STD_PREFIX "/usr/include/aether/"
 #define INCLUDE_PATHS(current_file_path) { current_file_path, STD_PREFIX }
@@ -27,6 +26,7 @@ typedef struct {
   Macros    *macros;
   char      *file_path;
   FilePaths *included_files;
+  Arena     *arena;
   Ir         ir;
 } Parser;
 
@@ -217,13 +217,14 @@ static Token *parser_expect_token(Parser *parser, u64 id_mask) {
 static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask);
 
 Ir parse_ex(Str code, char *file_path, Macros *macros,
-            FilePaths *included_files) {
+            FilePaths *included_files, Arena *arena) {
   Parser parser = {0};
 
   parser.tokens = lex(code, file_path);
   parser.macros = macros;
   parser.included_files = included_files;
   parser.file_path = file_path;
+  parser.arena = arena;
   parser.ir = parser_parse_block(&parser, 0);
 
   return parser.ir;
@@ -338,7 +339,7 @@ static Str get_file_dir(Str path) {
 }
 
 static IrExpr *parser_parse_expr(Parser *parser) {
-  IrExpr *expr = aalloc(sizeof(IrExpr));
+  IrExpr *expr = arena_alloc(parser->arena, sizeof(IrExpr));
   *expr = (IrExpr) {0};
 
   Token *token = parser_expect_token(parser, MASK(TT_OPAREN) | MASK(TT_STR) |
@@ -548,7 +549,8 @@ static IrExpr *parser_parse_expr(Parser *parser) {
 
     expr->kind = IrExprKindBlock;
     expr->as.block = parse_ex(code, path_cstr, &macros,
-                              parser->included_files);
+                              parser->included_files,
+                              parser->arena);
 
     if (parser->macros->cap < parser->macros->len + macros.len) {
       parser->macros->cap = parser->macros->len + macros.len;
@@ -629,8 +631,9 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
 Ir parse(Str code, char *file_path) {
   Macros macros = {0};
   FilePaths included_files = {0};
-  Ir ir = parse_ex(code, file_path, &macros, &included_files);
-  expand_macros_block(&ir, &macros, NULL, NULL, false);
+  Arena arena = {0};
+  Ir ir = parse_ex(code, file_path, &macros, &included_files, &arena);
+  expand_macros_block(&ir, &macros, NULL, NULL, false, &arena);
 
   return ir;
 }

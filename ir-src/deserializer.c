@@ -1,6 +1,5 @@
 #include "aether/deserializer.h"
 #include "shl/shl-log.h"
-#include "shl/shl-arena.h"
 
 static void get_block_data_size(u8 *data, u32 *size);
 
@@ -123,57 +122,59 @@ static void get_block_data_size(u8 *data, u32 *size) {
     get_expr_data_size(data, size);
 }
 
-static void load_block_data(IrBlock *block, u8 *data, u32 *end, RcArena *rc_arena);
+static void load_block_data(IrBlock *block, u8 *data, u32 *end,
+                            Arena *arena, Arena *str_arena);
 
-static void load_str_data(Str *str, u8 *data, u32 *end, RcArena *rc_arena) {
+static void load_str_data(Str *str, u8 *data, u32 *end, Arena *str_arena) {
   str->len = *(u32 *) (data + *end);
   *end += sizeof(u32);
 
-  str->ptr = rc_arena_alloc(rc_arena, str->len * sizeof(char));
+  str->ptr = arena_alloc(str_arena, str->len * sizeof(char));
   for (u32 i = 0; i < str->len; ++i) {
     str->ptr[i] = *(char *) (data + *end);
     *end += sizeof(char);
   }
 }
 
-static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) {
+static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
+                           Arena *arena, Arena *str_arena) {
   expr->kind = *(IrExprKind *) (data + *end);
   *end += sizeof(IrExprKind);
 
   switch (expr->kind) {
   case IrExprKindBlock: {
-    load_block_data(&expr->as.block, data, end, rc_arena);
+    load_block_data(&expr->as.block, data, end, arena, str_arena);
   } break;
 
   case IrExprKindFuncCall: {
-    expr->as.func_call.func = aalloc(sizeof(IrExpr));
+    expr->as.func_call.func = arena_alloc(arena, sizeof(IrExpr));
 
-    load_expr_data(expr->as.func_call.func, data, end, rc_arena);
-    load_block_data(&expr->as.func_call.args, data, end, rc_arena);
+    load_expr_data(expr->as.func_call.func, data, end, arena, str_arena);
+    load_block_data(&expr->as.func_call.args, data, end, arena, str_arena);
   } break;
 
   case IrExprKindVarDef: {
-    expr->as.var_def.expr = aalloc(sizeof(IrExpr));
+    expr->as.var_def.expr = arena_alloc(arena, sizeof(IrExpr));
 
-    load_str_data(&expr->as.var_def.name, data, end, rc_arena);
-    load_expr_data(expr->as.var_def.expr, data, end, rc_arena);
+    load_str_data(&expr->as.var_def.name, data, end, str_arena);
+    load_expr_data(expr->as.var_def.expr, data, end, arena, str_arena);
   } break;
 
   case IrExprKindIf: {
-    expr->as._if.cond = aalloc(sizeof(IrExpr));
+    expr->as._if.cond = arena_alloc(arena, sizeof(IrExpr));
 
-    load_expr_data(expr->as._if.cond, data, end, rc_arena);
-    load_block_data(&expr->as._if.if_body, data, end, rc_arena);
+    load_expr_data(expr->as._if.cond, data, end, arena, str_arena);
+    load_block_data(&expr->as._if.if_body, data, end, arena, str_arena);
 
     u32 elifs_len = *(u32 *) (data + *end);
     *end += sizeof(u32);
 
     for (u32 i = 0; i < elifs_len; ++i) {
       IrElif elif = {0};
-      elif.cond = aalloc(sizeof(IrExpr));
+      elif.cond = arena_alloc(arena, sizeof(IrExpr));
 
-      load_expr_data(elif.cond, data, end, rc_arena);
-      load_block_data(&elif.body, data, end, rc_arena);
+      load_expr_data(elif.cond, data, end, arena, str_arena);
+      load_block_data(&elif.body, data, end, arena, str_arena);
 
       DA_APPEND(expr->as._if.elifs, elif);
     }
@@ -182,21 +183,21 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
     *end += sizeof(bool);
 
     if (expr->as._if.has_else)
-      load_block_data(&expr->as._if.else_body, data, end, rc_arena);
+      load_block_data(&expr->as._if.else_body, data, end, arena, str_arena);
   } break;
 
   case IrExprKindWhile: {
-    expr->as._while.cond = aalloc(sizeof(IrExpr));
+    expr->as._while.cond = arena_alloc(arena, sizeof(IrExpr));
 
-    load_expr_data(expr->as._while.cond, data, end, rc_arena);
-    load_block_data(&expr->as._while.body, data, end, rc_arena);
+    load_expr_data(expr->as._while.cond, data, end, arena, str_arena);
+    load_block_data(&expr->as._while.body, data, end, arena, str_arena);
   } break;
 
   case IrExprKindSet: {
-    expr->as.set.src = aalloc(sizeof(IrExpr));
+    expr->as.set.src = arena_alloc(arena, sizeof(IrExpr));
 
-    load_str_data(&expr->as.set.dest, data, end, rc_arena);
-    load_expr_data(expr->as.set.src, data, end, rc_arena);
+    load_str_data(&expr->as.set.dest, data, end, str_arena);
+    load_expr_data(expr->as.set.src, data, end, arena, str_arena);
   } break;
 
   case IrExprKindRet: {
@@ -204,22 +205,22 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
     *end += sizeof(bool);
 
     if (expr->as.ret.has_expr) {
-      expr->as.ret.expr = aalloc(sizeof(IrExpr));
+      expr->as.ret.expr = arena_alloc(arena, sizeof(IrExpr));
 
-      load_expr_data(expr->as.ret.expr, data, end, rc_arena);
+      load_expr_data(expr->as.ret.expr, data, end, arena, str_arena);
     }
   } break;
 
   case IrExprKindList: {
-    load_block_data(&expr->as.list.content, data, end, rc_arena);
+    load_block_data(&expr->as.list.content, data, end, arena, str_arena);
   } break;
 
   case IrExprKindIdent: {
-    load_str_data(&expr->as.ident.ident, data, end, rc_arena);
+    load_str_data(&expr->as.ident.ident, data, end, str_arena);
   } break;
 
   case IrExprKindString: {
-    load_str_data(&expr->as.string.lit, data, end, rc_arena);
+    load_str_data(&expr->as.string.lit, data, end, str_arena);
   } break;
 
   case IrExprKindInt: {
@@ -244,12 +245,12 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
     args->cap = args->len;
     *end += sizeof(u32);
 
-    args->items = malloc(args->len * sizeof(Str));
+    args->items = arena_alloc(arena, args->len * sizeof(Str));
     for (u32 i = 0; i < args->len; ++i)
-      load_str_data(args->items + i, data, end, rc_arena);
+      load_str_data(args->items + i, data, end, str_arena);
 
-    load_block_data(&expr->as.lambda.body, data, end, rc_arena);
-    load_str_data(&expr->as.lambda.intrinsic_name, data, end, rc_arena);
+    load_block_data(&expr->as.lambda.body, data, end, arena, str_arena);
+    load_str_data(&expr->as.lambda.intrinsic_name, data, end, str_arena);
   } break;
 
   case IrExprKindDict: {
@@ -258,39 +259,40 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end, RcArena *rc_arena) 
 
     expr->as.dict.items = malloc(expr->as.dict.len * sizeof(IrField));
     for (u32 i = 0; i < expr->as.dict.len; ++i) {
-      expr->as.dict.items[i].key = aalloc(sizeof(IrExpr));
-      expr->as.dict.items[i].expr = aalloc(sizeof(IrExpr));
+      expr->as.dict.items[i].key = arena_alloc(arena, sizeof(IrExpr));
+      expr->as.dict.items[i].expr = arena_alloc(arena, sizeof(IrExpr));
 
-      load_expr_data(expr->as.dict.items[i].key, data, end, rc_arena);
-      load_expr_data(expr->as.dict.items[i].expr, data, end, rc_arena);
+      load_expr_data(expr->as.dict.items[i].key, data, end, arena, str_arena);
+      load_expr_data(expr->as.dict.items[i].expr, data, end, arena, str_arena);
     }
   } break;
 
   case IrExprKindSelfCall: {
-    load_block_data(&expr->as.self_call.args, data, end, rc_arena);
+    load_block_data(&expr->as.self_call.args, data, end, arena, str_arena);
   } break;
   }
 
-  load_str_data(&expr->meta.file_path, data, end, rc_arena);
+  load_str_data(&expr->meta.file_path, data, end, str_arena);
   expr->meta.row = *(u32 *) (data + *end);
   *end += sizeof(u32);
   expr->meta.col = *(u32 *) (data + *end);
   *end += sizeof(u32);
 }
 
-static void load_block_data(IrBlock *block, u8 *data, u32 *end, RcArena *rc_arena) {
+static void load_block_data(IrBlock *block, u8 *data, u32 *end,
+                            Arena *arena, Arena *str_arena) {
   block->len = *(u32 *) (data + *end);
   block->cap = block->len;
   *end += sizeof(u32);
 
   block->items = malloc(block->len * sizeof(IrExpr *));
   for (u32 i = 0; i < block->len; ++i) {
-    block->items[i] = aalloc(sizeof(IrExpr));
-    load_expr_data(block->items[i], data, end, rc_arena);
+    block->items[i] = arena_alloc(arena, sizeof(IrExpr));
+    load_expr_data(block->items[i], data, end, arena, str_arena);
   }
 }
 
-Ir deserialize(u8 *data, u32 size, RcArena *rc_arena) {
+Ir deserialize(u8 *data, u32 size, Arena *arena, Arena *str_arena) {
   Ir ir = {0};
 
   if (size < sizeof(u32)) {
@@ -306,7 +308,7 @@ Ir deserialize(u8 *data, u32 size, RcArena *rc_arena) {
   }
 
   u32 end = sizeof(u32);
-  load_block_data(&ir, data, &end, rc_arena);
+  load_block_data(&ir, data, &end, arena, str_arena);
 
   return ir;
 }

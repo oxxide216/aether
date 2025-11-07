@@ -24,7 +24,7 @@ Value *printf_intrinsic(Vm *vm, Value **args) {
   str_print(STR(printf_sb.buffer, printf_sb.len));
   fflush(stdout);
 
-  return value_unit(&vm->rc_arena);
+  return value_unit(&vm->arena);
 }
 
 Value *input_size_intrinsic(Vm *vm, Value **args) {
@@ -32,14 +32,14 @@ Value *input_size_intrinsic(Vm *vm, Value **args) {
 
   Str buffer;
   buffer.len = size->as._int;
-  buffer.ptr = rc_arena_alloc(&vm->rc_arena, buffer.len);
+  buffer.ptr = arena_alloc(&vm->arena, buffer.len);
 
   if (got_sigint)
     memset(buffer.ptr, 3, buffer.len);
   else
     read(0, buffer.ptr, buffer.len);
 
-  return value_string(&vm->rc_arena, buffer);
+  return value_string(&vm->arena, buffer);
 }
 
 Value *input_intrinsic(Vm *vm, Value **args) {
@@ -49,14 +49,14 @@ Value *input_intrinsic(Vm *vm, Value **args) {
   u32 len = 0;
 
   if (got_sigint) {
-    buffer = rc_arena_alloc(&vm->rc_arena, 1);
+    buffer = arena_alloc(&vm->arena, 1);
     buffer[0] = 3;
     len = 1;
 
     got_sigint = false;
   } else {
     u32 buffer_size = DEFAULT_INPUT_BUFFER_SIZE;
-    buffer = rc_arena_alloc(&vm->rc_arena, buffer_size);
+    buffer = arena_alloc(&vm->arena, buffer_size);
 
     char ch;
     while ((ch = getc(stdin)) != EOF && ch != '\n') {
@@ -64,22 +64,21 @@ Value *input_intrinsic(Vm *vm, Value **args) {
         buffer_size += DEFAULT_INPUT_BUFFER_SIZE;
 
         char *prev_buffer = buffer;
-        buffer = rc_arena_alloc(&vm->rc_arena, buffer_size);
+        buffer = arena_alloc(&vm->arena, buffer_size);
         memcpy(buffer, prev_buffer, len);
-        rc_arena_free(&vm->rc_arena, prev_buffer);
       }
 
       buffer[len++] = ch;
     }
   }
 
-  return value_string(&vm->rc_arena, STR(buffer, len));
+  return value_string(&vm->arena, STR(buffer, len));
 }
 
 Value *get_args_intrinsic(Vm *vm, Value **args) {
   (void) args;
 
-    return value_list(&vm->rc_arena, vm->args);
+    return value_list(&vm->arena, vm->args);
 }
 
 Intrinsic base_intrinsics[] = {

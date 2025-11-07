@@ -13,7 +13,7 @@ Value *run_command_intrinsic(Vm *vm, Value **args) {
 
   free(path_cstring);
 
-  return value_int(&vm->rc_arena, exit_code);
+  return value_int(&vm->arena, exit_code);
 }
 
 Value *sleep_intrinsic(Vm *vm, Value **args) {
@@ -21,7 +21,7 @@ Value *sleep_intrinsic(Vm *vm, Value **args) {
 
   usleep((i64) (time->as._float * 1000000.0));
 
-  return value_unit(&vm->rc_arena);
+  return value_unit(&vm->arena);
 }
 
 Intrinsic system_intrinsics[] = {

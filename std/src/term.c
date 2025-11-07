@@ -20,15 +20,15 @@ Value *get_size_intrinsic(Vm *vm, Value **args) {
 
   Dict size = {0};
 
-  Value *rows = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
-  *rows = (Value) { ValueKindInt, { ._int = _size.ws_row }, 0 };
-  dict_push_value_str_key(&vm->rc_arena, &size, STR_LIT("rows"), rows);
+  Value *rows = arena_alloc(&vm->arena, sizeof(Value));
+  *rows = (Value) { ValueKindInt, { ._int = _size.ws_row } };
+  dict_push_value_str_key(&vm->arena, &size, STR_LIT("rows"), rows);
 
-  Value *cols = rc_arena_alloc(&vm->rc_arena, sizeof(Value));
-  *cols = (Value) { ValueKindInt, { ._int = _size.ws_col }, 0 };
-  dict_push_value_str_key(&vm->rc_arena, &size, STR_LIT("cols"), cols);
+  Value *cols = arena_alloc(&vm->arena, sizeof(Value));
+  *cols = (Value) { ValueKindInt, { ._int = _size.ws_col } };
+  dict_push_value_str_key(&vm->arena, &size, STR_LIT("cols"), cols);
 
-  return value_dict(&vm->rc_arena, size);
+  return value_dict(&vm->arena, size);
 }
 
 static void sigint_handler(i32 sig) {
@@ -55,7 +55,7 @@ Value *raw_mode_on_intrinsic(Vm *vm, Value **args) {
   else
     signal(SIGINT, sigint_handler);
 
-  return value_unit(&vm->rc_arena);
+  return value_unit(&vm->arena);
 }
 
 Value *raw_mode_off_intrinsic(Vm *vm, Value **args) {
@@ -68,7 +68,7 @@ Value *raw_mode_off_intrinsic(Vm *vm, Value **args) {
   if (default_sigint_handler)
     signal(SIGINT, default_sigint_handler);
 
-  return value_unit(&vm->rc_arena);
+  return value_unit(&vm->arena);
 }
 
 Intrinsic term_intrinsics[] = {

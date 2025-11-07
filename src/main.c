@@ -5,8 +5,6 @@
 #include "shl/shl-log.h"
 #define SHL_STR_IMPLEMENTATION
 #include "shl/shl-str.h"
-#define SHL_ARENA_IMPLEMENTATION
-#include "shl/shl-arena.h"
 
 static char *loader_path = "/usr/include/aether/loader.ae";
 

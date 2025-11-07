@@ -2,13 +2,13 @@
 
 # Compiler
 CFLAGS="-Wall -Wextra -Icompiler-lib-include -Ivm-lib-include -Iir-include \
-        -Ilibs -Istd/include -lm"
+        -Ilibs -Istd/include -Iarena -lm"
 LDFLAGS="-z execstack"
 BUILD_FLAGS="${@:1}"
 SRC="$(find src -name "*.c")"
 COMPILER_SRC="$(find compiler-lib-src -name "*.c")"
 VM_SRC="$(find vm-lib-src -name "*.c")"
-IR_SRC="$(find ir-src -name "*.c")"
+IR_SRC="$(find ir-src -name "*.c") arena/arena.c"
 LEXGEN_RUNTIME_SRC="$(find libs/lexgen/runtime-src -name "*.c")"
 LIB_SRC=""
 STD_SRC="std/src/core.c std/src/math.c std/src/str.c"
