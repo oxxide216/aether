@@ -9,7 +9,7 @@ Value *get_current_path_intrinsic(Vm *vm, Value **args) {
   char *path = arena_alloc(&vm->arena, PATH_MAX);
   getcwd(path, PATH_MAX);
 
-  return value_string(&vm->arena, STR(path, strlen(path)));
+  return value_string(STR(path, strlen(path)), &vm->arena, &vm->values);
 }
 
 Value *set_current_path_intrinsic(Vm *vm, Value **args) {
@@ -23,7 +23,7 @@ Value *set_current_path_intrinsic(Vm *vm, Value **args) {
 
   free(path_cstring);
 
-  return value_unit(&vm->arena);
+  return value_unit(&vm->arena, &vm->values);
 }
 
 Value *get_absolute_path_intrinsic(Vm *vm, Value **args) {
@@ -38,7 +38,8 @@ Value *get_absolute_path_intrinsic(Vm *vm, Value **args) {
 
   free(path_cstring);
 
-  return value_string(&vm->arena, STR(absolute_path, strlen(absolute_path)));
+  return value_string(STR(absolute_path, strlen(absolute_path)),
+                      &vm->arena, &vm->values);
 }
 
 Intrinsic path_intrinsics[] = {

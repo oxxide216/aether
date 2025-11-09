@@ -16,7 +16,7 @@ Value *str_insert_intrinsic(Vm *vm, Value **args) {
          string->as.string.ptr + index->as._int,
          string->as.string.len - index->as._int);
 
-  return value_string(&vm->arena, new_string);
+  return value_string(new_string, &vm->arena, &vm->values);
 }
 
 Value *str_remove_intrinsic(Vm *vm, Value **args) {
@@ -32,7 +32,7 @@ Value *str_remove_intrinsic(Vm *vm, Value **args) {
          string->as.string.ptr + index->as._int + 1,
          string->as.string.len - index->as._int - amount->as._int);
 
-  return value_string(&vm->arena, new_string);
+  return value_string(new_string, &vm->arena, &vm->values);
 }
 
 Value *str_replace_intrinsic(Vm *vm, Value **args) {
@@ -51,7 +51,7 @@ Value *str_replace_intrinsic(Vm *vm, Value **args) {
          string->as.string.ptr + index->as._int + sub_string->as.string.len,
          string->as.string.len - index->as._int - sub_string->as.string.len);
 
-  return value_string(&vm->arena, new_string);
+  return value_string(new_string, &vm->arena, &vm->values);
 }
 
 Value *split_intrinsic(Vm *vm, Value **args) {
@@ -106,7 +106,7 @@ Value *split_intrinsic(Vm *vm, Value **args) {
     };
   }
 
-  return value_list(&vm->arena, list);
+  return value_list(list, &vm->arena, &vm->values);
 }
 
 Value *sub_str_intrinsic(Vm *vm, Value **args) {
@@ -116,14 +116,14 @@ Value *sub_str_intrinsic(Vm *vm, Value **args) {
 
   if (begin->as._int >= end->as._int ||
       end->as._int > string->as.string.len)
-    return value_unit(&vm->arena);
+    return value_unit(&vm->arena, &vm->values);
 
   Str sub_string = {
     string->as.string.ptr + begin->as._int,
     end->as._int - begin->as._int,
   };
 
-  return value_string(&vm->arena, sub_string);
+  return value_string(sub_string, &vm->arena, &vm->values);
 }
 
 Value *join_intrinsic(Vm *vm, Value **args) {
@@ -138,7 +138,7 @@ Value *join_intrinsic(Vm *vm, Value **args) {
       sb_push_str(&sb, filler->as.string);
 
     if (node->value->kind != ValueKindString)
-      PANIC(&vm->arena, "join: wrong part kinds\n");
+      PANIC(&vm->arena, &vm->values, "join: wrong part kinds\n");
 
     sb_push_str(&sb, node->value->as.string);
 
@@ -153,7 +153,7 @@ Value *join_intrinsic(Vm *vm, Value **args) {
   memcpy(joined.ptr, sb.buffer, sb.len);
   free(sb.buffer);
 
-  return value_string(&vm->arena, joined);
+  return value_string(joined, &vm->arena, &vm->values);
 }
 
 Value *eat_str_intrinsic(Vm *vm, Value **args) {
@@ -161,7 +161,7 @@ Value *eat_str_intrinsic(Vm *vm, Value **args) {
   Value *pattern = args[1];
 
   if (string->as.string.len < pattern->as.string.len)
-    return value_bool(&vm->arena, false);
+    return value_bool(false, &vm->arena, &vm->values);
 
   Str string_begin = {
     string->as.string.ptr,
@@ -187,14 +187,14 @@ Value *eat_str_intrinsic(Vm *vm, Value **args) {
     { .string = new_string },
   };
 
-  return value_list(&vm->arena, new_list);
+  return value_list(new_list, &vm->arena, &vm->values);
 }
 
 static Value *eat_byte(Vm *vm, Value **args, u32 size) {
   Value *string = args[0];
 
   if (string->as.string.len < size)
-    return value_unit(&vm->arena);
+    return value_unit(&vm->arena, &vm->values);
 
   i64 _int = 0;
   switch (size) {
@@ -221,7 +221,7 @@ static Value *eat_byte(Vm *vm, Value **args, u32 size) {
     { .string = new_string },
   };
 
-  return value_list(&vm->arena, new_list);
+  return value_list(new_list, &vm->arena, &vm->values);
 }
 
 Value *eat_byte_64_intrinsic(Vm *vm, Value **args) {

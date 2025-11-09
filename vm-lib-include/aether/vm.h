@@ -52,10 +52,10 @@
       return NULL;                                         \
   } while (0)
 
-#define PANIC(arena, ...)     \
-  do {                           \
-    ERROR(__VA_ARGS__);          \
-    return value_unit(arena); \
+#define PANIC(arena, values, ...)     \
+  do {                                \
+    ERROR(__VA_ARGS__);               \
+    return value_unit(arena, values); \
   } while(0)
 
 typedef enum {
@@ -76,16 +76,18 @@ typedef Da(NamedValue)    NamedValues;
 typedef struct DictValue  DictValue;
 typedef Da(DictValue)     Dict;
 
+typedef struct Vm Vm;
+typedef struct Value Value;
+typedef Da(Value *) Values;
+
 typedef struct {
   IrArgs      args;
   IrBlock     body;
-  NamedValues catched_values;
+  NamedValues catched_values_names;
+  Arena       catched_values_arena;
+  Values      catched_values;
   Str         intrinsic_name;
 } Func;
-
-typedef struct Vm Vm;
-
-typedef struct Value Value;
 
 typedef enum {
   VarKindLocal = 0,
@@ -123,6 +125,7 @@ struct Vm {
   Vars         global_vars;
   Vars         local_vars;
   Intrinsics   intrinsics;
+  Values       values;
   Arena        arena;
   i32          argc;
   char       **argv;
@@ -171,20 +174,22 @@ struct NamedValue {
   Value *value;
 };
 
-ListNode *list_clone(Arena *arena, ListNode *list);
-Dict      dict_clone(Arena *arena, Dict *dict);
+ListNode *list_clone(ListNode *list, Arena *arena, Values *values);
+Dict      dict_clone(Dict *dict, Arena *arena, Values *values);
 
-Value *value_unit(Arena *arena);
-Value *value_list(Arena *arena, ListNode *list);
-Value *value_string(Arena *arena, Str string);
-Value *value_int(Arena *arena, i64 _int);
-Value *value_float(Arena *arena, f64 _float);
-Value *value_bool(Arena *arena, bool _bool);
-Value *value_dict(Arena *arena, Dict dict);
-Value *value_func(Arena *arena, Func func);
-Value *value_env(Arena *arena, Vm vm);
+Value *value_unit(Arena *arena, Values *values);
+Value *value_list(ListNode *list, Arena *arena, Values *values);
+Value *value_string(Str string, Arena *arena, Values *values);
+Value *value_int(i64 _int, Arena *arena, Values *values);
+Value *value_float(f64 _float, Arena *arena, Values *values);
+Value *value_bool(bool _bool, Arena *arena, Values *values);
+Value *value_dict(Dict dict, Arena *arena, Values *values);
+Value *value_func(Func func, Arena *arena, Values *values);
+Value *value_env(Vm vm, Arena *arena, Values *values);
 
-Value *value_clone(Arena *arena, Value *value);
+Value *value_alloc(Arena *arena, Values *values);
+Value *value_clone(Value *value, Arena *arena, Values *values);
+void   value_free(Value *value);
 bool   value_eq(Value *a, Value *b);
 
 Value *execute_func(Vm *vm, Value **args, Func *func,

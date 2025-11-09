@@ -15,7 +15,7 @@ Value *unblock_input_intrinsic(Vm *vm, Value **args) {
 
   fcntl(0, F_SETFL, fcntl(0, F_GETFL) | O_NONBLOCK);
 
-  return value_unit(&vm->arena);
+  return value_unit(&vm->arena, &vm->values);
 }
 
 Value *block_input_intrinsic(Vm *vm, Value **args) {
@@ -23,7 +23,7 @@ Value *block_input_intrinsic(Vm *vm, Value **args) {
 
   fcntl(0, F_SETFL, fcntl(0, F_GETFL) ^ O_NONBLOCK);
 
-  return value_unit(&vm->arena);
+  return value_unit(&vm->arena, &vm->values);
 }
 
 static char *str_to_cstr(Str str) {
@@ -42,7 +42,7 @@ Value *get_file_info_intrinsic(Vm *vm, Value **args) {
   if (access(path_cstring, F_OK) != 0) {
     free(path_cstring);
 
-    return value_unit(&vm->arena);
+    return value_unit(&vm->arena, &vm->values);
   }
 
   Dict info = {0};
@@ -64,7 +64,7 @@ Value *get_file_info_intrinsic(Vm *vm, Value **args) {
   if (stat(path_cstring, &st) < 0) {
     free(path_cstring);
 
-    return value_unit(&vm->arena);
+    return value_unit(&vm->arena, &vm->values);
   }
 
   Value *size = arena_alloc(&vm->arena, sizeof(Value));
@@ -76,7 +76,7 @@ Value *get_file_info_intrinsic(Vm *vm, Value **args) {
 
   free(path_cstring);
 
-  return value_dict(&vm->arena, info);
+  return value_dict(info, &vm->arena, &vm->values);
 }
 
 Value *read_file_intrinsic(Vm *vm, Value **args) {
@@ -89,9 +89,9 @@ Value *read_file_intrinsic(Vm *vm, Value **args) {
   free(path_cstring);
 
   if (content.len == (u32) -1)
-    return value_unit(&vm->arena);
+    return value_unit(&vm->arena, &vm->values);
 
-  return value_string(&vm->arena, content);
+  return value_string(content, &vm->arena, &vm->values);
 }
 
 Value *write_file_intrinsic(Vm *vm, Value **args) {
@@ -104,7 +104,7 @@ Value *write_file_intrinsic(Vm *vm, Value **args) {
 
   free(path_cstring);
 
-  return value_unit(&vm->arena);
+  return value_unit(&vm->arena, &vm->values);
 }
 
 Value *delete_file_intrinsic(Vm *vm, Value **args) {
@@ -116,7 +116,7 @@ Value *delete_file_intrinsic(Vm *vm, Value **args) {
 
   free(path_cstring);
 
-  return value_unit(&vm->arena);
+  return value_unit(&vm->arena, &vm->values);
 }
 
 static i32 unlink_dir_callback(const char *fpath, const struct stat *sb,
@@ -137,7 +137,7 @@ Value *delete_directory_intrinsic(Vm *vm, Value **args) {
 
   nftw(path_cstring, unlink_dir_callback, 64, FTW_DEPTH | FTW_PHYS);
 
-  return value_unit(&vm->arena);
+  return value_unit(&vm->arena, &vm->values);
 }
 
 Value *list_directory_intrinsic(Vm *vm, Value **args) {
@@ -169,12 +169,12 @@ Value *list_directory_intrinsic(Vm *vm, Value **args) {
   } else {
     free(path_cstring);
 
-    return value_unit(&vm->arena);
+    return value_unit(&vm->arena, &vm->values);
   }
 
   free(path_cstring);
 
-  return value_list(&vm->arena, list);
+  return value_list(list, &vm->arena, &vm->values);
 }
 
 Intrinsic io_intrinsics[] = {

@@ -20,7 +20,7 @@ Value *get_size_intrinsic(Vm *vm, Value **args) {
 
   Dict size = {0};
 
-  Value *rows = arena_alloc(&vm->arena, sizeof(Value));
+  Value *rows = value_alloc(&vm->arena, &vm->values);
   *rows = (Value) { ValueKindInt, { ._int = _size.ws_row } };
   dict_push_value_str_key(&vm->arena, &size, STR_LIT("rows"), rows);
 
@@ -28,7 +28,7 @@ Value *get_size_intrinsic(Vm *vm, Value **args) {
   *cols = (Value) { ValueKindInt, { ._int = _size.ws_col } };
   dict_push_value_str_key(&vm->arena, &size, STR_LIT("cols"), cols);
 
-  return value_dict(&vm->arena, size);
+  return value_dict(size, &vm->arena, &vm->values);
 }
 
 static void sigint_handler(i32 sig) {
@@ -55,7 +55,7 @@ Value *raw_mode_on_intrinsic(Vm *vm, Value **args) {
   else
     signal(SIGINT, sigint_handler);
 
-  return value_unit(&vm->arena);
+  return value_unit(&vm->arena, &vm->values);
 }
 
 Value *raw_mode_off_intrinsic(Vm *vm, Value **args) {
@@ -68,7 +68,7 @@ Value *raw_mode_off_intrinsic(Vm *vm, Value **args) {
   if (default_sigint_handler)
     signal(SIGINT, default_sigint_handler);
 
-  return value_unit(&vm->arena);
+  return value_unit(&vm->arena, &vm->values);
 }
 
 Intrinsic term_intrinsics[] = {

@@ -7,11 +7,11 @@ Value *abs_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
   if (value->kind == ValueKindInt && value->as._int < 0)
-    return value_int(&vm->arena, -value->as._int);
+    return value_int(-value->as._int, &vm->arena, &vm->values);
   else if (value->kind == ValueKindFloat && value->as._float < 0.0)
-    return value_float(&vm->arena, -value->as._float);
+    return value_float(-value->as._float, &vm->arena, &vm->values);
 
-  return value_unit(&vm->arena);
+  return value_unit(&vm->arena, &vm->values);
 }
 
 Value *min_intrinsic(Vm *vm, Value **args) {
@@ -19,14 +19,13 @@ Value *min_intrinsic(Vm *vm, Value **args) {
   Value *b = args[1];
 
   if (a->kind == ValueKindInt)
-    return value_int(&vm->arena, a->as._int <=
-                                    b->as._int ? a->as._int : b->as._int);
+    return value_int(a->as._int <= b->as._int ? a->as._int : b->as._int,
+                     &vm->arena, &vm->values);
   else if (b->kind == ValueKindFloat)
-    return value_float(&vm->arena,
-                       a->as._float <=
-                       b->as._float ? a->as._float : b->as._float);
+    return value_float(a->as._float <= b->as._float ? a->as._float : b->as._float,
+                       &vm->arena, &vm->values);
 
-  return value_unit(&vm->arena);
+  return value_unit(&vm->arena, &vm->values);
 }
 
 Value *max_intrinsic(Vm *vm, Value **args) {
@@ -34,13 +33,13 @@ Value *max_intrinsic(Vm *vm, Value **args) {
   Value *b = args[1];
 
   if (a->kind == ValueKindInt)
-    return value_float(&vm->arena, a->as._int >=
-                                      b->as._int ? a->as._int : b->as._int);
+    return value_float(a->as._int >= b->as._int ? a->as._int : b->as._int,
+                       &vm->arena, &vm->values);
   else if (a->kind == ValueKindFloat)
-    return value_float(&vm->arena, a->as._float >=
-                                      b->as._float ? a->as._float : b->as._float);
+    return value_float(a->as._float >= b->as._float ? a->as._float : b->as._float,
+                       &vm->arena, &vm->values);
 
-  return value_unit(&vm->arena);
+  return value_unit(&vm->arena, &vm->values);
 }
 
 Value *pow_intrinsic(Vm *vm, Value **args) {
@@ -53,29 +52,29 @@ Value *pow_intrinsic(Vm *vm, Value **args) {
     for (u32 i = 0; i < pow->as._int; ++i)
       result *= value->as._int;
 
-    return value_int(&vm->arena, result);
+    return value_int(result, &vm->arena, &vm->values);
   } else if (value->kind == ValueKindFloat) {
     f64 result = 1.0;
 
     for (u32 i = 0; i < pow->as._int; ++i)
       result *= value->as._float;
 
-    return value_float(&vm->arena, result);
+    return value_float(result, &vm->arena, &vm->values);
   }
 
-  return value_unit(&vm->arena);
+  return value_unit(&vm->arena, &vm->values);
 }
 
 Value *sqrt_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
-  return value_float(&vm->arena, sqrt(value->as._float));
+  return value_float(sqrt(value->as._float), &vm->arena, &vm->values);
 }
 
 Value *round_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
-  return value_float(&vm->arena, round(value->as._float));
+  return value_float(round(value->as._float), &vm->arena, &vm->values);
 }
 
 Intrinsic math_intrinsics[] = {

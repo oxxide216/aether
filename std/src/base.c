@@ -24,7 +24,7 @@ Value *printf_intrinsic(Vm *vm, Value **args) {
   str_print(STR(printf_sb.buffer, printf_sb.len));
   fflush(stdout);
 
-  return value_unit(&vm->arena);
+  return value_unit(&vm->arena, &vm->values);
 }
 
 Value *input_size_intrinsic(Vm *vm, Value **args) {
@@ -39,7 +39,7 @@ Value *input_size_intrinsic(Vm *vm, Value **args) {
   else
     read(0, buffer.ptr, buffer.len);
 
-  return value_string(&vm->arena, buffer);
+  return value_string(buffer, &vm->arena, &vm->values);
 }
 
 Value *input_intrinsic(Vm *vm, Value **args) {
@@ -72,13 +72,13 @@ Value *input_intrinsic(Vm *vm, Value **args) {
     }
   }
 
-  return value_string(&vm->arena, STR(buffer, len));
+  return value_string(STR(buffer, len), &vm->arena, &vm->values);
 }
 
 Value *get_args_intrinsic(Vm *vm, Value **args) {
   (void) args;
 
-    return value_list(&vm->arena, vm->args);
+    return value_list(vm->args, &vm->arena, &vm->values);
 }
 
 Intrinsic base_intrinsics[] = {

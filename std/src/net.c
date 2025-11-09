@@ -18,7 +18,7 @@ Value *create_server_intrinsic(Vm *vm, Value **args) {
 
   i32 server_socket = socket(AF_INET, SOCK_STREAM, 0);
   if (server_socket < 0)
-    return value_unit(&vm->arena);
+    return value_unit(&vm->arena, &vm->values);
 
   fcntl(server_socket, F_SETFL, O_NONBLOCK);
 
@@ -35,16 +35,16 @@ Value *create_server_intrinsic(Vm *vm, Value **args) {
            sizeof(address)) < 0) {
     close(server_socket);
 
-    return value_unit(&vm->arena);
+    return value_unit(&vm->arena, &vm->values);
   }
 
   if (listen(server_socket, 3) < 0) {
     close(server_socket);
 
-    return value_unit(&vm->arena);
+    return value_unit(&vm->arena, &vm->values);
   }
 
-  return value_int(&vm->arena, server_socket);
+  return value_int(server_socket, &vm->arena, &vm->values);
 }
 
 Value *create_client_intrinsic(Vm *vm, Value **args) {
@@ -71,7 +71,7 @@ Value *create_client_intrinsic(Vm *vm, Value **args) {
     free(server_ip_address_cstr);
     free(port_cstr);
 
-    return value_unit(&vm->arena);
+    return value_unit(&vm->arena, &vm->values);
   }
 
   i32 client_socket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
@@ -79,7 +79,7 @@ Value *create_client_intrinsic(Vm *vm, Value **args) {
     free(server_ip_address_cstr);
     free(port_cstr);
 
-    return value_unit(&vm->arena);
+    return value_unit(&vm->arena, &vm->values);
   }
 
   i32 enable = 1;
@@ -91,13 +91,13 @@ Value *create_client_intrinsic(Vm *vm, Value **args) {
     free(port_cstr);
     freeaddrinfo(result);
 
-    return value_unit(&vm->arena);
+    return value_unit(&vm->arena, &vm->values);
   }
 
   free(server_ip_address_cstr);
   freeaddrinfo(result);
 
-  return value_int(&vm->arena, client_socket);
+  return value_int(client_socket, &vm->arena, &vm->values);
 }
 
 Value *accept_connection_intrinsic(Vm *vm, Value **args) {
@@ -114,12 +114,12 @@ Value *accept_connection_intrinsic(Vm *vm, Value **args) {
                              (struct sockaddr*) &address,
                              &address_size);
   if (client_socket < 0)
-    return value_unit(&vm->arena);
+    return value_unit(&vm->arena, &vm->values);
 
   i32 enable = 1;
   setsockopt(client_socket, SOL_TCP, TCP_NODELAY, &enable, sizeof(enable));
 
-  return value_int(&vm->arena, client_socket);
+  return value_int(client_socket, &vm->arena, &vm->values);
 }
 
 Value *close_connection_intrinsic(Vm *vm, Value **args) {
@@ -127,7 +127,7 @@ Value *close_connection_intrinsic(Vm *vm, Value **args) {
 
   close(client->as._int);
 
-  return value_unit(&vm->arena);
+  return value_unit(&vm->arena, &vm->values);
 }
 
 Value *send_intrinsic(Vm *vm, Value **args) {
@@ -137,7 +137,7 @@ Value *send_intrinsic(Vm *vm, Value **args) {
   send(receiver->as._int, message->as.string.ptr,
        message->as.string.len, 0);
 
-  return value_unit(&vm->arena);
+  return value_unit(&vm->arena, &vm->values);
 }
 
 Value *receive_size_intrinsic(Vm *vm, Value **args) {
@@ -155,9 +155,9 @@ Value *receive_size_intrinsic(Vm *vm, Value **args) {
     buffer.len = recv(receiver->as._int, buffer.ptr, size->as._int, 0);
 
   if (buffer.len == 0)
-    return value_unit(&vm->arena);
+    return value_unit(&vm->arena, &vm->values);
 
-  return value_string(&vm->arena, buffer);
+  return value_string(buffer, &vm->arena, &vm->values);
 }
 
 Value *receive_intrinsic(Vm *vm, Value **args) {
@@ -184,7 +184,7 @@ Value *receive_intrinsic(Vm *vm, Value **args) {
       break;
 
     if (len < 0)
-      return value_unit(&vm->arena);
+      return value_unit(&vm->arena, &vm->values);
 
     buffer.len += (u32) len;
 
@@ -198,9 +198,9 @@ Value *receive_intrinsic(Vm *vm, Value **args) {
   }
 
   if (buffer.len == 0)
-    return value_unit(&vm->arena);
+    return value_unit(&vm->arena, &vm->values);
 
-  return value_string(&vm->arena, buffer);
+  return value_string(buffer, &vm->arena, &vm->values);
 }
 
 Intrinsic net_intrinsics[] = {
