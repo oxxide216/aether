@@ -11,11 +11,10 @@
 
   (glass/circle (/ (- (get-at size 'width') circle-radius) 2.0)
                 (/ (- (get-at size 'height') circle-radius) 2.0)
-                circle-radius)
+                circle-radius 1.0 1.0 1.0 1.0)
 
   (glass/quad (/ (- (get-at size 'width') quad-width) 2.0)
               (/ (- (get-at size 'height') quad-height) 2.0)
-              quad-width
-              quad-height))
+              quad-width quad-height 1.0 1.0 1.0 1.0))
 
 (glass/run 'Hello, OpenGL!' 640 480 main-loop)

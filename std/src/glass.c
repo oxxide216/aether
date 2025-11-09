@@ -11,6 +11,7 @@
 
 typedef struct {
   f32 x, y;
+  f32 r, g, b, a;
   f32 u, v;
   i32 type;
 } Vertex;
@@ -40,8 +41,9 @@ static Str vertex_src = STR_LIT(
   "#version 330 core\n"
   "uniform vec2 u_resolution;\n"
   "layout (location = 0) in vec2 i_pos;\n"
-  "layout (location = 1) in vec2 i_uv;\n"
-  "layout (location = 2) in int i_type;\n"
+  "layout (location = 1) in vec4 i_color;\n"
+  "layout (location = 2) in vec2 i_uv;\n"
+  "layout (location = 3) in int i_type;\n"
   "out vec4 o_color;\n"
   "out vec2 o_uv;\n"
   "flat out int o_type;\n"
@@ -49,10 +51,7 @@ static Str vertex_src = STR_LIT(
   "  gl_Position = vec4(i_pos.x / u_resolution.x * 2.0 - 1.0,\n"
   "                     1.0 - i_pos.y / u_resolution.y * 2.0,\n"
   "                     1.0, 1.0);\n"
-  "  if (i_type == 0)\n"
-  "    o_color = vec4(0.5, 0.0, 0.0, 1.0);\n"
-  "  else if (i_type == 1)\n"
-  "    o_color = vec4(0.0, 0.5, 0.0, 1.0);\n"
+  "  o_color = i_color;\n"
   "  o_uv = i_uv;\n"
   "  o_type = i_type;\n"
   "}\n");
@@ -101,6 +100,7 @@ Value *run_intrinsic(Vm *vm, Value **args) {
 
     GlassAttributes attributes = {0};
     glass_push_attribute(&attributes, GlassAttributeKindFloat, 2);
+    glass_push_attribute(&attributes, GlassAttributeKindFloat, 4);
     glass_push_attribute(&attributes, GlassAttributeKindFloat, 2);
     glass_push_attribute(&attributes, GlassAttributeKindInt, 1);
 
@@ -207,7 +207,8 @@ Value *clear_intrinsic(Vm *vm, Value **args) {
   return value_unit(&vm->arena, &vm->values);
 }
 
-void push_primitive(f32 x, f32 y, f32 width, f32 height, i32 type) {
+void push_primitive(f32 x, f32 y, f32 width, f32 height,
+                    f32 r, f32 g, f32 b, f32 a, i32 type) {
   DA_APPEND(glass.indices, glass.vertices.len);
   DA_APPEND(glass.indices, glass.vertices.len + 1);
   DA_APPEND(glass.indices, glass.vertices.len + 2);
@@ -215,16 +216,16 @@ void push_primitive(f32 x, f32 y, f32 width, f32 height, i32 type) {
   DA_APPEND(glass.indices, glass.vertices.len + 1);
   DA_APPEND(glass.indices, glass.vertices.len + 3);
 
-  Vertex vertex0 = { x, y, 0.0, 0.0, type };
+  Vertex vertex0 = { x, y, r, g, b, a, 0.0, 0.0, type };
   DA_APPEND(glass.vertices, vertex0);
 
-  Vertex vertex1 = { x + width, y, 1.0, 0.0, type };
+  Vertex vertex1 = { x + width, y, r, g, b, a, 1.0, 0.0, type };
   DA_APPEND(glass.vertices, vertex1);
 
-  Vertex vertex2 = { x, y + height, 0.0, 1.0, type };
+  Vertex vertex2 = { x, y + height, r, g, b, a, 0.0, 1.0, type };
   DA_APPEND(glass.vertices, vertex2);
 
-  Vertex vertex3 = { x + width, y + height, 1.0, 1.0, type };
+  Vertex vertex3 = { x + width, y + height, r, g, b, a, 1.0, 1.0, type };
   DA_APPEND(glass.vertices, vertex3);
 }
 
@@ -235,8 +236,9 @@ Value *quad_intrinsic(Vm *vm, Value **args) {
     return value_unit(&vm->arena, &vm->values);
 
   push_primitive(args[0]->as._float, args[1]->as._float,
-                 args[2]->as._float,
-                 args[3]->as._float,
+                 args[2]->as._float, args[3]->as._float,
+                 args[4]->as._float, args[5]->as._float,
+                 args[6]->as._float, args[7]->as._float,
                  TYPE_BASE);
 
   return value_unit(&vm->arena, &vm->values);
@@ -249,8 +251,9 @@ Value *circle_intrinsic(Vm *vm, Value **args) {
     return value_unit(&vm->arena, &vm->values);
 
   push_primitive(args[0]->as._float, args[1]->as._float,
-                 args[2]->as._float,
-                 args[2]->as._float,
+                 args[2]->as._float, args[2]->as._float,
+                 args[3]->as._float, args[4]->as._float,
+                 args[5]->as._float, args[6]->as._float,
                  TYPE_CIRCLE);
 
   return value_unit(&vm->arena, &vm->values);
@@ -264,11 +267,13 @@ Intrinsic glass_intrinsics[] = {
   { STR_LIT("glass/clear"), false, 4,
     { ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFloat },
     &clear_intrinsic },
-  { STR_LIT("glass/quad"), false, 4,
-    { ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFloat },
+  { STR_LIT("glass/quad"), false, 8,
+    { ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFloat,
+      ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFloat },
     &quad_intrinsic },
-  { STR_LIT("glass/circle"), false, 3,
-    { ValueKindFloat, ValueKindFloat, ValueKindFloat },
+  { STR_LIT("glass/circle"), false, 7,
+    { ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFloat,
+      ValueKindFloat, ValueKindFloat, ValueKindFloat },
     &circle_intrinsic },
 };
 

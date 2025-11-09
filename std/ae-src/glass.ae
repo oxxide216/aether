@@ -2,5 +2,5 @@
 (let glass/window-size [] -> import 'glass/window-size')
 
 (let glass/clear [r g b a] -> import 'glass/clear')
-(let glass/circle [x y radius] -> import 'glass/circle')
-(let glass/quad [x y width height] -> import 'glass/quad')
+(let glass/circle [x y radius r g b a] -> import 'glass/circle')
+(let glass/quad [x y width height r g b a] -> import 'glass/quad')
