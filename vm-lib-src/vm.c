@@ -400,8 +400,9 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
     }
 
     Value *result = (*intrinsic->func)(vm, args);
-    if (vm->state != ExecStateContinue)
-      return NULL;
+
+    if (vm->state == ExecStateReturn)
+      vm->state = ExecStateContinue;
 
     return result;
   }
@@ -438,9 +439,11 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
     DA_APPEND(vm->local_vars, var);
   }
 
-  Value *result;
-  EXECUTE_BLOCK_SET(vm, result, &func->body, value_expected);
-  Value *result_stable = value_clone(result, &prev_arena, &vm->values);
+  Value *result = execute_block(vm, &func->body, value_expected);
+
+  Value *result_stable = NULL;
+  if (vm->state == ExecStateContinue)
+    result_stable = value_clone(result, &prev_arena, &vm->values);
 
   if (vm->local_vars.items)
     free(vm->local_vars.items);
@@ -716,10 +719,10 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   } break;
 
   case IrExprKindRet: {
-    vm->state = ExecStateReturn;
-
     if (expr->as.ret.has_expr)
       EXECUTE_EXPR_SET(vm, result, expr->as.ret.expr, true);
+
+    vm->state = ExecStateReturn;
   } break;
 
   case IrExprKindList: {

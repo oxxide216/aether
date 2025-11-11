@@ -5,6 +5,7 @@
 #include "glass/glass.h"
 #include "glass/params.h"
 #include "glass/math.h"
+#include "glass-winx-event-to-value.h"
 
 #define TYPE_BASE   0
 #define TYPE_CIRCLE 1
@@ -111,6 +112,29 @@ Value *run_intrinsic(Vm *vm, Value **args) {
     glass.object = glass_init_object(&glass.shader);
   }
 
+  Value *state = args[3];
+  Func event_handler = args[4]->as.func;
+  Func update = args[5]->as.func;
+  Func render = args[6]->as.func;
+
+  if (event_handler.args.len != 2) {
+    ERROR("glass/run: event handler should have two arguments\n");
+    vm->state = ExecStateExit;
+    return NULL;
+  }
+
+  if (update.args.len != 1) {
+    ERROR("glass/run: update body should have one argument\n");
+    vm->state = ExecStateExit;
+    return NULL;
+  }
+
+  if (render.args.len != 1) {
+    ERROR("glass/run: render body should have one argument\n");
+    vm->state = ExecStateExit;
+    return NULL;
+  }
+
   bool is_running = true;
   u64 prev_hash = 0;
 
@@ -126,10 +150,18 @@ Value *run_intrinsic(Vm *vm, Value **args) {
 
       if (event.kind == WinxEventKindQuit) {
         is_running = false;
-      } else if (event.kind == WinxEventKindResize) {
-        resized = true;
-        width = event.as.resize.width;
-        height = event.as.resize.height;
+      } else {
+        Value *event_value = winx_event_to_value(&event, vm);
+        Value *args[2] = { state, event_value };
+        state = execute_func(vm, args, &event_handler, NULL, true);
+        if (vm->state != ExecStateContinue)
+          break;
+
+        if (event.kind == WinxEventKindResize) {
+          resized = true;
+          width = event.as.resize.width;
+          height = event.as.resize.height;
+        }
       }
     }
 
@@ -141,7 +173,11 @@ Value *run_intrinsic(Vm *vm, Value **args) {
                          vec2((f32) width, (f32) height));
     }
 
-    execute_func(vm, NULL, &args[3]->as.func, NULL, false);
+    state = execute_func(vm, &state, &update, NULL, true);
+    if (vm->state != ExecStateContinue)
+      break;
+
+    execute_func(vm, &state, &render, NULL, false);
     if (vm->state != ExecStateContinue)
       break;
 
@@ -260,8 +296,9 @@ Value *circle_intrinsic(Vm *vm, Value **args) {
 }
 
 Intrinsic glass_intrinsics[] = {
-  { STR_LIT("glass/run"), false, 4,
-    { ValueKindString, ValueKindInt, ValueKindInt, ValueKindFunc },
+  { STR_LIT("glass/run"), false, 7,
+    { ValueKindString, ValueKindInt, ValueKindInt, ValueKindUnit,
+      ValueKindFunc, ValueKindFunc, ValueKindFunc },
     &run_intrinsic },
   { STR_LIT("glass/window-size"), true, 0, {}, &window_size_intrinsic },
   { STR_LIT("glass/clear"), false, 4,

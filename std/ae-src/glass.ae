@@ -1,4 +1,5 @@
-(let glass/run [title width height callback] -> import 'glass/run')
+(let glass/run [title width height init-state
+                event-hanlder update render] -> import 'glass/run')
 (let glass/window-size [] -> import 'glass/window-size')
 
 (let glass/clear [r g b a] -> import 'glass/clear')

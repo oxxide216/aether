@@ -17,8 +17,8 @@
 (let byte-32-to-str [int] -> import 'byte-32-to-str')
 (let byte-16-to-str [int] -> import 'byte-16-to-str')
 (let byte-8-to-str [int] -> import 'byte-8-to-str')
-(let to-int [str] -> import 'to-int')
-(let to-float [int] -> import 'to-float')
+(let to-int [value] -> import 'to-int')
+(let to-float [value] -> import 'to-float')
 
 ; Math
 (let + [a b] -> import 'add')

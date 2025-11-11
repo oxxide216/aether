@@ -163,6 +163,8 @@ Value *map_intrinsic(Vm *vm, Value **args) {
     Value *func_args[] = { node->value };
     // TODO: put real metadata here
     Value *replacement = execute_func(vm, func_args, &func->as.func, NULL, true);
+    if (vm->state != ExecStateContinue)
+      break;
 
     *new_list_next = arena_alloc(&vm->arena, sizeof(ListNode));
     (*new_list_next)->value = replacement;
@@ -185,6 +187,8 @@ Value *filter_intrinsic(Vm *vm, Value **args) {
     Value *func_args[] = { node->value };
     // TODO: put real metadata here
     Value *is_ok = execute_func(vm, func_args, &func->as.func, NULL, true);
+    if (vm->state != ExecStateContinue)
+      break;
 
     if (is_ok->kind != ValueKindBool)
       PANIC(&vm->arena, &vm->values, "filter: wrong argument kinds\n");
@@ -212,6 +216,8 @@ Value *fold_intrinsic(Vm *vm, Value **args) {
     Value *func_args[] = { accumulator, node->value };
     // TODO: put real metadata here
     Value *new_accumulator = execute_func(vm, func_args, &func->as.func, NULL, true);
+    if (vm->state != ExecStateContinue)
+      break;
 
     accumulator = new_accumulator;
 
