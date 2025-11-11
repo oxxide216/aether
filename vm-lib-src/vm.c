@@ -280,6 +280,29 @@ static void catch_vars(Vm *vm, Strs *local_names,
     CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.set.src);
   } break;
 
+  case IrExprKindGetAt: {
+    CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.get_at.src);
+    CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.get_at.key);
+  } break;
+
+  case IrExprKindSetAt: {
+    CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.set_at.key);
+    CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.set_at.value);
+
+    for (u32 i = 0; i < local_names->len; ++i)
+      if (str_eq(expr->as.set_at.dest, local_names->items[i]))
+        return;
+
+    Var *var = get_var(vm, expr->as.set_at.dest);
+    if (var && var->kind != VarKindGlobal) {
+      NamedValue value = {
+        var->name,
+        value_clone(var->value, arena, values),
+      };
+      DA_APPEND(*catched_values, value);
+    }
+  } break;
+
   case IrExprKindRet: {
     if (expr->as.ret.has_expr)
       CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.ret.expr);
@@ -555,6 +578,141 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     if (value_expected)
       return value_unit(&vm->arena, &vm->values);
+  } break;
+
+  case IrExprKindGetAt: {
+    if (!value_expected)
+      break;
+
+    Value *src;
+    EXECUTE_EXPR_SET(vm, src, expr->as.get_at.src, true);
+    Value *key;
+    EXECUTE_EXPR_SET(vm, key, expr->as.get_at.key, true);
+
+    if (src->kind == ValueKindList) {
+      ListNode *node = src->as.list->next;
+      u32 i = 0;
+      while (node && i < key->as._int) {
+        node = node->next;
+        ++i;
+      }
+
+      if (!node) {
+        PERROR(META_FMT, "get-at: out of bounds\\n",
+               META_ARG(expr->meta));
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+      }
+
+      result = node->value;
+    } else if (src->kind == ValueKindString) {
+      if (key->as._int >= src->as.string.len) {
+        PERROR(META_FMT, "get-at: out of bounds\\n",
+               META_ARG(expr->meta));
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+      }
+
+      Str result_string = src->as.string;
+      result_string.ptr += key->as._int;
+      result_string.len = 1;
+
+      result = value_string(result_string, &vm->arena, &vm->values);
+    } else if (src->kind == ValueKindDict) {
+      bool found = false;
+
+      for (u32 i = 0; i < src->as.dict.len; ++i) {
+        if (value_eq(src->as.dict.items[i].key, key)) {
+          result = src->as.dict.items[i].value;
+          found = true;
+
+          break;
+        }
+      }
+
+      if (!found)
+        result = value_unit(&vm->arena, &vm->values);
+    } else {
+      PERROR(META_FMT, "get-at: source should be list, string or dictionary\\n",
+             META_ARG(expr->meta));
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+    }
+  } break;
+
+  case IrExprKindSetAt: {
+    Var *dest_var = get_var(vm, expr->as.set_at.dest);
+    if (!dest_var) {
+      PERROR(META_FMT, "Symbol "STR_FMT" was not defined before usage\n",
+            META_ARG(expr->meta), STR_ARG(expr->as.set_at.dest));
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+
+      return NULL;
+    }
+
+    Value *key;
+    EXECUTE_EXPR_SET(vm, key, expr->as.set_at.key, true);
+    Value *value;
+    EXECUTE_EXPR_SET(vm, value, expr->as.set_at.value, true);
+
+    if (dest_var->value->kind == ValueKindList) {
+      ListNode *node = dest_var->value->as.list->next;
+      u32 i = 0;
+      while (node && i < key->as._int) {
+        node = node->next;
+        ++i;
+      }
+
+      if (!node) {
+        PERROR(META_FMT, "set-at: index out of bounds\n",
+               META_ARG(expr->meta));
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+      }
+
+      node->value = value;
+    } else if (dest_var->value->kind == ValueKindString) {
+      if (key->as._int >= dest_var->value->as.string.len) {
+        PERROR(META_FMT, "set-at: index out of bounds\n",
+               META_ARG(expr->meta));
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+      }
+
+      if (value->as.string.len != 1) {
+        PERROR(META_FMT, "set-at: string of length 1 can be assigned\\n",
+               META_ARG(expr->meta));
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+      }
+
+      dest_var->value->as.string.ptr[key->as._int] = value->as.string.ptr[0];
+    } else if (dest_var->value->kind == ValueKindDict) {
+      bool found = false;
+
+      for (u32 i = 0; i < dest_var->value->as.dict.len; ++i) {
+        if (value_eq(dest_var->value->as.dict.items[i].key, key)) {
+          dest_var->value->as.dict.items[i].value = value;
+          found = true;
+
+          break;
+        }
+      }
+
+      if (!found) {
+        DictValue dict_value = { key, value };
+        DA_APPEND(dest_var->value->as.dict, dict_value);
+      }
+    } else {
+      PERROR(META_FMT, "set-at: destination should be list, string or dictionary\n",
+             META_ARG(expr->meta));
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+    }
+
+  if (value_expected)
+    result = value_unit(&vm->arena, &vm->values);
   } break;
 
   case IrExprKindRet: {

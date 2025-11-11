@@ -2,8 +2,6 @@
 (let head [list] -> import 'head')
 (let tail [list] -> import 'tail')
 (let last [list] -> import 'last')
-(let get-at [collection key] -> import 'get-at')
-(let set-at [collection key value] -> import 'set-at')
 (let get-index [collection item] -> import 'get-index')
 (let len [collection] -> import 'len')
 (let get-range [list begin end] -> import 'get-range')

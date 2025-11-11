@@ -40,78 +40,6 @@ Value *last_intrinsic(Vm *vm, Value **args) {
   return node->value;
 }
 
-Value *get_at_intrinsic(Vm *vm, Value **args) {
-  Value *collection = args[0];
-  Value *key = args[1];
-
-  if (collection->kind == ValueKindList) {
-    ListNode *node = collection->as.list->next;
-    u32 i = 0;
-    while (node && i < key->as._int) {
-      node = node->next;
-      ++i;
-    }
-
-    if (node)
-      return node->value;
-  } else if (collection->kind == ValueKindString) {
-    if (key->as._int < collection->as.string.len) {
-      Str result = collection->as.string;
-      result.ptr += key->as._int;
-      result.len = 1;
-
-      return value_string(result, &vm->arena, &vm->values);
-    }
-  } else if (collection->kind == ValueKindDict) {
-    for (u32 i = 0; i < collection->as.dict.len; ++i)
-      if (value_eq(collection->as.dict.items[i].key, key))
-        return collection->as.dict.items[i].value;
-  }
-
-  return value_unit(&vm->arena, &vm->values);
-}
-
-Value *set_at_intrinsic(Vm *vm, Value **args) {
-  Value *collection = args[0];
-  Value *key = args[1];
-  Value *value = args[2];
-
-  if (collection->kind == ValueKindList) {
-    ListNode *node = collection->as.list->next;
-    u32 i = 0;
-    while (node && i < key->as._int) {
-      node = node->next;
-      ++i;
-    }
-
-    if (!node)
-      PANIC(&vm->arena, &vm->values, "set-at: out of bounds\n");
-
-    node->value = value;
-  } else if (collection->kind == ValueKindString) {
-    if (key->as._int >= collection->as.string.len)
-      PANIC(&vm->arena, &vm->values, "set-at: out of bounds\n");
-
-    if (value->as.string.len != 1)
-      PANIC(&vm->arena, &vm->values, "set-nth: only one-sized string can be assigned\n");
-
-    collection->as.string.ptr[key->as._int] = value->as.string.ptr[0];
-  } else if (collection->kind == ValueKindDict) {
-    for (u32 i = 0; i < collection->as.dict.len; ++i) {
-      if (value_eq(collection->as.dict.items[i].key, key)) {
-        collection->as.dict.items[i].value = value;
-
-        return value_unit(&vm->arena, &vm->values);
-      }
-    }
-
-    DictValue dict_value = { key, value };
-    DA_APPEND(collection->as.dict, dict_value);
-  }
-
-  return value_unit(&vm->arena, &vm->values);
-}
-
 Value *get_index_intrinsic(Vm *vm, Value **args) {
   Value *collection = args[0];
   Value *item = args[1];
@@ -839,18 +767,6 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("head"), true, 1, { ValueKindList }, &head_intrinsic },
   { STR_LIT("tail"), true, 1, { ValueKindList }, &tail_intrinsic },
   { STR_LIT("last"), true, 1, { ValueKindList }, &last_intrinsic },
-  { STR_LIT("get-at"), true, 2, { ValueKindList, ValueKindInt }, &get_at_intrinsic },
-  { STR_LIT("get-at"), true, 2, { ValueKindString, ValueKindInt }, &get_at_intrinsic },
-  { STR_LIT("get-at"), true, 2, { ValueKindDict, ValueKindUnit }, &get_at_intrinsic },
-  { STR_LIT("set-at"), false, 3,
-    { ValueKindList, ValueKindInt, ValueKindUnit },
-    &set_at_intrinsic },
-  { STR_LIT("set-at"), false, 3,
-    { ValueKindString, ValueKindInt, ValueKindString },
-    &set_at_intrinsic },
-  { STR_LIT("set-at"), false, 3,
-    { ValueKindDict, ValueKindUnit, ValueKindUnit },
-    &set_at_intrinsic },
   { STR_LIT("get-index"), true, 2, { ValueKindList, ValueKindUnit }, &get_index_intrinsic },
   { STR_LIT("get-index"), true, 2, { ValueKindString, ValueKindString }, &get_index_intrinsic },
   { STR_LIT("len"), true, 1, { ValueKindList }, &len_intrinsic },

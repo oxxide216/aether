@@ -11,28 +11,30 @@
 #define TT_MACRO 7
 #define TT_WHILE 8
 #define TT_SET 9
-#define TT_USE 10
-#define TT_FIELD 11
-#define TT_RET 12
-#define TT_IMPORT 13
-#define TT_OPAREN 14
-#define TT_CPAREN 15
-#define TT_OBRACKET 16
-#define TT_CBRACKET 17
-#define TT_OCURLY 18
-#define TT_CCURLY 19
-#define TT_STR 20
-#define TT_UNPACK 21
-#define TT_RIGHT_ARROW 22
-#define TT_DOUBLE_ARROW 23
-#define TT_RHOMBUS 24
-#define TT_COLON 25
-#define TT_INT 26
-#define TT_FLOAT 27
-#define TT_BOOL 28
-#define TT_IDENT 29
+#define TT_GET_AT 10
+#define TT_SET_AT 11
+#define TT_USE 12
+#define TT_FIELD 13
+#define TT_RET 14
+#define TT_IMPORT 15
+#define TT_OPAREN 16
+#define TT_CPAREN 17
+#define TT_OBRACKET 18
+#define TT_CBRACKET 19
+#define TT_OCURLY 20
+#define TT_CCURLY 21
+#define TT_STR 22
+#define TT_UNPACK 23
+#define TT_RIGHT_ARROW 24
+#define TT_DOUBLE_ARROW 25
+#define TT_RHOMBUS 26
+#define TT_COLON 27
+#define TT_INT 28
+#define TT_FLOAT 29
+#define TT_BOOL 30
+#define TT_IDENT 31
 
-#define TTS_COUNT 30
+#define TTS_COUNT 32
 
 TransitionTable *get_transition_table(void);
 
@@ -98,6 +100,24 @@ TransitionCol table_col_set[] = {
   { 1, 's', 's', 2 },
   { 2, 'e', 'e', 3 },
   { 3, 't', 't', 0 },
+};
+
+TransitionCol table_col_get_at[] = {
+  { 1, 'g', 'g', 2 },
+  { 2, 'e', 'e', 3 },
+  { 3, 't', 't', 4 },
+  { 4, '-', '-', 5 },
+  { 5, 'a', 'a', 6 },
+  { 6, 't', 't', 0 },
+};
+
+TransitionCol table_col_set_at[] = {
+  { 1, 's', 's', 2 },
+  { 2, 'e', 'e', 3 },
+  { 3, 't', 't', 4 },
+  { 4, '-', '-', 5 },
+  { 5, 'a', 'a', 6 },
+  { 6, 't', 't', 0 },
 };
 
 TransitionCol table_col_use[] = {
@@ -268,6 +288,8 @@ TransitionRow table_rows[] = {
   { table_col_macro, sizeof(table_col_macro) / sizeof(TransitionCol) },
   { table_col_while, sizeof(table_col_while) / sizeof(TransitionCol) },
   { table_col_set, sizeof(table_col_set) / sizeof(TransitionCol) },
+  { table_col_get_at, sizeof(table_col_get_at) / sizeof(TransitionCol) },
+  { table_col_set_at, sizeof(table_col_set_at) / sizeof(TransitionCol) },
   { table_col_use, sizeof(table_col_use) / sizeof(TransitionCol) },
   { table_col_field, sizeof(table_col_field) / sizeof(TransitionCol) },
   { table_col_ret, sizeof(table_col_ret) / sizeof(TransitionCol) },

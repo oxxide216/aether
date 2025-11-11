@@ -56,6 +56,17 @@ static void get_expr_data_size(u8 *data, u32 *size) {
     get_expr_data_size(data, size);
   } break;
 
+  case IrExprKindGetAt: {
+    get_expr_data_size(data, size);
+    get_expr_data_size(data, size);
+  } break;
+
+  case IrExprKindSetAt: {
+    get_str_data_size(data, size);
+    get_expr_data_size(data, size);
+    get_expr_data_size(data, size);
+  } break;
+
   case IrExprKindRet: {
     bool has_expr = *(bool *) (data + *size);
     *size += sizeof(bool);
@@ -198,6 +209,23 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
 
     load_str_data(&expr->as.set.dest, data, end, str_arena);
     load_expr_data(expr->as.set.src, data, end, arena, str_arena);
+  } break;
+
+  case IrExprKindGetAt: {
+    expr->as.get_at.src = arena_alloc(arena, sizeof(IrExpr));
+    expr->as.get_at.key = arena_alloc(arena, sizeof(IrExpr));
+
+    load_expr_data(expr->as.get_at.src, data, end, arena, str_arena);
+    load_expr_data(expr->as.get_at.key, data, end, arena, str_arena);
+  } break;
+
+  case IrExprKindSetAt: {
+    expr->as.set_at.key = arena_alloc(arena, sizeof(IrExpr));
+    expr->as.set_at.value = arena_alloc(arena, sizeof(IrExpr));
+
+    load_str_data(&expr->as.set_at.dest, data, end, str_arena);
+    load_expr_data(expr->as.set_at.key, data, end, arena, str_arena);
+    load_expr_data(expr->as.set_at.value, data, end, arena, str_arena);
   } break;
 
   case IrExprKindRet: {
