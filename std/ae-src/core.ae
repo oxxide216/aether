@@ -67,9 +67,3 @@
     (let element (head -list))
     body
     (set -list (tail -list))))
-
-(macro print [...args] ->
-  (printf [args]))
-
-(macro println [...args] ->
-  (printf [args '\n']))

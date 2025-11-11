@@ -777,8 +777,6 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Str bytecode = {0};
   bytecode.ptr = (char *) serialize(&ir, &bytecode.len);
 
-  arena_free(&ir_arena);
-  free(ir.items);
   free(path_cstr);
 
   return value_string(bytecode, &vm->arena, &vm->values);
@@ -798,6 +796,11 @@ Value *eval_compiled_intrinsic(Vm *vm, Value **args) {
 
   arena_free(&ir_arena);
 
+  if (env->as.env->vm.state == ExecStateExit) {
+    vm->state = ExecStateExit;
+    vm->exit_code = env->as.env->vm.exit_code;
+  }
+
   return result;
 }
 
@@ -814,6 +817,11 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
   Value *result = execute_block(&env->as.env->vm, &ir, true);
 
   arena_free(&ir_arena);
+
+  if (env->as.env->vm.state == ExecStateExit) {
+    vm->state = ExecStateExit;
+    vm->exit_code = env->as.env->vm.exit_code;
+  }
 
   return result;
 }

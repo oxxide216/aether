@@ -1,5 +1,26 @@
 #include "aether/macros.h"
 
+#define INLINE_THEN_EXPAND(expr)                                         \
+  do {                                                                   \
+    try_inline_macro_arg(&(expr), arg_names, args, NULL, unpack, arena); \
+    expand_macros(expr, macros, arg_names, args, unpack, arena);         \
+  } while (0)
+
+void ir_block_append(IrBlock *block, IrExpr *expr, Arena *arena) {
+  if (!block->items) {
+    block->cap = 1;
+    block->items = arena_alloc(arena, sizeof(IrExpr *));
+  } else if (block->len >= block->cap) {
+    block->cap *= 2;
+
+    IrExpr **prev_items = block->items;
+    block->items = arena_alloc(arena, block->cap * sizeof(IrExpr *));
+    memcpy(block->items, prev_items, block->len * sizeof(IrExpr *));
+  }
+
+  block->items[block->len++] = expr;
+}
+
 static void clone_block(IrBlock *block, Arena *arena);
 
 static void clone_expr(IrExpr **expr, Arena *arena) {
@@ -75,8 +96,8 @@ static void clone_expr(IrExpr **expr, Arena *arena) {
 
 static void clone_block(IrBlock *block, Arena *arena) {
   IrBlock new_block = {0};
-  new_block.cap = block->cap;
   new_block.len = block->len;
+  new_block.cap = block->len;
   new_block.items = arena_alloc(arena, new_block.cap * sizeof(IrExpr *));
   memcpy(new_block.items, block->items, new_block.len * sizeof(IrExpr *));
 
@@ -229,12 +250,12 @@ static void append_macro_arg(u32 index, IrArgs *arg_names,
 
       if (!try_inline_macro_arg(&new_arg, arg_names, args, dest, unpack, arena)) {
         clone_expr(&new_arg, arena);
-        DA_APPEND(*dest, new_arg);
+        ir_block_append(dest, new_arg, arena);
       }
     }
   } else {
     clone_expr(&arg, arena);
-    DA_APPEND(*dest, arg);
+    ir_block_append(dest, arg, arena);
   }
 }
 
@@ -282,7 +303,7 @@ void expand_macros_block(IrBlock *block, Macros *macros,
 
     if (!try_inline_macro_arg(&new_expr, arg_names, args, &new_block, unpack, arena)) {
       clone_expr(&new_expr, arena);
-      DA_APPEND(new_block, new_expr);
+      ir_block_append(&new_block, new_expr, arena);
     }
   }
 
@@ -291,12 +312,6 @@ void expand_macros_block(IrBlock *block, Macros *macros,
 
   *block = new_block;
 }
-
-#define INLINE_THEN_EXPAND(expr)                                         \
-  do {                                                                   \
-    try_inline_macro_arg(&(expr), arg_names, args, NULL, unpack, arena); \
-    expand_macros(expr, macros, arg_names, args, unpack, arena);         \
-  } while (0)
 
 void expand_macros(IrExpr *expr, Macros *macros,
                    IrArgs *arg_names, IrBlock *args,
@@ -321,10 +336,13 @@ void expand_macros(IrExpr *expr, Macros *macros,
         if (macro->has_unpack) {
           --new_args.len;
 
-          IrBlock variadic_block = {0};
+          IrBlock variadic_block;
+          variadic_block.len = expr->as.func_call.args.len - new_args.len;
+          variadic_block.cap = variadic_block.len;
+          variadic_block.items = arena_alloc(arena, variadic_block.cap * sizeof(IrExpr));
 
-          for (u32 i = new_args.len; i < expr->as.func_call.args.len; ++i)
-            DA_APPEND(variadic_block, expr->as.func_call.args.items[i]);
+          for (u32 i = 0; i < variadic_block.len; ++i)
+            variadic_block.items[i] = expr->as.func_call.args.items[new_args.len + i];
 
           IrExpr *variadic_args = arena_alloc(arena, sizeof(IrExpr));
           variadic_args->kind = IrExprKindList;
@@ -338,18 +356,18 @@ void expand_macros(IrExpr *expr, Macros *macros,
 
         for (u32 i = 0; i < macro->arg_names.len; ++i) {
           StringBuilder sb = {0};
-          sb_push_u64(&sb, (u64) &macro);
+          sb_push_str(&sb, macro->name);
           sb_push_char(&sb, '@');
           sb_push_str(&sb, macro->arg_names.items[i]);
 
           Str new_arg_name = sb_to_str(sb);
           DA_APPEND(new_arg_names, new_arg_name);
-        }
+        };
 
         expr->kind = IrExprKindBlock;
         expr->as.block = macro->body;
-        clone_block(&expr->as.block, arena);
 
+        clone_block(&expr->as.block, arena);
         rename_args_block(&expr->as.block, &macro->arg_names, &new_arg_names);
         expand_macros_block(&expr->as.block, macros,
                             &new_arg_names, &new_args,

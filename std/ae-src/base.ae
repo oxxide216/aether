@@ -3,3 +3,9 @@
 (let input [] -> import 'input')
 
 (let get-args [] -> import 'get-args')
+
+(macro print [...args] ->
+  (printf [args]))
+
+(macro println [...args] ->
+  (printf [args '\n']))

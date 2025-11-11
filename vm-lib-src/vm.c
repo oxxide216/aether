@@ -415,7 +415,8 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
     DA_APPEND(vm->local_vars, var);
   }
 
-  Value *result = execute_block(vm, &func->body, value_expected);
+  Value *result;
+  EXECUTE_BLOCK_SET(vm, result, &func->body, value_expected);
   Value *result_stable = value_clone(result, &prev_arena, &vm->values);
 
   if (vm->local_vars.items)

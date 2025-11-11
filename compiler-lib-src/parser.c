@@ -620,7 +620,7 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
   while (token && !(MASK(token->id) & end_id_mask)) {
     IrExpr *expr = parser_parse_expr(parser);
     if (expr)
-      DA_APPEND(block, expr);
+      ir_block_append(&block, expr, parser->arena);
 
     token = parser_peek_token(parser);
   }
