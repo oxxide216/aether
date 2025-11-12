@@ -286,8 +286,9 @@ Value *circle_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
     return value_unit(&vm->arena, &vm->values);
 
-  push_primitive(args[0]->as._float, args[1]->as._float,
-                 args[2]->as._float, args[2]->as._float,
+  push_primitive(args[0]->as._float - args[2]->as._float,
+                 args[1]->as._float - args[2]->as._float,
+                 args[2]->as._float * 2.0, args[2]->as._float * 2.0,
                  args[3]->as._float, args[4]->as._float,
                  args[5]->as._float, args[6]->as._float,
                  TYPE_CIRCLE);
