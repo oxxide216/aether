@@ -1,7 +1,10 @@
-(let glass/run [title width height init-state
+(let glass/load-texture [path] -> import 'glass/load-texture')
+(let glass/run [title width height init
                 event-hanlder update render] -> import 'glass/run')
 (let glass/window-size [] -> import 'glass/window-size')
 
 (let glass/clear [r g b a] -> import 'glass/clear')
 (let glass/circle [x y radius r g b a] -> import 'glass/circle')
 (let glass/quad [x y width height r g b a] -> import 'glass/quad')
+(let glass/texture [x y id] -> import 'glass/texture')
+(let glass/textured-quad [x y width height id] -> import 'glass/textured-quad')

@@ -26,7 +26,7 @@ if [ "$GLASS" != "" ]; then
   LDFLAGS="$LDFLAGS -lX11 -lGL -lGLEW"
   LIB_SRC="$LIB_SRC $(find libs/winx/src -name "*.c" -not -name "io.c")"
   LIB_SRC="$LIB_SRC $(find libs/glass/src -name "*.c" -not -name "io.c")"
-  STD_SRC="$STD_SRC std/src/glass.c std/src/glass-winx-event-to-value.c"
+  STD_SRC="$STD_SRC std/src/glass/*"
 fi
 
 lexgen compiler-lib-src/grammar.h compiler-lib-src/grammar.lg
