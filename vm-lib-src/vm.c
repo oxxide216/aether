@@ -100,6 +100,12 @@ Value *value_dict(Dict dict, Arena *arena, Values *values) {
   return value;
 }
 
+Value *value_func(Func func, Arena *arena, Values *values) {
+  Value *value = value_alloc(arena, values);
+  *value = (Value) { ValueKindFunc, { .func = func } };
+  return value;
+}
+
 Value *value_env(Vm vm, Arena *arena, Values *values) {
   Value *value = value_alloc(arena, values);
   Env *env = arena_alloc(arena, sizeof(Env));
@@ -344,10 +350,7 @@ static void catch_vars(Vm *vm, Strs *local_names,
       CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.dict.items[i].expr);
   } break;
 
-  case IrExprKindSelfCall: {
-    for (u32 i = 0; i < expr->as.self_call.args.len; ++i)
-      CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.self_call.args.items[i]);
-  } break;
+  case IrExprKindSelf: break;
   }
 }
 
@@ -836,16 +839,13 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     result = value_dict(dict, &vm->arena, &vm->values);
   } break;
 
-  case IrExprKindSelfCall: {
-    Value **func_args = malloc(expr->as.self_call.args.len * sizeof(Value *));
-
-    for (u32 i = 0; i < expr->as.self_call.args.len; ++i)
-      EXECUTE_EXPR_SET(vm, func_args[i], expr->as.self_call.args.items[i], true);
-
-    EXECUTE_FUNC_SET(vm, result, func_args, &vm->current_func_value,
-                     &expr->meta, value_expected);
-
-    free(func_args);
+  case IrExprKindSelf: {
+    if (value_expected) {
+      if (vm->is_inside_of_func)
+        return value_func(vm->current_func_value, &vm->arena, &vm->values);
+      else
+        result = value_unit(&vm->arena, &vm->values);
+    }
   } break;
   }
 

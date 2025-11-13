@@ -98,9 +98,7 @@ static void clone_expr(IrExpr **expr, Arena *arena) {
       clone_expr(&new_expr->as.ret.expr, arena);
   } break;
 
-  case IrExprKindSelfCall: {
-    clone_block(&new_expr->as.self_call.args, arena);
-  } break;
+  case IrExprKindSelf: break;
   }
 }
 
@@ -237,9 +235,7 @@ static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names, IrArgs *new_a
       rename_args_expr(expr->as.ret.expr, prev_arg_names, new_arg_names);
   } break;
 
-  case IrExprKindSelfCall: {
-    rename_args_block(&expr->as.self_call.args, prev_arg_names, new_arg_names);
-  } break;
+  case IrExprKindSelf: break;
   }
 }
 
@@ -465,8 +461,6 @@ void expand_macros(IrExpr *expr, Macros *macros,
       INLINE_THEN_EXPAND(expr->as.ret.expr);
   } break;
 
-  case IrExprKindSelfCall: {
-    expand_macros_block(&expr->as.self_call.args, macros, arg_names, args, unpack, arena);
-  } break;
+  case IrExprKindSelf: break;
   }
 }

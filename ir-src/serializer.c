@@ -150,9 +150,7 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
     }
   } break;
 
-  case IrExprKindSelfCall: {
-    save_block_data(&expr->as.self_call.args, data, data_size, end);
-  } break;
+  case IrExprKindSelf: break;
   }
 
   save_str_data(expr->meta.file_path, data, data_size, end);

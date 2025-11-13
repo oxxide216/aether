@@ -116,9 +116,7 @@ static void get_expr_data_size(u8 *data, u32 *size) {
     get_str_data_size(data, size);
   } break;
 
-  case IrExprKindSelfCall: {
-    get_block_data_size(data, size);
-  } break;
+  case IrExprKindSelf: break;
   }
 
   get_str_data_size(data, size);
@@ -295,9 +293,7 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
     }
   } break;
 
-  case IrExprKindSelfCall: {
-    load_block_data(&expr->as.self_call.args, data, end, arena, str_arena);
-  } break;
+  case IrExprKindSelf: break;
   }
 
   load_str_data(&expr->meta.file_path, data, end, str_arena);

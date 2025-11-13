@@ -347,7 +347,8 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   Token *token = parser_expect_token(parser, MASK(TT_OPAREN) | MASK(TT_STR) |
                                              MASK(TT_IDENT) | MASK(TT_INT) |
                                              MASK(TT_FLOAT) | MASK(TT_BOOL) |
-                                             MASK(TT_OCURLY) | MASK(TT_OBRACKET));
+                                             MASK(TT_OCURLY) | MASK(TT_OBRACKET) |
+                                             MASK(TT_DOUBLE_ARROW));
 
   expr->meta.file_path = STR(token->file_path, strlen(token->file_path));
   expr->meta.row = token->row;
@@ -360,35 +361,35 @@ static IrExpr *parser_parse_expr(Parser *parser) {
                               token->lexeme.len - 2);
 
     return expr;
-  } break;
+  };
 
   case TT_IDENT: {
     expr->kind = IrExprKindIdent;
     expr->as.ident.ident = token->lexeme;
 
     return expr;
-  } break;
+  };
 
   case TT_INT: {
     expr->kind = IrExprKindInt;
     expr->as._int._int = str_to_i64(token->lexeme);
 
     return expr;
-  } break;
+  };
 
   case TT_FLOAT: {
     expr->kind = IrExprKindFloat;
     expr->as._float._float = str_to_f64(token->lexeme);
 
     return expr;
-  } break;
+  };
 
   case TT_BOOL: {
     expr->kind = IrExprKindBool;
     expr->as._bool._bool = str_eq(token->lexeme, STR_LIT("true"));
 
     return expr;
-  } break;
+  };
 
   case TT_OBRACKET: {
     u32 prev_index = parser->index;
@@ -408,14 +409,18 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     }
 
     return expr;
-  } break;
+  };
 
   case TT_OCURLY: {
     expr->kind = IrExprKindDict;
     expr->as.dict = parser_parse_dict(parser);
 
     return expr;
-  } break;
+  };
+
+  case TT_DOUBLE_ARROW: {
+    expr->kind = IrExprKindSelf;
+  }
   }
 
   token = parser_peek_token(parser);
@@ -612,24 +617,11 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   } break;
 
   default: {
-    token = parser_peek_token(parser);
+    expr->kind = IrExprKindFuncCall;
+    expr->as.func_call.func = parser_parse_expr(parser);
+    expr->as.func_call.args = parser_parse_block(parser, MASK(TT_CPAREN));
 
-    if (token && token->id == TT_DOUBLE_ARROW) {
-      parser_next_token(parser);
-
-      expr->kind = IrExprKindSelfCall;
-      expr->as.self_call.args = parser_parse_block(parser, MASK(TT_CPAREN));
-
-      parser_expect_token(parser, MASK(TT_CPAREN));
-
-      break;
-    } else {
-      expr->kind = IrExprKindFuncCall;
-      expr->as.func_call.func = parser_parse_expr(parser);
-      expr->as.func_call.args = parser_parse_block(parser, MASK(TT_CPAREN));
-
-      parser_expect_token(parser, MASK(TT_CPAREN));
-    }
+    parser_expect_token(parser, MASK(TT_CPAREN));
   } break;
   }
 
