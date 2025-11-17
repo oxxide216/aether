@@ -445,7 +445,7 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
   Value *result = execute_block(vm, &func->body, value_expected);
 
   Value *result_stable = NULL;
-  if (vm->state == ExecStateContinue)
+  if (value_expected && vm->state == ExecStateContinue)
     result_stable = value_clone(result, &prev_arena, &vm->values);
 
   if (vm->local_vars.items)
