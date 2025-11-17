@@ -40,8 +40,12 @@ Value *str_replace_intrinsic(Vm *vm, Value **args) {
   Value *index = args[1];
   Value *sub_string = args[2];
 
+  u32 new_len = string->as.string.len;
+  if (new_len < index->as._int + sub_string->as.string.len)
+    new_len = index->as._int + sub_string->as.string.len;
+
   Str new_string;
-  new_string.len = string->as.string.len - sub_string->as.string.len - index->as._int;
+  new_string.len = new_len;
   new_string.ptr = arena_alloc(&vm->arena, new_string.len);
   memcpy(new_string.ptr, string->as.string.ptr, index->as._int);
   memcpy(new_string.ptr + index->as._int,
@@ -242,13 +246,13 @@ Value *eat_byte_8_intrinsic(Vm *vm, Value **args) {
 
 Intrinsic str_intrinsics[] = {
   { STR_LIT("str-insert"), true, 3,
-    { ValueKindString, ValueKindString, ValueKindInt },
+    { ValueKindString, ValueKindInt, ValueKindString },
     &str_insert_intrinsic },
   { STR_LIT("str-remove"), true, 3,
     { ValueKindString, ValueKindInt, ValueKindInt },
     &str_remove_intrinsic },
   { STR_LIT("str-replace"), true, 3,
-    { ValueKindString, ValueKindString, ValueKindInt },
+    { ValueKindString, ValueKindInt, ValueKindString },
     &str_replace_intrinsic },
   { STR_LIT("split"), true, 2, { ValueKindString, ValueKindString }, &split_intrinsic },
   { STR_LIT("sub-str"), true, 3,
