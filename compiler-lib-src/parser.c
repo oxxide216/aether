@@ -420,6 +420,8 @@ static IrExpr *parser_parse_expr(Parser *parser) {
 
   case TT_DOUBLE_ARROW: {
     expr->kind = IrExprKindSelf;
+
+    return expr;
   }
   }
 
