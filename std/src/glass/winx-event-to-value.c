@@ -143,6 +143,11 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
     WinxKeyCode key_code = event->as.key.key_code;
     dict_push_value_str_key(&vm->arena, &result, STR_LIT("key-code"),
                             value_string(key_code_names[key_code], &vm->arena, &vm->values));
+
+    Str _char = { arena_alloc(&vm->arena, 1), 1 };
+    *_char.ptr = (char) event->as.key._char;
+    dict_push_value_str_key(&vm->arena, &result, STR_LIT("char"),
+                            value_string(_char, &vm->arena, &vm->values));
   } break;
 
   case WinxEventKindKeyRelease: {
@@ -151,6 +156,11 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
     WinxKeyCode key_code = event->as.key.key_code;
     dict_push_value_str_key(&vm->arena, &result, STR_LIT("key-code"),
                             value_string(key_code_names[key_code], &vm->arena, &vm->values));
+
+    Str _char = { arena_alloc(&vm->arena, 1), 1 };
+    *_char.ptr = (char) event->as.key._char;
+    dict_push_value_str_key(&vm->arena, &result, STR_LIT("char"),
+                            value_string(_char, &vm->arena, &vm->values));
   } break;
 
   case WinxEventKindKeyHold: {
@@ -159,6 +169,11 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
     WinxKeyCode key_code = event->as.key.key_code;
     dict_push_value_str_key(&vm->arena, &result, STR_LIT("key-code"),
                             value_string(key_code_names[key_code], &vm->arena, &vm->values));
+
+    Str _char = { arena_alloc(&vm->arena, 1), 1 };
+    *_char.ptr = (char) event->as.key._char;
+    dict_push_value_str_key(&vm->arena, &result, STR_LIT("char"),
+                            value_string(_char, &vm->arena, &vm->values));
   } break;
 
   case WinxEventKindButtonPress: {

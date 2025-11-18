@@ -13,7 +13,7 @@
 (let event-hanlder [state event] ->
   (if (or (== (get-at event 'type') 'key-press')
           (== (get-at event 'type') 'key-hold'))
-    (println (get-at event 'key-code')))
+    (println (get-at event 'key-code') ':' (get-at event 'char')))
   state)
 
 (let update [state] -> state)
