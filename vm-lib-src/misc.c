@@ -44,7 +44,7 @@ Value *dict_get_value_str_key(Arena *arena, Dict *dict, Str key) {
   return result;
 }
 
-void sb_push_value(StringBuilder *sb, Value *value, u32 level) {
+void sb_push_value(StringBuilder *sb, Value *value, u32 level, bool kind) {
   switch (value->kind) {
   case ValueKindUnit: {
     sb_push(sb, "unit");
@@ -60,7 +60,7 @@ void sb_push_value(StringBuilder *sb, Value *value, u32 level) {
 
       if (node->value->kind == ValueKindString)
         sb_push_char(sb, '\'');
-      sb_push_value(sb, node->value, level);
+      sb_push_value(sb, node->value, level, kind);
       if (node->value->kind == ValueKindString)
         sb_push_char(sb, '\'');
 
@@ -71,22 +71,35 @@ void sb_push_value(StringBuilder *sb, Value *value, u32 level) {
   } break;
 
   case ValueKindString: {
-    sb_push_str(sb, value->as.string);
+    if (kind)
+      sb_push(sb, "str");
+    else
+      sb_push_str(sb, value->as.string);
   } break;
 
   case ValueKindInt: {
-    sb_push_i64(sb, value->as._int);
+    if (kind)
+      sb_push(sb, "int");
+    else
+      sb_push_i64(sb, value->as._int);
   } break;
 
   case ValueKindFloat: {
-    sb_push_f64(sb, value->as._float);
+    if (kind)
+      sb_push(sb, "float");
+    else
+      sb_push_f64(sb, value->as._float);
   } break;
 
   case ValueKindBool: {
-    if (value->as._bool)
-      sb_push(sb, "true");
-    else
-      sb_push(sb, "false");
+    if (kind) {
+      sb_push(sb, "str");
+    } else {
+      if (value->as._bool)
+        sb_push(sb, "true");
+      else
+        sb_push(sb, "false");
+    }
   } break;
 
   case ValueKindFunc: {
@@ -108,9 +121,9 @@ void sb_push_value(StringBuilder *sb, Value *value, u32 level) {
       for (u32 j = 0; j < level + 1; ++j)
         sb_push(sb, "  ");
 
-      sb_push_value(sb, value->as.dict.items[i].key, level + 1);
+      sb_push_value(sb, value->as.dict.items[i].key, level + 1, kind);
       sb_push(sb, ": ");
-      sb_push_value(sb, value->as.dict.items[i].value, level + 1);
+      sb_push_value(sb, value->as.dict.items[i].value, level + 1, kind);
 
       sb_push_char(sb, '\n');
     }

@@ -389,12 +389,24 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
     Intrinsic *intrinsic = get_intrinsic(vm, func->intrinsic_name, func->args.len, args);
 
     if (!intrinsic) {
+      StringBuilder sb = {0};
+      sb_push_str(&sb, func->intrinsic_name);
+      sb_push(&sb, " [");
+      for (u32 i = 0; i < func->args.len; ++i) {
+        if (i > 0)
+          sb_push_char(&sb, ' ');
+        sb_push_value(&sb, args[i], 0, true);
+      }
+      sb_push_char(&sb, ']');
+
+      Str signature = sb_to_str(sb);
+
       if (meta)
-        PERROR(META_FMT, "Intrinsic `"STR_FMT"` with such signature was not found\n",
-               META_ARG(*meta), STR_ARG(func->intrinsic_name));
+        PERROR(META_FMT, "Intrinsic `"STR_FMT"` was not found\n",
+               META_ARG(*meta), STR_ARG(signature));
       else
-        ERROR("Intrinsic `"STR_FMT"` with such signature was not found\n",
-              STR_ARG(func->intrinsic_name));
+        ERROR("Intrinsic `"STR_FMT"` was not found\n",
+              STR_ARG(signature));
 
       vm->state = ExecStateExit;
       vm->exit_code = 1;

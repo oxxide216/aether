@@ -315,7 +315,7 @@ Value *to_str_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
   StringBuilder sb = {0};
-  sb_push_value(&sb, value, 0);
+  sb_push_value(&sb, value, 0, false);
 
   Str string;
   string.len = sb.len;

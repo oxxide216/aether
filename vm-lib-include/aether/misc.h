@@ -8,6 +8,6 @@ void dict_push_value(Dict *dict, Value *key, Value *value);
 void dict_push_value_str_key(Arena *arena, Dict *dict,
                              Str key, Value *value);
 Value *dict_get_value_str_key(Arena *arena, Dict *dict, Str key);
-void sb_push_value(StringBuilder *sb, Value *value, u32 level);
+void sb_push_value(StringBuilder *sb, Value *value, u32 level, bool kind);
 
 #endif // MISC_H
