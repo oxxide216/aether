@@ -315,7 +315,7 @@ Value *to_str_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
   StringBuilder sb = {0};
-  sb_push_value(&sb, value, 0, false);
+  SB_PUSH_VALUE(&sb, value, 0, false, vm);
 
   Str string;
   string.len = sb.len;
@@ -391,7 +391,7 @@ Value *add_intrinsic(Vm *vm, Value **args) {
       b->kind == ValueKindInt) {
     return value_int(a->as._int + b->as._int, &vm->arena, &vm->values);
   } else if (a->kind == ValueKindFloat &&
-        b->kind == ValueKindFloat) {
+             b->kind == ValueKindFloat) {
     return value_float(a->as._float + b->as._float, &vm->arena, &vm->values);
   } else if (a->kind == ValueKindString &&
              b->kind == ValueKindString) {
@@ -730,11 +730,6 @@ Value *eval_compiled_intrinsic(Vm *vm, Value **args) {
 
   arena_free(&ir_arena);
 
-  if (env->as.env->vm.state == ExecStateExit) {
-    vm->state = ExecStateExit;
-    vm->exit_code = env->as.env->vm.exit_code;
-  }
-
   return result;
 }
 
@@ -751,11 +746,6 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
   Value *result = execute_block(&env->as.env->vm, &ir, true);
 
   arena_free(&ir_arena);
-
-  if (env->as.env->vm.state == ExecStateExit) {
-    vm->state = ExecStateExit;
-    vm->exit_code = env->as.env->vm.exit_code;
-  }
 
   return result;
 }
