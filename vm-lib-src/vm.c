@@ -395,7 +395,7 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
       for (u32 i = 0; i < func->args.len; ++i) {
         if (i > 0)
           sb_push_char(&sb, ' ');
-        sb_push_value(&sb, args[i], 0, true);
+        SB_PUSH_VALUE(&sb, args[i], 0, true, vm);
       }
       sb_push_char(&sb, ']');
 

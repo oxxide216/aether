@@ -44,7 +44,8 @@ Value *dict_get_value_str_key(Arena *arena, Dict *dict, Str key) {
   return result;
 }
 
-void sb_push_value(StringBuilder *sb, Value *value, u32 level, bool kind) {
+void sb_push_value(StringBuilder *sb, Value *value,
+                   u32 level, bool kind, Vm *vm) {
   switch (value->kind) {
   case ValueKindUnit: {
     sb_push(sb, "unit");
@@ -60,7 +61,7 @@ void sb_push_value(StringBuilder *sb, Value *value, u32 level, bool kind) {
 
       if (node->value->kind == ValueKindString)
         sb_push_char(sb, '\'');
-      sb_push_value(sb, node->value, level, kind);
+      sb_push_value(sb, node->value, level, kind, vm);
       if (node->value->kind == ValueKindString)
         sb_push_char(sb, '\'');
 
@@ -121,9 +122,9 @@ void sb_push_value(StringBuilder *sb, Value *value, u32 level, bool kind) {
       for (u32 j = 0; j < level + 1; ++j)
         sb_push(sb, "  ");
 
-      sb_push_value(sb, value->as.dict.items[i].key, level + 1, kind);
+      sb_push_value(sb, value->as.dict.items[i].key, level + 1, kind, vm);
       sb_push(sb, ": ");
-      sb_push_value(sb, value->as.dict.items[i].value, level + 1, kind);
+      sb_push_value(sb, value->as.dict.items[i].value, level + 1, kind, vm);
 
       sb_push_char(sb, '\n');
     }
@@ -135,6 +136,12 @@ void sb_push_value(StringBuilder *sb, Value *value, u32 level, bool kind) {
 
   case ValueKindEnv: {
     sb_push(sb, "environment");
+  } break;
+
+  default: {
+    ERROR("Unknown value kind: %u\n", value->kind);
+    vm->state = ExecStateExit;
+    vm->exit_code = 1;
   } break;
   }
 }
