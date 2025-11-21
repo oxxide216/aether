@@ -119,7 +119,7 @@ Value *sub_str_intrinsic(Vm *vm, Value **args) {
   Value *end = args[2];
 
   if (begin->as._int >= end->as._int ||
-      end->as._int > string->as.string.len)
+      (u32) end->as._int > string->as.string.len)
     return value_unit(&vm->arena, &vm->values);
 
   Str sub_string = {

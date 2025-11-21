@@ -1,4 +1,8 @@
+#if defined(__unix__)
 #include <math.h>
+#elif defined(__wasm__)
+#include <emscripten.h>
+#endif
 
 #include "aether/vm.h"
 #include "aether/misc.h"
@@ -49,14 +53,14 @@ Value *pow_intrinsic(Vm *vm, Value **args) {
   if (value->kind == ValueKindInt) {
     i64 result = 1;
 
-    for (u32 i = 0; i < pow->as._int; ++i)
+    for (u32 i = 0; i < (u32) pow->as._int; ++i)
       result *= value->as._int;
 
     return value_int(result, &vm->arena, &vm->values);
   } else if (value->kind == ValueKindFloat) {
     f64 result = 1.0;
 
-    for (u32 i = 0; i < pow->as._int; ++i)
+    for (u32 i = 0; i < (u32) pow->as._int; ++i)
       result *= value->as._float;
 
     return value_float(result, &vm->arena, &vm->values);

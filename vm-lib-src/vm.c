@@ -610,7 +610,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     if (src->kind == ValueKindList) {
       ListNode *node = src->as.list->next;
       u32 i = 0;
-      while (node && i < key->as._int) {
+      while (node && i < (u32) key->as._int) {
         node = node->next;
         ++i;
       }
@@ -624,7 +624,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
       result = node->value;
     } else if (src->kind == ValueKindString) {
-      if (key->as._int >= src->as.string.len) {
+      if ((u32) key->as._int >= src->as.string.len) {
         PERROR(META_FMT, "get-at: out of bounds\\n",
                META_ARG(expr->meta));
         vm->state = ExecStateExit;
@@ -677,7 +677,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     if (dest_var->value->kind == ValueKindList) {
       ListNode *node = dest_var->value->as.list->next;
       u32 i = 0;
-      while (node && i < key->as._int) {
+      while (node && i < (u32) key->as._int) {
         node = node->next;
         ++i;
       }
@@ -691,7 +691,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
       node->value = value;
     } else if (dest_var->value->kind == ValueKindString) {
-      if (key->as._int >= dest_var->value->as.string.len) {
+      if ((u32) key->as._int >= dest_var->value->as.string.len) {
         PERROR(META_FMT, "set-at: index out of bounds\n",
                META_ARG(expr->meta));
         vm->state = ExecStateExit;

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Aether VM Test</title>
+</head>
+<body>
+  <canvas id="output"></canvas>
+
+  <script src="aether.js" defer></script>
+  <script>
+    Module = {
+      onRuntimeInitialized: async function() {
+        const aether_main = Module.cwrap('emscripten_main', 'number', ['string']);
+        //const result = aether_main('dest/hello-world.ae');
+        //console.log(`Result: ${result}`);
+      },
+    };
+  </script>
+</body>
+</html>

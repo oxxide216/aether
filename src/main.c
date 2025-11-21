@@ -9,9 +9,6 @@
 static char *loader_path = "/usr/include/aether/loader.ae";
 
 i32 main(i32 argc, char **argv) {
-  if (argc > 1)
-    loader_path = argv[1];
-
   Str code = read_file(loader_path);
   if (code.len == (u32) -1) {
     ERROR("Loader file was not found at %s\n", loader_path);

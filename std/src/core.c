@@ -109,10 +109,10 @@ Value *get_range_intrinsic(Vm *vm, Value **args) {
     ListNode *sub_list = arena_alloc(&vm->arena, sizeof(ListNode));
     ListNode *sub_list_node = sub_list;
 
-    for (u32 i = 0; i < begin->as._int; ++i)
+    for (u32 i = 0; i < (u32) begin->as._int; ++i)
       node = node->next;
 
-    for (u32 i = 0; i < end->as._int - begin->as._int; ++i) {
+    for (u32 i = 0; i < (u32) end->as._int - begin->as._int; ++i) {
       sub_list_node->next = arena_alloc(&vm->arena, sizeof(ListNode));
       sub_list_node->next->value = node->value;
 
@@ -287,7 +287,7 @@ Value *sort_intrinsic(Vm *vm, Value **args) {
   u32 gaps[] = { 701, 301, 132, 57, 23, 10, 4, 1 };
 
   for(u32 i = 0; i < ARRAY_LEN(gaps); ++i) {
-    for (u32 j = gaps[i]; j < len->as._int; ++j) {
+    for (u32 j = gaps[i]; j < (u32) len->as._int; ++j) {
       Value *temp = sorted[j];
       u32 k = j;
 
@@ -301,7 +301,7 @@ Value *sort_intrinsic(Vm *vm, Value **args) {
   ListNode *result = arena_alloc(&vm->arena, sizeof(ListNode));
 
   ListNode **next = &result->next;
-  for (u32 i = 0; i < len->as._int; ++i) {
+  for (u32 i = 0; i < (u32) len->as._int; ++i) {
     *next = arena_alloc(&vm->arena, sizeof(ListNode));
     (*next)->value = arena_alloc(&vm->arena, sizeof(Value));
     (*next)->value = value_clone(sorted[i], &vm->arena, &vm->values);
@@ -468,7 +468,7 @@ Value *mul_intrinsic(Vm *vm, Value **args) {
     return value_float(a->as._float * b->as._float, &vm->arena, &vm->values);
   } else if (a->kind == ValueKindString) {
     StringBuilder sb = {0};
-    for (u32 i = 0; i < b->as._int; ++i)
+    for (u32 i = 0; i < (u32) b->as._int; ++i)
       sb_push_str(&sb, a->as.string);
 
     Str result = {

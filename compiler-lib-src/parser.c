@@ -6,8 +6,20 @@
 #include "grammar.h"
 #include "shl/shl-log.h"
 
+#ifdef __emscripten__
+#define SHL_STR_IMPLEMENTATION
+#include "shl/shl-str.h"
+#endif
+
 #define STD_PREFIX "/usr/include/aether/"
+
+#ifdef __emscripten__
+#define EMSCRIPTEN_STD_PREFIX "dest/"
+#define INCLUDE_PATHS(current_file_path) { current_file_path, STD_PREFIX, EMSCRIPTEN_STD_PREFIX }
+#else
 #define INCLUDE_PATHS(current_file_path) { current_file_path, STD_PREFIX }
+#endif
+
 
 #define MASK(id) (1 << (id))
 

@@ -1,7 +1,8 @@
 ./aether
 libaether.so
-libs
+libs/
 test.ac
 eval.ac
 compiler-lib-src/grammar.h
-std/src/iui/fonts
+std/src/iui/fonts/
+dest/

@@ -1,13 +1,14 @@
 #include <unistd.h>
-#include <linux/limits.h>
 
 #include "aether/vm.h"
+
+#define PATH_MAX_LENGTH 64
 
 Value *get_current_path_intrinsic(Vm *vm, Value **args) {
   (void) args;
 
-  char *path = arena_alloc(&vm->arena, PATH_MAX);
-  getcwd(path, PATH_MAX);
+  char *path = arena_alloc(&vm->arena, PATH_MAX_LENGTH);
+  getcwd(path, PATH_MAX_LENGTH);
 
   return value_string(STR(path, strlen(path)), &vm->arena, &vm->values);
 }
@@ -33,7 +34,7 @@ Value *get_absolute_path_intrinsic(Vm *vm, Value **args) {
   memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
   path_cstring[path->as.string.len] = '\0';
 
-  char *absolute_path = arena_alloc(&vm->arena, PATH_MAX);
+  char *absolute_path = arena_alloc(&vm->arena, PATH_MAX_LENGTH);
   realpath(path_cstring, absolute_path);
 
   free(path_cstring);

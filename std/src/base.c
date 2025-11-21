@@ -5,7 +5,7 @@
 
 #define DEFAULT_INPUT_BUFFER_SIZE   64
 
-Value *got_sigint = false;
+bool got_sigint = false;
 
 static StringBuilder printf_sb = {0};
 
