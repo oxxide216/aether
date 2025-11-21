@@ -7,10 +7,20 @@
 
 (let args (get-args))
 (let env (make-env))
+(let from-bytecode false)
 
 (if (< (len args) 2)
   (error 'Input file was not provided')
   (exit 1))
+
+(let out-index (get-index args '-o'))
+(if out-index
+  (if (< (+ out-index 1) (len args))
+    (let compiled (compile env content path))
+    (write-file (get-at args out-index) compiled)))
+
+(if (get-index args '-c')
+  (set from-bytecode true))
 
 (let core-path '/usr/include/aether/std/core.ae')
 (let core-content (read-file core-path))
@@ -30,11 +40,15 @@
 (let base-compiled (compile env base-content base-path))
 (eval-compiled env base-compiled)
 
-(let path (get-at args 1))
+(let path (get-at (filter [arg] -> (not (begins-with arg '-')) <>
+                          args) 1))
 (let content (read-file path))
 (if (unit? content)
   (error 'Could not open input file ' path)
   (exit 1))
 
-(let compiled (compile env content path))
+(let compiled (if from-bytecode
+                content
+               else
+                (compile env content path)))
 (eval-compiled env compiled)
