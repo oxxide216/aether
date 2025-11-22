@@ -13,11 +13,18 @@
   (error 'Input file was not provided')
   (exit 1))
 
+(let path (get-at args 1))
+(let content (read-file path))
+(if (unit? content)
+  (error 'Could not open input file ' path)
+  (exit 1))
+
 (let out-index (get-index args '-o'))
 (if out-index
   (if (< (+ out-index 1) (len args))
     (let compiled (compile env content path))
-    (write-file (get-at args (+ out-index 1)) compiled)))
+    (write-file (get-at args (+ out-index 1)) compiled)
+    (exit 0)))
 
 (if (get-index args '-c')
   (set from-bytecode true))
@@ -39,13 +46,6 @@
 
 (let base-compiled (compile env base-content base-path))
 (eval-compiled env base-compiled)
-
-(let path (get-at (filter [arg] -> (not (begins-with arg '-')) <>
-                          args) 1))
-(let content (read-file path))
-(if (unit? content)
-  (error 'Could not open input file ' path)
-  (exit 1))
 
 (let compiled (if from-bytecode content
                else (compile env content path)))

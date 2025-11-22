@@ -1,10 +1,11 @@
 #include "aether/vm.h"
 #include "aether/misc.h"
 #include "winx/winx.h"
-#include "winx/event.h"
+
 #include "glass/glass.h"
 #include "glass/params.h"
 #include "glass/math.h"
+#include "winx/event.h"
 #include "winx-event-to-value.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -136,7 +137,7 @@ Value *load_texture_intrinsic(Vm *vm, Value **args) {
 }
 
 static u64 fnv_hash(u8 *data, u32 size) {
-  u64 hash = 14695981039346656037u;
+  u64 hash = (u64) 14695981039346656037u;
 
   for (u32 i = 0; i < size; ++i) {
     hash *= 1099511628211u;

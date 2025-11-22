@@ -6,6 +6,7 @@
 #include "io.h"
 #include "aether/parser.h"
 #include "aether/vm.h"
+#include "aether/deserializer.h"
 #include "emscripten-log.h"
 
 static char *ems_loader_path = "dest/ems-loader.ae";

@@ -18,8 +18,7 @@
   (error 'Could not load core module')
   (exit 1))
 
-(let core-compiled (compile env core-content core-path))
-(eval-compiled env core-compiled)
+(eval env core-content)
 
 (let base-path 'dest/std/base.ae')
 (let base-content (read-file base-path))
@@ -27,8 +26,7 @@
   (error 'Could not load base module')
   (exit 1))
 
-(let base-compiled (compile env base-content base-path))
-(eval-compiled env base-compiled)
+(eval env base-content)
 
 (let path (get-at (filter [arg] -> (not (begins-with arg '-')) <>
                           args) 1))

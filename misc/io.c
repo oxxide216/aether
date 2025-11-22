@@ -21,6 +21,23 @@ Str read_file(char *path) {
   return content;
 }
 
+Str read_file_arena(char *path, Arena *arena) {
+  Str content;
+
+  FILE *file = fopen(path, "r");
+  if (!file)
+    return (Str) { NULL, (unsigned int) -1 };
+
+  fseek(file, 0, SEEK_END);
+  content.len = ftell(file);
+  content.ptr = arena_alloc(arena, content.len);
+  fseek(file, 0, SEEK_SET);
+  fread(content.ptr, 1, content.len, file);
+  fclose(file);
+
+  return content;
+}
+
 bool write_file(char *path, Str content) {
   FILE *file = fopen(path, "w");
   if (!file) {

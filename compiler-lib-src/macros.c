@@ -374,8 +374,6 @@ void expand_macros(IrExpr *expr, Macros *macros,
           DA_APPEND(new_args, variadic_args);
         }
 
-        clone_block(&new_args, arena);
-
         IrArgs new_arg_names = {0};
 
         for (u32 i = 0; i < macro->arg_names.len; ++i) {
@@ -396,6 +394,10 @@ void expand_macros(IrExpr *expr, Macros *macros,
         expand_macros_block(&expr->as.block, macros,
                             &new_arg_names, &new_args,
                             macro->has_unpack, arena);
+
+        for (u32 i = 0; i < new_arg_names.len; ++i)
+          free(new_arg_names.items[i].ptr);
+        free(new_arg_names.items);
       }
     }
   } break;

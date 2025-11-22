@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <title>Aether VM Test</title>
+
+  <link rel="stylesheet" type="text/css" href="aether.css">
 </head>
 <body>
   <canvas id="output"></canvas>
@@ -10,10 +12,9 @@
   <script src="aether.js" defer></script>
   <script>
     Module = {
-      onRuntimeInitialized: async function() {
+      onRuntimeInitialized: function() {
         const aether_main = Module.cwrap('emscripten_main', 'number', ['string']);
-        //const result = aether_main('dest/hello-world.ae');
-        //console.log(`Result: ${result}`);
+        aether_main('dest/app.abc');
       },
     };
   </script>

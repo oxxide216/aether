@@ -156,8 +156,11 @@ void value_free(Value *value) {
   } else if (value->kind == ValueKindFunc) {
     arena_free(&value->as.func.catched_values_arena);
   } else if (value->kind == ValueKindEnv) {
-    if (value->as.env)
+    if (value->as.env) {
+      free(value->as.env->macros.items);
+      free(value->as.env->included_files.items);
       vm_destroy(&value->as.env->vm);
+    }
   }
 }
 
@@ -512,10 +515,19 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     Value **func_args = malloc(expr->as.func_call.args.len * sizeof(Value *));
 
-    for (u32 i = 0; i < expr->as.func_call.args.len; ++i)
-      EXECUTE_EXPR_SET(vm, func_args[i], expr->as.func_call.args.items[i], true);
+    for (u32 i = 0; i < expr->as.func_call.args.len; ++i) {
+      func_args[i] = execute_expr(vm, expr->as.func_call.args.items[i], true);
+      if (vm->state != ExecStateContinue) {
+        free(func_args);
+        return NULL;
+      }
+    }
 
-    EXECUTE_FUNC_SET(vm, result, func_args, &func_value->as.func, &expr->meta, value_expected);
+    result = execute_func(vm, func_args, &func_value->as.func, &expr->meta, value_expected);
+    if (vm->state != ExecStateContinue) {
+      free(func_args);
+      return NULL;
+    }
 
     free(func_args);
   } break;
@@ -831,6 +843,8 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       },
     };
 
+    free(local_names.items);
+
     result = func_value;
   } break;
 
@@ -945,5 +959,10 @@ void vm_destroy(Vm *vm) {
   free(vm->global_vars.items);
   free(vm->local_vars.items);
   free(vm->intrinsics.items);
+
+  for (u32 i = 0; i < vm->values.len; ++i)
+    value_free(vm->values.items[i]);
+  free(vm->values.items);
+
   arena_free(&vm->arena);
 }
