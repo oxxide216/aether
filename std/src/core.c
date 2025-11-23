@@ -738,13 +738,20 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
 
   Value *env = args[0];
   Value *code = args[1];
+  Value *path = args[2];
+
+  char *path_cstr = malloc(path->as.string.len + 1);
+  memcpy(path_cstr, path->as.string.ptr,
+         path->as.string.len);
+  path_cstr[path->as.string.len] = '\0';
 
   Arena ir_arena = {0};
-  Ir ir = parse_ex(code->as.string, "eval", &env->as.env->macros,
+  Ir ir = parse_ex(code->as.string, path_cstr, &env->as.env->macros,
                    &env->as.env->included_files, &ir_arena);
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false, &ir_arena);
   Value *result = execute_block(&env->as.env->vm, &ir, true);
 
+  free(path_cstr);
   arena_free(&ir_arena);
 
   return result;
@@ -844,7 +851,9 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("eval-compiled"), true, 2,
     { ValueKindEnv, ValueKindString },
     &eval_compiled_intrinsic },
-  { STR_LIT("eval"), true, 2, { ValueKindEnv, ValueKindString }, &eval_intrinsic },
+  { STR_LIT("eval"), true, 3,
+    { ValueKindEnv, ValueKindString, ValueKindString },
+    &eval_intrinsic },
   // Other
   { STR_LIT("exit"), false, 1, { ValueKindInt }, &exit_intrinsic },
 };

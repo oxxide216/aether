@@ -55,7 +55,7 @@
 (let make-env [] -> import 'make-env')
 (let compile [env code path] -> import 'compile')
 (let eval-compiled [env bytecode] -> import 'eval-compiled')
-(let eval [env code] -> import 'eval')
+(let eval [env code path] -> import 'eval')
 
 (let exit [exit-code] -> import 'exit')
 

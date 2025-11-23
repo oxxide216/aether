@@ -6,8 +6,7 @@
 #define SHL_STR_IMPLEMENTATION
 #include "shl/shl-str.h"
 
-//static char *loader_path = "/usr/include/aether/loader.ae";
-static char *loader_path = "hi.ae";
+static char *loader_path = "/usr/include/aether/loader.ae";
 
 i32 main(i32 argc, char **argv) {
   Str code = read_file(loader_path);
@@ -16,11 +15,11 @@ i32 main(i32 argc, char **argv) {
     exit(1);
   }
 
-  Intrinsics intrinsics = {0};
-  Vm vm = vm_create(argc, argv, &intrinsics);
-
   Arena ir_arena = {0};
   Ir ir = parse(code, loader_path, &ir_arena);
+
+  Intrinsics intrinsics = {0};
+  Vm vm = vm_create(argc, argv, &intrinsics);
   execute_block(&vm, &ir, false);
 
   free(code.ptr);

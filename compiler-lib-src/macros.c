@@ -11,9 +11,8 @@ void ir_block_append(IrBlock *block, IrExpr *expr, Arena *arena) {
     block->cap = 1;
     block->items = arena_alloc(arena, sizeof(IrExpr *));
   } else if (block->len >= block->cap) {
-    block->cap *= 2;
-
     IrExpr **prev_items = block->items;
+    block->cap *= 2;
     block->items = arena_alloc(arena, block->cap * sizeof(IrExpr *));
     memcpy(block->items, prev_items, block->len * sizeof(IrExpr *));
   }

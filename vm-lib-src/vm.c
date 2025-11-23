@@ -959,10 +959,6 @@ void vm_destroy(Vm *vm) {
   free(vm->global_vars.items);
   free(vm->local_vars.items);
   free(vm->intrinsics.items);
-
-  for (u32 i = 0; i < vm->values.len; ++i)
-    value_free(vm->values.items[i]);
   free(vm->values.items);
-
   arena_free(&vm->arena);
 }

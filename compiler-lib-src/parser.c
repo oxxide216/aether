@@ -534,8 +534,8 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     expr->as._if.elifs.len = elifs.len;
     expr->as._if.elifs.cap = expr->as._if.elifs.len;
     expr->as._if.elifs.items =
-      arena_alloc(parser->arena, expr->as._if.elifs.cap * sizeof(IrField));
-    memcpy(expr->as._if.elifs.items, elifs.items, expr->as._if.elifs.len * sizeof(IrField));
+      arena_alloc(parser->arena, expr->as._if.elifs.cap * sizeof(IrElif));
+    memcpy(expr->as._if.elifs.items, elifs.items, expr->as._if.elifs.len * sizeof(IrElif));
 
     free(elifs.items);
 
@@ -646,7 +646,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     }
 
     memcpy(parser->macros->items + parser->macros->len,
-           macros.items, macros.cap * sizeof(Macro));
+           macros.items, macros.len * sizeof(Macro));
     parser->macros->len += macros.len;
 
     free(macros.items);

@@ -26,19 +26,21 @@ EMSCRIPTEN_KEEPALIVE
 i32 emscripten_main(char *path) {
   Str code = read_file(ems_loader_path);
   if (code.len == (u32) -1) {
-    INFO("Could not open file %s, listing current directory", ems_loader_path);
+    INFO("Loader file was not found at %s, listing current directory", ems_loader_path);
     list_dir(".");
     return 1;
   }
+
+  Arena ir_arena = {0};
+  Ir ir = parse(code, ems_loader_path, &ir_arena);
 
   i32 argc = 2;
   char *argv[] = { "aether", path };
   Intrinsics intrinsics = {0};
   Vm vm = vm_create(argc, argv, &intrinsics);
-
-  Ir ir = parse(code, path);
   execute_block(&vm, &ir, false);
 
+  arena_free(&ir_arena);
   vm_destroy(&vm);
 
   return vm.exit_code;

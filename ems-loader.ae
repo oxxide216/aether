@@ -18,7 +18,7 @@
   (error 'Could not load core module')
   (exit 1))
 
-(eval env core-content)
+(eval env core-content core-path)
 
 (let base-path 'dest/std/base.ae')
 (let base-content (read-file base-path))
@@ -26,7 +26,7 @@
   (error 'Could not load base module')
   (exit 1))
 
-(eval env base-content)
+(eval env base-content base-path)
 
 (let path (get-at (filter [arg] -> (not (begins-with arg '-')) <>
                           args) 1))
