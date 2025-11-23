@@ -783,7 +783,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Var *var = get_var(vm, expr->as.ident.ident);
     if (!var) {
       PERROR(META_FMT, "Symbol "STR_FMT" was not defined before usage\n",
-            META_ARG(expr->meta), STR_ARG(expr->as.ident.ident));
+             META_ARG(expr->meta), STR_ARG(expr->as.ident.ident));
       vm->state = ExecStateExit;
       vm->exit_code = 1;
 
