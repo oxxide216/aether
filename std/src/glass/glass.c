@@ -1,18 +1,15 @@
+#include "glass.h"
 #include "aether/vm.h"
 #include "aether/misc.h"
 #include "winx/winx.h"
-
 #include "glass/glass.h"
 #include "glass/params.h"
 #include "glass/math.h"
 #include "winx/event.h"
 #include "winx-event-to-value.h"
+#include "text.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-
-#define TYPE_BASE    0
-#define TYPE_CIRCLE  1
-#define TYPE_TEXTURE 2
 
 #define MAX_TEXTURES_SUPPORTED     32
 #define MAX_TEXTURES_SUPPORTED_STR "32"
@@ -42,6 +39,7 @@ typedef struct {
   GlassObject object;
   i32         texture_ids[MAX_TEXTURES_SUPPORTED];
   u32         textures_loaded;
+  Fonts       fonts;
 } Glass;
 
 typedef struct {
@@ -83,16 +81,44 @@ static Str fragment_src = STR_LIT(
   "  vec2 uv = vec2(o_uv.x - 0.5, o_uv.y - 0.5);\n"
   "  if (o_type == 1)\n"
   "    color.a *= 1.0 - smoothstep(0.475, 0.5, length(uv));\n"
+  "  else if (o_type == 3)\n"
+  "    color.a *= texture(u_textures[o_texture_index], o_uv).r;\n"
   "  if (o_type == 2)\n"
-  "    frag_color = texture(u_textures[o_texture_index], o_uv) * o_color;\n"
+  "    frag_color = o_color * texture(u_textures[o_texture_index], o_uv);\n"
   "  else\n"
   "    frag_color = color;\n"
   "}\n");
+
+static i32 samplers[MAX_TEXTURES_SUPPORTED];
 
 static Glass glass = {0};
 static bool initialized = false;
 
 static Color clear_color = {0};
+
+static Value *try_get_dict_field_of_kind_str_key(Dict *dict, Str key,
+                                                 ValueKind expected_kind,
+                                                 char *intrinsic_name,
+                                                 char *arg_name) {
+  Value *result = NULL;
+
+  for (u32 i = 0; i < dict->len; ++i)
+    if (dict->items[i].key->kind == ValueKindString &&
+        str_eq(dict->items[i].key->as.string, key))
+      result = dict->items[i].value;
+
+  if (!result) {
+    ERROR("%s: %s should have a "STR_FMT" field\n",
+          intrinsic_name, arg_name, STR_ARG(key));
+  } else if (result->kind != expected_kind) {
+    ERROR(""STR_FMT" field of %s has unexpected type\n",
+          STR_ARG(key), arg_name);
+
+    return NULL;
+  }
+
+  return result;
+}
 
 Value *load_texture_intrinsic(Vm *vm, Value **args) {
   Str file_name = args[0]->as.string;
@@ -135,6 +161,30 @@ Value *load_texture_intrinsic(Vm *vm, Value **args) {
 
   return value_dict(result, &vm->arena, &vm->values);
 }
+
+Value *load_font_intrinsic(Vm *vm, Value **args) {
+  u32 index = glass.fonts.len;
+
+  Str file_name = args[0]->as.string;
+  char *file_name_cstr = malloc(file_name.len + 1);
+  memcpy(file_name_cstr, file_name.ptr, file_name.len);
+  file_name_cstr[file_name.len] = '\0';
+
+  load_font(&glass.fonts, file_name_cstr);
+
+  free(file_name_cstr);
+
+  if (glass.fonts.len == index)
+    return value_unit(&vm->arena, &vm->values);
+
+  Dict result = {0};
+
+  dict_push_value_str_key(&vm->arena, &result, STR_LIT("id"),
+                          value_int(index, &vm->arena, &vm->values));
+
+  return value_dict(result, &vm->arena, &vm->values);
+}
+
 
 static u64 fnv_hash(u8 *data, u32 size) {
   u64 hash = (u64) 14695981039346656037u;
@@ -201,8 +251,11 @@ Value *run_intrinsic(Vm *vm, Value **args) {
 
     glass.object = glass_init_object(&glass.shader);
 
+    for (i32 i = 0; i < MAX_TEXTURES_SUPPORTED; ++i)
+      samplers[i] = i;
+
     glass_set_param_1i_array(&glass.shader, "u_textures",
-                             glass.texture_ids, MAX_TEXTURES_SUPPORTED);
+                             samplers, MAX_TEXTURES_SUPPORTED);
   }
 
   Value *state = execute_func(vm, &state, &init, NULL, true);
@@ -310,6 +363,27 @@ Value *window_size_intrinsic(Vm *vm, Value **args) {
   return value_dict(size, &vm->arena, &vm->values);
 }
 
+Value *text_width_intrinsic(Vm *vm, Value **args) {
+  if (!initialized)
+    return value_unit(&vm->arena, &vm->values);
+
+  Value *id = try_get_dict_field_of_kind_str_key(&args[1]->as.dict, STR_LIT("id"),
+                                                 ValueKindInt, "font", "font");
+  if (!id)
+    vm->state = ExecStateExit;
+
+  if (id->as._int < glass.fonts.len) {
+    Font *font = glass.fonts.items + id->as._int;
+
+    f32 result = 0.0;
+    render_text(0.0, 0.0, args[0]->as._int, args[2]->as.string, font, &result, true);
+
+    return value_float(result, &vm->arena, &vm->values);
+  }
+
+  return value_unit(&vm->arena, &vm->values);
+}
+
 Value *clear_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
     return value_unit(&vm->arena, &vm->values);
@@ -323,22 +397,26 @@ Value *clear_intrinsic(Vm *vm, Value **args) {
 }
 
 void push_primitive(f32 x, f32 y, f32 width, f32 height,
+                    f32 u0, f32 v0, f32 u1, f32 v1,
                     f32 r, f32 g, f32 b, f32 a,
                     i32 texture_id, i32 type) {
   u32 index = (u32) -1;
-  for (u32 i = 0; i < MAX_TEXTURES_SUPPORTED; ++i) {
-    if (glass.texture_ids[i] == texture_id) {
-      index = i;
-      break;
+
+  if (texture_id != 0) {
+    for (u32 i = 0; i < MAX_TEXTURES_SUPPORTED; ++i) {
+      if (glass.texture_ids[i] == texture_id) {
+        index = i;
+        break;
+      }
     }
-  }
 
-  if (index == (u32) -1) {
-    index = glass.textures_loaded;
-    glass.textures_loaded = (glass.textures_loaded + 1) % MAX_TEXTURES_SUPPORTED;
-  }
+    if (index == (u32) -1) {
+      index = glass.textures_loaded;
+      glass.textures_loaded = (glass.textures_loaded + 1) % MAX_TEXTURES_SUPPORTED;
+    }
 
-  glass.texture_ids[index] = texture_id;
+    glass.texture_ids[index] = texture_id;
+  }
 
   DA_APPEND(glass.indices, glass.vertices.len);
   DA_APPEND(glass.indices, glass.vertices.len + 1);
@@ -347,16 +425,16 @@ void push_primitive(f32 x, f32 y, f32 width, f32 height,
   DA_APPEND(glass.indices, glass.vertices.len + 1);
   DA_APPEND(glass.indices, glass.vertices.len + 3);
 
-  Vertex vertex0 = { x, y, r, g, b, a, 0.0, 0.0, index, type };
+  Vertex vertex0 = { x, y, r, g, b, a, u0, v0, index, type };
   DA_APPEND(glass.vertices, vertex0);
 
-  Vertex vertex1 = { x + width, y, r, g, b, a, 1.0, 0.0, index, type };
+  Vertex vertex1 = { x + width, y, r, g, b, a, u1, v0, index, type };
   DA_APPEND(glass.vertices, vertex1);
 
-  Vertex vertex2 = { x, y + height, r, g, b, a, 0.0, 1.0, index, type };
+  Vertex vertex2 = { x, y + height, r, g, b, a, u0, v1, index, type };
   DA_APPEND(glass.vertices, vertex2);
 
-  Vertex vertex3 = { x + width, y + height, r, g, b, a, 1.0, 1.0, index, type };
+  Vertex vertex3 = { x + width, y + height, r, g, b, a, u1, v1, index, type };
   DA_APPEND(glass.vertices, vertex3);
 }
 
@@ -368,6 +446,7 @@ Value *quad_intrinsic(Vm *vm, Value **args) {
 
   push_primitive(args[0]->as._float, args[1]->as._float,
                  args[2]->as._float, args[3]->as._float,
+                 0.0, 0.0, 1.0, 1.0,
                  args[4]->as._float, args[5]->as._float,
                  args[6]->as._float, args[7]->as._float,
                  0, TYPE_BASE);
@@ -384,6 +463,7 @@ Value *circle_intrinsic(Vm *vm, Value **args) {
   push_primitive(args[0]->as._float - args[2]->as._float,
                  args[1]->as._float - args[2]->as._float,
                  args[2]->as._float * 2.0, args[2]->as._float * 2.0,
+                 0.0, 0.0, 1.0, 1.0,
                  args[3]->as._float, args[4]->as._float,
                  args[5]->as._float, args[6]->as._float,
                  0, TYPE_CIRCLE);
@@ -391,33 +471,7 @@ Value *circle_intrinsic(Vm *vm, Value **args) {
   return value_unit(&vm->arena, &vm->values);
 }
 
-static Value *try_get_dict_field_of_kind_str_key(Dict *dict, Str key,
-                                                 ValueKind expected_kind,
-                                                 char *intrinsic_name,
-                                                 char *arg_name) {
-  Value *result = NULL;
-
-  for (u32 i = 0; i < dict->len; ++i)
-    if (dict->items[i].key->kind == ValueKindString &&
-        str_eq(dict->items[i].key->as.string, key))
-      result = dict->items[i].value;
-
-  if (!result) {
-    ERROR("%s: %s should have a "STR_FMT" field\n",
-          intrinsic_name, arg_name, STR_ARG(key));
-  } else if (result->kind != expected_kind) {
-    ERROR(""STR_FMT" field of %s has unexpected type\n",
-          STR_ARG(key), arg_name);
-
-    return NULL;
-  }
-
-  return result;
-}
-
 Value *texture_intrinsic(Vm *vm, Value **args) {
-  (void) vm;
-
   if (!initialized)
     return value_unit(&vm->arena, &vm->values);
 
@@ -438,14 +492,13 @@ Value *texture_intrinsic(Vm *vm, Value **args) {
 
   push_primitive(args[0]->as._float, args[1]->as._float,
                  width->as._float, height->as._float,
-                 1.0, 1.0, 1.0, 1.0, id->as._int, TYPE_TEXTURE);
+                 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                 id->as._int, TYPE_TEXTURE);
 
   return value_unit(&vm->arena, &vm->values);
 }
 
 Value *textured_quad_intrinsic(Vm *vm, Value **args) {
-  (void) vm;
-
   if (!initialized)
     return value_unit(&vm->arena, &vm->values);
 
@@ -456,18 +509,61 @@ Value *textured_quad_intrinsic(Vm *vm, Value **args) {
 
   push_primitive(args[0]->as._float, args[1]->as._float,
                  args[2]->as._float, args[3]->as._float,
-                 1.0, 1.0, 1.0, 1.0, id->as._int, TYPE_TEXTURE);
+                 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                 id->as._int, TYPE_TEXTURE);
+
+  return value_unit(&vm->arena, &vm->values);
+}
+
+Value *tile_intrinsic(Vm *vm, Value **args) {
+  if (!initialized)
+    return value_unit(&vm->arena, &vm->values);
+
+  Value *id = try_get_dict_field_of_kind_str_key(&args[8]->as.dict, STR_LIT("id"),
+                                                 ValueKindInt, "texture", "texture");
+  if (!id)
+    vm->state = ExecStateExit;
+
+  push_primitive(args[0]->as._float, args[1]->as._float,
+                 args[2]->as._float, args[3]->as._float,
+                 args[4]->as._float, args[5]->as._float,
+                 args[6]->as._float, args[7]->as._float,
+                 1.0, 1.0, 1.0, 1.0,
+                 id->as._int, TYPE_TEXTURE);
+
+  return value_unit(&vm->arena, &vm->values);
+}
+
+Value *text_intrinsic(Vm *vm, Value **args) {
+  if (!initialized)
+    return value_unit(&vm->arena, &vm->values);
+
+  Value *id = try_get_dict_field_of_kind_str_key(&args[3]->as.dict, STR_LIT("id"),
+                                                 ValueKindInt, "font", "font");
+  if (!id)
+    vm->state = ExecStateExit;
+
+  if (id->as._int < glass.fonts.len) {
+    Font *font = glass.fonts.items + id->as._int;
+
+    render_text(args[0]->as._float, args[1]->as._float, args[2]->as._int,
+                args[4]->as.string, font, NULL, false);
+  }
 
   return value_unit(&vm->arena, &vm->values);
 }
 
 Intrinsic glass_intrinsics[] = {
   { STR_LIT("glass/load-texture"), true, 1, { ValueKindString }, &load_texture_intrinsic },
+  { STR_LIT("glass/load-font"), true, 1, { ValueKindString }, &load_font_intrinsic },
   { STR_LIT("glass/run"), false, 7,
     { ValueKindString, ValueKindInt, ValueKindInt,
       ValueKindFunc, ValueKindFunc, ValueKindFunc, ValueKindFunc },
     &run_intrinsic },
   { STR_LIT("glass/window-size"), true, 0, {}, &window_size_intrinsic },
+  { STR_LIT("glass/text-width"), true, 3,
+    { ValueKindInt, ValueKindDict, ValueKindString },
+    &text_width_intrinsic },
   { STR_LIT("glass/clear"), false, 4,
     { ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFloat },
     &clear_intrinsic },
@@ -485,6 +581,13 @@ Intrinsic glass_intrinsics[] = {
   { STR_LIT("glass/textured-quad"), false, 5,
     { ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindDict },
     &textured_quad_intrinsic },
+  { STR_LIT("glass/tile"), false, 9,
+    { ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFloat,
+      ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindDict },
+    &tile_intrinsic },
+  { STR_LIT("glass/text"), false, 5,
+    { ValueKindFloat, ValueKindFloat, ValueKindInt, ValueKindDict, ValueKindString },
+    &text_intrinsic },
 };
 
 u32 glass_intrinsics_len = ARRAY_LEN(glass_intrinsics);

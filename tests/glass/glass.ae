@@ -7,6 +7,8 @@
 (let init [] ->
   {
     'atom': (glass/load-texture 'tests/glass/atom-icon.jpg')
+    'krypton': (glass/load-font 'tests/glass/MonaspaceKrypton-Regular-static.otf')
+    'text': 'Wow!,'
   }
 )
 
@@ -31,6 +33,14 @@
 
   (glass/quad (/ (- (get-at size 'width') quad-width) 2.0)
               (/ (- (get-at size 'height') quad-height) 2.0)
-              quad-width quad-height 0.7 0.2 0.4 1.0))
+              quad-width quad-height 0.7 0.2 0.4 1.0)
+
+  (let text-width (glass/text-width 48
+                                    (get-at state 'krypton')
+                                    (get-at state 'text')))
+  (glass/text (/ (- (get-at size 'width') text-width) 2.0)
+              (- (get-at size 'height') 100.0)
+              48 (get-at state 'krypton')
+              (get-at state 'text')))
 
 (glass/run 'Hello, OpenGL!' 640 480 init event-hanlder update render)

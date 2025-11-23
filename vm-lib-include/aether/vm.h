@@ -8,7 +8,7 @@
 #include "shl/shl-str.h"
 #include "shl/shl-log.h"
 
-#define MAX_INTRINSIC_ARGS_COUNT 8
+#define MAX_INTRINSIC_ARGS_COUNT 10
 
 #define EXECUTE_FUNC(vm, args, func, meta, value_expected) \
   do {                                                     \
