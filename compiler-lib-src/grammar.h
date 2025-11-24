@@ -14,27 +14,25 @@
 #define TT_GET_AT 10
 #define TT_SET_AT 11
 #define TT_USE 12
-#define TT_FIELD 13
-#define TT_RET 14
-#define TT_IMPORT 15
-#define TT_OPAREN 16
-#define TT_CPAREN 17
-#define TT_OBRACKET 18
-#define TT_CBRACKET 19
-#define TT_OCURLY 20
-#define TT_CCURLY 21
-#define TT_STR 22
-#define TT_UNPACK 23
-#define TT_RIGHT_ARROW 24
-#define TT_DOUBLE_ARROW 25
-#define TT_RHOMBUS 26
-#define TT_COLON 27
-#define TT_INT 28
-#define TT_FLOAT 29
-#define TT_BOOL 30
-#define TT_IDENT 31
+#define TT_RET 13
+#define TT_IMPORT 14
+#define TT_OPAREN 15
+#define TT_CPAREN 16
+#define TT_OBRACKET 17
+#define TT_CBRACKET 18
+#define TT_OCURLY 19
+#define TT_CCURLY 20
+#define TT_STR 21
+#define TT_UNPACK 22
+#define TT_RIGHT_ARROW 23
+#define TT_RHOMBUS 24
+#define TT_COLON 25
+#define TT_INT 26
+#define TT_FLOAT 27
+#define TT_BOOL 28
+#define TT_IDENT 29
 
-#define TTS_COUNT 32
+#define TTS_COUNT 30
 
 TransitionTable *get_transition_table(void);
 
@@ -126,14 +124,6 @@ TransitionCol table_col_use[] = {
   { 3, 'e', 'e', 0 },
 };
 
-TransitionCol table_col_field[] = {
-  { 1, 'f', 'f', 2 },
-  { 2, 'i', 'i', 3 },
-  { 3, 'e', 'e', 4 },
-  { 4, 'l', 'l', 5 },
-  { 5, 'd', 'd', 0 },
-};
-
 TransitionCol table_col_ret[] = {
   { 1, 'r', 'r', 2 },
   { 2, 'e', 'e', 3 },
@@ -187,12 +177,6 @@ TransitionCol table_col_unpack[] = {
 TransitionCol table_col_right_arrow[] = {
   { 1, '-', '-', 2 },
   { 2, '>', '>', 0 },
-};
-
-TransitionCol table_col_double_arrow[] = {
-  { 1, '<', '<', 2 },
-  { 2, '-', '-', 3 },
-  { 3, '>', '>', 0 },
 };
 
 TransitionCol table_col_rhombus[] = {
@@ -291,7 +275,6 @@ TransitionRow table_rows[] = {
   { table_col_get_at, sizeof(table_col_get_at) / sizeof(TransitionCol) },
   { table_col_set_at, sizeof(table_col_set_at) / sizeof(TransitionCol) },
   { table_col_use, sizeof(table_col_use) / sizeof(TransitionCol) },
-  { table_col_field, sizeof(table_col_field) / sizeof(TransitionCol) },
   { table_col_ret, sizeof(table_col_ret) / sizeof(TransitionCol) },
   { table_col_import, sizeof(table_col_import) / sizeof(TransitionCol) },
   { table_col_oparen, sizeof(table_col_oparen) / sizeof(TransitionCol) },
@@ -303,7 +286,6 @@ TransitionRow table_rows[] = {
   { table_col_str, sizeof(table_col_str) / sizeof(TransitionCol) },
   { table_col_unpack, sizeof(table_col_unpack) / sizeof(TransitionCol) },
   { table_col_right_arrow, sizeof(table_col_right_arrow) / sizeof(TransitionCol) },
-  { table_col_double_arrow, sizeof(table_col_double_arrow) / sizeof(TransitionCol) },
   { table_col_rhombus, sizeof(table_col_rhombus) / sizeof(TransitionCol) },
   { table_col_colon, sizeof(table_col_colon) / sizeof(TransitionCol) },
   { table_col_int, sizeof(table_col_int) / sizeof(TransitionCol) },

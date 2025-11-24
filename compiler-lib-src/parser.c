@@ -56,7 +56,6 @@ static char *token_names[] = {
   "set",
   "get-at",
   "set-at",
-  "field",
   "ret",
   "import",
   "`(`",
@@ -68,7 +67,6 @@ static char *token_names[] = {
   "string literal",
   "...",
   "->",
-  "<->",
   "<>",
   ":",
   "int",
@@ -409,8 +407,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   Token *token = parser_expect_token(parser, MASK(TT_OPAREN) | MASK(TT_STR) |
                                              MASK(TT_IDENT) | MASK(TT_INT) |
                                              MASK(TT_FLOAT) | MASK(TT_BOOL) |
-                                             MASK(TT_OCURLY) | MASK(TT_OBRACKET) |
-                                             MASK(TT_DOUBLE_ARROW));
+                                             MASK(TT_OCURLY) | MASK(TT_OBRACKET));
 
   expr->meta.file_path = STR(token->file_path, strlen(token->file_path));
   expr->meta.row = token->row;
@@ -479,12 +476,6 @@ static IrExpr *parser_parse_expr(Parser *parser) {
 
     return expr;
   };
-
-  case TT_DOUBLE_ARROW: {
-    expr->kind = IrExprKindSelf;
-
-    return expr;
-  }
   }
 
   token = parser_peek_token(parser);

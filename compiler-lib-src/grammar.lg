@@ -12,7 +12,6 @@ set=set
 get_at=get\-at
 set_at=set\-at
 use=use
-field=field
 ret=ret
 import=import
 
@@ -25,7 +24,6 @@ ccurly=}
 str="|'
 unpack=...
 right_arrow=\->
-double_arrow=<\->
 rhombus=<>
 colon=:
 

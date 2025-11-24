@@ -11,7 +11,7 @@
 (let print-todos [left] ->
   (if left
     (println (head left))
-    (<-> (tail left))))
+    (print-todos (tail left))))
 
 (while true
   (print '>> ')

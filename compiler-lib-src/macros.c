@@ -96,8 +96,6 @@ static void clone_expr(IrExpr **expr, Arena *arena) {
     if (new_expr->as.ret.has_expr)
       clone_expr(&new_expr->as.ret.expr, arena);
   } break;
-
-  case IrExprKindSelf: break;
   }
 }
 
@@ -233,8 +231,6 @@ static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names, IrArgs *new_a
     if (expr->as.ret.has_expr)
       rename_args_expr(expr->as.ret.expr, prev_arg_names, new_arg_names);
   } break;
-
-  case IrExprKindSelf: break;
   }
 }
 
@@ -461,7 +457,5 @@ void expand_macros(IrExpr *expr, Macros *macros,
     if (expr->as.ret.has_expr)
       INLINE_THEN_EXPAND(expr->as.ret.expr);
   } break;
-
-  case IrExprKindSelf: break;
   }
 }

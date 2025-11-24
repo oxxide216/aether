@@ -352,8 +352,6 @@ static void catch_vars(Vm *vm, Strs *local_names,
     for (u32 i = 0; i < expr->as.dict.len; ++i)
       CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.dict.items[i].expr);
   } break;
-
-  case IrExprKindSelf: break;
   }
 }
 
@@ -863,15 +861,6 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     }
 
     result = value_dict(dict, &vm->arena, &vm->values);
-  } break;
-
-  case IrExprKindSelf: {
-    if (value_expected) {
-      if (vm->is_inside_of_func)
-        return value_func(vm->current_func_value, &vm->arena, &vm->values);
-      else
-        result = value_unit(&vm->arena, &vm->values);
-    }
   } break;
   }
 

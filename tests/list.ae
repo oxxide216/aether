@@ -4,7 +4,7 @@
       (print (head list))
       (if tail list
         (print ' '))
-      (<-> (tail list))))
+      (print-list (tail list))))
   (print '[')
   (print-list-rec list)
   (println ']'))

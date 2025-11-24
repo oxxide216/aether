@@ -26,7 +26,6 @@ typedef enum {
   IrExprKindLambda,
   IrExprKindDict,
   IrExprKindRet,
-  IrExprKindSelf,
 } IrExprKind;
 
 typedef Da(Str) IrArgs;
