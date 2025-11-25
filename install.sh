@@ -1,4 +1,4 @@
-#!/usr/bin/sh
+#!/usr/bin/bash
 
 sudo cp aether /usr/bin/
 sudo rm -rf /usr/include/aether/
