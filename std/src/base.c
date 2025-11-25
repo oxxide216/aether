@@ -59,7 +59,7 @@ Value *input_intrinsic(Vm *vm, Value **args) {
     buffer = arena_alloc(&vm->arena, buffer_size);
 
     char ch;
-    while ((ch = getc(stdin)) != EOF && ch != '\n') {
+    while ((ch = getc(stdin)) != (char) EOF && ch != '\n') {
       if (len >= buffer_size) {
         buffer_size += DEFAULT_INPUT_BUFFER_SIZE;
 
