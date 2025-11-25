@@ -20,7 +20,7 @@
     (exit 1))
   (eval env repl-content repl-path))
 
-(let path args::1)
+(let path non-flag-args::1)
 (let content (read-file path))
 (if (unit? content)
   (error 'Could not open input file ' path)
