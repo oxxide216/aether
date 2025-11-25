@@ -5,12 +5,20 @@
 (use 'std/io.ae')
 (use 'std/log.ae')
 
+(let core-path '/usr/include/aether/std/core.ae')
+(let base-path '/usr/include/aether/std/base.ae')
+(let repl-path '/usr/include/aether/repl.ae')
+
 (let args (get-args))
+(let non-flag-args (filter [arg] -> (not (begins-with arg '-')) <> args))
 (let env (make-env))
 
-(if (< (len args) 2)
-  (error 'Input file was not provided')
-  (exit 1))
+(if (< (len non-flag-args) 2)
+  (let repl-content (read-file repl-path))
+  (if (unit? repl-content)
+    (error 'Could not load repl')
+    (exit 1))
+  (eval env repl-content repl-path))
 
 (let path args::1)
 (let content (read-file path))
@@ -18,7 +26,6 @@
   (error 'Could not open input file ' path)
   (exit 1))
 
-(let core-path '/usr/include/aether/std/core.ae')
 (let core-content (read-file core-path))
 (if (unit? core-content)
   (error 'Could not load core module')
@@ -27,7 +34,6 @@
 (let core-compiled (compile env core-content core-path))
 (eval-compiled env core-compiled)
 
-(let base-path '/usr/include/aether/std/base.ae')
 (let base-content (read-file base-path))
 (if (unit? base-content)
   (error 'Could not load base module')
