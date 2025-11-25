@@ -31,16 +31,14 @@
   (error 'Could not load core module')
   (exit 1))
 
-(let core-compiled (compile env core-content core-path))
-(eval-compiled env core-compiled)
+(eval env core-content core-path)
 
 (let base-content (read-file base-path))
 (if (unit? base-content)
   (error 'Could not load base module')
   (exit 1))
 
-(let base-compiled (compile env base-content base-path))
-(eval-compiled env base-compiled)
+(eval env base-content base-path)
 
 (if (get-index args '-c')
   (eval-compiled env content)
