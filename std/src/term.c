@@ -5,12 +5,8 @@
 #include "aether/vm.h"
 #include "aether/misc.h"
 
-extern bool got_sigint;
-
 static struct termios default_term_state = {0};
 static bool is_term_state_initialized = false;
-
-static void (*default_sigint_handler)(i32) = NULL;
 
 Value *get_size_intrinsic(Vm *vm, Value **args) {
   (void) args;
@@ -31,12 +27,6 @@ Value *get_size_intrinsic(Vm *vm, Value **args) {
   return value_dict(size, &vm->arena, &vm->values);
 }
 
-static void sigint_handler(i32 sig) {
-  (void) sig;
-
-  got_sigint = true;
-}
-
 Value *raw_mode_on_intrinsic(Vm *vm, Value **args) {
   (void) vm;
   (void) args;
@@ -50,11 +40,6 @@ Value *raw_mode_on_intrinsic(Vm *vm, Value **args) {
   term_state.c_lflag &= ~(ECHO | ICANON);
   tcsetattr(0, TCSANOW, &term_state);
 
-  if (!default_sigint_handler)
-    default_sigint_handler = signal(SIGINT, sigint_handler);
-  else
-    signal(SIGINT, sigint_handler);
-
   return value_unit(&vm->arena, &vm->values);
 }
 
@@ -64,9 +49,6 @@ Value *raw_mode_off_intrinsic(Vm *vm, Value **args) {
 
   if (is_term_state_initialized)
     tcsetattr(0, TCSANOW, &default_term_state);
-
-  if (default_sigint_handler)
-    signal(SIGINT, default_sigint_handler);
 
   return value_unit(&vm->arena, &vm->values);
 }

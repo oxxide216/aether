@@ -5,8 +5,6 @@
 
 #define DEFAULT_INPUT_BUFFER_SIZE   64
 
-bool got_sigint = false;
-
 static StringBuilder printf_sb = {0};
 
 Value *printf_intrinsic(Vm *vm, Value **args) {
@@ -34,10 +32,7 @@ Value *input_size_intrinsic(Vm *vm, Value **args) {
   buffer.len = size->as._int;
   buffer.ptr = arena_alloc(&vm->arena, buffer.len);
 
-  if (got_sigint)
-    memset(buffer.ptr, 3, buffer.len);
-  else
-    read(0, buffer.ptr, buffer.len);
+  read(0, buffer.ptr, buffer.len);
 
   return value_string(buffer, &vm->arena, &vm->values);
 }
@@ -48,28 +43,20 @@ Value *input_intrinsic(Vm *vm, Value **args) {
   char *buffer = NULL;
   u32 len = 0;
 
-  if (got_sigint) {
-    buffer = arena_alloc(&vm->arena, 1);
-    buffer[0] = 3;
-    len = 1;
+  u32 buffer_size = DEFAULT_INPUT_BUFFER_SIZE;
+  buffer = arena_alloc(&vm->arena, buffer_size);
 
-    got_sigint = false;
-  } else {
-    u32 buffer_size = DEFAULT_INPUT_BUFFER_SIZE;
-    buffer = arena_alloc(&vm->arena, buffer_size);
+  char ch;
+  while ((ch = getc(stdin)) != (char) EOF && ch != '\n') {
+    if (len >= buffer_size) {
+      buffer_size += DEFAULT_INPUT_BUFFER_SIZE;
 
-    char ch;
-    while ((ch = getc(stdin)) != (char) EOF && ch != '\n') {
-      if (len >= buffer_size) {
-        buffer_size += DEFAULT_INPUT_BUFFER_SIZE;
-
-        char *prev_buffer = buffer;
-        buffer = arena_alloc(&vm->arena, buffer_size);
-        memcpy(buffer, prev_buffer, len);
-      }
-
-      buffer[len++] = ch;
+      char *prev_buffer = buffer;
+      buffer = arena_alloc(&vm->arena, buffer_size);
+      memcpy(buffer, prev_buffer, len);
     }
+
+    buffer[len++] = ch;
   }
 
   return value_string(STR(buffer, len), &vm->arena, &vm->values);
