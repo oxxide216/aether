@@ -1,134 +1,6 @@
 #include "aether/deserializer.h"
 #include "shl/shl-log.h"
 
-static void get_block_data_size(u8 *data, u32 *size);
-
-static void get_str_data_size(u8 *data, u32 *size) {
-  u32 len = *(u32 *) (data + *size);
-  *size += sizeof(u32) + len * sizeof(char);
-}
-
-static void get_expr_data_size(u8 *data, u32 *size) {
-  IrExprKind kind = *(IrExprKind *) (data + *size);
-  *size += sizeof(IrExprKind);
-
-  switch (kind) {
-  case IrExprKindBlock: {
-    get_block_data_size(data, size);
-  } break;
-
-  case IrExprKindFuncCall: {
-    get_expr_data_size(data, size);
-    get_block_data_size(data, size);
-  } break;
-
-  case IrExprKindVarDef: {
-    get_str_data_size(data, size);
-    get_expr_data_size(data, size);
-  } break;
-
-  case IrExprKindIf: {
-    get_expr_data_size(data, size);
-    get_block_data_size(data, size);
-
-    u32 elifs_len = *(u32 *) (data + *size);
-    *size += sizeof(u32);
-
-    for (u32 i = 0; i < elifs_len; ++i) {
-      get_expr_data_size(data, size);
-      get_block_data_size(data, size);
-    }
-
-    bool has_else = *(bool *) (data + *size);
-    *size += sizeof(bool);
-
-    if (has_else)
-      get_block_data_size(data, size);
-  } break;
-
-  case IrExprKindWhile: {
-    get_expr_data_size(data, size);
-    get_block_data_size(data, size);
-  } break;
-
-  case IrExprKindSet: {
-    get_str_data_size(data, size);
-    get_expr_data_size(data, size);
-  } break;
-
-  case IrExprKindGetAt: {
-    get_expr_data_size(data, size);
-    get_expr_data_size(data, size);
-  } break;
-
-  case IrExprKindSetAt: {
-    get_str_data_size(data, size);
-    get_expr_data_size(data, size);
-    get_expr_data_size(data, size);
-  } break;
-
-  case IrExprKindRet: {
-    bool has_expr = *(bool *) (data + *size);
-    *size += sizeof(bool);
-
-    if (has_expr)
-      get_expr_data_size(data, size);
-  } break;
-
-  case IrExprKindList: {
-    get_block_data_size(data, size);
-  } break;
-
-  case IrExprKindIdent:
-  case IrExprKindString: {
-    get_str_data_size(data, size);
-  } break;
-
-  case IrExprKindInt: {
-    *size += sizeof(i64);
-  } break;
-
-  case IrExprKindFloat: {
-    *size += sizeof(f64);
-  } break;
-
-  case IrExprKindBool: {
-    *size += sizeof(bool);
-  } break;
-
-  case IrExprKindLambda: {
-    u32 len = *(u32 *) (data + *size);
-    *size += sizeof(u32) + len * sizeof(Str);
-
-    get_block_data_size(data, size);
-    get_str_data_size(data, size);
-  } break;
-
-  case IrExprKindDict: {
-    u32 len = *(u32 *) (data + *size);
-    *size += sizeof(u32);
-
-    for (u32 i = 0; i < len; ++i) {
-      get_str_data_size(data, size);
-      get_expr_data_size(data, size);
-    }
-
-    get_str_data_size(data, size);
-  } break;
-  }
-
-  get_str_data_size(data, size);
-  *size += 2 * sizeof(u32);
-}
-
-static void get_block_data_size(u8 *data, u32 *size) {
-  u32 len = *(u32 *) (data + *size);
-  *size += sizeof(u32);
-
-  for (u32 i = 0; i < len; ++i)
-    get_expr_data_size(data, size);
-}
-
 static void load_block_data(IrBlock *block, u8 *data, u32 *end,
                             Arena *arena, Arena *str_arena);
 
@@ -173,17 +45,19 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
     load_expr_data(expr->as._if.cond, data, end, arena, str_arena);
     load_block_data(&expr->as._if.if_body, data, end, arena, str_arena);
 
-    u32 elifs_len = *(u32 *) (data + *end);
+    expr->as._if.elifs.len = *(u32 *) (data + *end);
+    expr->as._if.elifs.cap = expr->as._if.elifs.len;
     *end += sizeof(u32);
 
-    for (u32 i = 0; i < elifs_len; ++i) {
+    expr->as._if.elifs.items = arena_alloc(arena, expr->as._if.elifs.cap * sizeof(IrElif));
+    for (u32 i = 0; i < expr->as._if.elifs.len; ++i) {
       IrElif elif = {0};
       elif.cond = arena_alloc(arena, sizeof(IrExpr));
 
       load_expr_data(elif.cond, data, end, arena, str_arena);
       load_block_data(&elif.body, data, end, arena, str_arena);
 
-      DA_APPEND(expr->as._if.elifs, elif);
+      expr->as._if.elifs.items[i] = elif;
     }
 
     expr->as._if.has_else = *(bool *) (data + *end);
@@ -279,15 +153,35 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
 
   case IrExprKindDict: {
     expr->as.dict.len = *(u32 *) (data + *end);
+    expr->as.dict.cap = expr->as.dict.len;
     *end += sizeof(u32);
 
-    expr->as.dict.items = malloc(expr->as.dict.len * sizeof(IrField));
+    expr->as.dict.items = arena_alloc(arena, expr->as.dict.cap * sizeof(IrField));
     for (u32 i = 0; i < expr->as.dict.len; ++i) {
       expr->as.dict.items[i].key = arena_alloc(arena, sizeof(IrExpr));
       expr->as.dict.items[i].expr = arena_alloc(arena, sizeof(IrExpr));
 
       load_expr_data(expr->as.dict.items[i].key, data, end, arena, str_arena);
       load_expr_data(expr->as.dict.items[i].expr, data, end, arena, str_arena);
+    }
+  } break;
+
+  case IrExprKindMatch: {
+    expr->as.match.src = arena_alloc(arena, sizeof(IrExpr));
+
+    load_expr_data(expr->as.match.src, data, end, arena, str_arena);
+
+    expr->as.match.cases.len = *(u32 *) (data + *end);
+    expr->as.match.cases.cap = expr->as.match.cases.len;
+    *end += sizeof(u32);
+
+    expr->as.match.cases.items = arena_alloc(arena, expr->as.match.cases.cap * sizeof(IrCase));
+    for (u32 i = 0; i < expr->as.match.cases.len; ++i) {
+      expr->as.match.cases.items[i].pattern = arena_alloc(arena, sizeof(IrExpr));
+      expr->as.match.cases.items[i].expr = arena_alloc(arena, sizeof(IrExpr));
+
+      load_expr_data(expr->as.match.cases.items[i].pattern, data, end, arena, str_arena);
+      load_expr_data(expr->as.match.cases.items[i].expr, data, end, arena, str_arena);
     }
   } break;
   }
@@ -305,7 +199,7 @@ static void load_block_data(IrBlock *block, u8 *data, u32 *end,
   block->cap = block->len;
   *end += sizeof(u32);
 
-  block->items = malloc(block->len * sizeof(IrExpr *));
+  block->items = arena_alloc(arena, block->len * sizeof(IrExpr *));
   for (u32 i = 0; i < block->len; ++i) {
     block->items[i] = arena_alloc(arena, sizeof(IrExpr));
     load_expr_data(block->items[i], data, end, arena, str_arena);

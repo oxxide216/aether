@@ -3,8 +3,8 @@
 (let pos { 'x': 4 'y': 6 })
 
 (set num 6)
-(set-at list 2 4)
-(set-at pos 'x' (+ (get-at pos 'x') 2))
+(set list::2 4)
+(set pos::'x' (+ (get-at pos 'x') 2))
 
 (println num)
 (println list)

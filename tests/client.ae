@@ -1,6 +1,6 @@
 (use 'std/net.ae')
 
-(let client (create-client '127.0.0.1' '8080'))
+(let client (create-client '127.0.0.1' 8080))
 (if (unit? client)
   (println 'ERROR: Could not connect to server')
   (exit 1))

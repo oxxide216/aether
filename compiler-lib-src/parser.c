@@ -58,6 +58,7 @@ static char *token_names[] = {
   "set-at",
   "ret",
   "import",
+  "match",
   "`(`",
   "`)`",
   "`[`",
@@ -65,10 +66,11 @@ static char *token_names[] = {
   "`{`",
   "`}`",
   "string literal",
-  "...",
-  "->",
-  "<>",
-  ":",
+  "`...`",
+  "`->`",
+  "`<>`",
+  "`:`",
+  "`::`"
   "int",
   "float",
   "bool",
@@ -328,7 +330,7 @@ static IrExprDict parser_parse_dict(Parser *parser) {
 
   dict.len = fields.len;
   dict.cap = dict.len;
-  dict.items = arena_alloc(parser->arena, fields.cap * sizeof(IrField));
+  dict.items = arena_alloc(parser->arena, dict.cap * sizeof(IrField));
   memcpy(dict.items, fields.items, dict.len * sizeof(IrField));
 
   free(fields.items);
@@ -384,6 +386,35 @@ static IrExprLambda parser_parse_lambda(Parser *parser) {
   return lambda;
 }
 
+static IrExprMatch parser_parse_match(Parser *parser) {
+  IrExprMatch match = {0};
+
+  match.src = parser_parse_expr(parser);
+
+  IrCases cases = {0};
+
+  Token *token;
+  while ((token = parser_peek_token(parser))->id != TT_CPAREN) {
+    IrExpr *pattern = parser_parse_expr(parser);
+    parser_expect_token(parser, MASK(TT_RIGHT_ARROW));
+    IrExpr *expr = parser_parse_expr(parser);
+
+    IrCase _case = { pattern, expr };
+    DA_APPEND(cases, _case);
+  }
+
+  match.cases.len = cases.len;
+  match.cases.cap = match.cases.len;
+  match.cases.items = arena_alloc(parser->arena, match.cases.cap * sizeof(IrCase));
+  memcpy(match.cases.items, cases.items, match.cases.len * sizeof(IrCase));
+
+  free(cases.items);
+
+  parser_expect_token(parser, MASK(TT_CPAREN));
+
+  return match;
+}
+
 static char *str_to_cstr(Str str) {
   char *result = malloc((str.len + 1) * sizeof(char));
   memcpy(result, str.ptr, str.len * sizeof(char));
@@ -413,42 +444,34 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   expr->meta.row = token->row;
   expr->meta.col = token->col;
 
+  bool found_atom = true;
+
   switch (token->id) {
   case TT_STR: {
     expr->kind = IrExprKindString;
     expr->as.string.lit = STR(token->lexeme.ptr + 1,
                               token->lexeme.len - 2);
-
-    return expr;
-  };
+  } break;
 
   case TT_IDENT: {
     expr->kind = IrExprKindIdent;
     expr->as.ident.ident = token->lexeme;
-
-    return expr;
-  };
+  } break;
 
   case TT_INT: {
     expr->kind = IrExprKindInt;
     expr->as._int._int = str_to_i64(token->lexeme);
-
-    return expr;
-  };
+  } break;
 
   case TT_FLOAT: {
     expr->kind = IrExprKindFloat;
     expr->as._float._float = str_to_f64(token->lexeme);
-
-    return expr;
-  };
+  } break;
 
   case TT_BOOL: {
     expr->kind = IrExprKindBool;
     expr->as._bool._bool = str_eq(token->lexeme, STR_LIT("true"));
-
-    return expr;
-  };
+  } break;
 
   case TT_OBRACKET: {
     Token *prev_token = parser->current_token;
@@ -466,134 +489,147 @@ static IrExpr *parser_parse_expr(Parser *parser) {
       expr->kind = IrExprKindList;
       expr->as.list.content = block;
     }
-
-    return expr;
-  };
+  } break;
 
   case TT_OCURLY: {
     expr->kind = IrExprKindDict;
     expr->as.dict = parser_parse_dict(parser);
-
-    return expr;
-  };
-  }
-
-  token = parser_peek_token(parser);
-
-  switch (token->id) {
-  case TT_LET: {
-    parser_next_token(parser);
-
-    Token *name_token = parser_expect_token(parser, MASK(TT_IDENT));
-
-    expr->kind = IrExprKindVarDef;
-    expr->as.var_def.name = name_token->lexeme;
-    expr->as.var_def.expr = parser_parse_expr(parser);
-
-    parser_expect_token(parser, MASK(TT_CPAREN));
   } break;
 
-  case TT_IF: {
-    parser_next_token(parser);
+  default: {
+    found_atom = false;
+  } break;
+  }
 
-    expr->kind = IrExprKindIf;
-    expr->as._if.cond = parser_parse_expr(parser);
+  if (!found_atom) {
+    token = parser_peek_token(parser);
 
-    expr->as._if.if_body = parser_parse_block(parser, MASK(TT_CPAREN) |
+    switch (token->id) {
+    case TT_LET: {
+      parser_next_token(parser);
+
+      Token *name_token = parser_expect_token(parser, MASK(TT_IDENT));
+
+      expr->kind = IrExprKindVarDef;
+      expr->as.var_def.name = name_token->lexeme;
+      expr->as.var_def.expr = parser_parse_expr(parser);
+
+      parser_expect_token(parser, MASK(TT_CPAREN));
+    } break;
+
+    case TT_IF: {
+      parser_next_token(parser);
+
+      expr->kind = IrExprKindIf;
+      expr->as._if.cond = parser_parse_expr(parser);
+
+      expr->as._if.if_body = parser_parse_block(parser, MASK(TT_CPAREN) |
+                                                        MASK(TT_ELIF) |
+                                                        MASK(TT_ELSE));
+
+      Token *next_token = parser_expect_token(parser, MASK(TT_CPAREN) |
                                                       MASK(TT_ELIF) |
                                                       MASK(TT_ELSE));
 
-    Token *next_token = parser_expect_token(parser, MASK(TT_CPAREN) |
-                                                    MASK(TT_ELIF) |
-                                                    MASK(TT_ELSE));
+      IrElifs elifs = {0};
 
-    IrElifs elifs = {0};
-
-    while (next_token->id == TT_ELIF) {
-      IrElif elif;
-      elif.cond = parser_parse_expr(parser);
-      elif.body = parser_parse_block(parser, MASK(TT_CPAREN) |
-                                             MASK(TT_ELIF) |
-                                             MASK(TT_ELSE));
-      DA_APPEND(expr->as._if.elifs, elif);
-
-      next_token = parser_expect_token(parser, MASK(TT_CPAREN) |
+      while (next_token->id == TT_ELIF) {
+        IrElif elif;
+        elif.cond = parser_parse_expr(parser);
+        elif.body = parser_parse_block(parser, MASK(TT_CPAREN) |
                                                MASK(TT_ELIF) |
                                                MASK(TT_ELSE));
-    }
+        DA_APPEND(elifs, elif);
 
-    expr->as._if.elifs.len = elifs.len;
-    expr->as._if.elifs.cap = expr->as._if.elifs.len;
-    expr->as._if.elifs.items =
-      arena_alloc(parser->arena, expr->as._if.elifs.cap * sizeof(IrElif));
-    memcpy(expr->as._if.elifs.items, elifs.items, expr->as._if.elifs.len * sizeof(IrElif));
-
-    free(elifs.items);
-
-    expr->as._if.has_else = next_token->id == TT_ELSE;
-    if (expr->as._if.has_else) {
-      expr->as._if.else_body = parser_parse_block(parser, MASK(TT_CPAREN));
-      parser_expect_token(parser, MASK(TT_CPAREN));
-    }
-  } break;
-
-  case TT_MACRO: {
-    parser_next_token(parser);
-
-    parser_parse_macro_def(parser);
-
-    return NULL;
-  } break;
-
-  case TT_WHILE: {
-    parser_next_token(parser);
-
-    expr->kind = IrExprKindWhile;
-    expr->as._while.cond = parser_parse_expr(parser);
-    expr->as._while.body = parser_parse_block(parser, MASK(TT_CPAREN));
-
-    parser_expect_token(parser, MASK(TT_CPAREN));
-  } break;
-
-  case TT_USE: {
-    parser_next_token(parser);
-
-    Str current_file_path = {
-      token->file_path,
-      strlen(token->file_path),
-    };
-
-    Str new_file_path = parser_expect_token(parser, MASK(TT_STR))->lexeme;
-    new_file_path.ptr += 1;
-    new_file_path.len -= 2;
-
-    parser_expect_token(parser, MASK(TT_CPAREN));
-
-    char *prefix = str_to_cstr(get_file_dir(current_file_path));
-    char *include_paths[] = INCLUDE_PATHS(prefix);
-    char *path_cstr = NULL;
-    Str path;
-    Str code;
-    bool already_included = false;
-
-    for (u32 i = 0; i < ARRAY_LEN(include_paths); ++i) {
-      if (path_cstr) {
-        free(path_cstr);
-        path_cstr = NULL;
+        next_token = parser_expect_token(parser, MASK(TT_CPAREN) |
+                                                 MASK(TT_ELIF) |
+                                                 MASK(TT_ELSE));
       }
 
-      StringBuilder path_sb = {0};
-      sb_push(&path_sb, include_paths[i]);
-      sb_push_str(&path_sb, new_file_path);
-      path = sb_to_str(path_sb);
-      path_cstr = str_to_cstr(path);
+      expr->as._if.elifs.len = elifs.len;
+      expr->as._if.elifs.cap = expr->as._if.elifs.len;
+      expr->as._if.elifs.items =
+        arena_alloc(parser->arena, expr->as._if.elifs.cap * sizeof(IrElif));
+      memcpy(expr->as._if.elifs.items, elifs.items, expr->as._if.elifs.len * sizeof(IrElif));
 
-      free(path_sb.buffer);
+      free(elifs.items);
 
-      already_included = false;
-      for (u32 j = 0; j < parser->included_files->len; ++j) {
-        if (str_eq(parser->included_files->items[j], path)) {
-          already_included = true;
+      expr->as._if.has_else = next_token->id == TT_ELSE;
+      if (expr->as._if.has_else) {
+        expr->as._if.else_body = parser_parse_block(parser, MASK(TT_CPAREN));
+        parser_expect_token(parser, MASK(TT_CPAREN));
+      }
+    } break;
+
+    case TT_MACRO: {
+      parser_next_token(parser);
+
+      parser_parse_macro_def(parser);
+
+      return NULL;
+    } break;
+
+    case TT_WHILE: {
+      parser_next_token(parser);
+
+      expr->kind = IrExprKindWhile;
+      expr->as._while.cond = parser_parse_expr(parser);
+      expr->as._while.body = parser_parse_block(parser, MASK(TT_CPAREN));
+
+      parser_expect_token(parser, MASK(TT_CPAREN));
+    } break;
+
+    case TT_USE: {
+      parser_next_token(parser);
+
+      Str current_file_path = {
+        token->file_path,
+        strlen(token->file_path),
+      };
+
+      Str new_file_path = parser_expect_token(parser, MASK(TT_STR))->lexeme;
+      new_file_path.ptr += 1;
+      new_file_path.len -= 2;
+
+      parser_expect_token(parser, MASK(TT_CPAREN));
+
+      char *prefix = str_to_cstr(get_file_dir(current_file_path));
+      char *include_paths[] = INCLUDE_PATHS(prefix);
+      char *path_cstr = NULL;
+      Str path;
+      Str code;
+      bool already_included = false;
+
+      for (u32 i = 0; i < ARRAY_LEN(include_paths); ++i) {
+        if (path_cstr) {
+          free(path_cstr);
+          path_cstr = NULL;
+        }
+
+        StringBuilder path_sb = {0};
+        sb_push(&path_sb, include_paths[i]);
+        sb_push_str(&path_sb, new_file_path);
+        path = sb_to_str(path_sb);
+        path_cstr = str_to_cstr(path);
+
+        free(path_sb.buffer);
+
+        already_included = false;
+        for (u32 j = 0; j < parser->included_files->len; ++j) {
+          if (str_eq(parser->included_files->items[j], path)) {
+            already_included = true;
+
+            break;
+          }
+        }
+
+        if (already_included)
+          break;
+
+        code = read_file_arena(path_cstr, parser->arena);
+
+        if (code.len != (u32) -1) {
+          DA_APPEND(*parser->included_files, path);
 
           break;
         }
@@ -602,99 +638,98 @@ static IrExpr *parser_parse_expr(Parser *parser) {
       if (already_included)
         break;
 
-      code = read_file_arena(path_cstr, parser->arena);
-
-      if (code.len != (u32) -1) {
-        DA_APPEND(*parser->included_files, path);
-
-        break;
+      if (code.len == (u32) -1) {
+        ERROR("File "STR_FMT" was not found\n", STR_ARG(new_file_path));
+        exit(1);
       }
+
+      Macros macros = {0};
+
+      u32 path_len = strlen(path_cstr);
+      char *new_path_cstr = arena_alloc(parser->arena, path_len);
+      memcpy(new_path_cstr, path_cstr, path_len);
+
+      expr->kind = IrExprKindBlock;
+      expr->as.block = parse_ex(code, new_path_cstr, &macros,
+                                parser->included_files,
+                                parser->arena);
+
+      if (parser->macros->cap < parser->macros->len + macros.len) {
+        parser->macros->cap = parser->macros->len + macros.len;
+        parser->macros->items = realloc(parser->macros->items,
+                                        parser->macros->cap * sizeof(Macro));
+      }
+
+      memcpy(parser->macros->items + parser->macros->len,
+             macros.items, macros.len * sizeof(Macro));
+      parser->macros->len += macros.len;
+
+      free(macros.items);
+      free(prefix);
+      free(path_cstr);
+    } break;
+
+    case TT_SET: {
+      parser_next_token(parser);
+
+      Str dest = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
+
+      token = parser_peek_token(parser);
+      if (token->id == TT_QOLON) {
+        parser_next_token(parser);
+
+        expr->kind = IrExprKindSetAt;
+        expr->as.set_at.dest = dest;
+        expr->as.set_at.key = parser_parse_expr(parser);
+        expr->as.set_at.value = parser_parse_expr(parser);
+      } else {
+        expr->kind = IrExprKindSet;
+        expr->as.set.dest = dest;
+        expr->as.set.src = parser_parse_expr(parser);
+      }
+
+      parser_expect_token(parser, MASK(TT_CPAREN));
+    } break;
+
+    case TT_RET: {
+      parser_next_token(parser);
+
+      expr->kind = IrExprKindRet;
+      expr->as.ret.has_expr = parser_peek_token(parser)->id != TT_CPAREN;
+
+      if (expr->as.ret.has_expr)
+        expr->as.ret.expr = parser_parse_expr(parser);
+
+      parser_expect_token(parser, MASK(TT_CPAREN));
+    } break;
+
+    case TT_MATCH: {
+      parser_next_token(parser);
+
+      expr->kind = IrExprKindMatch;
+      expr->as.match = parser_parse_match(parser);
+    } break;
+
+    default: {
+      expr->kind = IrExprKindFuncCall;
+      expr->as.func_call.func = parser_parse_expr(parser);
+      expr->as.func_call.args = parser_parse_block(parser, MASK(TT_CPAREN));
+
+      parser_expect_token(parser, MASK(TT_CPAREN));
+    } break;
     }
+  }
 
-    if (already_included)
-      break;
-
-    if (code.len == (u32) -1) {
-      ERROR("File "STR_FMT" was not found\n", STR_ARG(new_file_path));
-      exit(1);
-    }
-
-    Macros macros = {0};
-
-    u32 path_len = strlen(path_cstr);
-    char *new_path_cstr = arena_alloc(parser->arena, path_len);
-    memcpy(new_path_cstr, path_cstr, path_len);
-
-    expr->kind = IrExprKindBlock;
-    expr->as.block = parse_ex(code, new_path_cstr, &macros,
-                              parser->included_files,
-                              parser->arena);
-
-    if (parser->macros->cap < parser->macros->len + macros.len) {
-      parser->macros->cap = parser->macros->len + macros.len;
-      parser->macros->items = realloc(parser->macros->items,
-                                      parser->macros->cap * sizeof(Macro));
-    }
-
-    memcpy(parser->macros->items + parser->macros->len,
-           macros.items, macros.len * sizeof(Macro));
-    parser->macros->len += macros.len;
-
-    free(macros.items);
-    free(prefix);
-    free(path_cstr);
-  } break;
-
-  case TT_SET: {
+  token = parser_peek_token(parser);
+  if (token && token->id == TT_QOLON) {
     parser_next_token(parser);
 
-    expr->kind = IrExprKindSet;
-    expr->as.set.dest = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
-    expr->as.set.src = parser_parse_expr(parser);
+    IrExpr *get_at = arena_alloc(parser->arena, sizeof(IrExpr));
+    get_at->kind = IrExprKindGetAt;
+    get_at->as.get_at.src = expr;
+    get_at->as.get_at.key = parser_parse_expr(parser);
 
-    parser_expect_token(parser, MASK(TT_CPAREN));
-  } break;
-
-  case TT_GET_AT: {
-    parser_next_token(parser);
-
-    expr->kind = IrExprKindGetAt;
-    expr->as.get_at.src = parser_parse_expr(parser);
-    expr->as.get_at.key = parser_parse_expr(parser);
-
-    parser_expect_token(parser, MASK(TT_CPAREN));
-  } break;
-
-  case TT_SET_AT: {
-    parser_next_token(parser);
-
-    expr->kind = IrExprKindSetAt;
-    expr->as.set_at.dest = parser_expect_token(parser, MASK(TT_IDENT))->lexeme;
-    expr->as.set_at.key = parser_parse_expr(parser);
-    expr->as.set_at.value = parser_parse_expr(parser);
-
-    parser_expect_token(parser, MASK(TT_CPAREN));
-  } break;
-
-  case TT_RET: {
-    parser_next_token(parser);
-
-    expr->kind = IrExprKindRet;
-    expr->as.ret.has_expr = parser_peek_token(parser)->id != TT_CPAREN;
-
-    if (expr->as.ret.has_expr)
-      expr->as.ret.expr = parser_parse_expr(parser);
-
-    parser_expect_token(parser, MASK(TT_CPAREN));
-  } break;
-
-  default: {
-    expr->kind = IrExprKindFuncCall;
-    expr->as.func_call.func = parser_parse_expr(parser);
-    expr->as.func_call.args = parser_parse_block(parser, MASK(TT_CPAREN));
-
-    parser_expect_token(parser, MASK(TT_CPAREN));
-  } break;
+    expr = get_at;
   }
 
   return expr;

@@ -349,8 +349,19 @@ static void catch_vars(Vm *vm, Strs *local_names,
   } break;
 
   case IrExprKindDict: {
-    for (u32 i = 0; i < expr->as.dict.len; ++i)
+    for (u32 i = 0; i < expr->as.dict.len; ++i) {
+      CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.dict.items[i].key);
       CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.dict.items[i].expr);
+    }
+  } break;
+
+  case IrExprKindMatch: {
+    CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.match.src);
+
+    for (u32 i = 0; i < expr->as.match.cases.len; ++i) {
+      CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.match.cases.items[i].pattern);
+      CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.match.cases.items[i].expr);
+    }
   } break;
   }
 }
@@ -861,6 +872,21 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     }
 
     result = value_dict(dict, &vm->arena, &vm->values);
+  } break;
+
+  case IrExprKindMatch: {
+    Value *src;
+    EXECUTE_EXPR_SET(vm, src, expr->as.match.src, true);
+
+    for (u32 i = 0; i < expr->as.match.cases.len; ++i) {
+      Value *pattern;
+      EXECUTE_EXPR_SET(vm, pattern, expr->as.match.cases.items[i].pattern, true);
+
+      if (value_eq(pattern, src)) {
+        EXECUTE_EXPR_SET(vm, result, expr->as.match.cases.items[i].expr, value_expected);
+        break;
+      }
+    }
   } break;
   }
 

@@ -26,6 +26,7 @@ typedef enum {
   IrExprKindLambda,
   IrExprKindDict,
   IrExprKindRet,
+  IrExprKindMatch,
 } IrExprKind;
 
 typedef Da(Str) IrArgs;
@@ -111,6 +112,8 @@ typedef struct {
   IrExpr *expr;
 } IrField;
 
+typedef Da(IrField) IrFields;
+
 typedef Da(IrField) IrExprDict;
 
 typedef struct {
@@ -118,7 +121,17 @@ typedef struct {
   IrExpr *expr;
 } IrExprRet;
 
-typedef Da(IrField) IrFields;
+typedef struct {
+  IrExpr *pattern;
+  IrExpr *expr;
+} IrCase;
+
+typedef Da(IrCase) IrCases;
+
+typedef struct {
+  IrExpr  *src;
+  IrCases  cases;
+} IrExprMatch;
 
 typedef union {
   IrBlock        block;
@@ -138,6 +151,7 @@ typedef union {
   IrExprLambda   lambda;
   IrExprDict     dict;
   IrExprRet      ret;
+  IrExprMatch    match;
 } IrExprAs;
 
 typedef struct {

@@ -149,6 +149,19 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
       save_expr_data(expr->as.dict.items[i].expr, data, data_size, end);
     }
   } break;
+
+  case IrExprKindMatch: {
+    save_expr_data(expr->as.match.src, data, data_size, end);
+
+    reserve_space(sizeof(u32), data, data_size, end);
+    *(u32 *) (*data + *end) = expr->as.match.cases.len;
+    *end += sizeof(u32);
+
+    for (u32 i = 0; i < expr->as.match.cases.len; ++i) {
+      save_expr_data(expr->as.match.cases.items[i].pattern, data, data_size, end);
+      save_expr_data(expr->as.match.cases.items[i].expr, data, data_size, end);
+    }
+  } break;
   }
 
   save_str_data(expr->meta.file_path, data, data_size, end);

@@ -9,11 +9,10 @@ else=else
 macro=macro
 while=while
 set=set
-get_at=get\-at
-set_at=set\-at
 use=use
 ret=ret
 import=import
+match=match
 
 oparen=\(
 cparen=\)
@@ -26,6 +25,7 @@ unpack=...
 right_arrow=\->
 rhombus=<>
 colon=:
+qolon=::
 
 int=\-?0-9+
 float=\-?0-9+.0-9+

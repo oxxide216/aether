@@ -11,22 +11,22 @@
 #define TT_MACRO 7
 #define TT_WHILE 8
 #define TT_SET 9
-#define TT_GET_AT 10
-#define TT_SET_AT 11
-#define TT_USE 12
-#define TT_RET 13
-#define TT_IMPORT 14
-#define TT_OPAREN 15
-#define TT_CPAREN 16
-#define TT_OBRACKET 17
-#define TT_CBRACKET 18
-#define TT_OCURLY 19
-#define TT_CCURLY 20
-#define TT_STR 21
-#define TT_UNPACK 22
-#define TT_RIGHT_ARROW 23
-#define TT_RHOMBUS 24
-#define TT_COLON 25
+#define TT_USE 10
+#define TT_RET 11
+#define TT_IMPORT 12
+#define TT_MATCH 13
+#define TT_OPAREN 14
+#define TT_CPAREN 15
+#define TT_OBRACKET 16
+#define TT_CBRACKET 17
+#define TT_OCURLY 18
+#define TT_CCURLY 19
+#define TT_STR 20
+#define TT_UNPACK 21
+#define TT_RIGHT_ARROW 22
+#define TT_RHOMBUS 23
+#define TT_COLON 24
+#define TT_QOLON 25
 #define TT_INT 26
 #define TT_FLOAT 27
 #define TT_BOOL 28
@@ -100,24 +100,6 @@ TransitionCol table_col_set[] = {
   { 3, 't', 't', 0 },
 };
 
-TransitionCol table_col_get_at[] = {
-  { 1, 'g', 'g', 2 },
-  { 2, 'e', 'e', 3 },
-  { 3, 't', 't', 4 },
-  { 4, '-', '-', 5 },
-  { 5, 'a', 'a', 6 },
-  { 6, 't', 't', 0 },
-};
-
-TransitionCol table_col_set_at[] = {
-  { 1, 's', 's', 2 },
-  { 2, 'e', 'e', 3 },
-  { 3, 't', 't', 4 },
-  { 4, '-', '-', 5 },
-  { 5, 'a', 'a', 6 },
-  { 6, 't', 't', 0 },
-};
-
 TransitionCol table_col_use[] = {
   { 1, 'u', 'u', 2 },
   { 2, 's', 's', 3 },
@@ -137,6 +119,14 @@ TransitionCol table_col_import[] = {
   { 4, 'o', 'o', 5 },
   { 5, 'r', 'r', 6 },
   { 6, 't', 't', 0 },
+};
+
+TransitionCol table_col_match[] = {
+  { 1, 'm', 'm', 2 },
+  { 2, 'a', 'a', 3 },
+  { 3, 't', 't', 4 },
+  { 4, 'c', 'c', 5 },
+  { 5, 'h', 'h', 0 },
 };
 
 TransitionCol table_col_oparen[] = {
@@ -186,6 +176,11 @@ TransitionCol table_col_rhombus[] = {
 
 TransitionCol table_col_colon[] = {
   { 1, ':', ':', 0 },
+};
+
+TransitionCol table_col_qolon[] = {
+  { 1, ':', ':', 2 },
+  { 2, ':', ':', 0 },
 };
 
 TransitionCol table_col_int[] = {
@@ -272,11 +267,10 @@ TransitionRow table_rows[] = {
   { table_col_macro, sizeof(table_col_macro) / sizeof(TransitionCol) },
   { table_col_while, sizeof(table_col_while) / sizeof(TransitionCol) },
   { table_col_set, sizeof(table_col_set) / sizeof(TransitionCol) },
-  { table_col_get_at, sizeof(table_col_get_at) / sizeof(TransitionCol) },
-  { table_col_set_at, sizeof(table_col_set_at) / sizeof(TransitionCol) },
   { table_col_use, sizeof(table_col_use) / sizeof(TransitionCol) },
   { table_col_ret, sizeof(table_col_ret) / sizeof(TransitionCol) },
   { table_col_import, sizeof(table_col_import) / sizeof(TransitionCol) },
+  { table_col_match, sizeof(table_col_match) / sizeof(TransitionCol) },
   { table_col_oparen, sizeof(table_col_oparen) / sizeof(TransitionCol) },
   { table_col_cparen, sizeof(table_col_cparen) / sizeof(TransitionCol) },
   { table_col_obracket, sizeof(table_col_obracket) / sizeof(TransitionCol) },
@@ -288,6 +282,7 @@ TransitionRow table_rows[] = {
   { table_col_right_arrow, sizeof(table_col_right_arrow) / sizeof(TransitionCol) },
   { table_col_rhombus, sizeof(table_col_rhombus) / sizeof(TransitionCol) },
   { table_col_colon, sizeof(table_col_colon) / sizeof(TransitionCol) },
+  { table_col_qolon, sizeof(table_col_qolon) / sizeof(TransitionCol) },
   { table_col_int, sizeof(table_col_int) / sizeof(TransitionCol) },
   { table_col_float, sizeof(table_col_float) / sizeof(TransitionCol) },
   { table_col_bool, sizeof(table_col_bool) / sizeof(TransitionCol) },

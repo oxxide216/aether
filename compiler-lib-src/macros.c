@@ -88,13 +88,24 @@ static void clone_expr(IrExpr **expr, Arena *arena) {
   } break;
 
   case IrExprKindDict: {
-    for (u32 i = 0; i < new_expr->as.dict.len; ++i)
+    for (u32 i = 0; i < new_expr->as.dict.len; ++i) {
+      clone_expr(&new_expr->as.dict.items[i].key, arena);
       clone_expr(&new_expr->as.dict.items[i].expr, arena);
+    }
   } break;
 
   case IrExprKindRet: {
     if (new_expr->as.ret.has_expr)
       clone_expr(&new_expr->as.ret.expr, arena);
+  } break;
+
+  case IrExprKindMatch: {
+    clone_expr(&new_expr->as.match.src, arena);
+
+    for (u32 i = 0; i < new_expr->as.match.cases.len; ++i) {
+      clone_expr(&new_expr->as.match.cases.items[i].pattern, arena);
+      clone_expr(&new_expr->as.match.cases.items[i].expr, arena);
+    }
   } break;
   }
 }
@@ -223,13 +234,24 @@ static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names, IrArgs *new_a
   } break;
 
   case IrExprKindDict: {
-    for (u32 i = 0; i < expr->as.dict.len; ++i)
+    for (u32 i = 0; i < expr->as.dict.len; ++i) {
+      rename_args_expr(expr->as.dict.items[i].key, prev_arg_names, new_arg_names);
       rename_args_expr(expr->as.dict.items[i].expr, prev_arg_names, new_arg_names);
+    }
   } break;
 
   case IrExprKindRet: {
     if (expr->as.ret.has_expr)
       rename_args_expr(expr->as.ret.expr, prev_arg_names, new_arg_names);
+  } break;
+
+  case IrExprKindMatch: {
+    rename_args_expr(expr->as.match.src, prev_arg_names, new_arg_names);
+
+    for (u32 i = 0; i < expr->as.match.cases.len; ++i) {
+      rename_args_expr(expr->as.match.cases.items[i].pattern, prev_arg_names, new_arg_names);
+      rename_args_expr(expr->as.match.cases.items[i].expr, prev_arg_names, new_arg_names);
+    }
   } break;
   }
 }
@@ -449,13 +471,24 @@ void expand_macros(IrExpr *expr, Macros *macros,
   } break;
 
   case IrExprKindDict: {
-    for (u32 i = 0; i < expr->as.dict.len; ++i)
+    for (u32 i = 0; i < expr->as.dict.len; ++i) {
+      INLINE_THEN_EXPAND(expr->as.dict.items[i].key);
       INLINE_THEN_EXPAND(expr->as.dict.items[i].expr);
+    }
   } break;
 
   case IrExprKindRet: {
     if (expr->as.ret.has_expr)
       INLINE_THEN_EXPAND(expr->as.ret.expr);
+  } break;
+
+  case IrExprKindMatch: {
+    INLINE_THEN_EXPAND(expr->as.match.src);
+
+    for (u32 i = 0; i < expr->as.match.cases.len; ++i) {
+      INLINE_THEN_EXPAND(expr->as.match.cases.items[i].pattern);
+      INLINE_THEN_EXPAND(expr->as.match.cases.items[i].expr);
+    }
   } break;
   }
 }
