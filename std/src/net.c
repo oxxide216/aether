@@ -57,9 +57,11 @@ Value *create_client_intrinsic(Vm *vm, Value **args) {
          server_ip_address->as.string.len);
   server_ip_address_cstr[server_ip_address->as.string.len] = '\0';
 
-  char *port_cstr = malloc(port->as.string.len + 1);
-  memcpy(port_cstr, port->as.string.ptr, port->as.string.len);
-  port_cstr[port->as.string.len] = '\0';
+  StringBuilder sb = {0};
+  sb_push_i64(&sb, port->as._int);
+  sb_push_char(&sb, '\0');
+
+  char *port_cstr = sb.buffer;
 
   struct addrinfo hints = {0};
   hints.ai_family = AF_INET;
@@ -95,6 +97,7 @@ Value *create_client_intrinsic(Vm *vm, Value **args) {
   }
 
   free(server_ip_address_cstr);
+  free(port_cstr);
   freeaddrinfo(result);
 
   return value_int(client_socket, &vm->arena, &vm->values);
@@ -206,7 +209,7 @@ Value *receive_intrinsic(Vm *vm, Value **args) {
 Intrinsic net_intrinsics[] = {
   { STR_LIT("create-server"), true, 1, { ValueKindInt }, &create_server_intrinsic },
   { STR_LIT("create-client"), true, 2,
-    { ValueKindString, ValueKindString },
+    { ValueKindString, ValueKindInt },
     &create_client_intrinsic },
   { STR_LIT("accept-connection"), true, 2,
     { ValueKindInt, ValueKindInt },
