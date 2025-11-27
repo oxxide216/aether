@@ -5,50 +5,42 @@
 (use 'std/io.ae')
 (use 'std/log.ae')
 
-(let core-path '/usr/include/aether/std/core.ae')
-(let base-path '/usr/include/aether/std/base.ae')
-(let repl-path '/usr/include/aether/repl.ae')
+(use 'config.ae')
+(use 'module-loader.ae')
+(use 'args-parser.ae')
+(use 'repl.ae')
 
 (let args (get-args))
-(let non-flag-args (filter [arg] -> (not (begins-with arg '-')) <> args))
-(let env (make-env))
 
-(if (< (len non-flag-args) 2)
-  (let repl-content (read-file repl-path))
-  (if (unit? repl-content)
-    (error 'Could not load repl')
-    (exit 1))
-  (eval env repl-content repl-path))
+(if (< (len args) 2)
+  (repl)
+  (exit 0))
 
-(let path non-flag-args::1)
-(let content (read-file path))
-(if (unit? content)
+(let parsed (parse-args (tail args)))
+(let parsed-args parsed::'args')
+(let input-path (head parsed-args))
+(let mode parsed::'mode')
+(let output-path parsed::'output-path')
+
+(if (unit? input-path)
+  (error 'No input file was provided')
+  (exit 1))
+
+(let input-content (read-file input-path))
+(if (unit? input-content)
   (error 'Could not open input file ' path)
   (exit 1))
 
-(let core-content (read-file core-path))
-(if (unit? core-content)
-  (error 'Could not load core module')
-  (exit 1))
+(let env (make-env parsed-args))
 
-(eval env core-content core-path)
+(if (or (== mode mode-default) (== mode mode-eval-bytecode))
+  (load-module env 'core' core-path)
+  (load-module env 'base' base-path)
 
-(let base-content (read-file base-path))
-(if (unit? base-content)
-  (error 'Could not load base module')
-  (exit 1))
-
-(eval env base-content base-path)
-
-(if (get-index args '-c')
-  (eval-compiled env content)
-  (exit 0))
-
-(let out-index (get-index args '-o'))
-(if out-index
-  (if (< (+ out-index 1) (len args))
-    (let compiled (compile env content path))
-    (write-file args::(+ out-index 1) compiled)
-    (exit 0)))
-
-(eval env content path)
+  (if (== mode mode-default)
+    (eval env input-content input-path)
+   else
+    (eval-compiled env input-content))
+ elif (== mode mode-compile-only)
+  (let compiled (compile env input-content input-path))
+  (write-file output-path compiled))

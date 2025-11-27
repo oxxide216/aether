@@ -1,34 +1,12 @@
 (use 'std/core.ae')
+(use 'std/base.ae')
 (use 'std/system.ae')
 (use 'std/term.ae')
 (use 'std/io.ae')
 (use 'std/str.ae')
 
-(let env (make-env))
-
-(let core-path '/usr/include/aether/std/core.ae')
-(let core-content (read-file core-path))
-(if (not core-content)
-  (error 'Could not load core module')
-  (exit 1))
-
-(let core-compiled (compile env core-content core-path))
-(eval-compiled env core-compiled)
-
-(let base-path '/usr/include/aether/std/base.ae')
-(let base-content (read-file base-path))
-(if (not base-content)
-  (error 'Could not load base module')
-  (exit 1))
-
-(let base-compiled (compile env base-content base-path))
-(eval-compiled env base-compiled)
-
-(let history [])
-(let is-running true)
-
-(term/raw-mode-on)
-(unblock-input)
+(use 'config.ae')
+(use 'module-loader.ae')
 
 (let read-line [prompt] ->
   (let buffer '')
@@ -95,23 +73,34 @@
    else
     buffer))
 
-(while is-running
-  (let command (read-line (+ term/fg-magenta (+ ' > ' term/reset))))
-  (if (or (unit? command) (== command 'quit'))
-    (set is-running false)
-    (println '')
-   elif command
-    (if (unit? (last history))
-      (set history (+ history command))
-     elif (!= (last history) command)
-      (set history (+ history command)))
+(let repl [] ->
+  (let env (make-env []))
+  (load-module env 'core' core-path)
+  (load-module env 'base' base-path)
 
-    (print '\n')
-    (let result (eval env command '<repl>'))
-    (if result
-      (println term/fg-green '=> ' term/reset result))
-   else
-    (print '\n')))
+  (let history [])
+  (let is-running true)
 
-(block-input)
-(term/raw-mode-off)
+  (term/raw-mode-on)
+  (unblock-input)
+
+  (while is-running
+    (let command (read-line (+ term/fg-magenta (+ ' > ' term/reset))))
+    (if (or (unit? command) (== command 'quit'))
+      (set is-running false)
+      (println '')
+     elif command
+      (if (unit? (last history))
+        (set history (+ history command))
+       elif (!= (last history) command)
+        (set history (+ history command)))
+
+      (print '\n')
+      (let result (eval env command '<repl>'))
+      (if result
+        (println term/fg-green '=> ' term/reset result))
+     else
+      (print '\n')))
+
+  (block-input)
+  (term/raw-mode-off))

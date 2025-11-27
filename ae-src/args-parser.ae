@@ -1,0 +1,40 @@
+(use 'std/core.ae')
+(use 'std/base.ae')
+(use 'std/str.ae')
+
+(use 'config.ae')
+
+(let parse-args [args] ->
+  (let mode mode-default)
+  (let output-path '')
+
+  (while (head args)
+    (if (or (== (head args) '-h') (== (head args) '--help'))
+      (print 'Usage: aether [FLAGS] [FILE] [ARGS]...\n\n'
+             'With no FILE, start REPL.\n\n'
+             '  -h --help                 show this message\n'
+             '  -o [FILE]                 output bytecode into [FILE]\n'
+             '  -c                        execute bytecode\n')
+      (exit 0)
+     elif (== (head args) '-o')
+      (set args (tail args))
+      (if (unit? (head args))
+        (error '-o flag requires an argument')
+        (exit 1))
+      (set output-path (head args))
+      (set mode mode-compile-only)
+     elif (== (head args) '-c')
+      (set mode mode-eval-bytecode)
+     else
+      (ret {
+        'args': args
+        'mode': mode
+        'output-path': output-path
+      }))
+    (set args (tail args)))
+
+  {
+    'args': args
+    'mode': mode
+    'output-path': output-path
+  })

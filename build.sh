@@ -55,7 +55,7 @@ if [ "$WASM" != "" ]; then
   rm -rf dest/
   mkdir -p dest/std/
   cp std/ae-src/* dest/std/
-  cp ems-loader.ae assets/* dest/
+  cp ae-src/ems-loader.ae assets/* dest/
 
   CC=/usr/lib/emsdk/upstream/emscripten/emcc
   OUT=dest/aether.js

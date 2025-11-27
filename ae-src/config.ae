@@ -1,0 +1,7 @@
+(let core-path '/usr/include/aether/std/core.ae')
+(let base-path '/usr/include/aether/std/base.ae')
+(let repl-path '/usr/include/aether/load/repl.ae')
+
+(let mode-default 0)
+(let mode-compile-only 1)
+(let mode-eval-bytecode 2)
