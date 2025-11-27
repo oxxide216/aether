@@ -10,46 +10,46 @@
 
 #define MAX_INTRINSIC_ARGS_COUNT 10
 
-#define EXECUTE_FUNC(vm, args, func, meta, value_expected) \
-  do {                                                     \
-    execute_func(vm, args, func, meta, value_expected);    \
-    if (vm->state != ExecStateContinue)                    \
-      return NULL;                                         \
+#define EXECUTE_FUNC(vm, args, func, meta, value_expected)              \
+  do {                                                                  \
+    Value *result = execute_func(vm, args, func, meta, value_expected); \
+    if (vm->state != ExecStateContinue)                                 \
+      return result;                                                    \
   } while (0)
 
-#define EXECUTE_EXPR(vm, expr, value_expected) \
-  do {                                         \
-    execute_expr(vm, expr, value_expected);    \
-    if (vm->state != ExecStateContinue)        \
-      return NULL;                             \
+#define EXECUTE_EXPR(vm, expr, value_expected)              \
+  do {                                                      \
+    Value *result = execute_expr(vm, expr, value_expected); \
+    if (vm->state != ExecStateContinue)                     \
+      return result;                                        \
   } while (0)
 
-#define EXECUTE_BLOCK(vm, block, value_expected) \
-  do {                                           \
-    execute_block(vm, block, value_expected);    \
-    if (vm->state != ExecStateContinue)          \
-      return NULL;                               \
+#define EXECUTE_BLOCK(vm, block, value_expected)              \
+  do {                                                        \
+    Value *result = execute_block(vm, block, value_expected); \
+    if (vm->state != ExecStateContinue)                       \
+      return result;                                          \
   } while (0)
 
 #define EXECUTE_FUNC_SET(vm, dest, args, func, meta, value_expected) \
   do {                                                               \
     dest = execute_func(vm, args, func, meta, value_expected);       \
     if (vm->state != ExecStateContinue)                              \
-      return NULL;                                                   \
+      return dest;                                                   \
   } while (0)
 
 #define EXECUTE_EXPR_SET(vm, dest, expr, value_expected) \
   do {                                                   \
     dest = execute_expr(vm, expr, value_expected);       \
     if (vm->state != ExecStateContinue)                  \
-      return NULL;                                       \
+      return dest;                                       \
   } while (0)
 
 #define EXECUTE_BLOCK_SET(vm, dest, block, value_expected) \
   do {                                                     \
     dest = execute_block(vm, block, value_expected);       \
     if (vm->state != ExecStateContinue)                    \
-      return NULL;                                         \
+      return dest;                                         \
   } while (0)
 
 #define PANIC(arena, values, ...)     \
@@ -127,8 +127,6 @@ struct Vm {
   Intrinsics   intrinsics;
   Values       values;
   Arena        arena;
-  i32          argc;
-  char       **argv;
   ListNode    *args;
   ExecState    state;
   i64          exit_code;
@@ -140,6 +138,7 @@ typedef struct {
   Macros    macros;
   FilePaths included_files;
   Vm        vm;
+  u32       refs_count;
 } Env;
 
 typedef union {
@@ -200,6 +199,7 @@ u32    execute(Ir *ir, i32 argc, char **argv, Arena *arena,
                Intrinsics *intrinsics, Value **result_value);
 
 Vm   vm_create(i32 argc, char **argv, Intrinsics *intrinsics);
+void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics);
 void vm_destroy(Vm *vm);
 
 #endif // AETHER_VM

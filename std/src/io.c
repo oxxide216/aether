@@ -84,7 +84,7 @@ Value *read_file_intrinsic(Vm *vm, Value **args) {
 
   char *path_cstring = str_to_cstr(path->as.string);
 
-  Str content = read_file(path_cstring);
+  Str content = read_file_arena(path_cstring, &vm->arena);
 
   free(path_cstring);
 

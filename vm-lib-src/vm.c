@@ -43,7 +43,7 @@ ListNode *list_clone(ListNode *list, Arena *arena, Values *values) {
 
 Dict dict_clone(Dict *dict, Arena *arena, Values *values) {
   Dict copy = {
-    arena_alloc(arena, dict->len * sizeof(IrField)),
+    arena_alloc(arena, dict->len * sizeof(DictValue)),
     dict->len,
     dict->len,
   };
@@ -108,8 +108,10 @@ Value *value_func(Func func, Arena *arena, Values *values) {
 
 Value *value_env(Vm vm, Arena *arena, Values *values) {
   Value *value = value_alloc(arena, values);
-  Env *env = arena_alloc(arena, sizeof(Env));
+  Env *env = malloc(sizeof(Env));
+  *env = (Env) {0};
   env->vm = vm;
+  env->refs_count = 1;
   *value = (Value) { ValueKindEnv, { .env = env } };
   return value;
 }
@@ -134,6 +136,8 @@ Value *value_clone(Value *value, Arena *arena, Values *values) {
     memcpy(copy->as.string.ptr, value->as.string.ptr, copy->as.string.len);
   } else if (value->kind == ValueKindDict) {
     copy->as.dict = dict_clone(&value->as.dict, arena, values);
+  } else if (value->kind == ValueKindEnv) {
+    ++copy->as.env->refs_count;
   }
 
   return copy;
@@ -156,10 +160,13 @@ void value_free(Value *value) {
   } else if (value->kind == ValueKindFunc) {
     arena_free(&value->as.func.catched_values_arena);
   } else if (value->kind == ValueKindEnv) {
-    if (value->as.env) {
-      free(value->as.env->macros.items);
-      free(value->as.env->included_files.items);
+    if (--value->as.env->refs_count == 0) {
+      if (value->as.env->macros.items)
+        free(value->as.env->macros.items);
+      if (value->as.env->included_files.items)
+        free(value->as.env->included_files.items);
       vm_destroy(&value->as.env->vm);
+      free(value->as.env);
     }
   }
 }
@@ -423,7 +430,7 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
       vm->state = ExecStateExit;
       vm->exit_code = 1;
 
-      return NULL;
+      return value_unit(&vm->arena, &vm->values);
     }
 
     Value *result = (*intrinsic->func)(vm, args);
@@ -468,9 +475,14 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
 
   Value *result = execute_block(vm, &func->body, value_expected);
 
+  if (vm->state == ExecStateReturn)
+    vm->state = ExecStateContinue;
+
   Value *result_stable = NULL;
   if (value_expected && vm->state == ExecStateContinue)
-    result_stable = value_clone(result, &prev_arena, &vm->values);
+    result_stable = value_clone(result, &prev_arena, &prev_values);
+  else
+    result_stable = value_unit(&prev_arena, &prev_values);
 
   if (vm->local_vars.items)
     free(vm->local_vars.items);
@@ -480,13 +492,11 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
 
   for (u32 i = 0; i < vm->values.len; ++i)
     value_free(vm->values.items[i]);
+  free(vm->values.items);
   vm->values = prev_values;
 
   arena_free(&vm->arena);
   vm->arena = prev_arena;
-
-  if (vm->state == ExecStateReturn)
-    vm->state = ExecStateContinue;
 
   return result_stable;
 }
@@ -509,7 +519,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       vm->state = ExecStateExit;
       vm->exit_code = 1;
 
-      return NULL;
+      return value_unit(&vm->arena, &vm->values);
     }
 
     if (expr->as.func_call.args.len != func_value->as.func.args.len) {
@@ -519,7 +529,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       vm->state = ExecStateExit;
       vm->exit_code = 1;
 
-      return NULL;
+      return value_unit(&vm->arena, &vm->values);
     }
 
     Value **func_args = malloc(expr->as.func_call.args.len * sizeof(Value *));
@@ -528,14 +538,14 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       func_args[i] = execute_expr(vm, expr->as.func_call.args.items[i], true);
       if (vm->state != ExecStateContinue) {
         free(func_args);
-        return NULL;
+        return value_unit(&vm->arena, &vm->values);
       }
     }
 
     result = execute_func(vm, func_args, &func_value->as.func, &expr->meta, value_expected);
     if (vm->state != ExecStateContinue) {
       free(func_args);
-      return NULL;
+      return value_unit(&vm->arena, &vm->values);
     }
 
     free(func_args);
@@ -604,7 +614,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       vm->state = ExecStateExit;
       vm->exit_code = 1;
 
-      return NULL;
+      return value_unit(&vm->arena, &vm->values);
     }
 
     Value *src;
@@ -672,7 +682,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       if (!found)
         result = value_unit(&vm->arena, &vm->values);
     } else {
-      PERROR(META_FMT, "get-at: source should be list, string or dictionary\\n",
+      PERROR(META_FMT, "get-at: source should be list, string or dictionary\n",
              META_ARG(expr->meta));
       vm->state = ExecStateExit;
       vm->exit_code = 1;
@@ -687,7 +697,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       vm->state = ExecStateExit;
       vm->exit_code = 1;
 
-      return NULL;
+      return value_unit(&vm->arena, &vm->values);
     }
 
     Value *key;
@@ -741,7 +751,17 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
       if (!found) {
         DictValue dict_value = { key, value };
-        DA_APPEND(dest_var->value->as.dict, dict_value);
+
+        if (dest_var->value->as.dict.cap == dest_var->value->as.dict.len) {
+          dest_var->value->as.dict.cap *= 2;
+          DictValue *new_items =
+            arena_alloc(&vm->arena, dest_var->value->as.dict.cap * sizeof(DictValue));
+          memcpy(new_items, dest_var->value->as.dict.items,
+                 dest_var->value->as.dict.len * sizeof(DictValue));
+          dest_var->value->as.dict.items = new_items;
+        }
+
+        dest_var->value->as.dict.items[dest_var->value->as.dict.len++] = dict_value;
       }
     } else {
       PERROR(META_FMT, "set-at: destination should be list, string or dictionary\n",
@@ -796,7 +816,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       vm->state = ExecStateExit;
       vm->exit_code = 1;
 
-      return NULL;
+      return value_unit(&vm->arena, &vm->values);
     }
 
     result = value_clone(var->value, &vm->arena, &vm->values);
@@ -862,13 +882,16 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       break;
 
     Dict dict = {0};
+    dict.len = expr->as.dict.len;
+    dict.cap = dict.len;
+    dict.items = arena_alloc(&vm->arena, dict.cap * sizeof(DictValue));
 
-    for (u32 i = 0; i < expr->as.dict.len; ++i) {
+    for (u32 i = 0; i < dict.len; ++i) {
       DictValue field = {0};
       EXECUTE_EXPR_SET(vm, field.key, expr->as.dict.items[i].key, true);
       EXECUTE_EXPR_SET(vm, field.value, expr->as.dict.items[i].expr, true);
 
-      DA_APPEND(dict, field);
+      dict.items[i] = field;
     }
 
     result = value_dict(dict, &vm->arena, &vm->values);
@@ -919,6 +942,31 @@ static void intrinsics_append(Intrinsics *a, Intrinsic *b, u32 b_len) {
 Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
   Vm vm = {0};
 
+  ListNode *args = arena_alloc(&vm.arena, sizeof(ListNode));
+  ListNode *args_end = args;
+  for (u32 i = 0; i < (u32) argc; ++i) {
+    u32 len = strlen(argv[i]);
+    char *buffer = arena_alloc(&vm.arena, len);
+    memcpy(buffer, argv[i], len);
+
+    ListNode *new_arg = arena_alloc(&vm.arena, sizeof(ListNode));
+    new_arg->value = arena_alloc(&vm.arena, sizeof(Value));
+    *new_arg->value = (Value) {
+      ValueKindString,
+      { .string = { buffer, len } },
+    };
+    new_arg->is_static = true;
+
+    args_end->next = new_arg;
+    args_end = new_arg;
+  }
+
+  vm_init(&vm, args, intrinsics);
+
+  return vm;
+}
+
+void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics) {
   intrinsics_append(intrinsics, core_intrinsics, core_intrinsics_len);
   intrinsics_append(intrinsics, math_intrinsics, math_intrinsics_len);
   intrinsics_append(intrinsics, str_intrinsics, str_intrinsics_len);
@@ -934,46 +982,26 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
   intrinsics_append(intrinsics, glass_intrinsics, glass_intrinsics_len);
 #endif
 
-  vm.intrinsics = *intrinsics;
+  vm->intrinsics = *intrinsics;
+  vm->args = args;
 
-  vm.argc = argc;
-  vm.argv = argv;
-  vm.args = arena_alloc(&vm.arena, sizeof(ListNode));
-  ListNode *args_end = vm.args;
-  for (u32 i = 0; i < (u32) argc; ++i) {
-    u32 len = strlen(argv[i]);
-    char *buffer = arena_alloc(&vm.arena, len);
-    memcpy(buffer, argv[i], len);
-
-    ListNode *new_arg = arena_alloc(&vm.arena, sizeof(ListNode));
-    new_arg->value = arena_alloc(&vm.arena, sizeof(Value));
-    *new_arg->value = (Value) {
-      ValueKindString,
-      { .string = { buffer, len } },
-    };
-    new_arg->is_static = true;
-
-    if (args_end) {
-      args_end->next = new_arg;
-      args_end = new_arg;
-    } else {
-      vm.args = new_arg;
-      args_end = new_arg;
-    }
-  }
-
-  Value *unit_value = value_alloc(&vm.arena, &vm.values);
-  unit_value->kind = ValueKindUnit;
+  Value *unit_value = value_unit(&vm->arena, &vm->values);
   Var unit_var = { STR_LIT("unit"), unit_value, VarKindGlobal };
-  DA_APPEND(vm.global_vars, unit_var);
-
-  return vm;
+  DA_APPEND(vm->global_vars, unit_var);
 }
 
 void vm_destroy(Vm *vm) {
-  free(vm->global_vars.items);
-  free(vm->local_vars.items);
-  free(vm->intrinsics.items);
-  free(vm->values.items);
+  if (vm->global_vars.items)
+    free(vm->global_vars.items);
+  if (vm->local_vars.items)
+    free(vm->local_vars.items);
+  if (vm->intrinsics.items)
+    free(vm->intrinsics.items);
+
+  for (u32 i = 0; i < vm->values.len; ++i)
+    value_free(vm->values.items[i]);
+
+  if (vm->values.items)
+    free(vm->values.items);
   arena_free(&vm->arena);
 }

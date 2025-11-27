@@ -51,8 +51,9 @@
 (let bool? [value] -> import 'is-bool')
 (let func? [value] -> import 'is-func')
 (let dict? [value] -> import 'is-dict')
+(let not-unit? [value] -> (not (unit? value)))
 
-(let make-env [] -> import 'make-env')
+(let make-env [args] -> import 'make-env')
 (let compile [env code path] -> import 'compile')
 (let eval-compiled [env bytecode] -> import 'eval-compiled')
 (let eval [env code path] -> import 'eval')
@@ -65,3 +66,6 @@
     (let element (head -list))
     body
     (set -list (tail -list))))
+
+(macro do [...body] ->
+  ([] -> body))

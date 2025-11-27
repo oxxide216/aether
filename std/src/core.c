@@ -685,10 +685,19 @@ Value *is_dict_intrinsic(Vm *vm, Value **args) {
 }
 
 Value *make_env_intrinsic(Vm *vm, Value **args) {
-  (void) args;
+  Value *cmd_args = args[0];
+
+  ListNode *node = cmd_args->as.list->next;
+  while (node) {
+    if (node->value->kind != ValueKindString)
+      PANIC(&vm->arena, &vm->values, "make-env: every program argument should be of type string\n");
+
+    node = node->next;
+  }
 
   Intrinsics intrinsics = {0};
-  Vm new_vm = vm_create(vm->argc, vm->argv, &intrinsics);
+  Vm new_vm = {0};
+  vm_init(&new_vm, cmd_args->as.list, &intrinsics);
 
   return value_env(new_vm, &vm->arena, &vm->values);
 }
@@ -705,13 +714,18 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   Ir ir = parse_ex(code->as.string, path_cstr, &env->as.env->macros,
-                   &env->as.env->included_files, &ir_arena);
+                   &env->as.env->included_files, &ir_arena, &env->as.env->vm.arena);
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false, &ir_arena);
 
   Str bytecode = {0};
   bytecode.ptr = (char *) serialize(&ir, &bytecode.len);
+  char *new_ptr = arena_alloc(&vm->arena, bytecode.len);
+  memcpy(new_ptr, bytecode.ptr, bytecode.len);
+  free(bytecode.ptr);
+  bytecode.ptr = new_ptr;
 
   free(path_cstr);
+  arena_free(&ir_arena);
 
   return value_string(bytecode, &vm->arena, &vm->values);
 }
@@ -730,7 +744,7 @@ Value *eval_compiled_intrinsic(Vm *vm, Value **args) {
 
   arena_free(&ir_arena);
 
-  return result;
+  return value_clone(result, &vm->arena, &vm->values);
 }
 
 Value *eval_intrinsic(Vm *vm, Value **args) {
@@ -747,14 +761,14 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   Ir ir = parse_ex(code->as.string, path_cstr, &env->as.env->macros,
-                   &env->as.env->included_files, &ir_arena);
+                   &env->as.env->included_files, &ir_arena, &env->as.env->vm.arena);
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false, &ir_arena);
   Value *result = execute_block(&env->as.env->vm, &ir, true);
 
   free(path_cstr);
   arena_free(&ir_arena);
 
-  return result;
+  return value_clone(result, &vm->arena, &vm->values);
 }
 
 Value *exit_intrinsic(Vm *vm, Value **args) {
@@ -844,7 +858,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("is-func"), true, 1, { ValueKindUnit }, &is_func_intrinsic },
   { STR_LIT("is-dict"), true, 1, { ValueKindUnit }, &is_dict_intrinsic },
   // Env
-  { STR_LIT("make-env"), true, 0, {}, &make_env_intrinsic },
+  { STR_LIT("make-env"), true, 1, { ValueKindList }, &make_env_intrinsic },
   { STR_LIT("compile"), true, 3,
     { ValueKindEnv, ValueKindString, ValueKindString },
     &compile_intrinsic },

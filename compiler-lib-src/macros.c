@@ -380,7 +380,7 @@ void expand_macros(IrExpr *expr, Macros *macros,
           IrBlock variadic_block;
           variadic_block.len = expr->as.func_call.args.len - new_args.len;
           variadic_block.cap = variadic_block.len;
-          variadic_block.items = arena_alloc(arena, variadic_block.cap * sizeof(IrExpr));
+          variadic_block.items = arena_alloc(arena, variadic_block.cap * sizeof(IrExpr *));
 
           for (u32 i = 0; i < variadic_block.len; ++i)
             variadic_block.items[i] = expr->as.func_call.args.items[new_args.len + i];

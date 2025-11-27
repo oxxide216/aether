@@ -14,7 +14,7 @@
          term/reset ' Everything is ok!')
 
 (let print-color-ex [name fg bg alt-fg alt-bg] ->
-  (println alt-bg fg  name term/fg-white
+  (println alt-bg fg name
            term/reset (* FILLER (+ (- (len LONGEST-NAME) (len name)) GAP))
            alt-fg bg name term/reset))
 
