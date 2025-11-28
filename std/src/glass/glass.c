@@ -135,7 +135,7 @@ Value *load_texture_intrinsic(Vm *vm, Value **args) {
   if (!buffer) {
     stbi_image_free(buffer);
 
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
   }
 
   GlassTexture texture = glass_init_texture(GlassFilteringModeLinear);
@@ -143,7 +143,7 @@ Value *load_texture_intrinsic(Vm *vm, Value **args) {
   if (texture.id == 0) {
     stbi_image_free(buffer);
 
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
   }
 
   glass_put_texture_data(&texture, buffer, width, height, GlassPixelKindRGBA);
@@ -152,14 +152,14 @@ Value *load_texture_intrinsic(Vm *vm, Value **args) {
 
   Dict result = {0};
 
-  dict_push_value_str_key(&vm->arena, &result, STR_LIT("id"),
-                          value_int(texture.id, &vm->arena, &vm->values));
-  dict_push_value_str_key(&vm->arena, &result, STR_LIT("width"),
-                          value_float((f64) width, &vm->arena, &vm->values));
-  dict_push_value_str_key(&vm->arena, &result, STR_LIT("height"),
-                          value_float((f64) height, &vm->arena, &vm->values));
+  dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("id"),
+                          value_int(texture.id, vm_get_arena(vm), &vm->values));
+  dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("width"),
+                          value_float((f64) width, vm_get_arena(vm), &vm->values));
+  dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("height"),
+                          value_float((f64) height, vm_get_arena(vm), &vm->values));
 
-  return value_dict(result, &vm->arena, &vm->values);
+  return value_dict(result, vm_get_arena(vm), &vm->values);
 }
 
 Value *load_font_intrinsic(Vm *vm, Value **args) {
@@ -175,14 +175,14 @@ Value *load_font_intrinsic(Vm *vm, Value **args) {
   free(file_name_cstr);
 
   if (glass.fonts.len == index)
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
 
   Dict result = {0};
 
-  dict_push_value_str_key(&vm->arena, &result, STR_LIT("id"),
-                          value_int(index, &vm->arena, &vm->values));
+  dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("id"),
+                          value_int(index, vm_get_arena(vm), &vm->values));
 
-  return value_dict(result, &vm->arena, &vm->values);
+  return value_dict(result, vm_get_arena(vm), &vm->values);
 }
 
 
@@ -339,33 +339,33 @@ Value *run_intrinsic(Vm *vm, Value **args) {
   winx_destroy_window(&glass.window);
   winx_cleanup(&glass.winx);
 
-  return value_unit(&vm->arena, &vm->values);
+  return value_unit(vm_get_arena(vm), &vm->values);
 }
 
 Value *window_size_intrinsic(Vm *vm, Value **args) {
   (void) args;
 
   if (!initialized)
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
 
   Dict size = {0};
 
-  Value *width = value_alloc(&vm->arena, &vm->values);
+  Value *width = value_alloc(vm_get_arena(vm), &vm->values);
   width->kind = ValueKindFloat;
   width->as._float = (f32) glass.window.width;
-  dict_push_value_str_key(&vm->arena, &size, STR_LIT("width"), width);
+  dict_push_value_str_key(vm_get_arena(vm), &size, STR_LIT("width"), width);
 
-  Value *height = value_alloc(&vm->arena, &vm->values);
+  Value *height = value_alloc(vm_get_arena(vm), &vm->values);
   height->kind = ValueKindFloat;
   height->as._float = (f32) glass.window.height;
-  dict_push_value_str_key(&vm->arena, &size, STR_LIT("height"), height);
+  dict_push_value_str_key(vm_get_arena(vm), &size, STR_LIT("height"), height);
 
-  return value_dict(size, &vm->arena, &vm->values);
+  return value_dict(size, vm_get_arena(vm), &vm->values);
 }
 
 Value *text_width_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
 
   Value *id = try_get_dict_field_of_kind_str_key(&args[1]->as.dict, STR_LIT("id"),
                                                  ValueKindInt, "font", "font");
@@ -378,22 +378,22 @@ Value *text_width_intrinsic(Vm *vm, Value **args) {
     f32 result = 0.0;
     render_text(0.0, 0.0, args[0]->as._int, args[2]->as.string, font, &result, true);
 
-    return value_float(result, &vm->arena, &vm->values);
+    return value_float(result, vm_get_arena(vm), &vm->values);
   }
 
-  return value_unit(&vm->arena, &vm->values);
+  return value_unit(vm_get_arena(vm), &vm->values);
 }
 
 Value *clear_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
 
   clear_color.r = args[0]->as._float;
   clear_color.g = args[1]->as._float;
   clear_color.b = args[2]->as._float;
   clear_color.a = args[3]->as._float;
 
-  return value_unit(&vm->arena, &vm->values);
+  return value_unit(vm_get_arena(vm), &vm->values);
 }
 
 void push_primitive(f32 x, f32 y, f32 width, f32 height,
@@ -442,7 +442,7 @@ Value *quad_intrinsic(Vm *vm, Value **args) {
   (void) vm;
 
   if (!initialized)
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
 
   push_primitive(args[0]->as._float, args[1]->as._float,
                  args[2]->as._float, args[3]->as._float,
@@ -451,14 +451,14 @@ Value *quad_intrinsic(Vm *vm, Value **args) {
                  args[6]->as._float, args[7]->as._float,
                  0, TYPE_BASE);
 
-  return value_unit(&vm->arena, &vm->values);
+  return value_unit(vm_get_arena(vm), &vm->values);
 }
 
 Value *circle_intrinsic(Vm *vm, Value **args) {
   (void) vm;
 
   if (!initialized)
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
 
   push_primitive(args[0]->as._float - args[2]->as._float,
                  args[1]->as._float - args[2]->as._float,
@@ -468,12 +468,12 @@ Value *circle_intrinsic(Vm *vm, Value **args) {
                  args[5]->as._float, args[6]->as._float,
                  0, TYPE_CIRCLE);
 
-  return value_unit(&vm->arena, &vm->values);
+  return value_unit(vm_get_arena(vm), &vm->values);
 }
 
 Value *texture_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
 
   Value *id = try_get_dict_field_of_kind_str_key(&args[2]->as.dict, STR_LIT("id"),
                                                  ValueKindInt, "texture", "texture");
@@ -495,12 +495,12 @@ Value *texture_intrinsic(Vm *vm, Value **args) {
                  0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
                  id->as._int, TYPE_TEXTURE);
 
-  return value_unit(&vm->arena, &vm->values);
+  return value_unit(vm_get_arena(vm), &vm->values);
 }
 
 Value *textured_quad_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
 
   Value *id = try_get_dict_field_of_kind_str_key(&args[4]->as.dict, STR_LIT("id"),
                                                  ValueKindInt, "texture", "texture");
@@ -512,12 +512,12 @@ Value *textured_quad_intrinsic(Vm *vm, Value **args) {
                  0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
                  id->as._int, TYPE_TEXTURE);
 
-  return value_unit(&vm->arena, &vm->values);
+  return value_unit(vm_get_arena(vm), &vm->values);
 }
 
 Value *tile_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
 
   Value *id = try_get_dict_field_of_kind_str_key(&args[8]->as.dict, STR_LIT("id"),
                                                  ValueKindInt, "texture", "texture");
@@ -531,12 +531,12 @@ Value *tile_intrinsic(Vm *vm, Value **args) {
                  1.0, 1.0, 1.0, 1.0,
                  id->as._int, TYPE_TEXTURE);
 
-  return value_unit(&vm->arena, &vm->values);
+  return value_unit(vm_get_arena(vm), &vm->values);
 }
 
 Value *text_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
 
   Value *id = try_get_dict_field_of_kind_str_key(&args[3]->as.dict, STR_LIT("id"),
                                                  ValueKindInt, "font", "font");
@@ -550,7 +550,7 @@ Value *text_intrinsic(Vm *vm, Value **args) {
                 args[4]->as.string, font, NULL, false);
   }
 
-  return value_unit(&vm->arena, &vm->values);
+  return value_unit(vm_get_arena(vm), &vm->values);
 }
 
 Intrinsic glass_intrinsics[] = {

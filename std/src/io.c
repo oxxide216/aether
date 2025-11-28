@@ -15,7 +15,7 @@ Value *unblock_input_intrinsic(Vm *vm, Value **args) {
 
   fcntl(0, F_SETFL, fcntl(0, F_GETFL) | O_NONBLOCK);
 
-  return value_unit(&vm->arena, &vm->values);
+  return value_unit(vm_get_arena(vm), &vm->values);
 }
 
 Value *block_input_intrinsic(Vm *vm, Value **args) {
@@ -23,7 +23,7 @@ Value *block_input_intrinsic(Vm *vm, Value **args) {
 
   fcntl(0, F_SETFL, fcntl(0, F_GETFL) ^ O_NONBLOCK);
 
-  return value_unit(&vm->arena, &vm->values);
+  return value_unit(vm_get_arena(vm), &vm->values);
 }
 
 static char *str_to_cstr(Str str) {
@@ -42,17 +42,17 @@ Value *get_file_info_intrinsic(Vm *vm, Value **args) {
   if (access(path_cstring, F_OK) != 0) {
     free(path_cstring);
 
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
   }
 
   Dict info = {0};
 
   DIR *directory = opendir(path_cstring);
 
-  Value *is_directory = arena_alloc(&vm->arena, sizeof(Value));
+  Value *is_directory = arena_alloc(vm_get_arena(vm), sizeof(Value));
   is_directory->kind = ValueKindBool;
   is_directory->as._bool = directory != NULL || errno != ENOTDIR;
-  dict_push_value_str_key(&vm->arena, &info,
+  dict_push_value_str_key(vm_get_arena(vm), &info,
                           STR_LIT("is-directory"),
                           is_directory);
 
@@ -64,19 +64,19 @@ Value *get_file_info_intrinsic(Vm *vm, Value **args) {
   if (stat(path_cstring, &st) < 0) {
     free(path_cstring);
 
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
   }
 
-  Value *size = arena_alloc(&vm->arena, sizeof(Value));
+  Value *size = arena_alloc(vm_get_arena(vm), sizeof(Value));
   size->kind = ValueKindInt;
   size->as._int = st.st_size;
-  dict_push_value_str_key(&vm->arena, &info,
+  dict_push_value_str_key(vm_get_arena(vm), &info,
                           STR_LIT("size"),
                           size);
 
   free(path_cstring);
 
-  return value_dict(info, &vm->arena, &vm->values);
+  return value_dict(info, vm_get_arena(vm), &vm->values);
 }
 
 Value *read_file_intrinsic(Vm *vm, Value **args) {
@@ -84,14 +84,14 @@ Value *read_file_intrinsic(Vm *vm, Value **args) {
 
   char *path_cstring = str_to_cstr(path->as.string);
 
-  Str content = read_file_arena(path_cstring, &vm->arena);
+  Str content = read_file_arena(path_cstring, vm_get_arena(vm));
 
   free(path_cstring);
 
   if (content.len == (u32) -1)
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
 
-  return value_string(content, &vm->arena, &vm->values);
+  return value_string(content, vm_get_arena(vm), &vm->values);
 }
 
 Value *write_file_intrinsic(Vm *vm, Value **args) {
@@ -104,7 +104,7 @@ Value *write_file_intrinsic(Vm *vm, Value **args) {
 
   free(path_cstring);
 
-  return value_unit(&vm->arena, &vm->values);
+  return value_unit(vm_get_arena(vm), &vm->values);
 }
 
 Value *delete_file_intrinsic(Vm *vm, Value **args) {
@@ -116,7 +116,7 @@ Value *delete_file_intrinsic(Vm *vm, Value **args) {
 
   free(path_cstring);
 
-  return value_unit(&vm->arena, &vm->values);
+  return value_unit(vm_get_arena(vm), &vm->values);
 }
 
 static i32 unlink_dir_callback(const char *fpath, const struct stat *sb,
@@ -137,13 +137,13 @@ Value *delete_directory_intrinsic(Vm *vm, Value **args) {
 
   nftw(path_cstring, unlink_dir_callback, 64, FTW_DEPTH | FTW_PHYS);
 
-  return value_unit(&vm->arena, &vm->values);
+  return value_unit(vm_get_arena(vm), &vm->values);
 }
 
 Value *list_directory_intrinsic(Vm *vm, Value **args) {
   Value *path = args[0];
 
-  ListNode *list = arena_alloc(&vm->arena, sizeof(ListNode));
+  ListNode *list = arena_alloc(vm_get_arena(vm), sizeof(ListNode));
   ListNode *list_end = list;
 
   char *path_cstring = str_to_cstr(path->as.string);
@@ -155,12 +155,12 @@ Value *list_directory_intrinsic(Vm *vm, Value **args) {
     while ((entry = readdir(dir)) != NULL) {
       Str path;
       path.len = strlen(entry->d_name);
-      path.ptr = arena_alloc(&vm->arena, path.len);
+      path.ptr = arena_alloc(vm_get_arena(vm), path.len);
       memcpy(path.ptr, entry->d_name, path.len);
 
-      list_end->next = arena_alloc(&vm->arena, sizeof(ListNode));
+      list_end->next = arena_alloc(vm_get_arena(vm), sizeof(ListNode));
       list_end = list_end->next;
-      list_end->value = arena_alloc(&vm->arena, sizeof(Value));
+      list_end->value = arena_alloc(vm_get_arena(vm), sizeof(Value));
       list_end->value->kind = ValueKindString;
       list_end->value->as.string = path;
     }
@@ -169,12 +169,12 @@ Value *list_directory_intrinsic(Vm *vm, Value **args) {
   } else {
     free(path_cstring);
 
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
   }
 
   free(path_cstring);
 
-  return value_list(list, &vm->arena, &vm->values);
+  return value_list(list, vm_get_arena(vm), &vm->values);
 }
 
 Intrinsic io_intrinsics[] = {

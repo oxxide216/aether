@@ -7,7 +7,7 @@ Value *str_insert_intrinsic(Vm *vm, Value **args) {
 
   Str new_string;
   new_string.len = string->as.string.len + sub_string->as.string.len;
-  new_string.ptr = arena_alloc(&vm->arena, new_string.len);
+  new_string.ptr = arena_alloc(vm_get_arena(vm), new_string.len);
   memcpy(new_string.ptr, string->as.string.ptr, index->as._int);
   memcpy(new_string.ptr + index->as._int,
          sub_string->as.string.ptr,
@@ -16,7 +16,7 @@ Value *str_insert_intrinsic(Vm *vm, Value **args) {
          string->as.string.ptr + index->as._int,
          string->as.string.len - index->as._int);
 
-  return value_string(new_string, &vm->arena, &vm->values);
+  return value_string(new_string, vm_get_arena(vm), &vm->values);
 }
 
 Value *str_remove_intrinsic(Vm *vm, Value **args) {
@@ -26,13 +26,13 @@ Value *str_remove_intrinsic(Vm *vm, Value **args) {
 
   Str new_string;
   new_string.len = string->as.string.len - amount->as._int;
-  new_string.ptr = arena_alloc(&vm->arena, new_string.len);
+  new_string.ptr = arena_alloc(vm_get_arena(vm), new_string.len);
   memcpy(new_string.ptr, string->as.string.ptr, index->as._int);
   memcpy(new_string.ptr + index->as._int,
          string->as.string.ptr + index->as._int + 1,
          string->as.string.len - index->as._int - amount->as._int);
 
-  return value_string(new_string, &vm->arena, &vm->values);
+  return value_string(new_string, vm_get_arena(vm), &vm->values);
 }
 
 Value *str_replace_intrinsic(Vm *vm, Value **args) {
@@ -46,7 +46,7 @@ Value *str_replace_intrinsic(Vm *vm, Value **args) {
 
   Str new_string;
   new_string.len = new_len;
-  new_string.ptr = arena_alloc(&vm->arena, new_string.len);
+  new_string.ptr = arena_alloc(vm_get_arena(vm), new_string.len);
   memcpy(new_string.ptr, string->as.string.ptr, index->as._int);
   memcpy(new_string.ptr + index->as._int,
          sub_string->as.string.ptr,
@@ -55,14 +55,14 @@ Value *str_replace_intrinsic(Vm *vm, Value **args) {
          string->as.string.ptr + index->as._int + sub_string->as.string.len,
          string->as.string.len - index->as._int - sub_string->as.string.len);
 
-  return value_string(new_string, &vm->arena, &vm->values);
+  return value_string(new_string, vm_get_arena(vm), &vm->values);
 }
 
 Value *split_intrinsic(Vm *vm, Value **args) {
   Value *string = args[0];
   Value *delimeter = args[1];
 
-  ListNode *list = arena_alloc(&vm->arena, sizeof(ListNode));
+  ListNode *list = arena_alloc(vm_get_arena(vm), sizeof(ListNode));
   ListNode *node = list;
   u32 index = 0, i = 0;
 
@@ -77,12 +77,12 @@ Value *split_intrinsic(Vm *vm, Value **args) {
     }
 
     if (found) {
-      node->next = arena_alloc(&vm->arena, sizeof(ListNode));
-      node->next->value = arena_alloc(&vm->arena, sizeof(Value));
+      node->next = arena_alloc(vm_get_arena(vm), sizeof(ListNode));
+      node->next->value = arena_alloc(vm_get_arena(vm), sizeof(Value));
 
       Str new_string;
       new_string.len = i - index;
-      new_string.ptr = arena_alloc(&vm->arena, new_string.len);
+      new_string.ptr = arena_alloc(vm_get_arena(vm), new_string.len);
       memcpy(new_string.ptr, string->as.string.ptr + index, new_string.len);
 
       *node->next->value = (Value) {
@@ -96,12 +96,12 @@ Value *split_intrinsic(Vm *vm, Value **args) {
   }
 
   if (i > 0) {
-    node->next = arena_alloc(&vm->arena, sizeof(ListNode));
-    node->next->value = arena_alloc(&vm->arena, sizeof(Value));
+    node->next = arena_alloc(vm_get_arena(vm), sizeof(ListNode));
+    node->next->value = arena_alloc(vm_get_arena(vm), sizeof(Value));
 
     Str new_string;
     new_string.len = i - index;
-    new_string.ptr = arena_alloc(&vm->arena, new_string.len);
+    new_string.ptr = arena_alloc(vm_get_arena(vm), new_string.len);
     memcpy(new_string.ptr, string->as.string.ptr + index, new_string.len);
 
     *node->next->value = (Value) {
@@ -110,7 +110,7 @@ Value *split_intrinsic(Vm *vm, Value **args) {
     };
   }
 
-  return value_list(list, &vm->arena, &vm->values);
+  return value_list(list, vm_get_arena(vm), &vm->values);
 }
 
 Value *sub_str_intrinsic(Vm *vm, Value **args) {
@@ -120,14 +120,14 @@ Value *sub_str_intrinsic(Vm *vm, Value **args) {
 
   if (begin->as._int >= end->as._int ||
       (u32) end->as._int > string->as.string.len)
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
 
   Str sub_string = {
     string->as.string.ptr + begin->as._int,
     end->as._int - begin->as._int,
   };
 
-  return value_string(sub_string, &vm->arena, &vm->values);
+  return value_string(sub_string, vm_get_arena(vm), &vm->values);
 }
 
 Value *join_intrinsic(Vm *vm, Value **args) {
@@ -142,7 +142,7 @@ Value *join_intrinsic(Vm *vm, Value **args) {
       sb_push_str(&sb, filler->as.string);
 
     if (node->value->kind != ValueKindString)
-      PANIC(&vm->arena, &vm->values, "join: wrong part kinds\n");
+      PANIC(vm_get_arena(vm), &vm->values, "join: wrong part kinds\n");
 
     sb_push_str(&sb, node->value->as.string);
 
@@ -150,14 +150,14 @@ Value *join_intrinsic(Vm *vm, Value **args) {
   }
 
   Str joined = {
-    arena_alloc(&vm->arena, sb.len),
+    arena_alloc(vm_get_arena(vm), sb.len),
     sb.len,
   };
 
   memcpy(joined.ptr, sb.buffer, sb.len);
   free(sb.buffer);
 
-  return value_string(joined, &vm->arena, &vm->values);
+  return value_string(joined, vm_get_arena(vm), &vm->values);
 }
 
 Value *eat_str_intrinsic(Vm *vm, Value **args) {
@@ -165,7 +165,7 @@ Value *eat_str_intrinsic(Vm *vm, Value **args) {
   Value *pattern = args[1];
 
   if (string->as.string.len < pattern->as.string.len)
-    return value_bool(false, &vm->arena, &vm->values);
+    return value_bool(false, vm_get_arena(vm), &vm->values);
 
   Str string_begin = {
     string->as.string.ptr,
@@ -174,31 +174,31 @@ Value *eat_str_intrinsic(Vm *vm, Value **args) {
 
   bool matches = str_eq(string_begin, pattern->as.string);
 
-  ListNode *new_list = arena_alloc(&vm->arena, sizeof(ListNode));
+  ListNode *new_list = arena_alloc(vm_get_arena(vm), sizeof(ListNode));
 
-  new_list->next = arena_alloc(&vm->arena, sizeof(ListNode));
-  new_list->next->value = arena_alloc(&vm->arena, sizeof(Value));
+  new_list->next = arena_alloc(vm_get_arena(vm), sizeof(ListNode));
+  new_list->next->value = arena_alloc(vm_get_arena(vm), sizeof(Value));
   *new_list->next->value = (Value) { ValueKindBool, { ._bool = matches } };
 
-  new_list->next->next = arena_alloc(&vm->arena, sizeof(ListNode));
+  new_list->next->next = arena_alloc(vm_get_arena(vm), sizeof(ListNode));
   Str new_string = {
     string->as.string.ptr + pattern->as.string.len,
     string->as.string.len - pattern->as.string.len,
   };
-  new_list->next->next->value = arena_alloc(&vm->arena, sizeof(Value));
+  new_list->next->next->value = arena_alloc(vm_get_arena(vm), sizeof(Value));
   *new_list->next->next->value = (Value) {
     ValueKindString,
     { .string = new_string },
   };
 
-  return value_list(new_list, &vm->arena, &vm->values);
+  return value_list(new_list, vm_get_arena(vm), &vm->values);
 }
 
 static Value *eat_byte(Vm *vm, Value **args, u32 size) {
   Value *string = args[0];
 
   if (string->as.string.len < size)
-    return value_unit(&vm->arena, &vm->values);
+    return value_unit(vm_get_arena(vm), &vm->values);
 
   i64 _int = 0;
   switch (size) {
@@ -208,24 +208,24 @@ static Value *eat_byte(Vm *vm, Value **args, u32 size) {
   case 1: _int = *(i8 *) string->as.string.ptr; break;
   }
 
-  ListNode *new_list = arena_alloc(&vm->arena, sizeof(ListNode));
+  ListNode *new_list = arena_alloc(vm_get_arena(vm), sizeof(ListNode));
 
-  new_list->next = arena_alloc(&vm->arena, sizeof(ListNode));
-  new_list->next->value = arena_alloc(&vm->arena, sizeof(Value));
+  new_list->next = arena_alloc(vm_get_arena(vm), sizeof(ListNode));
+  new_list->next->value = arena_alloc(vm_get_arena(vm), sizeof(Value));
   *new_list->next->value = (Value) { ValueKindInt, { ._int = _int } };
 
-  new_list->next->next = arena_alloc(&vm->arena, sizeof(ListNode));
+  new_list->next->next = arena_alloc(vm_get_arena(vm), sizeof(ListNode));
   Str new_string = {
     string->as.string.ptr + size,
     string->as.string.len - size,
   };
-  new_list->next->next->value = arena_alloc(&vm->arena, sizeof(Value));
+  new_list->next->next->value = arena_alloc(vm_get_arena(vm), sizeof(Value));
   *new_list->next->next->value = (Value) {
     ValueKindString,
     { .string = new_string },
   };
 
-  return value_list(new_list, &vm->arena, &vm->values);
+  return value_list(new_list, vm_get_arena(vm), &vm->values);
 }
 
 Value *eat_byte_64_intrinsic(Vm *vm, Value **args) {

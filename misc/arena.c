@@ -31,6 +31,14 @@ void *arena_alloc(Arena *arena, u32 size) {
   return (*segment_next)->space;
 }
 
+void arena_reset(Arena *arena) {
+  Segment *segment = arena->segments;
+  while (segment) {
+    segment->len = 0;
+    segment = segment->next;
+  }
+}
+
 void arena_free(Arena *arena) {
   Segment *segment = arena->segments;
   while (segment) {

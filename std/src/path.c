@@ -7,10 +7,10 @@
 Value *get_current_path_intrinsic(Vm *vm, Value **args) {
   (void) args;
 
-  char *path = arena_alloc(&vm->arena, PATH_MAX_LENGTH);
+  char *path = arena_alloc(vm_get_arena(vm), PATH_MAX_LENGTH);
   getcwd(path, PATH_MAX_LENGTH);
 
-  return value_string(STR(path, strlen(path)), &vm->arena, &vm->values);
+  return value_string(STR(path, strlen(path)), vm_get_arena(vm), &vm->values);
 }
 
 Value *set_current_path_intrinsic(Vm *vm, Value **args) {
@@ -24,7 +24,7 @@ Value *set_current_path_intrinsic(Vm *vm, Value **args) {
 
   free(path_cstring);
 
-  return value_unit(&vm->arena, &vm->values);
+  return value_unit(vm_get_arena(vm), &vm->values);
 }
 
 Value *get_absolute_path_intrinsic(Vm *vm, Value **args) {
@@ -34,13 +34,13 @@ Value *get_absolute_path_intrinsic(Vm *vm, Value **args) {
   memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
   path_cstring[path->as.string.len] = '\0';
 
-  char *absolute_path = arena_alloc(&vm->arena, PATH_MAX_LENGTH);
+  char *absolute_path = arena_alloc(vm_get_arena(vm), PATH_MAX_LENGTH);
   realpath(path_cstring, absolute_path);
 
   free(path_cstring);
 
   return value_string(STR(absolute_path, strlen(absolute_path)),
-                      &vm->arena, &vm->values);
+                      vm_get_arena(vm), &vm->values);
 }
 
 Intrinsic path_intrinsics[] = {

@@ -141,65 +141,65 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
     type = STR_LIT("key-press");
 
     WinxKeyCode key_code = event->as.key.key_code;
-    dict_push_value_str_key(&vm->arena, &result, STR_LIT("key-code"),
-                            value_string(key_code_names[key_code], &vm->arena, &vm->values));
+    dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("key-code"),
+                            value_string(key_code_names[key_code], vm_get_arena(vm), &vm->values));
 
-    Str _char = { arena_alloc(&vm->arena, 1), 1 };
+    Str _char = { arena_alloc(vm_get_arena(vm), 1), 1 };
     *_char.ptr = (char) event->as.key._char;
-    dict_push_value_str_key(&vm->arena, &result, STR_LIT("char"),
-                            value_string(_char, &vm->arena, &vm->values));
+    dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("char"),
+                            value_string(_char, vm_get_arena(vm), &vm->values));
   } break;
 
   case WinxEventKindKeyRelease: {
     type = STR_LIT("key-release");
 
     WinxKeyCode key_code = event->as.key.key_code;
-    dict_push_value_str_key(&vm->arena, &result, STR_LIT("key-code"),
-                            value_string(key_code_names[key_code], &vm->arena, &vm->values));
+    dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("key-code"),
+                            value_string(key_code_names[key_code], vm_get_arena(vm), &vm->values));
 
-    Str _char = { arena_alloc(&vm->arena, 1), 1 };
+    Str _char = { arena_alloc(vm_get_arena(vm), 1), 1 };
     *_char.ptr = (char) event->as.key._char;
-    dict_push_value_str_key(&vm->arena, &result, STR_LIT("char"),
-                            value_string(_char, &vm->arena, &vm->values));
+    dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("char"),
+                            value_string(_char, vm_get_arena(vm), &vm->values));
   } break;
 
   case WinxEventKindKeyHold: {
     type = STR_LIT("key-hold");
 
     WinxKeyCode key_code = event->as.key.key_code;
-    dict_push_value_str_key(&vm->arena, &result, STR_LIT("key-code"),
-                            value_string(key_code_names[key_code], &vm->arena, &vm->values));
+    dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("key-code"),
+                            value_string(key_code_names[key_code], vm_get_arena(vm), &vm->values));
 
-    Str _char = { arena_alloc(&vm->arena, 1), 1 };
+    Str _char = { arena_alloc(vm_get_arena(vm), 1), 1 };
     *_char.ptr = (char) event->as.key._char;
-    dict_push_value_str_key(&vm->arena, &result, STR_LIT("char"),
-                            value_string(_char, &vm->arena, &vm->values));
+    dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("char"),
+                            value_string(_char, vm_get_arena(vm), &vm->values));
   } break;
 
   case WinxEventKindButtonPress: {
     type = STR_LIT("button-press");
 
     WinxMouseButton button = event->as.button.button;
-    dict_push_value_str_key(&vm->arena, &result, STR_LIT("button"),
-                            value_string(mouse_button_names[button], &vm->arena, &vm->values));
+    dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("button"),
+                            value_string(mouse_button_names[button], vm_get_arena(vm), &vm->values));
   } break;
 
   case WinxEventKindButtonRelease: {
     type = STR_LIT("button-release");
 
     WinxMouseButton button = event->as.button.button;
-    dict_push_value_str_key(&vm->arena, &result, STR_LIT("button"),
-                            value_string(mouse_button_names[button], &vm->arena, &vm->values));
+    dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("button"),
+                            value_string(mouse_button_names[button], vm_get_arena(vm), &vm->values));
   } break;
 
   case WinxEventKindMouseMove: {
     type = STR_LIT("mouse-move");
 
-    dict_push_value_str_key(&vm->arena, &result, STR_LIT("x"),
-                            value_int(event->as.mouse_move.x, &vm->arena, &vm->values));
+    dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("x"),
+                            value_int(event->as.mouse_move.x, vm_get_arena(vm), &vm->values));
 
-    dict_push_value_str_key(&vm->arena, &result, STR_LIT("y"),
-                            value_int(event->as.mouse_move.y, &vm->arena, &vm->values));
+    dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("y"),
+                            value_int(event->as.mouse_move.y, vm_get_arena(vm), &vm->values));
   } break;
 
   case WinxEventKindFocus: {
@@ -213,11 +213,11 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
   case WinxEventKindResize: {
     type = STR_LIT("resize");
 
-    dict_push_value_str_key(&vm->arena, &result, STR_LIT("width"),
-                            value_int(event->as.resize.width, &vm->arena, &vm->values));
+    dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("width"),
+                            value_int(event->as.resize.width, vm_get_arena(vm), &vm->values));
 
-    dict_push_value_str_key(&vm->arena, &result, STR_LIT("height"),
-                            value_int(event->as.resize.height, &vm->arena, &vm->values));
+    dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("height"),
+                            value_int(event->as.resize.height, vm_get_arena(vm), &vm->values));
   } break;
 
   case WinxEventKindQuit: {
@@ -225,8 +225,8 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
   } break;
   }
 
-  dict_push_value_str_key(&vm->arena, &result, STR_LIT("type"),
-                          value_string(type, &vm->arena, &vm->values));
+  dict_push_value_str_key(vm_get_arena(vm), &result, STR_LIT("type"),
+                          value_string(type, vm_get_arena(vm), &vm->values));
 
-  return value_dict(result, &vm->arena, &vm->values);
+  return value_dict(result, vm_get_arena(vm), &vm->values);
 }

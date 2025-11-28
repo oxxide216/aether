@@ -121,12 +121,15 @@ typedef struct {
 
 typedef Da(Intrinsic) Intrinsics;
 
+typedef Da(Arena) Arenas;
+
 struct Vm {
   Vars         global_vars;
   Vars         local_vars;
   Intrinsics   intrinsics;
   Values       values;
-  Arena        arena;
+  Arenas       arenas;
+  u32          current_arena_index;
   ListNode    *args;
   ExecState    state;
   i64          exit_code;
@@ -202,5 +205,7 @@ u32    execute(Ir *ir, i32 argc, char **argv, Arena *arena,
 Vm   vm_create(i32 argc, char **argv, Intrinsics *intrinsics);
 void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics);
 void vm_destroy(Vm *vm);
+
+Arena *vm_get_arena(Vm *vm);
 
 #endif // AETHER_VM

@@ -3,7 +3,7 @@
 
 #include "shl/shl-defs.h"
 
-#define DEFAULT_ARENA_SEGMENT_SIZE 1024
+#define DEFAULT_ARENA_SEGMENT_SIZE 4096
 
 typedef struct Segment Segment;
 
@@ -18,6 +18,7 @@ typedef struct {
 } Arena;
 
 void *arena_alloc(Arena *arena, u32 size);
+void  arena_reset(Arena *arena);
 void  arena_free(Arena *arena);
 
 #endif // ARENA_H
