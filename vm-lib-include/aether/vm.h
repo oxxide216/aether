@@ -138,6 +138,7 @@ typedef struct {
   Macros    macros;
   FilePaths included_files;
   Vm        vm;
+  Arena     arena;
   u32       refs_count;
 } Env;
 

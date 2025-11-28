@@ -40,6 +40,7 @@ typedef struct {
   FilePaths *included_files;
   Arena     *arena;
   Arena     *persistent_arena;
+  bool       is_in_macro;
   Ir         ir;
 } Parser;
 
@@ -280,14 +281,17 @@ static Str copy_str(Str str, Arena *arena) {
   return copy;
 }
 
+static Arena *get_arena(Parser *parser) {
+  if (parser->is_in_macro)
+    return parser->persistent_arena;
+  return parser->arena;
+}
+
 static void parser_parse_macro_def(Parser *parser) {
   Macro macro = {0};
 
-  Arena *arena = parser->arena;
-  parser->arena = parser->persistent_arena;
-
   Token *name_token = parser_expect_token(parser, MASK(TT_IDENT));
-  macro.name = copy_str(name_token->lexeme, parser->arena);
+  macro.name = copy_str(name_token->lexeme, parser->persistent_arena);
 
   parser_expect_token(parser, MASK(TT_OBRACKET));
 
@@ -306,7 +310,7 @@ static void parser_parse_macro_def(Parser *parser) {
       break;
     }
 
-    Str arg_name = copy_str(arg_token->lexeme, parser->arena);
+    Str arg_name = copy_str(arg_token->lexeme, parser->persistent_arena);
     DA_APPEND(arg_names, arg_name);
 
     next_token = parser_peek_token(parser);
@@ -314,7 +318,7 @@ static void parser_parse_macro_def(Parser *parser) {
 
   macro.arg_names.len = arg_names.len;
   macro.arg_names.cap = macro.arg_names.len;
-  macro.arg_names.items = arena_alloc(parser->arena, macro.arg_names.cap * sizeof(Str));
+  macro.arg_names.items = arena_alloc(parser->persistent_arena, macro.arg_names.cap * sizeof(Str));
   memcpy(macro.arg_names.items, arg_names.items, macro.arg_names.len * sizeof(Str));
 
   free(arg_names.items);
@@ -322,9 +326,12 @@ static void parser_parse_macro_def(Parser *parser) {
   parser_expect_token(parser, MASK(TT_CBRACKET));
   parser_expect_token(parser, MASK(TT_RIGHT_ARROW));
 
+  bool prev_is_in_macro = parser->is_in_macro;
+  parser->is_in_macro = true;
+
   macro.body = parser_parse_block(parser, MASK(TT_CPAREN));
 
-  parser->arena = arena;
+  parser->is_in_macro = prev_is_in_macro;
 
   parser_expect_token(parser, MASK(TT_CPAREN));
 
@@ -349,7 +356,7 @@ static IrExprDict parser_parse_dict(Parser *parser) {
 
   dict.len = fields.len;
   dict.cap = dict.len;
-  dict.items = arena_alloc(parser->arena, dict.cap * sizeof(IrField));
+  dict.items = arena_alloc(get_arena(parser), dict.cap * sizeof(IrField));
   memcpy(dict.items, fields.items, dict.len * sizeof(IrField));
 
   free(fields.items);
@@ -376,7 +383,7 @@ static IrExprLambda parser_parse_lambda(Parser *parser) {
 
   lambda.args.len = args.len;
   lambda.args.cap = lambda.args.len;
-  lambda.args.items = arena_alloc(parser->arena, lambda.args.cap * sizeof(Str));
+  lambda.args.items = arena_alloc(get_arena(parser), lambda.args.cap * sizeof(Str));
   memcpy(lambda.args.items, args.items, args.len * sizeof(Str));
 
   free(args.items);
@@ -390,7 +397,7 @@ static IrExprLambda parser_parse_lambda(Parser *parser) {
       intrinsic_name_token->lexeme.ptr + 1,
       intrinsic_name_token->lexeme.len - 2,
     };
-    lambda.intrinsic_name = copy_str(intrinsic_name, parser->arena);
+    lambda.intrinsic_name = copy_str(intrinsic_name, parser->persistent_arena);
   } else {
     lambda.body = parser_parse_block(parser, MASK(TT_CPAREN) |
                                              MASK(TT_CBRACKET) |
@@ -422,7 +429,7 @@ static IrExprMatch parser_parse_match(Parser *parser) {
 
   match.cases.len = cases.len;
   match.cases.cap = match.cases.len;
-  match.cases.items = arena_alloc(parser->arena, match.cases.cap * sizeof(IrCase));
+  match.cases.items = arena_alloc(get_arena(parser), match.cases.cap * sizeof(IrCase));
   memcpy(match.cases.items, cases.items, match.cases.len * sizeof(IrCase));
 
   free(cases.items);
@@ -449,7 +456,7 @@ static Str get_file_dir(Str path) {
 }
 
 static IrExpr *parser_parse_expr(Parser *parser) {
-  IrExpr *expr = arena_alloc(parser->arena, sizeof(IrExpr));
+  IrExpr *expr = arena_alloc(get_arena(parser), sizeof(IrExpr));
   *expr = (IrExpr) {0};
 
   Token *token = parser_expect_token(parser, MASK(TT_OPAREN) | MASK(TT_STR) |
@@ -458,7 +465,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
                                              MASK(TT_OCURLY) | MASK(TT_OBRACKET));
 
   expr->meta.file_path = copy_str(STR(token->file_path, strlen(token->file_path)),
-                                  parser->arena);
+                                  parser->persistent_arena);
 
   expr->meta.row = token->row;
   expr->meta.col = token->col;
@@ -470,12 +477,12 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     expr->kind = IrExprKindString;
 
     expr->as.string.lit = copy_str(STR(token->lexeme.ptr + 1, token->lexeme.len - 2),
-                                   parser->arena);
+                                   parser->persistent_arena);
   } break;
 
   case TT_IDENT: {
     expr->kind = IrExprKindIdent;
-    expr->as.ident.ident = copy_str(token->lexeme, parser->arena);
+    expr->as.ident.ident = copy_str(token->lexeme, parser->persistent_arena);
   } break;
 
   case TT_INT: {
@@ -531,7 +538,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
       Token *name_token = parser_expect_token(parser, MASK(TT_IDENT));
 
       expr->kind = IrExprKindVarDef;
-      expr->as.var_def.name = copy_str(name_token->lexeme, parser->arena);
+      expr->as.var_def.name = copy_str(name_token->lexeme, parser->persistent_arena);
       expr->as.var_def.expr = parser_parse_expr(parser);
 
       parser_expect_token(parser, MASK(TT_CPAREN));
@@ -569,7 +576,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
       expr->as._if.elifs.len = elifs.len;
       expr->as._if.elifs.cap = expr->as._if.elifs.len;
       expr->as._if.elifs.items =
-        arena_alloc(parser->arena, expr->as._if.elifs.cap * sizeof(IrElif));
+        arena_alloc(get_arena(parser), expr->as._if.elifs.cap * sizeof(IrElif));
       memcpy(expr->as._if.elifs.items, elifs.items, expr->as._if.elifs.len * sizeof(IrElif));
 
       free(elifs.items);
@@ -641,10 +648,10 @@ static IrExpr *parser_parse_expr(Parser *parser) {
         if (already_included)
           break;
 
-        code = read_file_arena(path.ptr, parser->arena);
+        code = read_file_arena(path.ptr, get_arena(parser));
 
         if (code.len != (u32) -1) {
-          char *new_ptr = arena_alloc(parser->arena, path.len);
+          char *new_ptr = arena_alloc(get_arena(parser), path.len);
           memcpy(new_ptr, path.ptr, path.len);
           free(path.ptr);
           path.ptr = new_ptr;
@@ -670,7 +677,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
       expr->kind = IrExprKindBlock;
       expr->as.block = parse_ex(code, path.ptr, parser->macros,
                                 parser->included_files, parser->arena,
-                                parser->arena);
+                                parser->persistent_arena);
 
       free(prefix);
     } break;
@@ -730,7 +737,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   if (token && token->id == TT_QOLON) {
     parser_next_token(parser);
 
-    IrExpr *get_at = arena_alloc(parser->arena, sizeof(IrExpr));
+    IrExpr *get_at = arena_alloc(get_arena(parser), sizeof(IrExpr));
     get_at->kind = IrExprKindGetAt;
     get_at->as.get_at.src = expr;
     get_at->as.get_at.key = parser_parse_expr(parser);
@@ -765,7 +772,7 @@ Ir parse(Str code, char *file_path, Arena *arena, Arena *persistent_arena) {
   FilePaths included_files = {0};
   Ir ir = parse_ex(code, file_path, &macros, &included_files,
                    arena, persistent_arena);
-  expand_macros_block(&ir, &macros, NULL, NULL, false, arena);
+  expand_macros_block(&ir, &macros, NULL, NULL, false, persistent_arena);
 
   if (macros.items)
     free(macros.items);

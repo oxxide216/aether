@@ -166,6 +166,7 @@ void value_free(Value *value) {
       if (value->as.env->included_files.items)
         free(value->as.env->included_files.items);
       vm_destroy(&value->as.env->vm);
+      arena_free(&value->as.env->arena);
       free(value->as.env);
     }
   }

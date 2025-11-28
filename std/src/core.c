@@ -714,8 +714,8 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   Ir ir = parse_ex(code->as.string, path_cstr, &env->as.env->macros,
-                   &env->as.env->included_files, &ir_arena, &env->as.env->vm.arena);
-  expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false, &ir_arena);
+                   &env->as.env->included_files, &ir_arena, &env->as.env->arena);
+  expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false, &env->as.env->arena);
 
   Str bytecode = {0};
   bytecode.ptr = (char *) serialize(&ir, &bytecode.len);
@@ -739,7 +739,7 @@ Value *eval_compiled_intrinsic(Vm *vm, Value **args) {
   Arena ir_arena = {0};
   Ir ir = deserialize((u8 *) bytecode->as.string.ptr,
                       bytecode->as.string.len,
-                      &ir_arena, &env->as.env->vm.arena);
+                      &ir_arena, &env->as.env->arena);
   Value *result = execute_block(&env->as.env->vm, &ir, true);
 
   arena_free(&ir_arena);
@@ -761,8 +761,8 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   Ir ir = parse_ex(code->as.string, path_cstr, &env->as.env->macros,
-                   &env->as.env->included_files, &ir_arena, &env->as.env->vm.arena);
-  expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false, &ir_arena);
+                   &env->as.env->included_files, &ir_arena, &env->as.env->arena);
+  expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false, &env->as.env->arena);
   Value *result = execute_block(&env->as.env->vm, &ir, true);
 
   free(path_cstr);
