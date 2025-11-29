@@ -4,35 +4,37 @@
 #include "shl/shl-str.h"
 #include "shl/shl-log.h"
 
+#define WHILE_FRAME_LENGTH 10
+
 #define META_FMT       STR_FMT":%u:%u: "
 #define META_ARG(meta) STR_ARG((meta).file_path), (meta).row + 1, (meta).col + 1
 
-#define CATCH_VARS(vm, local_names, catched_values, arena, values, expr) \
-  do {                                                                   \
-    catch_vars(vm, local_names, catched_values, arena, values, expr);    \
-    if (vm->state != ExecStateContinue)                                  \
-      return;                                                            \
+#define CATCH_VARS(vm, local_names, catched_values, frame, expr) \
+  do {                                                           \
+    catch_vars(vm, local_names, catched_values, frame, expr);    \
+    if (vm->state != ExecStateContinue)                          \
+      return;                                                    \
   } while (0)
 
-#define CATCH_VARS_BLOCK(vm, local_names, catched_values, arena, values, block) \
-  do {                                                                          \
-    catch_vars_block(vm, local_names, catched_values, arena, values, block);    \
-    if (vm->state != ExecStateContinue)                                         \
-      return;                                                                   \
+#define CATCH_VARS_BLOCK(vm, local_names, catched_values, frame, block) \
+  do {                                                                  \
+    catch_vars_block(vm, local_names, catched_values, frame, block);    \
+    if (vm->state != ExecStateContinue)                                 \
+      return;                                                           \
   } while (0)
 
 typedef Da(Str) Strs;
 
-ListNode *list_clone(ListNode *list, Arena *arena, Values *values) {
-  if (!list)
+ListNode *list_clone(ListNode *nodes, StackFrame *frame, u32 frame_index) {
+  if (!nodes)
     return NULL;
 
   ListNode *new_list = NULL;
   ListNode **new_list_next = &new_list;
-  ListNode *node = list;
+  ListNode *node = nodes;
   while (node) {
-    *new_list_next = arena_alloc(arena, sizeof(ListNode));
-    (*new_list_next)->value = value_clone(node->value, arena, values);
+    *new_list_next = arena_alloc(&frame->arena, sizeof(ListNode));
+    (*new_list_next)->value = value_clone(node->value, frame, frame_index);
     new_list_next = &(*new_list_next)->next;
 
     node = node->next;
@@ -41,101 +43,102 @@ ListNode *list_clone(ListNode *list, Arena *arena, Values *values) {
   return new_list;
 }
 
-Dict dict_clone(Dict *dict, Arena *arena, Values *values) {
+Dict dict_clone(Dict *dict, StackFrame *frame, u32 frame_index) {
   Dict copy = {
-    arena_alloc(arena, dict->len * sizeof(DictValue)),
+    arena_alloc(&frame->arena, dict->len * sizeof(DictValue)),
     dict->len,
     dict->len,
   };
 
   for (u32 i = 0; i < copy.len; ++i) {
-    copy.items[i].key = value_clone(dict->items[i].key, arena, values);
-    copy.items[i].value = value_clone(dict->items[i].value, arena, values);
+    copy.items[i].key = value_clone(dict->items[i].key, frame, frame_index);
+    copy.items[i].value = value_clone(dict->items[i].value, frame, frame_index);
   }
 
   return copy;
 }
 
-Value *value_unit(Arena *arena, Values *values) {
-  Value *value = value_alloc(arena, values);
-  value->kind = ValueKindUnit;
+Value *value_unit(StackFrame *frame, u32 frame_index) {
+  Value *value = value_alloc(frame);
+  *value = (Value) { ValueKindUnit, {}, frame_index };
   return value;
 }
 
-Value *value_list(ListNode *nodes, Arena *arena, Values *values) {
-  Value *value = value_alloc(arena, values);
-  *value = (Value) { ValueKindList, { .list = nodes } };
+Value *value_list(ListNode *nodes, StackFrame *frame, u32 frame_index) {
+  Value *value = value_alloc(frame);
+  *value = (Value) { ValueKindList, { .list = nodes }, frame_index };
   return value;
 }
 
-Value *value_string(Str string, Arena *arena, Values *values) {
-  Value *value = value_alloc(arena, values);
-  Str new_string = { arena_alloc(arena, string.len), string.len };
+Value *value_string(Str string, StackFrame *frame, u32 frame_index) {
+  Value *value = value_alloc(frame);
+  Str new_string = { arena_alloc(&frame->arena, string.len), string.len };
   memcpy(new_string.ptr, string.ptr, new_string.len);
-  *value = (Value) { ValueKindString, { .string = new_string } };
+  *value = (Value) { ValueKindString, { .string = new_string }, frame_index };
   return value;
 }
 
-Value *value_int(i64 _int, Arena *arena, Values *values) {
-  Value *value = value_alloc(arena, values);
-  *value = (Value) { ValueKindInt, { ._int = _int } };
+Value *value_int(i64 _int, StackFrame *frame, u32 frame_index) {
+  Value *value = value_alloc(frame);
+  *value = (Value) { ValueKindInt, { ._int = _int }, frame_index };
   return value;
 }
 
-Value *value_float(f64 _float, Arena *arena, Values *values) {
-  Value *value = value_alloc(arena, values);
-  *value = (Value) { ValueKindFloat, { ._float = _float } };
+Value *value_float(f64 _float, StackFrame *frame, u32 frame_index) {
+  Value *value = value_alloc(frame);
+  *value = (Value) { ValueKindFloat, { ._float = _float }, frame_index };
   return value;
 }
 
-Value *value_bool(bool _bool, Arena *arena, Values *values) {
-  Value *value = value_alloc(arena, values);
-  *value = (Value) { ValueKindBool, { ._bool = _bool } };
+Value *value_bool(bool _bool, StackFrame *frame, u32 frame_index) {
+  Value *value = value_alloc(frame);
+  *value = (Value) { ValueKindBool, { ._bool = _bool }, frame_index };
   return value;
 }
 
-Value *value_dict(Dict dict, Arena *arena, Values *values) {
-  Value *value = value_alloc(arena, values);
-  *value = (Value) { ValueKindDict, { .dict = dict } };
+Value *value_dict(Dict dict, StackFrame *frame, u32 frame_index) {
+  Value *value = value_alloc(frame);
+  *value = (Value) { ValueKindDict, { .dict = dict }, frame_index };
   return value;
 }
 
-Value *value_func(Func func, Arena *arena, Values *values) {
-  Value *value = value_alloc(arena, values);
-  *value = (Value) { ValueKindFunc, { .func = func } };
+Value *value_func(Func func, StackFrame *frame, u32 frame_index) {
+  Value *value = value_alloc(frame);
+  *value = (Value) { ValueKindFunc, { .func = func }, frame_index };
   return value;
 }
 
-Value *value_env(Vm vm, Arena *arena, Values *values) {
-  Value *value = value_alloc(arena, values);
+Value *value_env(Vm vm, StackFrame *frame, u32 frame_index) {
+  Value *value = value_alloc(frame);
   Env *env = malloc(sizeof(Env));
   *env = (Env) {0};
   env->vm = vm;
   env->refs_count = 1;
-  *value = (Value) { ValueKindEnv, { .env = env } };
+  *value = (Value) { ValueKindEnv, { .env = env }, frame_index };
   return value;
 }
 
-Value *value_alloc(Arena *arena, Values *local_values) {
-  Value *value = arena_alloc(arena, sizeof(Value));
-  DA_APPEND(*local_values, value);
+Value *value_alloc(StackFrame *frame) {
+  Value *value = arena_alloc(&frame->arena, sizeof(Value));
+  DA_APPEND(frame->values, value);
 
   return value;
 }
 
-Value *value_clone(Value *value, Arena *arena, Values *values) {
-  Value *copy = value_alloc(arena, values);
+Value *value_clone(Value *value, StackFrame *frame, u32 frame_index) {
+  Value *copy = value_alloc(frame);
   *copy = *value;
+  copy->frame_index = frame_index;
 
   if (value->kind == ValueKindList) {
-    copy->as.list = arena_alloc(arena, sizeof(ListNode));
-    copy->as.list->next = list_clone(value->as.list->next, arena, values);
+    copy->as.list = arena_alloc(&frame->arena, sizeof(ListNode));
+    copy->as.list->next = list_clone(value->as.list->next, frame, frame_index);
   } else if (value->kind == ValueKindString) {
     copy->as.string.len = value->as.string.len;
-    copy->as.string.ptr = arena_alloc(arena, copy->as.string.len);
+    copy->as.string.ptr = arena_alloc(&frame->arena, copy->as.string.len);
     memcpy(copy->as.string.ptr, value->as.string.ptr, copy->as.string.len);
   } else if (value->kind == ValueKindDict) {
-    copy->as.dict = dict_clone(&value->as.dict, arena, values);
+    copy->as.dict = dict_clone(&value->as.dict, frame, frame_index);
   } else if (value->kind == ValueKindEnv) {
     ++copy->as.env->refs_count;
   }
@@ -158,7 +161,7 @@ void value_free(Value *value) {
       value_free(value->as.dict.items[i].value);
     }
   } else if (value->kind == ValueKindFunc) {
-    arena_free(&value->as.func.catched_values_arena);
+    arena_free(&value->as.func.catched_frame.arena);
   } else if (value->kind == ValueKindEnv) {
     if (--value->as.env->refs_count == 0) {
       if (value->as.env->macros.items)
@@ -238,73 +241,82 @@ bool value_eq(Value *a, Value *b) {
 }
 
 static Var *get_var(Vm *vm, Str name) {
-  for (u32 i = vm->local_vars.len; i > 0; --i) {
-    if (str_eq(vm->local_vars.items[i - 1].name, name))
-      return vm->local_vars.items + i - 1;
+  u32 depth = 0;
+
+  for (u32 i = vm->current_frame_index + 1;
+       i > vm->current_frame_index - depth;
+       --i) {
+    StackFrame *frame = vm->frames.items + i - 1;
+
+    for (u32 j = frame->vars.len; j > 0; --j)
+      if (str_eq(frame->vars.items[j - 1].name, name))
+        return frame->vars.items + j - 1;
+
+    if (frame->can_lookup_through)
+      ++depth;
   }
 
-  for (u32 i = vm->global_vars.len; i > 0; --i) {
-    if (str_eq(vm->global_vars.items[i - 1].name, name))
-      return vm->global_vars.items + i - 1;
-  }
+  for (u32 j = vm->global_vars.len; j > 0; --j)
+    if (str_eq(vm->global_vars.items[j - 1].name, name))
+      return vm->global_vars.items + j - 1;
 
   return NULL;
 }
 
 static void catch_vars_block(Vm *vm, Strs *local_names,
                              NamedValues *catched_values,
-                             Arena *arena, Values *values,
+                             StackFrame *frame,
                              IrBlock *block);
 
 static void catch_vars(Vm *vm, Strs *local_names,
                        NamedValues *catched_values,
-                       Arena *arena, Values *values,
+                       StackFrame *frame,
                        IrExpr *expr) {
   switch (expr->kind) {
   case IrExprKindBlock: {
-    CATCH_VARS_BLOCK(vm, local_names, catched_values, arena, values, &expr->as.block);
+    CATCH_VARS_BLOCK(vm, local_names, catched_values, frame, &expr->as.block);
   } break;
 
   case IrExprKindFuncCall: {
-    CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.func_call.func);
-    CATCH_VARS_BLOCK(vm, local_names, catched_values, arena, values, &expr->as.func_call.args);
+    CATCH_VARS(vm, local_names, catched_values, frame, expr->as.func_call.func);
+    CATCH_VARS_BLOCK(vm, local_names, catched_values, frame, &expr->as.func_call.args);
   } break;
 
   case IrExprKindVarDef: {
-    CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.var_def.expr);
+    CATCH_VARS(vm, local_names, catched_values, frame, expr->as.var_def.expr);
 
     DA_APPEND(*local_names, expr->as.var_def.name);
   } break;
 
   case IrExprKindIf: {
-    CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as._if.cond);
-    CATCH_VARS_BLOCK(vm, local_names, catched_values, arena, values, &expr->as._if.if_body);
+    CATCH_VARS(vm, local_names, catched_values, frame, expr->as._if.cond);
+    CATCH_VARS_BLOCK(vm, local_names, catched_values, frame, &expr->as._if.if_body);
 
     for (u32 i = 0; i < expr->as._if.elifs.len; ++i)
-      CATCH_VARS_BLOCK(vm, local_names, catched_values, arena,
-                       values, &expr->as._if.elifs.items[i].body);
+      CATCH_VARS_BLOCK(vm, local_names, catched_values, frame,
+                       &expr->as._if.elifs.items[i].body);
 
     if (expr->as._if.has_else)
-      CATCH_VARS_BLOCK(vm, local_names, catched_values, arena,
-                       values, &expr->as._if.else_body);
+      CATCH_VARS_BLOCK(vm, local_names, catched_values, frame,
+                       &expr->as._if.else_body);
   } break;
 
   case IrExprKindWhile: {
-    CATCH_VARS_BLOCK(vm, local_names, catched_values, arena, values, &expr->as._while.body);
+    CATCH_VARS_BLOCK(vm, local_names, catched_values, frame, &expr->as._while.body);
   } break;
 
   case IrExprKindSet: {
-    CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.set.src);
+    CATCH_VARS(vm, local_names, catched_values, frame, expr->as.set.src);
   } break;
 
   case IrExprKindGetAt: {
-    CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.get_at.src);
-    CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.get_at.key);
+    CATCH_VARS(vm, local_names, catched_values, frame, expr->as.get_at.src);
+    CATCH_VARS(vm, local_names, catched_values, frame, expr->as.get_at.key);
   } break;
 
   case IrExprKindSetAt: {
-    CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.set_at.key);
-    CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.set_at.value);
+    CATCH_VARS(vm, local_names, catched_values, frame, expr->as.set_at.key);
+    CATCH_VARS(vm, local_names, catched_values, frame, expr->as.set_at.value);
 
     for (u32 i = 0; i < local_names->len; ++i)
       if (str_eq(expr->as.set_at.dest, local_names->items[i]))
@@ -314,7 +326,7 @@ static void catch_vars(Vm *vm, Strs *local_names,
     if (var && var->kind != VarKindGlobal) {
       NamedValue value = {
         var->name,
-        value_clone(var->value, arena, values),
+        value_clone(var->value, frame, 0),
       };
       DA_APPEND(*catched_values, value);
     }
@@ -322,11 +334,11 @@ static void catch_vars(Vm *vm, Strs *local_names,
 
   case IrExprKindRet: {
     if (expr->as.ret.has_expr)
-      CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.ret.expr);
+      CATCH_VARS(vm, local_names, catched_values, frame, expr->as.ret.expr);
   } break;
 
   case IrExprKindList: {
-    CATCH_VARS_BLOCK(vm, local_names, catched_values, arena, values, &expr->as.list.content);
+    CATCH_VARS_BLOCK(vm, local_names, catched_values, frame, &expr->as.list.content);
   } break;
 
   case IrExprKindIdent: {
@@ -338,7 +350,7 @@ static void catch_vars(Vm *vm, Strs *local_names,
     if (var && var->kind != VarKindGlobal) {
       NamedValue value = {
         var->name,
-        value_clone(var->value, arena, values),
+        value_clone(var->value, frame, 0),
       };
       DA_APPEND(*catched_values, value);
     }
@@ -353,22 +365,22 @@ static void catch_vars(Vm *vm, Strs *local_names,
     for (u32 i = 0; i < expr->as.lambda.args.len; ++i)
       DA_APPEND(*local_names, expr->as.lambda.args.items[i]);
 
-    CATCH_VARS_BLOCK(vm, local_names, catched_values, arena, values, &expr->as.lambda.body);
+    CATCH_VARS_BLOCK(vm, local_names, catched_values, frame, &expr->as.lambda.body);
   } break;
 
   case IrExprKindDict: {
     for (u32 i = 0; i < expr->as.dict.len; ++i) {
-      CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.dict.items[i].key);
-      CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.dict.items[i].expr);
+      CATCH_VARS(vm, local_names, catched_values, frame, expr->as.dict.items[i].key);
+      CATCH_VARS(vm, local_names, catched_values, frame, expr->as.dict.items[i].expr);
     }
   } break;
 
   case IrExprKindMatch: {
-    CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.match.src);
+    CATCH_VARS(vm, local_names, catched_values, frame, expr->as.match.src);
 
     for (u32 i = 0; i < expr->as.match.cases.len; ++i) {
-      CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.match.cases.items[i].pattern);
-      CATCH_VARS(vm, local_names, catched_values, arena, values, expr->as.match.cases.items[i].expr);
+      CATCH_VARS(vm, local_names, catched_values, frame, expr->as.match.cases.items[i].pattern);
+      CATCH_VARS(vm, local_names, catched_values, frame, expr->as.match.cases.items[i].expr);
     }
   } break;
   }
@@ -376,10 +388,10 @@ static void catch_vars(Vm *vm, Strs *local_names,
 
 static void catch_vars_block(Vm *vm, Strs *local_names,
                              NamedValues *catched_values,
-                             Arena *arena, Values *values,
+                             StackFrame *frame,
                              IrBlock *block) {
   for (u32 i = 0; i < block->len; ++i)
-    CATCH_VARS(vm, local_names, catched_values, arena, values, block->items[i]);
+    CATCH_VARS(vm, local_names, catched_values, frame, block->items[i]);
 }
 
 bool value_list_matches_kinds(u32 len, Value **values, ValueKind *kinds) {
@@ -433,7 +445,7 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
       vm->state = ExecStateExit;
       vm->exit_code = 1;
 
-      return value_unit(vm_get_arena(vm), &vm->values);
+      return value_unit(vm_get_frame(vm), vm->current_frame_index);
     }
 
     Value *result = (*intrinsic->func)(vm, args);
@@ -444,17 +456,15 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
     return result;
   }
 
-  Vars prev_local_vars = vm->local_vars;
-  Values prev_values = vm->values;
   bool prev_is_inside_of_func = vm->is_inside_of_func;
   Func prev_current_func_value = vm->current_func_value;
 
-  vm->local_vars = (Vars) {0};
-  vm->values = (Values) {0};
-  if (++vm->current_arena_index == vm->arenas.len)
-    DA_APPEND(vm->arenas, (Arena) {0});
   vm->is_inside_of_func = true;
   vm->current_func_value = *func;
+
+  begin_frame(vm);
+
+  StackFrame *frame = vm_get_frame(vm);
 
   for (u32 i = 0; i < func->args.len; ++i) {
     Var var = {
@@ -463,17 +473,17 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
       VarKindLocal,
     };
 
-    DA_APPEND(vm->local_vars, var);
+    DA_APPEND(frame->vars, var);
   }
 
-  for (u32 i = 0; i < func->catched_values.len; ++i) {
+  for (u32 i = 0; i < func->catched_frame.values.len; ++i) {
     Var var = {
       func->catched_values_names.items[i].name,
       func->catched_values_names.items[i].value,
       VarKindCatched,
     };
 
-    DA_APPEND(vm->local_vars, var);
+    DA_APPEND(frame->vars, var);
   }
 
   Value *result = execute_block(vm, &func->body, value_expected);
@@ -481,21 +491,16 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
   if (vm->state == ExecStateReturn)
     vm->state = ExecStateContinue;
 
+  end_frame(vm);
+
+  frame = vm_get_frame(vm);
+
   Value *result_stable = NULL;
   if (value_expected && vm->state == ExecStateContinue)
-    result_stable =
-      value_clone(result, vm->arenas.items + vm->current_arena_index - 1, &prev_values);
+    result_stable = value_clone(result, frame, vm->current_frame_index);
+  else
+    result_stable = value_unit(frame, vm->current_frame_index);
 
-  free(vm->local_vars.items);
-
-  for (u32 i = 0; i < vm->values.len; ++i)
-    value_free(vm->values.items[i]);
-  free(vm->values.items);
-
-  vm->local_vars = prev_local_vars;
-  vm->values = prev_values;
-  arena_reset(vm_get_arena(vm));
-  --vm->current_arena_index;
   vm->is_inside_of_func = prev_is_inside_of_func;
   vm->current_func_value = prev_current_func_value;
 
@@ -520,7 +525,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       vm->state = ExecStateExit;
       vm->exit_code = 1;
 
-      return value_unit(vm_get_arena(vm), &vm->values);
+      return value_unit(vm_get_frame(vm), vm->current_frame_index);
     }
 
     if (expr->as.func_call.args.len != func_value->as.func.args.len) {
@@ -530,7 +535,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       vm->state = ExecStateExit;
       vm->exit_code = 1;
 
-      return value_unit(vm_get_arena(vm), &vm->values);
+      return value_unit(vm_get_frame(vm), vm->current_frame_index);
     }
 
     Value **func_args = malloc(expr->as.func_call.args.len * sizeof(Value *));
@@ -539,14 +544,20 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       func_args[i] = execute_expr(vm, expr->as.func_call.args.items[i], true);
       if (vm->state != ExecStateContinue) {
         free(func_args);
-        return value_unit(vm_get_arena(vm), &vm->values);
+        return value_unit(vm_get_frame(vm), vm->current_frame_index);
       }
     }
 
     result = execute_func(vm, func_args, &func_value->as.func, &expr->meta, value_expected);
     if (vm->state != ExecStateContinue) {
+      Str name = STR_LIT("<lambda>");
+      if (expr->as.func_call.func->kind == IrExprKindIdent)
+        name = expr->as.func_call.func->as.ident.ident;
+
+      INFO("Trace: "META_FMT STR_FMT"\n", META_ARG(expr->meta), STR_ARG(name));
+
       free(func_args);
-      return value_unit(vm_get_arena(vm), &vm->values);
+      return value_unit(vm_get_frame(vm), vm->current_frame_index);
     }
 
     free(func_args);
@@ -572,7 +583,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     if (var.kind == VarKindGlobal)
       DA_APPEND(vm->global_vars, var);
     else
-      DA_APPEND(vm->local_vars, var);
+      DA_APPEND(vm_get_frame(vm)->vars, var);
   } break;
 
   case IrExprKindIf: {
@@ -596,6 +607,11 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   } break;
 
   case IrExprKindWhile: {
+    begin_frame(vm);
+    vm_get_frame(vm)->can_lookup_through = true;
+
+    u32 i = 0;
+
     while (true) {
       Value *cond;
       EXECUTE_EXPR_SET(vm, cond, expr->as._while.cond, true);
@@ -603,7 +619,17 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         break;
 
       EXECUTE_BLOCK(vm, &expr->as._while.body, false);
+
+      if (i++ == WHILE_FRAME_LENGTH) {
+        end_frame(vm);
+        begin_frame(vm);
+
+        i = 0;
+      }
     }
+
+    vm_get_frame(vm)->can_lookup_through = false;
+    end_frame(vm);
   } break;
 
   case IrExprKindSet: {
@@ -615,7 +641,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       vm->state = ExecStateExit;
       vm->exit_code = 1;
 
-      return value_unit(vm_get_arena(vm), &vm->values);
+      return value_unit(vm_get_frame(vm), vm->current_frame_index);
     }
 
     Value *src;
@@ -624,10 +650,11 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     if (dest_var->value == src)
       break;
 
-    dest_var->value = value_clone(src, vm_get_arena(vm), &vm->values);
+    dest_var->value = value_clone(src, vm->frames.items + dest_var->value->frame_index,
+                                  dest_var->value->frame_index);
 
     if (value_expected)
-      return value_unit(vm_get_arena(vm), &vm->values);
+      return value_unit(vm_get_frame(vm), vm->current_frame_index);
   } break;
 
   case IrExprKindGetAt: {
@@ -648,7 +675,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       }
 
       if (!node) {
-        PERROR(META_FMT, "get-at: out of bounds\\n",
+        PERROR(META_FMT, "get: out of bounds\\n",
                META_ARG(expr->meta));
         vm->state = ExecStateExit;
         vm->exit_code = 1;
@@ -657,7 +684,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       result = node->value;
     } else if (src->kind == ValueKindString) {
       if ((u32) key->as._int >= src->as.string.len) {
-        PERROR(META_FMT, "get-at: out of bounds\\n",
+        PERROR(META_FMT, "get: out of bounds\\n",
                META_ARG(expr->meta));
         vm->state = ExecStateExit;
         vm->exit_code = 1;
@@ -667,7 +694,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       result_string.ptr += key->as._int;
       result_string.len = 1;
 
-      result = value_string(result_string, vm_get_arena(vm), &vm->values);
+      result = value_string(result_string, vm_get_frame(vm), vm->current_frame_index);
     } else if (src->kind == ValueKindDict) {
       bool found = false;
 
@@ -681,12 +708,14 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       }
 
       if (!found)
-        result = value_unit(vm_get_arena(vm), &vm->values);
+        result = value_unit(vm_get_frame(vm), vm->current_frame_index);
     } else {
-      PERROR(META_FMT, "get-at: source should be list, string or dictionary\n",
+      PERROR(META_FMT, "get: source should be list, string or dictionary\n",
              META_ARG(expr->meta));
       vm->state = ExecStateExit;
       vm->exit_code = 1;
+
+      return value_unit(vm_get_frame(vm), vm->current_frame_index);
     }
   } break;
 
@@ -698,7 +727,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       vm->state = ExecStateExit;
       vm->exit_code = 1;
 
-      return value_unit(vm_get_arena(vm), &vm->values);
+      return value_unit(vm_get_frame(vm), vm->current_frame_index);
     }
 
     Value *key;
@@ -706,7 +735,21 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Value *value;
     EXECUTE_EXPR_SET(vm, value, expr->as.set_at.value, true);
 
+    key = value_clone(key, vm->frames.items + dest_var->value->frame_index,
+                      dest_var->value->frame_index);
+    value = value_clone(value, vm->frames.items + dest_var->value->frame_index,
+                        dest_var->value->frame_index);
+
     if (dest_var->value->kind == ValueKindList) {
+      if (key->kind != ValueKindInt) {
+        PERROR(META_FMT, "set: only integer can be used as an array index\n",
+               META_ARG(expr->meta));
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+
+        return value_unit(vm_get_frame(vm), vm->current_frame_index);
+      }
+
       ListNode *node = dest_var->value->as.list->next;
       u32 i = 0;
       while (node && i < (u32) key->as._int) {
@@ -715,26 +758,41 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       }
 
       if (!node) {
-        PERROR(META_FMT, "set-at: index out of bounds\n",
+        PERROR(META_FMT, "set: index out of bounds\n",
                META_ARG(expr->meta));
         vm->state = ExecStateExit;
         vm->exit_code = 1;
+
+        return value_unit(vm_get_frame(vm), vm->current_frame_index);
       }
 
       node->value = value;
     } else if (dest_var->value->kind == ValueKindString) {
-      if ((u32) key->as._int >= dest_var->value->as.string.len) {
-        PERROR(META_FMT, "set-at: index out of bounds\n",
+      if (key->kind != ValueKindInt) {
+        PERROR(META_FMT, "set: only integer can be used as a string index\n",
                META_ARG(expr->meta));
         vm->state = ExecStateExit;
         vm->exit_code = 1;
+
+        return value_unit(vm_get_frame(vm), vm->current_frame_index);
+      }
+
+      if ((u32) key->as._int >= dest_var->value->as.string.len) {
+        PERROR(META_FMT, "set: index out of bounds\n",
+               META_ARG(expr->meta));
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+
+        return value_unit(vm_get_frame(vm), vm->current_frame_index);
       }
 
       if (value->as.string.len != 1) {
-        PERROR(META_FMT, "set-at: string of length 1 can be assigned\\n",
+        PERROR(META_FMT, "set: only string of length 1 can be assigned\n",
                META_ARG(expr->meta));
         vm->state = ExecStateExit;
         vm->exit_code = 1;
+
+        return value_unit(vm_get_frame(vm), vm->current_frame_index);
       }
 
       dest_var->value->as.string.ptr[key->as._int] = value->as.string.ptr[0];
@@ -754,9 +812,12 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         DictValue dict_value = { key, value };
 
         if (dest_var->value->as.dict.cap == dest_var->value->as.dict.len) {
-          dest_var->value->as.dict.cap *= 2;
+          if (dest_var->value->as.dict.cap == 0)
+            dest_var->value->as.dict.cap = 1;
+          else
+            dest_var->value->as.dict.cap *= 2;
           DictValue *new_items =
-            arena_alloc(vm_get_arena(vm), dest_var->value->as.dict.cap * sizeof(DictValue));
+            arena_alloc(&vm_get_frame(vm)->arena, dest_var->value->as.dict.cap * sizeof(DictValue));
           memcpy(new_items, dest_var->value->as.dict.items,
                  dest_var->value->as.dict.len * sizeof(DictValue));
           dest_var->value->as.dict.items = new_items;
@@ -765,14 +826,16 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         dest_var->value->as.dict.items[dest_var->value->as.dict.len++] = dict_value;
       }
     } else {
-      PERROR(META_FMT, "set-at: destination should be list, string or dictionary\n",
+      PERROR(META_FMT, "set: destination should be list, string or dictionary\n",
              META_ARG(expr->meta));
       vm->state = ExecStateExit;
       vm->exit_code = 1;
+
+      return value_unit(vm_get_frame(vm), vm->current_frame_index);
     }
 
   if (value_expected)
-    result = value_unit(vm_get_arena(vm), &vm->values);
+    result = value_unit(vm_get_frame(vm), vm->current_frame_index);
   } break;
 
   case IrExprKindRet: {
@@ -786,11 +849,11 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     if (!value_expected)
       break;
 
-    ListNode *list = arena_alloc(vm_get_arena(vm), sizeof(ListNode));
+    ListNode *list = arena_alloc(&vm_get_frame(vm)->arena, sizeof(ListNode));
     ListNode *list_end = list;
 
     for (u32 i = 0; i < expr->as.list.content.len; ++i) {
-      ListNode *new_node = arena_alloc(vm_get_arena(vm), sizeof(ListNode));
+      ListNode *new_node = arena_alloc(&vm_get_frame(vm)->arena, sizeof(ListNode));
       EXECUTE_EXPR_SET(vm, new_node->value, expr->as.list.content.items[i], true);
       new_node->next = NULL;
 
@@ -803,7 +866,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       }
     }
 
-    result = value_list(list, vm_get_arena(vm), &vm->values);
+    result = value_list(list, vm_get_frame(vm), vm->current_frame_index);
   } break;
 
   case IrExprKindIdent: {
@@ -817,30 +880,35 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       vm->state = ExecStateExit;
       vm->exit_code = 1;
 
-      return value_unit(vm_get_arena(vm), &vm->values);
+      return value_unit(vm_get_frame(vm), vm->current_frame_index);
     }
 
-    result = value_clone(var->value, vm_get_arena(vm), &vm->values);
+    result = value_clone(var->value, vm_get_frame(vm),
+                         vm->current_frame_index);
   } break;
 
   case IrExprKindString: {
     if (value_expected)
-      result = value_string(expr->as.string.lit, vm_get_arena(vm), &vm->values);
+      result = value_string(expr->as.string.lit, vm_get_frame(vm),
+                            vm->current_frame_index);
   } break;
 
   case IrExprKindInt: {
     if (value_expected)
-      result = value_int(expr->as._int._int, vm_get_arena(vm), &vm->values);
+      result = value_int(expr->as._int._int, vm_get_frame(vm),
+                         vm->current_frame_index);
   } break;
 
   case IrExprKindFloat: {
     if (value_expected)
-      result = value_float(expr->as._float._float, vm_get_arena(vm), &vm->values);
+      result = value_float(expr->as._float._float, vm_get_frame(vm),
+                           vm->current_frame_index);
   } break;
 
   case IrExprKindBool: {
     if (value_expected)
-      result = value_bool(expr->as._bool._bool, vm_get_arena(vm), &vm->values);
+      result = value_bool(expr->as._bool._bool, vm_get_frame(vm),
+                          vm->current_frame_index);
   } break;
 
   case IrExprKindLambda: {
@@ -849,16 +917,15 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     Strs local_names = {0};
     NamedValues catched_values_names = {0};
-    Arena arena = {0};
-    Values values = {0};
+    StackFrame frame = {0};
 
     for (u32 i = 0; i < expr->as.lambda.args.len; ++i)
       DA_APPEND(local_names, expr->as.lambda.args.items[i]);
 
     catch_vars_block(vm, &local_names, &catched_values_names,
-                     &arena, &values, &expr->as.lambda.body);
+                     &frame, &expr->as.lambda.body);
 
-    Value *func_value = arena_alloc(vm_get_arena(vm), sizeof(Value));
+    Value *func_value = arena_alloc(&vm_get_frame(vm)->arena, sizeof(Value));
     *func_value = (Value) {
       ValueKindFunc,
       {
@@ -866,11 +933,11 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
           expr->as.lambda.args,
           expr->as.lambda.body,
           catched_values_names,
-          arena,
-          values,
+          frame,
           expr->as.lambda.intrinsic_name,
         },
       },
+      vm->current_frame_index,
     };
 
     free(local_names.items);
@@ -885,7 +952,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Dict dict = {0};
     dict.len = expr->as.dict.len;
     dict.cap = dict.len;
-    dict.items = arena_alloc(vm_get_arena(vm), dict.cap * sizeof(DictValue));
+    dict.items = arena_alloc(&vm_get_frame(vm)->arena, dict.cap * sizeof(DictValue));
 
     for (u32 i = 0; i < dict.len; ++i) {
       DictValue field = {0};
@@ -895,7 +962,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       dict.items[i] = field;
     }
 
-    result = value_dict(dict, vm_get_arena(vm), &vm->values);
+    result = value_dict(dict, vm_get_frame(vm), vm->current_frame_index);
   } break;
 
   case IrExprKindMatch: {
@@ -915,7 +982,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   }
 
   if (value_expected && !result)
-    return value_unit(vm_get_arena(vm), &vm->values);
+    return value_unit(vm_get_frame(vm), vm->current_frame_index);
   return result;
 }
 
@@ -928,7 +995,7 @@ Value *execute_block(Vm *vm, IrBlock *block, bool value_expected) {
   if (block->len > 0)
     EXECUTE_EXPR_SET(vm, result, block->items[block->len - 1], value_expected);
   else if (value_expected)
-    result = value_unit(vm_get_arena(vm), &vm->values);
+    result = value_unit(vm_get_frame(vm), vm->current_frame_index);
 
   return result;
 }
@@ -942,20 +1009,21 @@ static void intrinsics_append(Intrinsics *a, Intrinsic *b, u32 b_len) {
 
 Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
   Vm vm = {0};
-  DA_APPEND(vm.arenas, (Arena) {0});
+  DA_APPEND(vm.frames, (StackFrame) {0});
 
-  ListNode *args = arena_alloc(vm_get_arena(&vm), sizeof(ListNode));
+  ListNode *args = arena_alloc(&vm_get_frame(&vm)->arena, sizeof(ListNode));
   ListNode *args_end = args;
   for (u32 i = 0; i < (u32) argc; ++i) {
     u32 len = strlen(argv[i]);
-    char *buffer = arena_alloc(vm_get_arena(&vm), len);
+    char *buffer = arena_alloc(&vm_get_frame(&vm)->arena, len);
     memcpy(buffer, argv[i], len);
 
-    ListNode *new_arg = arena_alloc(vm_get_arena(&vm), sizeof(ListNode));
-    new_arg->value = arena_alloc(vm_get_arena(&vm), sizeof(Value));
+    ListNode *new_arg = arena_alloc(&vm_get_frame(&vm)->arena, sizeof(ListNode));
+    new_arg->value = arena_alloc(&vm_get_frame(&vm)->arena, sizeof(Value));
     *new_arg->value = (Value) {
       ValueKindString,
       { .string = { buffer, len } },
+      0,
     };
     new_arg->is_static = true;
 
@@ -987,7 +1055,7 @@ void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics) {
   vm->intrinsics = *intrinsics;
   vm->args = args;
 
-  Value *unit_value = value_unit(vm_get_arena(vm), &vm->values);
+  Value *unit_value = value_unit(vm_get_frame(vm), 0);
   Var unit_var = { STR_LIT("unit"), unit_value, VarKindGlobal };
   DA_APPEND(vm->global_vars, unit_var);
 }
@@ -995,22 +1063,37 @@ void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics) {
 void vm_destroy(Vm *vm) {
   if (vm->global_vars.items)
     free(vm->global_vars.items);
-  if (vm->local_vars.items)
-    free(vm->local_vars.items);
   if (vm->intrinsics.items)
     free(vm->intrinsics.items);
 
-  for (u32 i = 0; i < vm->values.len; ++i)
-    value_free(vm->values.items[i]);
+  for (u32 i = 0; i < vm->frames.len; ++i) {
+    StackFrame *frame = vm->frames.items + i;
 
-  if (vm->values.items)
-    free(vm->values.items);
-
-  for (u32 i = 0; i < vm->arenas.len; ++i)
-    arena_free(vm->arenas.items + i);
-  free(vm->arenas.items);
+    for (u32 j = 0; j < frame->values.len; ++j)
+      value_free(frame->values.items[j]);
+    free(frame->values.items);
+    arena_free(&frame->arena);
+    free(frame->vars.items);
+  }
+  free(vm->frames.items);
 }
 
-Arena *vm_get_arena(Vm *vm) {
-  return vm->arenas.items + vm->current_arena_index;
+void begin_frame(Vm *vm) {
+  if (++vm->current_frame_index == vm->frames.len)
+    DA_APPEND(vm->frames, (StackFrame) {0});
+}
+
+void end_frame(Vm *vm) {
+  StackFrame *frame = vm_get_frame(vm);
+
+  for (u32 i = 0; i < frame->values.len; ++i)
+    value_free(frame->values.items[i]);
+  frame->values.len = 0;
+  arena_reset(&frame->arena);
+  frame->vars.len = 0;
+  --vm->current_frame_index;
+}
+
+StackFrame *vm_get_frame(Vm *vm) {
+  return vm->frames.items + vm->current_frame_index;
 }

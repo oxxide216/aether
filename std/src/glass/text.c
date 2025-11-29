@@ -17,8 +17,12 @@ void load_font(Fonts *fonts, char *path) {
   if (data.len == (u32) -1)
     return;
 
-  if (!stbtt_InitFont(&font.info, (u8 *) data.ptr, 0))
+  if (!stbtt_InitFont(&font.info, (u8 *) data.ptr, 0)) {
+    free(data.ptr);
     return;
+  }
+
+  free(data.ptr);
 
   font.texture = glass_init_texture(GlassFilteringModeLinear);
 

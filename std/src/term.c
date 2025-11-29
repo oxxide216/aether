@@ -16,15 +16,15 @@ Value *get_size_intrinsic(Vm *vm, Value **args) {
 
   Dict size = {0};
 
-  Value *rows = value_alloc(vm_get_arena(vm), &vm->values);
-  *rows = (Value) { ValueKindInt, { ._int = _size.ws_row } };
-  dict_push_value_str_key(vm_get_arena(vm), &size, STR_LIT("rows"), rows);
+  Value *rows = value_alloc(vm_get_frame(vm));
+  *rows = (Value) { ValueKindInt, { ._int = _size.ws_row }, vm->current_frame_index };
+  dict_push_value_str_key(vm_get_frame(vm), vm->current_frame_index, &size, STR_LIT("rows"), rows);
 
-  Value *cols = arena_alloc(vm_get_arena(vm), sizeof(Value));
-  *cols = (Value) { ValueKindInt, { ._int = _size.ws_col } };
-  dict_push_value_str_key(vm_get_arena(vm), &size, STR_LIT("cols"), cols);
+  Value *cols = value_alloc(vm_get_frame(vm));
+  *cols = (Value) { ValueKindInt, { ._int = _size.ws_col }, vm->current_frame_index };
+  dict_push_value_str_key(vm_get_frame(vm), vm->current_frame_index, &size, STR_LIT("cols"), cols);
 
-  return value_dict(size, vm_get_arena(vm), &vm->values);
+  return value_dict(size, vm_get_frame(vm), vm->current_frame_index);
 }
 
 Value *raw_mode_on_intrinsic(Vm *vm, Value **args) {
@@ -40,7 +40,7 @@ Value *raw_mode_on_intrinsic(Vm *vm, Value **args) {
   term_state.c_lflag &= ~(ECHO | ICANON);
   tcsetattr(0, TCSANOW, &term_state);
 
-  return value_unit(vm_get_arena(vm), &vm->values);
+  return value_unit(vm_get_frame(vm), vm->current_frame_index);
 }
 
 Value *raw_mode_off_intrinsic(Vm *vm, Value **args) {
@@ -50,7 +50,7 @@ Value *raw_mode_off_intrinsic(Vm *vm, Value **args) {
   if (is_term_state_initialized)
     tcsetattr(0, TCSANOW, &default_term_state);
 
-  return value_unit(vm_get_arena(vm), &vm->values);
+  return value_unit(vm_get_frame(vm), vm->current_frame_index);
 }
 
 Intrinsic term_intrinsics[] = {

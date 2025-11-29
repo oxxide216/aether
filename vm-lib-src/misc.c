@@ -22,24 +22,35 @@ void dict_push_value(Dict *dict, Value *key, Value *value) {
   DA_APPEND(*dict, dict_value);
 }
 
-void dict_push_value_str_key(Arena *arena, Dict *dict,
-                             Str key, Value *value) {
-  Value *string = arena_alloc(arena, sizeof(Value));
+void dict_push_value_str_key(StackFrame *frame, u32 frame_index,
+                             Dict *dict, Str key, Value *value) {
+  if (dict->len == dict->cap) {
+    if (dict->cap == 0)
+      dict->cap = 1;
+    else
+      dict->cap *= 2;
+    DictValue *new_items = arena_alloc(&frame->arena, dict->cap * sizeof(DictValue));
+    memcpy(new_items, dict->items, dict->len * sizeof(DictValue));
+    dict->items = new_items;
+  }
+
+  Value *string = value_alloc(frame);
   *string = (Value) {
     ValueKindString,
     { .string = key },
+    frame_index,
   };
   DictValue dict_value = { string, value };
-  DA_APPEND(*dict, dict_value);
+  dict->items[dict->len++] = dict_value;
 }
 
-Value *dict_get_value_str_key(Arena *arena, Dict *dict, Str key) {
+Value *dict_get_value_str_key(StackFrame *frame, Dict *dict, Str key) {
   for (u32 i = 0; i < dict->len; ++i)
     if (dict->items[i].key->kind == ValueKindString &&
         str_eq(dict->items[i].key->as.string, key))
       return dict->items[i].value;
 
-  Value *result = arena_alloc(arena, sizeof(Value));
+  Value *result = value_alloc(frame);
   result->kind = ValueKindUnit;
   return result;
 }
