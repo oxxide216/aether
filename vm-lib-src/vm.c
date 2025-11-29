@@ -491,15 +491,15 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
   if (vm->state == ExecStateReturn)
     vm->state = ExecStateContinue;
 
-  end_frame(vm);
-
   frame = vm_get_frame(vm);
 
   Value *result_stable = NULL;
   if (value_expected && vm->state == ExecStateContinue)
-    result_stable = value_clone(result, frame, vm->current_frame_index);
+    result_stable = value_clone(result, frame - 1, vm->current_frame_index - 1);
   else
-    result_stable = value_unit(frame, vm->current_frame_index);
+    result_stable = value_unit(frame - 1, vm->current_frame_index - 1);
+
+  end_frame(vm);
 
   vm->is_inside_of_func = prev_is_inside_of_func;
   vm->current_func_value = prev_current_func_value;
@@ -855,7 +855,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     for (u32 i = 0; i < expr->as.list.content.len; ++i) {
       ListNode *new_node = arena_alloc(&vm_get_frame(vm)->arena, sizeof(ListNode));
       EXECUTE_EXPR_SET(vm, new_node->value, expr->as.list.content.items[i], true);
-      new_node->next = NULL;
+      new_node->next = NULL;;
 
       if (list_end) {
         list_end->next = new_node;

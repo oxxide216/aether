@@ -105,6 +105,7 @@ static Token *lex(Str code, char *file_path, Arena *arena) {
   Token *tokens = NULL;
   Token *tokens_end = NULL;
   LL_PREPEND(tokens, tokens_end, Token);
+  tokens_end->next = NULL;
 
   TransitionTable *table = get_transition_table();
   u32 row = 0, col = 0;
@@ -693,12 +694,12 @@ static IrExpr *parser_parse_expr(Parser *parser) {
         parser_next_token(parser);
 
         expr->kind = IrExprKindSetAt;
-        expr->as.set_at.dest = dest;
+        expr->as.set_at.dest = copy_str(dest, parser->persistent_arena);
         expr->as.set_at.key = parser_parse_expr(parser);
         expr->as.set_at.value = parser_parse_expr(parser);
       } else {
         expr->kind = IrExprKindSet;
-        expr->as.set.dest = dest;
+        expr->as.set.dest = copy_str(dest, parser->persistent_arena);
         expr->as.set.src = parser_parse_expr(parser);
       }
 

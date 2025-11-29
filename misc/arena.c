@@ -23,10 +23,11 @@ void *arena_alloc(Arena *arena, u32 size) {
 
   (*segment_next) = malloc(sizeof(Segment) + new_cap);
   (*segment_next)->space = (*segment_next) + 1;
-  memset((*segment_next)->space, 0, new_cap);
   (*segment_next)->len = size;
   (*segment_next)->cap = new_cap;
   (*segment_next)->next = NULL;
+
+  memset((*segment_next)->space, 0, (*segment_next)->cap);
 
   return (*segment_next)->space;
 }
@@ -35,6 +36,9 @@ void arena_reset(Arena *arena) {
   Segment *segment = arena->segments;
   while (segment) {
     segment->len = 0;
+
+    memset(segment->space, 0, segment->cap);
+
     segment = segment->next;
   }
 }
