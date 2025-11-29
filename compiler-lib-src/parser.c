@@ -327,6 +327,7 @@ static void parser_parse_macro_def(Parser *parser) {
   parser_expect_token(parser, MASK(TT_RIGHT_ARROW));
 
   bool prev_is_in_macro = parser->is_in_macro;
+
   parser->is_in_macro = true;
 
   macro.body = parser_parse_block(parser, MASK(TT_CPAREN));
@@ -755,11 +756,15 @@ static IrExpr *parser_parse_expr(Parser *parser) {
 static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
   IrBlock block = {0};
 
+  Arena *arena = parser->arena;
+  if (parser->is_in_macro)
+    arena = parser->persistent_arena;
+
   Token *token = parser_peek_token(parser);
   while (token && !(MASK(token->id) & end_id_mask)) {
     IrExpr *expr = parser_parse_expr(parser);
     if (expr)
-      ir_block_append(&block, expr, parser->arena);
+      ir_block_append(&block, expr, arena);
 
     token = parser_peek_token(parser);
   }
