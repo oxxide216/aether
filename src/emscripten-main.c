@@ -9,7 +9,7 @@
 #include "aether/deserializer.h"
 #include "emscripten-log.h"
 
-static char *ems_loader_path = "dest/ems-loader.ae";
+static char *loader_path = "dest/loader.abc";
 
 static void list_dir(char *path) {
   DIR *dir;
@@ -24,23 +24,25 @@ static void list_dir(char *path) {
 
 EMSCRIPTEN_KEEPALIVE
 i32 emscripten_main(char *path) {
-  Str code = read_file(ems_loader_path);
-  if (code.len == (u32) -1) {
-    INFO("Loader file was not found at %s, listing current directory", ems_loader_path);
+  Str bytecode = read_file(loader_path);
+  if (bytecode.len == (u32) -1) {
+    INFO("Loader file was not found at %s, listing current directory\n", loader_path);
     list_dir(".");
     return 1;
   }
 
   Arena ir_arena = {0};
-  Ir ir = parse(code, ems_loader_path, &ir_arena);
+  Arena persistent_arena = {0};
+  Ir ir = deserialize((u8 *) bytecode.ptr, bytecode.len, &ir_arena, &persistent_arena);
 
-  i32 argc = 2;
-  char *argv[] = { "aether", path };
+  i32 argc = 4;
+  char *argv[] = { "aether", "-c", "-w", path, NULL };
   Intrinsics intrinsics = {0};
   Vm vm = vm_create(argc, argv, &intrinsics);
   execute_block(&vm, &ir, false);
 
   arena_free(&ir_arena);
+  arena_free(&persistent_arena);
   vm_destroy(&vm);
 
   return vm.exit_code;

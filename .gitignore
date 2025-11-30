@@ -1,8 +1,6 @@
 /aether
-libaether.so
 libs/
 test.ac
 eval.ac
 compiler-lib-src/grammar.h
-std/src/iui/fonts/
 dest/

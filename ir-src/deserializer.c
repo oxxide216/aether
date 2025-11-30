@@ -17,8 +17,8 @@ static void load_str_data(Str *str, u8 *data, u32 *end, Arena *persistent_arena)
 
 static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
                            Arena *arena, Arena *persistent_arena) {
-  expr->kind = *(IrExprKind *) (data + *end);
-  *end += sizeof(IrExprKind);
+  expr->kind = *(u32 *) (data + *end);
+  *end += sizeof(u32);
 
   switch (expr->kind) {
   case IrExprKindBlock: {
@@ -60,8 +60,8 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
       expr->as._if.elifs.items[i] = elif;
     }
 
-    expr->as._if.has_else = *(bool *) (data + *end);
-    *end += sizeof(bool);
+    expr->as._if.has_else = *(u8 *) (data + *end);
+    *end += sizeof(u8);
 
     if (expr->as._if.has_else)
       load_block_data(&expr->as._if.else_body, data, end, arena, persistent_arena);
@@ -99,8 +99,8 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
   } break;
 
   case IrExprKindRet: {
-    expr->as.ret.has_expr = *(bool *) (data + *end);
-    *end += sizeof(bool);
+    expr->as.ret.has_expr = *(u8 *) (data + *end);
+    *end += sizeof(u8);
 
     if (expr->as.ret.has_expr) {
       expr->as.ret.expr = arena_alloc(arena, sizeof(IrExpr));
@@ -132,8 +132,8 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
   } break;
 
   case IrExprKindBool: {
-    expr->as._bool._bool = *(bool *) (data + *end);
-    *end += sizeof(bool);
+    expr->as._bool._bool = *(u8 *) (data + *end);
+    *end += sizeof(u8);
   } break;
 
   case IrExprKindLambda: {
@@ -201,7 +201,8 @@ static void load_block_data(IrBlock *block, u8 *data, u32 *end,
 
   block->items = arena_alloc(arena, block->len * sizeof(IrExpr *));
   for (u32 i = 0; i < block->len; ++i) {
-    block->items[i] = arena_alloc(arena, sizeof(IrExpr *));
+    block->items[i] = arena_alloc(arena, sizeof(IrExpr));
+
     load_expr_data(block->items[i], data, end, arena, persistent_arena);
   }
 }

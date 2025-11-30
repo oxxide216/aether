@@ -72,7 +72,7 @@ static char *token_names[] = {
   "`->`",
   "`<>`",
   "`:`",
-  "`::`"
+  "`::`",
   "int",
   "float",
   "bool",

@@ -51,26 +51,30 @@ fi
 
 lexgen compiler-lib-src/grammar.h compiler-lib-src/grammar.lg
 
+$CC -o $OUT $COMPILER_SRC $VM_SRC $IR_SRC $LEXGEN_RUNTIME_SRC \
+            $LIB_SRC $STD_SRC $SRC $CFLAGS $LDFLAGS $BUILD_FLAGS
+
 if [ "$WASM" != "" ]; then
   rm -rf dest/
   mkdir -p dest/std/
   cp std/ae-src/* dest/std/
-  cp ae-src/ems-loader.ae assets/* dest/
+  cp assets/* dest/
 
   CC=/usr/lib/emsdk/upstream/emscripten/emcc
   OUT=dest/aether.js
   CFLAGS="$CFLAGS -D__emscripten__ --preload-file dest \
                   -s EXPORTED_RUNTIME_METHODS='cwrap' \
-                  -s WASM=1 -s FULL_ES3=1 -s USE_WEBGL2=1 -s USE_GLFW=0"
+                  -s WASM=1 -s MEMORY64 -s FULL_ES3=1 \
+                  -s USE_WEBGL2=1 -s USE_GLFW=0 -gsource-map"
   LDFLAGS=
   SRC="src/emscripten-main.c"
 
-  aether ems-loader.ae -o dest/ems-loader.abc
+  ./aether -o dest/loader.abc ae-src/loader.ae
 
   if [ "$1" != "" ]; then
-    aether $1 -o dest/app.abc
+    ./aether -o dest/app.abc $1
   fi
-fi
 
-$CC -o $OUT $COMPILER_SRC $VM_SRC $IR_SRC $LEXGEN_RUNTIME_SRC \
-            $LIB_SRC $STD_SRC $SRC $CFLAGS $LDFLAGS $BUILD_FLAGS
+  $CC -o $OUT $COMPILER_SRC $VM_SRC $IR_SRC $LEXGEN_RUNTIME_SRC \
+              $LIB_SRC $STD_SRC $SRC $CFLAGS $LDFLAGS $BUILD_FLAGS
+fi

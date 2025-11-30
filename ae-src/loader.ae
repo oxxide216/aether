@@ -28,19 +28,22 @@
 
 (let input-content (read-file input-path))
 (if (unit? input-content)
-  (error 'Could not open input file ' path)
+  (error 'Could not open input file ' input-path)
   (exit 1))
 
 (let env (make-env parsed-args))
 
-(if (or (== mode mode-default) (== mode mode-eval-bytecode))
+(if parsed::'is-in-web'
+  (load-module env 'core' core-web-path)
+  (load-module env 'base' base-web-path)
+ else
   (load-module env 'core' core-path)
-  (load-module env 'base' base-path)
+  (load-module env 'base' base-path))
 
-  (if (== mode mode-default)
-    (eval env input-content input-path)
-   else
-    (eval-compiled env input-content))
+(if (== mode mode-default)
+  (eval env input-content input-path)
+ elif (== mode mode-eval-bytecode)
+  (eval-compiled env input-content)
  elif (== mode mode-compile-only)
   (let compiled (compile env input-content input-path))
   (write-file output-path compiled))

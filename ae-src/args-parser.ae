@@ -7,6 +7,7 @@
 (let parse-args [args] ->
   (let mode mode-default)
   (let output-path '')
+  (let is-in-web false)
 
   (while (head args)
     (if (or (== (head args) '-h') (== (head args) '--help'))
@@ -25,11 +26,14 @@
       (set mode mode-compile-only)
      elif (== (head args) '-c')
       (set mode mode-eval-bytecode)
+     elif (== (head args) '-w')
+      (set is-in-web true)
      else
       (ret {
         'args': args
         'mode': mode
         'output-path': output-path
+        'is-in-web': is-in-web
       }))
     (set args (tail args)))
 
@@ -37,4 +41,5 @@
     'args': args
     'mode': mode
     'output-path': output-path
+    'is-in-web': is-in-web
   })

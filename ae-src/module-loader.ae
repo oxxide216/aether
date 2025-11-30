@@ -4,7 +4,7 @@
 (let load-module [env name path] ->
   (let content (read-file path))
   (if (unit? content)
-    (error 'Could not load' name ' module')
+    (error 'Could not load ' name ' module')
     (exit 1))
 
   (eval env content path))

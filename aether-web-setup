@@ -1,0 +1,9 @@
+#!/usr/bin/bash
+
+OUT=dest/
+
+if [ "$1" != "" ]; then
+  OUT=$1
+fi
+
+cp -r /usr/include/aether/wasm $OUT

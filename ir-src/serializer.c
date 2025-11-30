@@ -1,13 +1,11 @@
 #include "aether/serializer.h"
 
-#define DATA_SIZE_DELTA 64
-
 static void save_block_data(Ir *ir, u8 **data, u32 *data_size, u32 *end);
 
 static void reserve_space(u32 amount, u8 **data, u32 *data_size, u32 *end) {
   u32 new_data_size = *data_size;
   while (*end + amount > new_data_size)
-    new_data_size += DATA_SIZE_DELTA;
+    new_data_size *= 2;
 
   if (new_data_size != *data_size) {
     *data_size = new_data_size;
@@ -27,9 +25,9 @@ static void save_str_data(Str str, u8 **data, u32 *data_size, u32 *end) {
 }
 
 static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
-  reserve_space(sizeof(IrExprKind), data, data_size, end);
-  *(IrExprKind *) (*data + *end) = expr->kind;
-  *end += sizeof(IrExprKind);
+  reserve_space(sizeof(u32), data, data_size, end);
+  *(u32 *) (*data + *end) = expr->kind;
+  *end += sizeof(u32);
 
   switch (expr->kind) {
   case IrExprKindBlock: {
@@ -59,9 +57,9 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
       save_block_data(&expr->as._if.elifs.items[i].body, data, data_size, end);
     }
 
-    reserve_space(sizeof(bool), data, data_size, end);
-    *(bool *) (*data + *end) = expr->as._if.has_else;
-    *end += sizeof(bool);
+    reserve_space(sizeof(u8), data, data_size, end);
+    *(u8 *) (*data + *end) = expr->as._if.has_else;
+    *end += sizeof(u8);
 
     if (expr->as._if.has_else)
       save_block_data(&expr->as._if.else_body, data, data_size, end);
@@ -89,9 +87,9 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
   } break;
 
   case IrExprKindRet: {
-    reserve_space(sizeof(bool), data, data_size, end);
-    *(bool *) (*data + *end) = expr->as.ret.has_expr;
-    *end += sizeof(bool);
+    reserve_space(sizeof(u8), data, data_size, end);
+    *(u8 *) (*data + *end) = expr->as.ret.has_expr;
+    *end += sizeof(u8);
 
     if (expr->as.ret.has_expr)
       save_expr_data(expr->as.ret.expr, data, data_size, end);
@@ -122,9 +120,9 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
   } break;
 
   case IrExprKindBool: {
-    reserve_space(sizeof(bool), data, data_size, end);
-    *(bool *) (*data + *end) = expr->as._bool._bool;
-    *end += sizeof(bool);
+    reserve_space(sizeof(u8), data, data_size, end);
+    *(u8 *) (*data + *end) = expr->as._bool._bool;
+    *end += sizeof(u8);
   } break;
 
   case IrExprKindLambda: {
@@ -165,7 +163,6 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
   }
 
   save_str_data(expr->meta.file_path, data, data_size, end);
-
   reserve_space(2 * sizeof(u32), data, data_size, end);
   *(u32 *) (*data + *end) = expr->meta.row;
   *end += sizeof(u32);
