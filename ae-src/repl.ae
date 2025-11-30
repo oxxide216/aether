@@ -8,6 +8,9 @@
 (use 'config.ae')
 (use 'module-loader.ae')
 
+(let history [])
+(let is-running true)
+
 (let read-line [prompt] ->
   (let buffer '')
   (let key (term/get-key))
@@ -77,9 +80,6 @@
   (let env (make-env []))
   (load-module env 'core' core-path)
   (load-module env 'base' base-path)
-
-  (let history [])
-  (let is-running true)
 
   (term/raw-mode-on)
   (unblock-input)
