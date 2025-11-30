@@ -1,8 +1,8 @@
 (let core-path '/usr/include/aether/std/core.ae')
 (let base-path '/usr/include/aether/std/base.ae')
 
-(let core-web-path 'dest/std/core.ae')
-(let base-web-path 'dest/std/base.ae')
+(let core-web-path 'dest/core.abc')
+(let base-web-path 'dest/base.abc')
 
 (let repl-path '/usr/include/aether/load/repl.ae')
 

@@ -8,3 +8,11 @@
     (exit 1))
 
   (eval env content path))
+
+(let load-compiled-module [env name path] ->
+  (let content (read-file path))
+  (if (unit? content)
+    (error 'Could not load precompiled ' name ' module')
+    (exit 1))
+
+  (eval-compiled env content))

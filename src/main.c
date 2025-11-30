@@ -17,8 +17,7 @@ i32 main(i32 argc, char **argv) {
 
   Arena ir_arena = {0};
   Arena persistent_arena = {0};
-  Ir ir = parse(code, loader_path, &ir_arena,
-                &persistent_arena);
+  Ir ir = parse(code, loader_path, &ir_arena, &persistent_arena);
 
   Intrinsics intrinsics = {0};
   Vm vm = vm_create(argc, argv, &intrinsics);

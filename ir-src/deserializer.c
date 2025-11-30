@@ -143,7 +143,7 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
     args->cap = args->len;
     *end += sizeof(u32);
 
-    args->items = arena_alloc(arena, args->len * sizeof(Str));
+    args->items = arena_alloc(arena, args->cap * sizeof(Str));
     for (u32 i = 0; i < args->len; ++i)
       load_str_data(args->items + i, data, end, persistent_arena);
 
@@ -184,6 +184,11 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
       load_expr_data(expr->as.match.cases.items[i].expr, data, end, arena, persistent_arena);
     }
   } break;
+
+  default: {
+    ERROR("Corrupted bytecode: unknown expression kind\n");
+    exit(1);
+  } break;
   }
 
   load_str_data(&expr->meta.file_path, data, end, persistent_arena);
@@ -199,7 +204,7 @@ static void load_block_data(IrBlock *block, u8 *data, u32 *end,
   block->cap = block->len;
   *end += sizeof(u32);
 
-  block->items = arena_alloc(arena, block->len * sizeof(IrExpr *));
+  block->items = arena_alloc(arena, block->cap * sizeof(IrExpr *));
   for (u32 i = 0; i < block->len; ++i) {
     block->items[i] = arena_alloc(arena, sizeof(IrExpr));
 

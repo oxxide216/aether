@@ -4,9 +4,8 @@
 
 #include "emscripten-main.h"
 #include "io.h"
-#include "aether/parser.h"
-#include "aether/vm.h"
 #include "aether/deserializer.h"
+#include "aether/vm.h"
 #include "emscripten-log.h"
 
 static char *loader_path = "dest/loader.abc";
@@ -41,6 +40,7 @@ i32 emscripten_main(char *path) {
   Vm vm = vm_create(argc, argv, &intrinsics);
   execute_block(&vm, &ir, false);
 
+  free(bytecode.ptr);
   arena_free(&ir_arena);
   arena_free(&persistent_arena);
   vm_destroy(&vm);

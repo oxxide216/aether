@@ -21,6 +21,7 @@
 (let input-path (head parsed-args))
 (let mode parsed::'mode')
 (let output-path parsed::'output-path')
+(let is-in-web parsed::'is-in-web')
 
 (if (unit? input-path)
   (error 'No input file was provided')
@@ -33,9 +34,9 @@
 
 (let env (make-env parsed-args))
 
-(if parsed::'is-in-web'
-  (load-module env 'core' core-web-path)
-  (load-module env 'base' base-web-path)
+(if is-in-web
+  (load-compiled-module env 'core' core-web-path)
+  (load-compiled-module env 'base' base-web-path)
  else
   (load-module env 'core' core-path)
   (load-module env 'base' base-path))

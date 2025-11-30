@@ -691,7 +691,8 @@ Value *make_env_intrinsic(Vm *vm, Value **args) {
   ListNode *node = cmd_args->as.list->next;
   while (node) {
     if (node->value->kind != ValueKindString)
-      PANIC(vm_get_frame(vm), vm->current_frame_index, "make-env: every program argument should be of type string\n");
+      PANIC(vm_get_frame(vm), vm->current_frame_index,
+            "make-env: every program argument should be of type string\n");
 
     node = node->next;
   }

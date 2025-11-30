@@ -5,12 +5,7 @@ CC=cc
 OUT=aether
 CFLAGS="-Wall -Wextra -Icompiler-lib-include -Ivm-lib-include -Iir-include \
         -Ilibs -Istd/include -Imisc -lm"
-
-if [ "$WASM" != "" ]; then
-  BUILD_FLAGS="${@:2}"
-else
-  BUILD_FLAGS="${@:1}"
-fi
+BUILD_FLAGS="${@:1}"
 
 LDFLAGS="-z execstack"
 SRC="src/main.c"
@@ -56,8 +51,7 @@ $CC -o $OUT $COMPILER_SRC $VM_SRC $IR_SRC $LEXGEN_RUNTIME_SRC \
 
 if [ "$WASM" != "" ]; then
   rm -rf dest/
-  mkdir -p dest/std/
-  cp std/ae-src/* dest/std/
+  mkdir dest/
   cp assets/* dest/
 
   CC=/usr/lib/emsdk/upstream/emscripten/emcc
@@ -65,15 +59,13 @@ if [ "$WASM" != "" ]; then
   CFLAGS="$CFLAGS -D__emscripten__ --preload-file dest \
                   -s EXPORTED_RUNTIME_METHODS='cwrap' \
                   -s WASM=1 -s MEMORY64 -s FULL_ES3=1 \
-                  -s USE_WEBGL2=1 -s USE_GLFW=0 -gsource-map"
+                  -s USE_WEBGL2=1 -s USE_GLFW=0"
   LDFLAGS=
   SRC="src/emscripten-main.c"
 
   ./aether -o dest/loader.abc ae-src/loader.ae
-
-  if [ "$1" != "" ]; then
-    ./aether -o dest/app.abc $1
-  fi
+  ./aether -o dest/core.abc std/ae-src/core.ae
+  ./aether -o dest/base.abc std/ae-src/base.ae
 
   $CC -o $OUT $COMPILER_SRC $VM_SRC $IR_SRC $LEXGEN_RUNTIME_SRC \
               $LIB_SRC $STD_SRC $SRC $CFLAGS $LDFLAGS $BUILD_FLAGS

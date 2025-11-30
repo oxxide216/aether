@@ -12,7 +12,12 @@
   <script src="aether.js" defer></script>
   <script>
     Module = {
-      onRuntimeInitialized: function() {
+      onRuntimeInitialized: async function() {
+        const response = await fetch('app.abc');
+        const content = await response.text();
+
+        FS.writeFile('dest/app.abc', content);
+
         const aether_main = Module.cwrap('emscripten_main', 'number', ['string']);
         aether_main('dest/app.abc');
       },
