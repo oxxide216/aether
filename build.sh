@@ -52,7 +52,6 @@ $CC -o $OUT $COMPILER_SRC $VM_SRC $IR_SRC $LEXGEN_RUNTIME_SRC \
 if [ "$WASM" != "" ]; then
   rm -rf dest/
   mkdir dest/
-  cp assets/* dest/
 
   CC=/usr/lib/emsdk/upstream/emscripten/emcc
   OUT=dest/aether.js
