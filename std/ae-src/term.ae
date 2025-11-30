@@ -6,7 +6,7 @@
 (let term/left      '\e[D')
 (let term/enter     '\n')
 (let term/escape    '\e')
-(let term/backspace (byte-8-to-str 127))
+(let term/backspace '\x7f')
 (let term/delete    '\e[P')
 
 (let term/reset      '\e[0m')

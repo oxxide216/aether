@@ -79,7 +79,9 @@ static char *token_names[] = {
   "identifier",
 };
 
-static char escape_char(char _char) {
+static char escape_char(Str *str) {
+  char _char = str->ptr[0];
+
   switch (_char) {
   case 'n': return '\n';
   case 'r': return '\r';
@@ -88,15 +90,81 @@ static char escape_char(char _char) {
   case 'e': return '\e';
   case 'b': return '\b';
   case '0': return 0;
-  case '1': return 1;
-  case '2': return 2;
-  case '3': return 3;
-  case '4': return 4;
-  case '5': return 5;
-  case '6': return 6;
-  case '7': return 7;
-  case '8': return 8;
-  case '9': return 9;
+  case '\\': return '\\';
+
+  case 'x': {
+    char result = '\0';
+
+    ++str->ptr;
+    --str->len;
+
+    while (str->len > 0 &&
+           ((str->ptr[0] >= '0' && str->ptr[0] <= '9') ||
+            (str->ptr[0] >= 'a' && str->ptr[0] <= 'f') ||
+            (str->ptr[0] >= 'A' && str->ptr[0] <= 'F'))) {
+      result *= 16;
+
+      if (str->ptr[0] >= '0' && str->ptr[0] <= '9')
+        result += str->ptr[0] - '0';
+      else if (str->ptr[0] >= 'a' && str->ptr[0] <= 'f')
+        result += str->ptr[0] - 'a' + 10;
+      else if (str->ptr[0] >= 'A' && str->ptr[0] <= 'F')
+        result += str->ptr[0] - 'A' + 10;
+
+      ++str->ptr;
+      --str->len;
+    }
+
+    --str->ptr;
+    ++str->len;
+
+    return result;
+  }
+
+  case 'd': {
+    char result = '\0';
+
+    ++str->ptr;
+    --str->len;
+
+    while (str->len > 0 && str->ptr[0] >= '0' && str->ptr[0] <= '9') {
+      result *= 10;
+
+      if (str->ptr[0] >= '0' && str->ptr[0] <= '9')
+        result += str->ptr[0] - '0';
+
+      ++str->ptr;
+      --str->len;
+    }
+
+    --str->ptr;
+    ++str->len;
+
+    return result;
+  }
+
+  case 'o': {
+    char result = '\0';
+
+    ++str->ptr;
+    --str->len;
+
+    while (str->len > 0 && str->ptr[0] >= '0' && str->ptr[0] <= '7') {
+      result *= 8;
+
+      if (str->ptr[0] >= '0' && str->ptr[0] <= '7')
+        result += str->ptr[0] - '0';
+
+      ++str->ptr;
+      --str->len;
+    }
+
+    --str->ptr;
+    ++str->len;
+
+    return result;
+  }
+
   default: return _char;
   }
 }
@@ -157,8 +225,9 @@ static Token *lex(Str code, char *file_path, Arena *arena) {
 
         if (is_escaped || code.ptr[0] != '\\') {
           if (is_escaped)
-            code.ptr[0] = escape_char(code.ptr[0]);
-          sb_push_char(&sb, code.ptr[0]);
+            sb_push_char(&sb, escape_char(&code));
+          else
+            sb_push_char(&sb, code.ptr[0]);
         }
 
         if (is_escaped)
