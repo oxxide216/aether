@@ -1,2 +1,3 @@
-(let run-command [command] -> import 'run-command')
-(let sleep [seconds] -> import 'sleep')
+(if (!= current-platform 'web')
+  (let run-command [command] -> import 'run-command')
+  (let sleep [seconds] -> import 'sleep'))

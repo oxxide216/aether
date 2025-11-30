@@ -3,8 +3,10 @@
 (let EOF '\d3')
 
 (let printf [arg] -> import 'printf')
-(let input-size [size] -> import 'input-size')
-(let input [] -> import 'input')
+
+(if (!= current-platform 'web')
+  (let input-size [size] -> import 'input-size')
+  (let input [] -> import 'input'))
 
 (let get-args [] -> import 'get-args')
 

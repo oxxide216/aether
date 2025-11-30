@@ -25,6 +25,7 @@ Value *printf_intrinsic(Vm *vm, Value **args) {
   return value_unit(vm_get_frame(vm), vm->current_frame_index);
 }
 
+#ifndef __emscripten__
 Value *input_size_intrinsic(Vm *vm, Value **args) {
   Value *size = args[0];
 
@@ -61,6 +62,7 @@ Value *input_intrinsic(Vm *vm, Value **args) {
 
   return value_string(STR(buffer, len), vm_get_frame(vm), vm->current_frame_index);
 }
+#endif
 
 Value *get_args_intrinsic(Vm *vm, Value **args) {
   (void) args;
@@ -70,8 +72,10 @@ Value *get_args_intrinsic(Vm *vm, Value **args) {
 
 Intrinsic base_intrinsics[] = {
   { STR_LIT("printf"), false, 1, { ValueKindList }, &printf_intrinsic },
+#ifndef __emscripten__
   { STR_LIT("input-size"), true, 1, { ValueKindInt }, &input_size_intrinsic },
   { STR_LIT("input"), true, 0, {}, &input_intrinsic },
+#endif
   { STR_LIT("get-args"), true, 0, {}, &get_args_intrinsic },
 };
 

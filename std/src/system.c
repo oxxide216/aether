@@ -2,6 +2,7 @@
 
 #include "aether/vm.h"
 
+#ifndef __emscripten__
 Value *run_command_intrinsic(Vm *vm, Value **args) {
   Value *path = args[0];
 
@@ -23,10 +24,13 @@ Value *sleep_intrinsic(Vm *vm, Value **args) {
 
   return value_unit(vm_get_frame(vm), vm->current_frame_index);
 }
+#endif
 
 Intrinsic system_intrinsics[] = {
+#ifndef __emscripten__
   { STR_LIT("run-command"), true, 1, { ValueKindString }, &run_command_intrinsic },
   { STR_LIT("sleep"), false, 1, { ValueKindFloat }, &sleep_intrinsic },
+#endif
 };
 
 u32 system_intrinsics_len = ARRAY_LEN(system_intrinsics);

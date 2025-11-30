@@ -1,7 +1,7 @@
 ; Standard input stream
-(let unblock-input [] -> import 'unblock-input')
-(let block-input [] -> import 'block-input')
-(let flush [] -> import 'flush')
+(if (!= current-platform 'web')
+  (let unblock-input [] -> import 'unblock-input')
+  (let block-input [] -> import 'block-input'))
 
 ; Files
 ; TODO: file data

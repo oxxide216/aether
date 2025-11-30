@@ -1057,6 +1057,15 @@ void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics) {
   Value *unit_value = value_unit(vm_get_frame(vm), 0);
   Var unit_var = { STR_LIT("unit"), unit_value, VarKindGlobal };
   DA_APPEND(vm->global_vars, unit_var);
+
+#ifdef __emscripten__
+  Value *platform_value = value_string(STR_LIT("web"), vm_get_frame(vm), 0);
+#else
+  Value *platform_value = value_string(STR_LIT("linux"), vm_get_frame(vm), 0);
+#endif
+
+  Var platform_var = { STR_LIT("current-platform"), platform_value, VarKindGlobal };
+  DA_APPEND(vm->global_vars, platform_var);
 }
 
 void vm_destroy(Vm *vm) {

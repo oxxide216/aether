@@ -10,6 +10,7 @@
 #include "aether/misc.h"
 #include "io.h"
 
+#ifndef __emscripten
 Value *unblock_input_intrinsic(Vm *vm, Value **args) {
   (void) args;
 
@@ -25,6 +26,7 @@ Value *block_input_intrinsic(Vm *vm, Value **args) {
 
   return value_unit(vm_get_frame(vm), vm->current_frame_index);
 }
+#endif
 
 static char *str_to_cstr(Str str) {
   char *cstr = malloc(str.len + 1);
@@ -175,8 +177,10 @@ Value *list_directory_intrinsic(Vm *vm, Value **args) {
 }
 
 Intrinsic io_intrinsics[] = {
+#ifndef __emscripten
   { STR_LIT("unblock-input"), false, 0, {}, &unblock_input_intrinsic },
   { STR_LIT("block-input"), false, 0, {}, &block_input_intrinsic },
+#endif
   // Files
   { STR_LIT("get-file-info"), true, 1, { ValueKindString }, &get_file_info_intrinsic },
   { STR_LIT("read-file"), true, 1, { ValueKindString }, &read_file_intrinsic },
