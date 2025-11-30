@@ -27,12 +27,13 @@
 #define TT_RHOMBUS 23
 #define TT_COLON 24
 #define TT_QOLON 25
-#define TT_INT 26
-#define TT_FLOAT 27
-#define TT_BOOL 28
-#define TT_IDENT 29
+#define TT_DOUBLE_ARROW 26
+#define TT_INT 27
+#define TT_FLOAT 28
+#define TT_BOOL 29
+#define TT_IDENT 30
 
-#define TTS_COUNT 30
+#define TTS_COUNT 31
 
 TransitionTable *get_transition_table(void);
 
@@ -183,6 +184,12 @@ TransitionCol table_col_qolon[] = {
   { 2, ':', ':', 0 },
 };
 
+TransitionCol table_col_double_arrow[] = {
+  { 1, '<', '<', 2 },
+  { 2, '-', '-', 3 },
+  { 3, '>', '>', 0 },
+};
+
 TransitionCol table_col_int[] = {
   { 1, '-', '-', 2 },
   { 1, -1, -1, 2 },
@@ -283,6 +290,7 @@ TransitionRow table_rows[] = {
   { table_col_rhombus, sizeof(table_col_rhombus) / sizeof(TransitionCol) },
   { table_col_colon, sizeof(table_col_colon) / sizeof(TransitionCol) },
   { table_col_qolon, sizeof(table_col_qolon) / sizeof(TransitionCol) },
+  { table_col_double_arrow, sizeof(table_col_double_arrow) / sizeof(TransitionCol) },
   { table_col_int, sizeof(table_col_int) / sizeof(TransitionCol) },
   { table_col_float, sizeof(table_col_float) / sizeof(TransitionCol) },
   { table_col_bool, sizeof(table_col_bool) / sizeof(TransitionCol) },

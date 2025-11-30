@@ -185,6 +185,8 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
     }
   } break;
 
+  case IrExprKindSelf: break;
+
   default: {
     ERROR("Corrupted bytecode: unknown expression kind\n");
     exit(1);

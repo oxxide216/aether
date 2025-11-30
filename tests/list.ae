@@ -2,9 +2,9 @@
   (let print-list-rec [list] ->
     (if list
       (print (head list))
-      (if tail list
+      (if (tail list)
         (print ' '))
-      (print-list (tail list))))
+      (<-> (tail list))))
   (print '[')
   (print-list-rec list)
   (println ']'))
@@ -13,8 +13,8 @@
 (set list (+ -1 list))
 (set list (+ list -2))
 
-(println (nth list 2))
-(println (nth list 10))
+(println list::2)
+(println list::10)
 (println (len list))
 (println (get-range list 1 4))
 (print-list list)

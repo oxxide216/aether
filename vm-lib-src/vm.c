@@ -383,6 +383,8 @@ static void catch_vars(Vm *vm, Strs *local_names,
       CATCH_VARS(vm, local_names, catched_values, frame, expr->as.match.cases.items[i].expr);
     }
   } break;
+
+  case IrExprKindSelf: break;
   }
 }
 
@@ -674,27 +676,20 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         ++i;
       }
 
-      if (!node) {
-        PERROR(META_FMT, "get: out of bounds\\n",
-               META_ARG(expr->meta));
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
-      }
-
-      result = node->value;
+      if (node)
+        result = node->value;
+      else
+        result = value_unit(vm_get_frame(vm), vm->current_frame_index);
     } else if (src->kind == ValueKindString) {
-      if ((u32) key->as._int >= src->as.string.len) {
-        PERROR(META_FMT, "get: out of bounds\\n",
-               META_ARG(expr->meta));
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
+      if ((u32) key->as._int < src->as.string.len) {
+        Str result_string = src->as.string;
+        result_string.ptr += key->as._int;
+        result_string.len = 1;
+
+        result = value_string(result_string, vm_get_frame(vm), vm->current_frame_index);
+      } else {
+        result = value_unit(vm_get_frame(vm), vm->current_frame_index);
       }
-
-      Str result_string = src->as.string;
-      result_string.ptr += key->as._int;
-      result_string.len = 1;
-
-      result = value_string(result_string, vm_get_frame(vm), vm->current_frame_index);
     } else if (src->kind == ValueKindDict) {
       bool found = false;
 
@@ -791,7 +786,6 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
                META_ARG(expr->meta));
         vm->state = ExecStateExit;
         vm->exit_code = 1;
-
         return value_unit(vm_get_frame(vm), vm->current_frame_index);
       }
 
@@ -978,6 +972,11 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         break;
       }
     }
+  } break;
+
+  case IrExprKindSelf: {
+    if (value_expected)
+      result = value_func(vm->current_func_value, vm_get_frame(vm), vm->current_frame_index);
   } break;
   }
 

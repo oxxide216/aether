@@ -107,6 +107,8 @@ static void clone_expr(IrExpr **expr, Arena *arena) {
       clone_expr(&new_expr->as.match.cases.items[i].expr, arena);
     }
   } break;
+
+  case IrExprKindSelf: break;
   }
 }
 
@@ -253,6 +255,8 @@ static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names, IrArgs *new_a
       rename_args_expr(expr->as.match.cases.items[i].expr, prev_arg_names, new_arg_names);
     }
   } break;
+
+  case IrExprKindSelf: break;
   }
 }
 
@@ -490,5 +494,7 @@ void expand_macros(IrExpr *expr, Macros *macros,
       INLINE_THEN_EXPAND(expr->as.match.cases.items[i].expr);
     }
   } break;
+
+  case IrExprKindSelf: break;
   }
 }

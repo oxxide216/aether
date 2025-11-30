@@ -434,7 +434,7 @@ Value *add_intrinsic(Vm *vm, Value **args) {
 
     return value_list(new_list, vm_get_frame(vm), vm->current_frame_index);
   } else if (b->kind == ValueKindList) {
-    ListNode *new_list = list_clone(b->as.list, vm_get_frame(vm), vm->current_frame_index);
+    ListNode *new_list = list_clone(b->as.list->next, vm_get_frame(vm), vm->current_frame_index);
     ListNode *next = new_list->next;
 
     new_list->next = arena_alloc(&vm_get_frame(vm)->arena, sizeof(ListNode));

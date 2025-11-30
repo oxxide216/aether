@@ -160,6 +160,8 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
       save_expr_data(expr->as.match.cases.items[i].expr, data, data_size, end);
     }
   } break;
+
+  case IrExprKindSelf: break;
   }
 
   save_str_data(expr->meta.file_path, data, data_size, end);

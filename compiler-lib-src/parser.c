@@ -73,6 +73,7 @@ static char *token_names[] = {
   "`<>`",
   "`:`",
   "`::`",
+  "`<->`",
   "int",
   "float",
   "bool",
@@ -281,11 +282,11 @@ static Token *parser_next_token(Parser *parser) {
 
 static void print_id_mask(u64 id_mask) {
   u32 ids_count = 0;
-  for (u32 i = 0; i < ARRAY_LEN(token_names); ++i)
+  for (u64 i = 0; i < ARRAY_LEN(token_names); ++i)
     if (MASK(i) & id_mask)
       ++ids_count;
 
-  for (u32 i = 0, j = 0; i < 64 && j < ids_count; ++i) {
+  for (u64 i = 0, j = 0; i < 64 && j < ids_count; ++i) {
     if ((1 << i) & id_mask) {
       if (j > 0) {
         if (j + 1 == ids_count)
@@ -533,7 +534,8 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   Token *token = parser_expect_token(parser, MASK(TT_OPAREN) | MASK(TT_STR) |
                                              MASK(TT_IDENT) | MASK(TT_INT) |
                                              MASK(TT_FLOAT) | MASK(TT_BOOL) |
-                                             MASK(TT_OCURLY) | MASK(TT_OBRACKET));
+                                             MASK(TT_OCURLY) | MASK(TT_OBRACKET) |
+                                             MASK(TT_DOUBLE_ARROW));
 
   expr->meta.file_path = copy_str(STR(token->file_path, strlen(token->file_path)),
                                   parser->persistent_arena);
@@ -592,6 +594,10 @@ static IrExpr *parser_parse_expr(Parser *parser) {
   case TT_OCURLY: {
     expr->kind = IrExprKindDict;
     expr->as.dict = parser_parse_dict(parser);
+  } break;
+
+  case TT_DOUBLE_ARROW: {
+    expr->kind = IrExprKindSelf;
   } break;
 
   default: {
