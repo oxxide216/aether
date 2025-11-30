@@ -4,7 +4,7 @@
 #include "shl/shl-str.h"
 #include "shl/shl-log.h"
 
-#define WHILE_FRAME_LENGTH 10
+#define WHILE_FRAME_LENGTH 100
 
 #define META_FMT       STR_FMT":%u:%u: "
 #define META_ARG(meta) STR_ARG((meta).file_path), (meta).row + 1, (meta).col + 1
