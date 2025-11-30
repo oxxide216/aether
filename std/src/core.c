@@ -434,14 +434,14 @@ Value *add_intrinsic(Vm *vm, Value **args) {
 
     return value_list(new_list, vm_get_frame(vm), vm->current_frame_index);
   } else if (b->kind == ValueKindList) {
-    ListNode *new_list = list_clone(b->as.list->next, vm_get_frame(vm), vm->current_frame_index);
-    ListNode *next = new_list->next;
+    ListNode *new_list = arena_alloc(&vm_get_frame(vm)->arena, sizeof(ListNode));
+    new_list->next = list_clone(b->as.list->next, vm_get_frame(vm), vm->current_frame_index);
 
     new_list->next = arena_alloc(&vm_get_frame(vm)->arena, sizeof(ListNode));
     new_list->next->value = a;
-    new_list->next->next = next;
+    new_list->next->next = list_clone(b->as.list->next, vm_get_frame(vm), vm->current_frame_index);
 
-    return value_list(b->as.list, vm_get_frame(vm), vm->current_frame_index);
+    return value_list(new_list, vm_get_frame(vm), vm->current_frame_index);
   }
 
   return value_unit(vm_get_frame(vm), vm->current_frame_index);
