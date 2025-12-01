@@ -60,7 +60,8 @@ if [ "$WASM" != "" ]; then
   CFLAGS="$CFLAGS -D__emscripten__ --preload-file dest \
                   -s EXPORTED_RUNTIME_METHODS='cwrap' \
                   -s WASM=1 -s MEMORY64 -s FULL_ES3=1 \
-                  -s USE_WEBGL2=1 -s USE_GLFW=0"
+                  -s USE_WEBGL2=1 -s USE_GLFW=0 \
+                  -s ENVIRONMENT=web -s SINGLE_FILE=1"
   LDFLAGS=
   SRC="src/emscripten-main.c"
 

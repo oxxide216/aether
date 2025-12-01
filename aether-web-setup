@@ -1,14 +1,12 @@
 #!/usr/bin/bash
 
-OUT_DIR=dest/
-
-if [ "$2" != "" ]; then
-  OUT_DIR=$2
-fi
-
-rm -rf $OUT_DIR
-cp -r /usr/include/aether/wasm $OUT_DIR
+rm -rf dest/
+cp -r /usr/include/aether/wasm dest/
 
 if [ "$1" != "" ]; then
   aether -o dest/app.abc "$1"
+fi
+
+if [ "$2" != "" ]; then
+  cp -r "$2"/* dest/
 fi
