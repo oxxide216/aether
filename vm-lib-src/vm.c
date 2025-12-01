@@ -705,10 +705,15 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       if (!found)
         result = value_unit(vm_get_frame(vm), vm->current_frame_index);
     } else {
-      PERROR(META_FMT, "get: source should be list, string or dictionary\n",
-             META_ARG(expr->meta));
+      StringBuilder sb = {0};
+      sb_push_value(&sb, src, 0, true, vm);
+
+      PERROR(META_FMT, "get: source should be list, string or dictionary, but got "STR_FMT"\n",
+             META_ARG(expr->meta), STR_ARG(sb_to_str(sb)));
       vm->state = ExecStateExit;
       vm->exit_code = 1;
+
+      free(sb.buffer);
 
       return value_unit(vm_get_frame(vm), vm->current_frame_index);
     }
@@ -820,10 +825,15 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         dest_var->value->as.dict.items[dest_var->value->as.dict.len++] = dict_value;
       }
     } else {
-      PERROR(META_FMT, "set: destination should be list, string or dictionary\n",
-             META_ARG(expr->meta));
+      StringBuilder sb = {0};
+      sb_push_value(&sb, dest_var->value, 0, true, vm);
+
+      PERROR(META_FMT, "set: destination should be list, string or dictionary, but got "STR_FMT"\n",
+             META_ARG(expr->meta), STR_ARG(sb_to_str(sb)));
       vm->state = ExecStateExit;
       vm->exit_code = 1;
+
+      free(sb.buffer);
 
       return value_unit(vm_get_frame(vm), vm->current_frame_index);
     }

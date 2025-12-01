@@ -410,7 +410,7 @@ static void parser_parse_macro_def(Parser *parser) {
   DA_APPEND(*parser->macros, macro);
 }
 
-static IrExpr *parser_parse_expr(Parser *parser);
+static IrExpr *parser_parse_expr(Parser *parser, bool is_short);
 
 static IrExprDict parser_parse_dict(Parser *parser) {
   IrExprDict dict = {0};
@@ -418,9 +418,9 @@ static IrExprDict parser_parse_dict(Parser *parser) {
   IrFields fields = {0};
 
   while (parser_peek_token(parser)->id != TT_CCURLY) {
-    IrExpr *key = parser_parse_expr(parser);
+    IrExpr *key = parser_parse_expr(parser, false);
     parser_expect_token(parser, MASK(TT_COLON));
-    IrExpr *expr = parser_parse_expr(parser);
+    IrExpr *expr = parser_parse_expr(parser, false);
 
     IrField field = { key, expr };
     DA_APPEND(fields, field);
@@ -486,14 +486,14 @@ static IrExprLambda parser_parse_lambda(Parser *parser) {
 static IrExprMatch parser_parse_match(Parser *parser) {
   IrExprMatch match = {0};
 
-  match.src = parser_parse_expr(parser);
+  match.src = parser_parse_expr(parser, false);
 
   IrCases cases = {0};
 
   while (parser_peek_token(parser)->id != TT_CPAREN) {
-    IrExpr *pattern = parser_parse_expr(parser);
+    IrExpr *pattern = parser_parse_expr(parser, false);
     parser_expect_token(parser, MASK(TT_RIGHT_ARROW));
-    IrExpr *expr = parser_parse_expr(parser);
+    IrExpr *expr = parser_parse_expr(parser, false);
 
     IrCase _case = { pattern, expr };
     DA_APPEND(cases, _case);
@@ -527,7 +527,7 @@ static Str get_file_dir(Str path) {
   return (Str) {0};
 }
 
-static IrExpr *parser_parse_expr(Parser *parser) {
+static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
   IrExpr *expr = arena_alloc(get_arena(parser), sizeof(IrExpr));
   *expr = (IrExpr) {0};
 
@@ -616,7 +616,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
 
       expr->kind = IrExprKindVarDef;
       expr->as.var_def.name = copy_str(name_token->lexeme, parser->persistent_arena);
-      expr->as.var_def.expr = parser_parse_expr(parser);
+      expr->as.var_def.expr = parser_parse_expr(parser, false);
 
       parser_expect_token(parser, MASK(TT_CPAREN));
     } break;
@@ -625,7 +625,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
       parser_next_token(parser);
 
       expr->kind = IrExprKindIf;
-      expr->as._if.cond = parser_parse_expr(parser);
+      expr->as._if.cond = parser_parse_expr(parser, false);
 
       expr->as._if.if_body = parser_parse_block(parser, MASK(TT_CPAREN) |
                                                         MASK(TT_ELIF) |
@@ -639,7 +639,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
 
       while (next_token->id == TT_ELIF) {
         IrElif elif;
-        elif.cond = parser_parse_expr(parser);
+        elif.cond = parser_parse_expr(parser, false);
         elif.body = parser_parse_block(parser, MASK(TT_CPAREN) |
                                                MASK(TT_ELIF) |
                                                MASK(TT_ELSE));
@@ -677,7 +677,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
       parser_next_token(parser);
 
       expr->kind = IrExprKindWhile;
-      expr->as._while.cond = parser_parse_expr(parser);
+      expr->as._while.cond = parser_parse_expr(parser, false);
       expr->as._while.body = parser_parse_block(parser, MASK(TT_CPAREN));
 
       parser_expect_token(parser, MASK(TT_CPAREN));
@@ -770,12 +770,12 @@ static IrExpr *parser_parse_expr(Parser *parser) {
 
         expr->kind = IrExprKindSetAt;
         expr->as.set_at.dest = copy_str(dest, parser->persistent_arena);
-        expr->as.set_at.key = parser_parse_expr(parser);
-        expr->as.set_at.value = parser_parse_expr(parser);
+        expr->as.set_at.key = parser_parse_expr(parser, false);
+        expr->as.set_at.value = parser_parse_expr(parser, false);
       } else {
         expr->kind = IrExprKindSet;
         expr->as.set.dest = copy_str(dest, parser->persistent_arena);
-        expr->as.set.src = parser_parse_expr(parser);
+        expr->as.set.src = parser_parse_expr(parser, false);
       }
 
       parser_expect_token(parser, MASK(TT_CPAREN));
@@ -788,7 +788,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
       expr->as.ret.has_expr = parser_peek_token(parser)->id != TT_CPAREN;
 
       if (expr->as.ret.has_expr)
-        expr->as.ret.expr = parser_parse_expr(parser);
+        expr->as.ret.expr = parser_parse_expr(parser, false);
 
       parser_expect_token(parser, MASK(TT_CPAREN));
     } break;
@@ -802,7 +802,7 @@ static IrExpr *parser_parse_expr(Parser *parser) {
 
     default: {
       expr->kind = IrExprKindFuncCall;
-      expr->as.func_call.func = parser_parse_expr(parser);
+      expr->as.func_call.func = parser_parse_expr(parser, false);
       expr->as.func_call.args = parser_parse_block(parser, MASK(TT_CPAREN));
 
       parser_expect_token(parser, MASK(TT_CPAREN));
@@ -810,20 +810,22 @@ static IrExpr *parser_parse_expr(Parser *parser) {
     }
   }
 
-  token = parser_peek_token(parser);
-  if (token && token->id == TT_QOLON) {
-    parser_next_token(parser);
+  if (!is_short) {
+    while ((token = parser_peek_token(parser)) &&
+           token->id == TT_QOLON) {
+      parser_next_token(parser);
 
-    IrExpr *get_at = arena_alloc(get_arena(parser), sizeof(IrExpr));
-    get_at->kind = IrExprKindGetAt;
-    get_at->as.get_at.src = expr;
-    get_at->as.get_at.key = parser_parse_expr(parser);
+      IrExpr *get_at = arena_alloc(get_arena(parser), sizeof(IrExpr));
+      get_at->kind = IrExprKindGetAt;
+      get_at->as.get_at.src = expr;
+      get_at->as.get_at.key = parser_parse_expr(parser, true);
 
-    get_at->meta.file_path = STR(token->file_path, strlen(token->file_path));
-    get_at->meta.row = token->row;
-    get_at->meta.col = token->col;
+      get_at->meta.file_path = STR(token->file_path, strlen(token->file_path));
+      get_at->meta.row = token->row;
+      get_at->meta.col = token->col;
 
-    expr = get_at;
+      expr = get_at;
+    }
   }
 
   return expr;
@@ -838,7 +840,7 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
 
   Token *token = parser_peek_token(parser);
   while (token && !(MASK(token->id) & end_id_mask)) {
-    IrExpr *expr = parser_parse_expr(parser);
+    IrExpr *expr = parser_parse_expr(parser, false);
     if (expr)
       ir_block_append(&block, expr, arena);
 
