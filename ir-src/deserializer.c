@@ -207,6 +207,7 @@ static void load_block_data(IrBlock *block, u8 *data, u32 *end,
   *end += sizeof(u32);
 
   block->items = arena_alloc(arena, block->cap * sizeof(IrExpr *));
+
   for (u32 i = 0; i < block->len; ++i) {
     block->items[i] = arena_alloc(arena, sizeof(IrExpr));
 

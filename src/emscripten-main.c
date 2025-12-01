@@ -25,9 +25,9 @@ EMSCRIPTEN_KEEPALIVE
 i32 emscripten_main(char *path) {
   Str bytecode = read_file(loader_path);
   if (bytecode.len == (u32) -1) {
-    INFO("Loader file was not found at %s, listing current directory\n", loader_path);
+    INFO("Could not find loader at %s, listing current directory\n", loader_path);
     list_dir(".");
-    return 1;
+    exit(1);
   }
 
   Arena ir_arena = {0};

@@ -62,9 +62,9 @@ if [ "$WASM" != "" ]; then
   LDFLAGS=
   SRC="src/emscripten-main.c"
 
-  ./aether -o dest/loader.abc ae-src/loader.ae
   ./aether -o dest/core.abc std/ae-src/core.ae
   ./aether -o dest/base.abc std/ae-src/base.ae
+  ./aether -o dest/loader.abc ae-src/loader.ae
 
   $CC -o $OUT $COMPILER_SRC $VM_SRC $IR_SRC $LEXGEN_RUNTIME_SRC \
               $LIB_SRC $STD_SRC $SRC $CFLAGS $LDFLAGS $BUILD_FLAGS

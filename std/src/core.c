@@ -716,8 +716,9 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   path_cstr[path->as.string.len] = '\0';
 
   Arena ir_arena = {0};
+  FilePaths included_files = {0};
   Ir ir = parse_ex(code->as.string, path_cstr, &env->as.env->macros,
-                   &env->as.env->included_files, &ir_arena, &env->as.env->arena);
+                   &included_files, &ir_arena, &env->as.env->arena);
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false, &env->as.env->arena);
 
   Str bytecode = {0};
@@ -729,6 +730,7 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
 
   free(path_cstr);
   arena_free(&ir_arena);
+  free(included_files.items);
 
   return value_string(bytecode, vm_get_frame(vm), vm->current_frame_index);
 }

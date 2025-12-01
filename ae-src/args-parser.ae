@@ -15,7 +15,8 @@
              'With no FILE, start REPL.\n\n'
              '  -h --help                 show this message\n'
              '  -o [FILE]                 output bytecode into [FILE]\n'
-             '  -c                        execute bytecode\n')
+             '  -c                        execute bytecode\n'
+             '  -w                        run in web mode\n')
       (exit 0)
      elif (== (head args) '-o')
       (set args (tail args))
