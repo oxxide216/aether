@@ -35,8 +35,8 @@
 (let env (make-env parsed-args))
 
 (if is-in-web
-  (load-compiled-module env 'core' core-web-path)
-  (load-compiled-module env 'base' base-web-path)
+  (load-module env 'core' core-web-path)
+  (load-module env 'base' base-web-path)
  else
   (load-module env 'core' core-path)
   (load-module env 'base' base-path))

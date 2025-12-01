@@ -12,7 +12,7 @@ if [ "$DEL" == "" ]; then
   if [ "$WASM" != "" ]; then
     sudo mkdir /usr/include/aether/wasm/
     sudo cp -r dest/aether.data dest/aether.js dest/aether.wasm \
-               dest/loader.abc dest/core.abc dest/base.abc \
+               dest/loader.abc dest/std/ js-src/aether-web.js \
                /usr/include/aether/wasm/
 
     if [ -f dest/aether.wasm.map ]; then
