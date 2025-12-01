@@ -256,9 +256,9 @@ static Var *get_var(Vm *vm, Str name) {
       ++depth;
   }
 
-  for (u32 j = vm->global_vars.len; j > 0; --j)
-    if (str_eq(vm->global_vars.items[j - 1].name, name))
-      return vm->global_vars.items + j - 1;
+  for (u32 i = vm->global_vars.len; i > 0; --i)
+    if (str_eq(vm->global_vars.items[i - 1].name, name))
+      return vm->global_vars.items + i - 1;
 
   return NULL;
 }
@@ -459,7 +459,7 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
   }
 
   bool prev_is_inside_of_func = vm->is_inside_of_func;
-  Func prev_current_func_value = vm->current_func_value;
+  Func prev_func_value = vm->current_func_value;
 
   vm->is_inside_of_func = true;
   vm->current_func_value = *func;
@@ -504,7 +504,7 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
   end_frame(vm);
 
   vm->is_inside_of_func = prev_is_inside_of_func;
-  vm->current_func_value = prev_current_func_value;
+  vm->current_func_value = prev_func_value;
 
   return result_stable;
 }

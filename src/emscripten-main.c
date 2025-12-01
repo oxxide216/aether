@@ -1,6 +1,6 @@
-#define SHL_LOG_H
-
 #include <dirent.h>
+
+#define SHL_LOG_H
 
 #include "emscripten-main.h"
 #include "emscripten-log.h"
@@ -9,49 +9,17 @@
 #include "aether/vm.h"
 #include "aether/misc.h"
 
-static char *loader_path = "dest/loader.abc";
-
 static Arena persistent_arena = {0};
 static Macros macros = {0};
 static FilePaths included_files = {0};
 static Vm vm = {0};
 
-Value *eval_compiled_intrinsic(Vm *vm, Value **args);
-Value *eval_intrinsic(Vm *vm, Value **args);
-
-static void list_dir(char *path) {
-  DIR *dir;
-  struct dirent *entry;
-  dir = opendir(path);
-  if (dir) {
-    while ((entry = readdir(dir)) != NULL)
-      printf("%s\n", entry->d_name);
-    closedir(dir);
-  }
-}
-
 EMSCRIPTEN_KEEPALIVE
-void emscripten_create(char *path) {
-  Str bytecode = read_file(loader_path);
-  if (bytecode.len == (u32) -1) {
-    INFO("Could not find loader at %s, listing current directory\n", loader_path);
-    list_dir(".");
-    exit(1);
-  }
-
-  Arena ir_arena = {0};
-  Ir ir = deserialize((u8 *) bytecode.ptr, bytecode.len,
-                      &ir_arena, &persistent_arena);
-  expand_macros_block(&ir, &macros, NULL, NULL, false, &persistent_arena);
-
-  i32 argc = 4;
-  char *argv[] = { "aether", "-c", "-w", path, NULL };
+void emscripten_create(void) {
+  i32 argc = 1;
+  char *argv[] = { "aether", NULL };
   Intrinsics intrinsics = {0};
   vm = vm_create(argc, argv, &intrinsics);
-  execute_block(&vm, &ir, false);
-
-  free(bytecode.ptr);
-  arena_free(&ir_arena);
 }
 
 char *value_to_cstr(Value *value) {
@@ -62,9 +30,9 @@ char *value_to_cstr(Value *value) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-char *emscripten_eval_compiled(char *bytecode) {
+char *emscripten_eval_compiled(char *bytecode, u32 bytecode_len) {
   Arena ir_arena = {0};
-  Ir ir = deserialize((u8 *) bytecode, strlen(bytecode),
+  Ir ir = deserialize((u8 *) bytecode, bytecode_len,
                       &ir_arena, &persistent_arena);
 
   Value *result = execute_block(&vm, &ir, true);
