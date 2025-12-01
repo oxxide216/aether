@@ -7,7 +7,6 @@
 (let parse-args [args] ->
   (let mode mode-default)
   (let output-path '')
-  (let is-in-web false)
 
   (while (head args)
     (if (or (== (head args) '-h') (== (head args) '--help'))
@@ -15,8 +14,7 @@
              'With no FILE, start REPL.\n\n'
              '  -h --help                 show this message\n'
              '  -o [FILE]                 output bytecode into [FILE]\n'
-             '  -c                        execute bytecode\n'
-             '  -w                        run in web mode\n')
+             '  -c                        execute bytecode\n')
       (exit 0)
      elif (== (head args) '-o')
       (set args (tail args))
@@ -27,14 +25,11 @@
       (set mode mode-compile-only)
      elif (== (head args) '-c')
       (set mode mode-eval-bytecode)
-     elif (== (head args) '-w')
-      (set is-in-web true)
      else
       (ret {
         'args': args
         'mode': mode
         'output-path': output-path
-        'is-in-web': is-in-web
       }))
     (set args (tail args)))
 
@@ -42,5 +37,4 @@
     'args': args
     'mode': mode
     'output-path': output-path
-    'is-in-web': is-in-web
   })
