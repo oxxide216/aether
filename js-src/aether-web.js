@@ -1,4 +1,5 @@
 let _aether_eval = null;
+let _aether_eval_compiled = null;
 
 function aether_init() {
   Module = {
@@ -11,7 +12,8 @@ function aether_init() {
       const aether_create = Module.cwrap('emscripten_create', 'number', ['string']);
       aether_create('dest/app.abc');
 
-      _aether_eval = Module.cwrap('emscripten_eval', 'null', ['string', 'string']);
+      _aether_eval = Module.cwrap('emscripten_eval', 'string', ['string', 'string']);
+      _aether_eval_compiled = Module.cwrap('emscripten_eval_compiled', 'string', ['string']);
 
       aether_eval('(use "std/core.ae")');
       aether_eval('(use "std/base.ae")');
@@ -24,5 +26,9 @@ function aether_init() {
 }
 
 function aether_eval(code) {
-  _aether_eval(code, 'aether-web.js');
+  return _aether_eval(code, 'aether-web.js');
+}
+
+function aether_eval_compiled(bytecode) {
+  return _aether_eval_compiled(bytecode);
 }

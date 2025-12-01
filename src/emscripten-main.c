@@ -3,10 +3,11 @@
 #include <dirent.h>
 
 #include "emscripten-main.h"
+#include "emscripten-log.h"
 #include "io.h"
 #include "aether/deserializer.h"
 #include "aether/vm.h"
-#include "emscripten-log.h"
+#include "aether/misc.h"
 
 static char *loader_path = "dest/loader.abc";
 
@@ -53,27 +54,38 @@ void emscripten_create(char *path) {
   arena_free(&ir_arena);
 }
 
+char *value_to_cstr(Value *value) {
+  StringBuilder sb = {0};
+  sb_push_value(&sb, value, 0, false, &vm);
+
+  return sb.buffer;
+}
+
 EMSCRIPTEN_KEEPALIVE
-void emscripten_eval_compiled(char *bytecode) {
+char *emscripten_eval_compiled(char *bytecode) {
   Arena ir_arena = {0};
   Ir ir = deserialize((u8 *) bytecode, strlen(bytecode),
                       &ir_arena, &persistent_arena);
 
-  execute_block(&vm, &ir, false);
+  Value *result = execute_block(&vm, &ir, true);
 
   arena_free(&ir_arena);
+
+  return value_to_cstr(result);
 }
 
 EMSCRIPTEN_KEEPALIVE
-void emscripten_eval(char *code, char *path) {
+char *emscripten_eval(char *code, char *path) {
   Arena ir_arena = {0};
   Ir ir = parse_ex(STR(code, strlen(code)), path, &macros,
                    &included_files, &ir_arena, &persistent_arena);
   expand_macros_block(&ir, &macros, NULL, NULL, false, &persistent_arena);
 
-  execute_block(&vm, &ir, false);
+  Value *result = execute_block(&vm, &ir, true);
 
   arena_free(&ir_arena);
+
+  return value_to_cstr(result);
 }
 
 EMSCRIPTEN_KEEPALIVE
