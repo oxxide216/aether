@@ -30,9 +30,9 @@ char *value_to_cstr(Value *value) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-char *emscripten_eval_compiled(char *bytecode, u32 bytecode_len) {
+char *emscripten_eval_compiled(u8 *bytecode, u32 bytecode_len) {
   Arena ir_arena = {0};
-  Ir ir = deserialize((u8 *) bytecode, bytecode_len,
+  Ir ir = deserialize(bytecode, bytecode_len,
                       &ir_arena, &persistent_arena);
 
   Value *result = execute_block(&vm, &ir, true);
