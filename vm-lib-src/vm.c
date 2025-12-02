@@ -496,10 +496,12 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
   frame = vm_get_frame(vm);
 
   Value *result_stable = NULL;
-  if (value_expected && vm->state == ExecStateContinue)
-    result_stable = value_clone(result, frame - 1, vm->current_frame_index - 1);
-  else
-    result_stable = value_unit(frame - 1, vm->current_frame_index - 1);
+  if (vm->state == ExecStateContinue) {
+    if (value_expected)
+      result_stable = value_clone(result, frame - 1, vm->current_frame_index - 1);
+    else
+      result_stable = value_unit(frame - 1, vm->current_frame_index - 1);
+  }
 
   end_frame(vm);
 
@@ -522,10 +524,15 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     EXECUTE_EXPR_SET(vm, func_value, expr->as.func_call.func, true);
 
     if (func_value->kind != ValueKindFunc) {
-      PERROR(META_FMT, "Value is not callable\n",
-             META_ARG(expr->meta));
+      StringBuilder sb = {0};
+      sb_push_value(&sb, func_value, 0, true, vm);
+
+      PERROR(META_FMT, "Value of kind "STR_FMT" is not callable\n",
+             META_ARG(expr->meta), STR_ARG(sb_to_str(sb)));
       vm->state = ExecStateExit;
       vm->exit_code = 1;
+
+      free(sb.buffer);
 
       return value_unit(vm_get_frame(vm), vm->current_frame_index);
     }

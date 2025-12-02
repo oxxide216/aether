@@ -57,7 +57,7 @@ if [ "$WASM" != "" ]; then
 
   CC=/usr/lib/emsdk/upstream/emscripten/emcc
   OUT=dest/aether.js
-  CFLAGS="$CFLAGS -D__emscripten__ --preload-file dest \
+  CFLAGS="$CFLAGS -D__emscripten__ --preload-file dest/ \
                   -s EXPORTED_RUNTIME_METHODS='cwrap' \
                   -s WASM=1 -s MEMORY64 -s FULL_ES3=1 \
                   -s USE_WEBGL2=1 -s USE_GLFW=0 \

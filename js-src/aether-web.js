@@ -1,5 +1,5 @@
-let _aether_eval = null;
 let _aether_eval_compiled = null;
+let _aether_eval = null;
 
 function aether_init(init_callback) {
   Module = {
