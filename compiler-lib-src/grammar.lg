@@ -24,10 +24,8 @@ ccurly=}
 str="|'
 unpack=...
 right_arrow=\->
-rhombus=<>
 colon=:
 qolon=::
-double_arrow=<\->
 
 int=\-?0-9+
 float=\-?0-9+.0-9+

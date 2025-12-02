@@ -61,6 +61,7 @@ static char *token_names[] = {
   "ret",
   "import",
   "match",
+  "do",
   "`(`",
   "`)`",
   "`[`",
@@ -70,10 +71,8 @@ static char *token_names[] = {
   "string literal",
   "`...`",
   "`->`",
-  "`<>`",
   "`:`",
   "`::`",
-  "`<->`",
   "int",
   "float",
   "bool",
@@ -471,13 +470,7 @@ static IrExprLambda parser_parse_lambda(Parser *parser) {
     };
     lambda.intrinsic_name = copy_str(intrinsic_name, parser->persistent_arena);
   } else {
-    lambda.body = parser_parse_block(parser, MASK(TT_CPAREN) |
-                                             MASK(TT_CBRACKET) |
-                                             MASK(TT_RHOMBUS));
-
-    if (parser_peek_token(parser) &&
-        parser_peek_token(parser)->id == TT_RHOMBUS)
-      parser_next_token(parser);
+    lambda.body = parser_parse_expr(parser);
   }
 
   return lambda;
