@@ -6,3 +6,7 @@ cp -r /usr/include/aether/wasm dest/
 if [ "$1" != "" ]; then
   cp -r "$1"/* dest/
 fi
+
+if [ "$2" != "" ]; then
+  aether -o dest/app.abc "$2"
+fi
