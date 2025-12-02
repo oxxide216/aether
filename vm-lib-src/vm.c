@@ -569,6 +569,8 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Value *value;
     EXECUTE_EXPR_SET(vm, value, expr->as.var_def.expr, true);
 
+    value = value_clone(value, vm_get_frame(vm), vm->current_frame_index);
+
     Var *prev_var = get_var(vm, expr->as.var_def.name);
     if (prev_var) {
       if (prev_var->value != value)
@@ -887,8 +889,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       return value_unit(vm_get_frame(vm), vm->current_frame_index);
     }
 
-    result = value_clone(var->value, vm_get_frame(vm),
-                         vm->current_frame_index);
+    result = var->value;
   } break;
 
   case IrExprKindString: {
