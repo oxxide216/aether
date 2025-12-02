@@ -25,9 +25,9 @@
 #define TT_STR 21
 #define TT_UNPACK 22
 #define TT_RIGHT_ARROW 23
-#define TT_RHOMBUS 24
-#define TT_COLON 25
-#define TT_QOLON 26
+#define TT_COLON 24
+#define TT_QOLON 25
+#define TT_RHOMBUS 26
 #define TT_DOUBLE_ARROW 27
 #define TT_INT 28
 #define TT_FLOAT 29
@@ -176,11 +176,6 @@ TransitionCol table_col_right_arrow[] = {
   { 2, '>', '>', 0 },
 };
 
-TransitionCol table_col_rhombus[] = {
-  { 1, '<', '<', 2 },
-  { 2, '>', '>', 0 },
-};
-
 TransitionCol table_col_colon[] = {
   { 1, ':', ':', 0 },
 };
@@ -188,6 +183,11 @@ TransitionCol table_col_colon[] = {
 TransitionCol table_col_qolon[] = {
   { 1, ':', ':', 2 },
   { 2, ':', ':', 0 },
+};
+
+TransitionCol table_col_rhombus[] = {
+  { 1, '<', '<', 2 },
+  { 2, '>', '>', 0 },
 };
 
 TransitionCol table_col_double_arrow[] = {
@@ -294,9 +294,9 @@ TransitionRow table_rows[] = {
   { table_col_str, sizeof(table_col_str) / sizeof(TransitionCol) },
   { table_col_unpack, sizeof(table_col_unpack) / sizeof(TransitionCol) },
   { table_col_right_arrow, sizeof(table_col_right_arrow) / sizeof(TransitionCol) },
-  { table_col_rhombus, sizeof(table_col_rhombus) / sizeof(TransitionCol) },
   { table_col_colon, sizeof(table_col_colon) / sizeof(TransitionCol) },
   { table_col_qolon, sizeof(table_col_qolon) / sizeof(TransitionCol) },
+  { table_col_rhombus, sizeof(table_col_rhombus) / sizeof(TransitionCol) },
   { table_col_double_arrow, sizeof(table_col_double_arrow) / sizeof(TransitionCol) },
   { table_col_int, sizeof(table_col_int) / sizeof(TransitionCol) },
   { table_col_float, sizeof(table_col_float) / sizeof(TransitionCol) },
