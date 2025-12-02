@@ -1,5 +1,7 @@
-(let core-path '/usr/include/aether/std/core.ae')
-(let base-path '/usr/include/aether/std/base.ae')
+(let core-paths ['/usr/include/aether/std/core.ae'
+                 'ae-src/std/core.ae'])
+(let base-paths ['/usr/include/aether/std/base.ae'
+                 'ae-src/std/base.ae'])
 
 (let repl-path '/usr/include/aether/load/repl.ae')
 

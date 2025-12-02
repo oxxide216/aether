@@ -4,7 +4,7 @@
 CC=cc
 OUT=aether
 CFLAGS="-Wall -Wextra -Icompiler-lib-include -Ivm-lib-include -Iir-include \
-        -Ilibs -Istd/include -Imisc -lm"
+        -Ilibs -Imisc -lm"
 BUILD_FLAGS="${@:1}"
 
 LDFLAGS="-z execstack"
@@ -14,16 +14,16 @@ VM_SRC="$(find vm-lib-src -name "*.c")"
 IR_SRC="$(find ir-src -name "*.c") $(find misc -name "*.c")"
 LEXGEN_RUNTIME_SRC="$(find libs/lexgen/runtime-src -name "*.c")"
 LIB_SRC=""
-STD_SRC="std/src/core.c std/src/math.c std/src/str.c"
+STD_SRC="src/std/core.c src/std/math.c src/std/str.c"
 
 if [ "$AETHER_GRAPHICS" == "" ]; then
   AETHER_GRAPHICS=x11
 fi
 
 if [ "$NOSYSTEM" == "" ]; then
-  STD_SRC="$STD_SRC std/src/base.c std/src/io.c \
-                    std/src/net.c std/src/path.c \
-                    std/src/term.c std/src/system.c"
+  STD_SRC="$STD_SRC src/std/base.c src/std/io.c \
+                    src/std/net.c src/std/path.c \
+                    src/std/term.c src/std/system.c"
 else
   CFLAGS="$CFLAGS -DNOSYSTEM"
 fi
@@ -33,7 +33,7 @@ if [ "$GLASS" != "" ]; then
   LIB_SRC="$LIB_SRC $(find libs/winx/src -name "*.c" -not -name "io.c" \
                            -not -path "libs/winx/src/platform/*")"
   LIB_SRC="$LIB_SRC $(find libs/glass/src -name "*.c" -not -name "io.c")"
-  STD_SRC="$STD_SRC std/src/glass/*"
+  STD_SRC="$STD_SRC src/std/glass/*"
   if [ "$AETHER_GRAPHICS" == "x11" ]; then
     CFLAGS="$CFLAGS -DX11"
     LDFLAGS="$LDFLAGS -lX11 -lGL -lGLEW"
@@ -51,11 +51,15 @@ $CC -o $OUT $COMPILER_SRC $VM_SRC $IR_SRC $LEXGEN_RUNTIME_SRC \
 
 if [ "$WASM" != "" ]; then
   rm -rf dest/
-  mkdir -p dest/std
+  mkdir dest/
   cp js-src/aether-web.js dest/
-  cp std/ae-src/* dest/std/
+  cp -r ae-src/std/ dest/
 
-  CC=/usr/lib/emsdk/upstream/emscripten/emcc
+  if [ "$EMCC_PATH" != "" ]; then
+    PATH="$PATH:$EMCC_PATH:$EMCC_PATH/upstream/emscripten:$EMCC_PATH/upstream/bin"
+  fi
+
+  CC=emcc
   OUT=dest/aether.js
   CFLAGS="$CFLAGS -D__emscripten__ --preload-file dest/ \
                   -s EXPORTED_RUNTIME_METHODS='cwrap' \

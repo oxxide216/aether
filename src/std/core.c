@@ -384,6 +384,12 @@ Value *to_float_intrinsic(Vm *vm, Value **args) {
   return value_unit(vm_get_frame(vm), vm->current_frame_index);
 }
 
+Value *to_bool_intrinsic(Vm *vm, Value **args) {
+  Value *value = args[0];
+
+  return value_bool(value_to_bool(value), vm_get_frame(vm), vm->current_frame_index);
+}
+
 Value *add_intrinsic(Vm *vm, Value **args) {
   Value *a = args[0];
   Value *b = args[1];
@@ -817,6 +823,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("to-int"), true, 1, { ValueKindFloat }, &to_int_intrinsic },
   { STR_LIT("to-float"), true, 1, { ValueKindInt }, &to_float_intrinsic },
   { STR_LIT("to-float"), true, 1, { ValueKindString }, &to_float_intrinsic },
+  { STR_LIT("to-bool"), true, 1, { ValueKindUnit }, &to_bool_intrinsic },
   // Math
   { STR_LIT("add"), true, 2, { ValueKindInt, ValueKindInt }, &add_intrinsic },
   { STR_LIT("add"), true, 2, { ValueKindFloat, ValueKindFloat }, &add_intrinsic },

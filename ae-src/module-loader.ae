@@ -1,16 +1,30 @@
 (use 'std/core.ae')
 (use 'std/log.ae')
 
-(let load-module [env name path] ->
-  (let content (read-file path))
+(let load-module [env name paths] ->
+  (let right-paths (filter [path] ->
+                             (to-bool (get-file-info path)) <> paths))
+
+  (if (unit? right-paths)
+    (error 'Could not load ' name ' module')
+    (exit 1))
+
+  (let content (read-file right-paths::0))
   (if (unit? content)
     (error 'Could not load ' name ' module')
     (exit 1))
 
-  (eval env content path))
+  (eval env content right-paths::0))
 
 (let load-compiled-module [env name path] ->
-  (let content (read-file path))
+  (let right-paths (filter [path] ->
+                             (get-file-info path) <> paths))
+
+  (if (unit? right-paths)
+    (error 'Could not load ' name ' module')
+    (exit 1))
+
+  (let content (read-file right-paths::0))
   (if (unit? content)
     (error 'Could not load precompiled ' name ' module')
     (exit 1))
