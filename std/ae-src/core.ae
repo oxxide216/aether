@@ -66,6 +66,3 @@
     (let element (head -list))
     body
     (set -list (tail -list))))
-
-(macro do [...body] ->
-  ([] -> body))

@@ -800,6 +800,15 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
       expr->as.match = parser_parse_match(parser);
     } break;
 
+    case TT_DO: {
+      parser_next_token(parser);
+
+      expr->kind = IrExprKindBlock;
+      expr->as.block = parser_parse_block(parser, MASK(TT_CPAREN));
+
+      parser_expect_token(parser, MASK(TT_CPAREN));
+    } break;
+
     default: {
       expr->kind = IrExprKindFuncCall;
       expr->as.func_call.func = parser_parse_expr(parser, false);

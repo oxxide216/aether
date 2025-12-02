@@ -13,6 +13,7 @@ use=use
 ret=ret
 import=import
 match=match
+do=do
 
 oparen=\(
 cparen=\)
