@@ -743,8 +743,6 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Value *value;
     EXECUTE_EXPR_SET(vm, value, expr->as.set_at.value, true);
 
-    key = value_clone(key, vm->frames.items + dest_var->value->frame_index,
-                      dest_var->value->frame_index);
     value = value_clone(value, vm->frames.items + dest_var->value->frame_index,
                         dest_var->value->frame_index);
 
@@ -816,6 +814,9 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       }
 
       if (!found) {
+        key = value_clone(key, vm->frames.items + dest_var->value->frame_index,
+                          dest_var->value->frame_index);
+
         DictValue dict_value = { key, value };
 
         if (dest_var->value->as.dict.cap == dest_var->value->as.dict.len) {
