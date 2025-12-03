@@ -337,8 +337,23 @@ static bool try_inline_macro_arg(IrExpr **expr, IrArgs *arg_names,
     try_replace_macro_arg_ident(&(*expr)->as.var_def.name, arg_names, args);
 
     return false;
-  } else if ((*expr)->kind == IrExprKindSet) {
+  }
+
+  if ((*expr)->kind == IrExprKindSet) {
     try_replace_macro_arg_ident(&(*expr)->as.set.dest, arg_names, args);
+
+    return false;
+  }
+
+  if ((*expr)->kind == IrExprKindSetAt) {
+    try_replace_macro_arg_ident(&(*expr)->as.set_at.dest, arg_names, args);
+
+    return false;
+  }
+
+  if ((*expr)->kind == IrExprKindLambda) {
+    for (u32 i = 0; i < (*expr)->as.lambda.args.len; ++i)
+      try_replace_macro_arg_ident((*expr)->as.lambda.args.items + i, arg_names, args);
 
     return false;
   }

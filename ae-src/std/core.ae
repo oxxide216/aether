@@ -63,5 +63,4 @@
 (let exit [exit-code] -> import 'exit')
 
 (macro for [element in collection ...body] ->
-  (for-each collection
-            [-] -> (let element -) body))
+  (for-each collection [element] -> body))
