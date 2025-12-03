@@ -136,7 +136,7 @@ Value *load_texture_intrinsic(Vm *vm, Value **args) {
   if (!buffer) {
     stbi_image_free(buffer);
 
-    return value_unit(vm_get_frame(vm), vm->current_frame_index);
+    return value_unit(vm->current_frame);
   }
 
   GlassTexture texture = glass_init_texture(GlassFilteringModeLinear);
@@ -144,7 +144,7 @@ Value *load_texture_intrinsic(Vm *vm, Value **args) {
   if (texture.id == 0) {
     stbi_image_free(buffer);
 
-    return value_unit(vm_get_frame(vm), vm->current_frame_index);
+    return value_unit(vm->current_frame);
   }
 
   glass_put_texture_data(&texture, buffer, width, height, GlassPixelKindRGBA);
@@ -153,14 +153,14 @@ Value *load_texture_intrinsic(Vm *vm, Value **args) {
 
   Dict result = {0};
 
-  dict_push_value_str_key(vm_get_frame(vm), vm->current_frame_index, &result, STR_LIT("id"),
-                          value_int(texture.id, vm_get_frame(vm), vm->current_frame_index));
-  dict_push_value_str_key(vm_get_frame(vm), vm->current_frame_index, &result, STR_LIT("width"),
-                          value_float((f64) width, vm_get_frame(vm), vm->current_frame_index));
-  dict_push_value_str_key(vm_get_frame(vm), vm->current_frame_index, &result, STR_LIT("height"),
-                          value_float((f64) height, vm_get_frame(vm), vm->current_frame_index));
+  dict_push_value_str_key(vm->current_frame, &result, STR_LIT("id"),
+                          value_int(texture.id, vm->current_frame));
+  dict_push_value_str_key(vm->current_frame, &result, STR_LIT("width"),
+                          value_float((f64) width, vm->current_frame));
+  dict_push_value_str_key(vm->current_frame, &result, STR_LIT("height"),
+                          value_float((f64) height, vm->current_frame));
 
-  return value_dict(result, vm_get_frame(vm), vm->current_frame_index);
+  return value_dict(result, vm->current_frame);
 }
 
 Value *load_font_intrinsic(Vm *vm, Value **args) {
@@ -176,14 +176,14 @@ Value *load_font_intrinsic(Vm *vm, Value **args) {
   free(file_name_cstr);
 
   if (glass.fonts.len == index)
-    return value_unit(vm_get_frame(vm), vm->current_frame_index);
+    return value_unit(vm->current_frame);
 
   Dict result = {0};
 
-  dict_push_value_str_key(vm_get_frame(vm), vm->current_frame_index, &result, STR_LIT("id"),
-                          value_int(index, vm_get_frame(vm), vm->current_frame_index));
+  dict_push_value_str_key(vm->current_frame, &result, STR_LIT("id"),
+                          value_int(index, vm->current_frame));
 
-  return value_dict(result, vm_get_frame(vm), vm->current_frame_index);
+  return value_dict(result, vm->current_frame);
 }
 
 static u64 fnv_hash(u8 *data, u32 size) {
@@ -259,10 +259,10 @@ Value *run_intrinsic(Vm *vm, Value **args) {
   }
 
   begin_frame(vm);
-  vm_get_frame(vm)->can_lookup_through = true;
+  vm->current_frame->can_lookup_through = true;
 
   begin_frame(vm);
-  vm_get_frame(vm)->can_lookup_through = true;
+  vm->current_frame->can_lookup_through = true;
 
   Value *state = execute_func(vm, &state, &init, NULL, true);
   if (vm->state != ExecStateContinue) {
@@ -321,16 +321,16 @@ Value *run_intrinsic(Vm *vm, Value **args) {
       break;
 
     if (i++ == MAIN_LOOP_FRAME_LENGTH) {
-      StackFrame *prev_frame = vm_get_frame(vm) - 1;
+      StackFrame *prev_frame = vm->current_frame - 1;
 
-      state = value_clone(state, prev_frame, vm->current_frame_index - 1);
+      state = value_clone(state, prev_frame - 1);
 
       end_frame(vm);
       begin_frame(vm);
 
       StackFrame temp_frame = *prev_frame;
-      *prev_frame = *vm_get_frame(vm);
-      *vm_get_frame(vm) = temp_frame;
+      *prev_frame = *vm->current_frame;
+      *vm->current_frame = temp_frame;
 
       i = 0;
     }
@@ -358,10 +358,10 @@ Value *run_intrinsic(Vm *vm, Value **args) {
     winx_draw(&glass.window);
   }
 
-  vm_get_frame(vm)->can_lookup_through = false;
+  vm->current_frame->can_lookup_through = false;
   end_frame(vm);
 
-  vm_get_frame(vm)->can_lookup_through = false;
+  vm->current_frame->can_lookup_through = false;
   end_frame(vm);
 
   winx_destroy_window(&glass.window);
@@ -369,33 +369,33 @@ Value *run_intrinsic(Vm *vm, Value **args) {
 
   initialized = false;
 
-  return value_unit(vm_get_frame(vm), vm->current_frame_index);
+  return value_unit(vm->current_frame);
 }
 
 Value *window_size_intrinsic(Vm *vm, Value **args) {
   (void) args;
 
   if (!initialized)
-    return value_unit(vm_get_frame(vm), vm->current_frame_index);
+    return value_unit(vm->current_frame);
 
   Dict size = {0};
 
-  Value *width = value_alloc(vm_get_frame(vm));
+  Value *width = value_alloc(vm->current_frame);
   width->kind = ValueKindFloat;
   width->as._float = (f32) glass.window.width;
-  dict_push_value_str_key(vm_get_frame(vm), vm->current_frame_index, &size, STR_LIT("width"), width);
+  dict_push_value_str_key(vm->current_frame, &size, STR_LIT("width"), width);
 
-  Value *height = value_alloc(vm_get_frame(vm));
+  Value *height = value_alloc(vm->current_frame);
   height->kind = ValueKindFloat;
   height->as._float = (f32) glass.window.height;
-  dict_push_value_str_key(vm_get_frame(vm), vm->current_frame_index, &size, STR_LIT("height"), height);
+  dict_push_value_str_key(vm->current_frame, &size, STR_LIT("height"), height);
 
-  return value_dict(size, vm_get_frame(vm), vm->current_frame_index);
+  return value_dict(size, vm->current_frame);
 }
 
 Value *text_width_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
-    return value_unit(vm_get_frame(vm), vm->current_frame_index);
+    return value_unit(vm->current_frame);
 
   Value *id = try_get_dict_field_of_kind_str_key(&args[1]->as.dict, STR_LIT("id"),
                                                  ValueKindInt, "font", "font");
@@ -408,22 +408,22 @@ Value *text_width_intrinsic(Vm *vm, Value **args) {
     f32 result = 0.0;
     render_text(0.0, 0.0, args[0]->as._int, args[2]->as.string, font, &result, true);
 
-    return value_float(result, vm_get_frame(vm), vm->current_frame_index);
+    return value_float(result, vm->current_frame);
   }
 
-  return value_unit(vm_get_frame(vm), vm->current_frame_index);
+  return value_unit(vm->current_frame);
 }
 
 Value *clear_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
-    return value_unit(vm_get_frame(vm), vm->current_frame_index);
+    return value_unit(vm->current_frame);
 
   clear_color.r = args[0]->as._float;
   clear_color.g = args[1]->as._float;
   clear_color.b = args[2]->as._float;
   clear_color.a = args[3]->as._float;
 
-  return value_unit(vm_get_frame(vm), vm->current_frame_index);
+  return value_unit(vm->current_frame);
 }
 
 void push_primitive(f32 x, f32 y, f32 width, f32 height,
@@ -472,7 +472,7 @@ Value *quad_intrinsic(Vm *vm, Value **args) {
   (void) vm;
 
   if (!initialized)
-    return value_unit(vm_get_frame(vm), vm->current_frame_index);
+    return value_unit(vm->current_frame);
 
   push_primitive(args[0]->as._float, args[1]->as._float,
                  args[2]->as._float, args[3]->as._float,
@@ -481,14 +481,14 @@ Value *quad_intrinsic(Vm *vm, Value **args) {
                  args[6]->as._float, args[7]->as._float,
                  0, TYPE_BASE);
 
-  return value_unit(vm_get_frame(vm), vm->current_frame_index);
+  return value_unit(vm->current_frame);
 }
 
 Value *circle_intrinsic(Vm *vm, Value **args) {
   (void) vm;
 
   if (!initialized)
-    return value_unit(vm_get_frame(vm), vm->current_frame_index);
+    return value_unit(vm->current_frame);
 
   push_primitive(args[0]->as._float - args[2]->as._float,
                  args[1]->as._float - args[2]->as._float,
@@ -498,12 +498,12 @@ Value *circle_intrinsic(Vm *vm, Value **args) {
                  args[5]->as._float, args[6]->as._float,
                  0, TYPE_CIRCLE);
 
-  return value_unit(vm_get_frame(vm), vm->current_frame_index);
+  return value_unit(vm->current_frame);
 }
 
 Value *texture_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
-    return value_unit(vm_get_frame(vm), vm->current_frame_index);
+    return value_unit(vm->current_frame);
 
   Value *id = try_get_dict_field_of_kind_str_key(&args[2]->as.dict, STR_LIT("id"),
                                                  ValueKindInt, "texture", "texture");
@@ -525,12 +525,12 @@ Value *texture_intrinsic(Vm *vm, Value **args) {
                  0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
                  id->as._int, TYPE_TEXTURE);
 
-  return value_unit(vm_get_frame(vm), vm->current_frame_index);
+  return value_unit(vm->current_frame);
 }
 
 Value *textured_quad_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
-    return value_unit(vm_get_frame(vm), vm->current_frame_index);
+    return value_unit(vm->current_frame);
 
   Value *id = try_get_dict_field_of_kind_str_key(&args[4]->as.dict, STR_LIT("id"),
                                                  ValueKindInt, "texture", "texture");
@@ -542,12 +542,12 @@ Value *textured_quad_intrinsic(Vm *vm, Value **args) {
                  0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
                  id->as._int, TYPE_TEXTURE);
 
-  return value_unit(vm_get_frame(vm), vm->current_frame_index);
+  return value_unit(vm->current_frame);
 }
 
 Value *tile_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
-    return value_unit(vm_get_frame(vm), vm->current_frame_index);
+    return value_unit(vm->current_frame);
 
   Value *id = try_get_dict_field_of_kind_str_key(&args[8]->as.dict, STR_LIT("id"),
                                                  ValueKindInt, "texture", "texture");
@@ -561,12 +561,12 @@ Value *tile_intrinsic(Vm *vm, Value **args) {
                  1.0, 1.0, 1.0, 1.0,
                  id->as._int, TYPE_TEXTURE);
 
-  return value_unit(vm_get_frame(vm), vm->current_frame_index);
+  return value_unit(vm->current_frame);
 }
 
 Value *text_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
-    return value_unit(vm_get_frame(vm), vm->current_frame_index);
+    return value_unit(vm->current_frame);
 
   Value *id = try_get_dict_field_of_kind_str_key(&args[3]->as.dict, STR_LIT("id"),
                                                  ValueKindInt, "font", "font");
@@ -580,7 +580,7 @@ Value *text_intrinsic(Vm *vm, Value **args) {
                 args[4]->as.string, font, NULL, false);
   }
 
-  return value_unit(vm_get_frame(vm), vm->current_frame_index);
+  return value_unit(vm->current_frame);
 }
 
 Intrinsic glass_intrinsics[] = {

@@ -22,8 +22,7 @@ void dict_push_value(Dict *dict, Value *key, Value *value) {
   DA_APPEND(*dict, dict_value);
 }
 
-void dict_push_value_str_key(StackFrame *frame, u32 frame_index,
-                             Dict *dict, Str key, Value *value) {
+void dict_push_value_str_key(StackFrame *frame, Dict *dict, Str key, Value *value) {
   if (dict->len == dict->cap) {
     if (dict->cap == 0)
       dict->cap = 1;
@@ -38,7 +37,7 @@ void dict_push_value_str_key(StackFrame *frame, u32 frame_index,
   *string = (Value) {
     ValueKindString,
     { .string = key },
-    frame_index,
+    frame,
   };
   DictValue dict_value = { string, value };
   dict->items[dict->len++] = dict_value;

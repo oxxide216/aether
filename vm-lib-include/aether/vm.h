@@ -52,10 +52,10 @@
       return dest;                                         \
   } while (0)
 
-#define PANIC(frame, frame_index, ...)     \
-  do {                                     \
-    ERROR(__VA_ARGS__);                    \
-    return value_unit(frame, frame_index); \
+#define PANIC(frame, ...)     \
+  do {                        \
+    ERROR(__VA_ARGS__);       \
+    return value_unit(frame); \
   } while(0)
 
 typedef enum {
@@ -94,14 +94,16 @@ typedef struct {
 
 typedef Da(Var) Vars;
 
-typedef struct {
-  Values values;
-  Arena  arena;
-  Vars   vars;
-  bool   can_lookup_through;
-} StackFrame;
+typedef struct StackFrame StackFrame;
 
-typedef Da(StackFrame) StackFrames;
+struct StackFrame {
+  Values      values;
+  Arena       arena;
+  Vars        vars;
+  bool        can_lookup_through;
+  StackFrame *next;
+  StackFrame *prev;
+};
 
 typedef struct {
   IrArgs      args;
@@ -130,15 +132,16 @@ typedef struct {
 typedef Da(Intrinsic) Intrinsics;
 
 struct Vm {
-  Vars         global_vars;
-  Intrinsics   intrinsics;
-  StackFrames  frames;
-  u32          current_frame_index;
-  ListNode    *args;
-  ExecState    state;
-  i64          exit_code;
-  bool         is_inside_of_func;
-  Func         current_func_value;
+  Vars        global_vars;
+  Intrinsics  intrinsics;
+  StackFrame *frames;
+  StackFrame *frames_end;
+  StackFrame *current_frame;
+  ListNode   *args;
+  ExecState   state;
+  i64         exit_code;
+  bool        is_inside_of_func;
+  Func        current_func_value;
 };
 
 typedef struct {
@@ -161,9 +164,9 @@ typedef union {
 } ValueAs;
 
 struct Value {
-  ValueKind kind;
-  ValueAs   as;
-  u32       frame_index;
+  ValueKind   kind;
+  ValueAs     as;
+  StackFrame *frame;
 };
 
 struct ListNode {
@@ -182,21 +185,21 @@ struct NamedValue {
   Value *value;
 };
 
-ListNode *list_clone(ListNode *list, StackFrame *frame, u32 frame_index);
-Dict      dict_clone(Dict *dict, StackFrame *frame, u32 frame_index);
+ListNode *list_clone(ListNode *list, StackFrame *frame);
+Dict      dict_clone(Dict *dict, StackFrame *frame);
 
-Value *value_unit(StackFrame *frame, u32 frame_index);
-Value *value_list(ListNode *nodes, StackFrame *frame, u32 frame_index);
-Value *value_string(Str string, StackFrame *frame, u32 frame_index);
-Value *value_int(i64 _int, StackFrame *frame, u32 frame_index);
-Value *value_float(f64 _float, StackFrame *frame, u32 frame_index);
-Value *value_bool(bool _bool, StackFrame *frame, u32 frame_index);
-Value *value_dict(Dict dict, StackFrame *frame, u32 frame_index);
-Value *value_func(Func func, StackFrame *frame, u32 frame_index);
-Value *value_env(Vm vm, StackFrame *frame, u32 frame_index);
+Value *value_unit(StackFrame *frame);
+Value *value_list(ListNode *nodes, StackFrame *frame);
+Value *value_string(Str string, StackFrame *frame);
+Value *value_int(i64 _int, StackFrame *frame);
+Value *value_float(f64 _float, StackFrame *frame);
+Value *value_bool(bool _bool, StackFrame *frame);
+Value *value_dict(Dict dict, StackFrame *frame);
+Value *value_func(Func func, StackFrame *frame);
+Value *value_env(Vm vm, StackFrame *frame);
 
 Value *value_alloc(StackFrame *frame);
-Value *value_clone(Value *value, StackFrame *frame, u32 frame_index);
+Value *value_clone(Value *value, StackFrame *frame);
 void   value_free(Value *value);
 bool   value_eq(Value *a, Value *b);
 
@@ -211,8 +214,7 @@ Vm   vm_create(i32 argc, char **argv, Intrinsics *intrinsics);
 void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics);
 void vm_destroy(Vm *vm);
 
-void        begin_frame(Vm *vm);
-void        end_frame(Vm *vm);
-StackFrame *vm_get_frame(Vm *vm);
+void begin_frame(Vm *vm);
+void end_frame(Vm *vm);
 
 #endif // AETHER_VM

@@ -14,7 +14,7 @@ Value *run_command_intrinsic(Vm *vm, Value **args) {
 
   free(path_cstring);
 
-  return value_int(exit_code, vm_get_frame(vm), vm->current_frame_index);
+  return value_int(exit_code, vm->current_frame);
 }
 
 Value *sleep_intrinsic(Vm *vm, Value **args) {
@@ -22,7 +22,7 @@ Value *sleep_intrinsic(Vm *vm, Value **args) {
 
   usleep((i64) (time->as._float * 1000000.0));
 
-  return value_unit(vm_get_frame(vm), vm->current_frame_index);
+  return value_unit(vm->current_frame);
 }
 #endif
 
