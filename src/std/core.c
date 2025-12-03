@@ -227,6 +227,34 @@ Value *fold_intrinsic(Vm *vm, Value **args) {
   return accumulator;
 }
 
+Value *zip_intrinsic(Vm *vm,Value **args) {
+  Value *list_a = args[0];
+  Value *list_b = args[1];
+
+  ListNode *new_list = arena_alloc(&vm_get_frame(vm)->arena, sizeof(ListNode));
+  ListNode **new_list_next = &new_list->next;
+
+  ListNode *node_a = list_a->as.list->next;
+  ListNode *node_b = list_b->as.list->next;
+  while (node_a && node_b) {
+    *new_list_next = arena_alloc(&vm_get_frame(vm)->arena, sizeof(ListNode));
+
+    ListNode *pair = arena_alloc(&vm_get_frame(vm)->arena, sizeof(ListNode));
+    pair->next = arena_alloc(&vm_get_frame(vm)->arena, sizeof(ListNode));
+    pair->next->value = value_clone(node_a->value, vm_get_frame(vm), vm->current_frame_index);
+    pair->next->next = arena_alloc(&vm_get_frame(vm)->arena, sizeof(ListNode));
+    pair->next->next->value = value_clone(node_b->value, vm_get_frame(vm), vm->current_frame_index);
+
+    (*new_list_next)->value = value_list(pair, vm_get_frame(vm), vm->current_frame_index);
+    new_list_next = &(*new_list_next)->next;
+
+    node_a = node_a->next;
+    node_b = node_b->next;
+  }
+
+  return value_list(new_list, vm_get_frame(vm), vm->current_frame_index);
+}
+
 bool value_bigger(Value *a, Value *b) {
   if (a->kind != b->kind)
     return false;
@@ -858,6 +886,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("fold"), true, 3,
     { ValueKindFunc, ValueKindUnit, ValueKindList },
     &fold_intrinsic },
+  { STR_LIT("zip"), true, 2, { ValueKindList, ValueKindList }, &zip_intrinsic },
   { STR_LIT("sort"), true, 1, { ValueKindList }, &sort_intrinsic },
   { STR_LIT("for-each"), false, 2, { ValueKindList, ValueKindFunc }, &for_each_intrinsic },
   { STR_LIT("for-each"), false, 2, { ValueKindString, ValueKindFunc }, &for_each_intrinsic },

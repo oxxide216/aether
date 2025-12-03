@@ -9,6 +9,7 @@
 (let map [func list] -> import 'map')
 (let filter [func list] -> import 'filter')
 (let fold [func accumulator list] -> import 'fold')
+(let zip [list-a list-b] -> import 'zip')
 (let sort [list] -> import 'sort')
 (let for-each [collection func] -> import 'for-each')
 
