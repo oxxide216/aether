@@ -1,7 +1,7 @@
 let _aetherEvalCompiled = null;
 let _aetherEval = null;
 
-function aether_init(aetherJSPath, initCallback) {
+function aetherInit(aetherJSPath, initCallback) {
   Module = {
     onRuntimeInitialized: async function() {
       const aetherCreate = Module.cwrap('emscripten_create', 'null', []);
