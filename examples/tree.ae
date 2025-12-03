@@ -1,0 +1,37 @@
+(use 'std/io.ae')
+
+(let DEPTH-LIMIT 4)
+(let TAB-WIDTH   2)
+(let FILLER      ' ')
+
+(if (< (len (get-args)) 2)
+  (println 'Target directory was not provided')
+  (exit 1))
+
+(let begins-with [str begin] ->
+  (== (get-range str 0 (len begin)) begin))
+
+(let print-directory [name path offset] ->
+  (if (> offset DEPTH-LIMIT)
+    (ret))
+
+  (let content (list-directory path))
+  (if (unit? content)
+    (ret))
+
+  (let items (filter
+               [item] -> (not (begins-with item '.')) <>
+               content))
+
+  (for item in items
+    (print (* FILLER (* offset TAB-WIDTH)) item)
+    (let info (get-file-info (+ path (+ '/' item))))
+    (if info
+      (if info::'is-directory'
+        (print '/')))
+    (print '\n')
+
+    (<-> item (+ path (+ '/' item)) (+ offset 1))))
+
+(let base-directory (get-args)::1)
+(print-directory base-directory base-directory 0)

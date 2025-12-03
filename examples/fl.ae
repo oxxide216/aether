@@ -1,0 +1,175 @@
+(use 'std/term.ae')
+(use 'std/io.ae')
+(use 'std/str.ae')
+(use 'std/path.ae')
+
+(let fg-color term/fg-magenta)
+(let bg-color term/bg-magenta)
+(let items-glue (join [term/reset '\n' fg-color] ''))
+
+(let render-view [] ->
+  (print term/hide)
+
+  (if (!= prev-row -1)
+    (if (!= prev-row row)
+      (print (term/go-to 1 (+ prev-row 1)) term/clear-line
+             fg-color items::prev-row term/reset))
+
+    (print (term/go-to 1 (+ row 1)) term/clear-line
+           term/fg-black bg-color items::row term/reset)
+
+    (ret))
+
+  (print term/clear (term/go-to 1 1))
+
+  (print fg-color (join items items-glue))
+  (print (term/go-to 1 (+ row 1))
+         term/fg-black bg-color items::row term/reset))
+
+(let render-prompt [] ->
+  (print term/show (term/go-to 1 term-size::'rows'))
+
+  (if (< prompt-history-pos (len prompt-history))
+    (print term/clear-line prompt prompt-history::prompt-history-pos)
+   else
+    (print term/clear-line prompt prompt-buffer))
+
+  (print (term/go-to (+ (len prompt) (+ prompt-pos 1)) term-size::'rows')))
+
+(let get-directory-items [path begin end] ->
+  (set-current-path path)
+  (sort (get-range (list-directory '.') begin end)))
+
+(let get-file-content-lines [content begin end] ->
+  (get-range (split content '\n') begin end))
+
+(let prepare-prompt [placeholder] ->
+  (set prompt placeholder)
+  (set prompt-buffer '')
+  (set prompt-pos 0)
+  (set prompt-file items::row)
+  (set prompt-history-pos (len prompt-history)))
+
+(let update-view [] ->
+  (let key (term/get-key))
+  (if (or (== key 'q') (== key '\3'))
+    (set is-running false)
+   elif (== key term/up)
+    (if (> row 0)
+      (set row (- row 1)))
+   elif (== key term/down)
+    (if (< (+ row 1) (len items))
+      (set row (+ row 1)))
+   elif (== key term/enter)
+    (let name items::row)
+    (let info (get-file-info name))
+    (if info
+      (if info::'is-directory'
+        (set items (get-directory-items name 0 term-size::'rows'))
+        (if (>= row (len items))
+          (set row (- (len items) 1)))
+        (set prev-row -1)))
+   elif (== key term/backspace)
+    (set items (get-directory-items '..' 0 term-size::'rows'))
+    (if (>= row (len items))
+      (set row (- (len items) 1)))
+    (set prev-row -1)
+   elif (== key ' ')
+    (prepare-prompt 'command: ')
+   elif (== key '/')
+    (prepare-prompt 'search: ')
+    (set search-mode true)))
+
+(let try-go-to-search-target [] ->
+  (if (and search-mode (> (len prompt-buffer) 0))
+    (let entries (filter [item] -> (begins-with item prompt-buffer) <> items))
+    (if entries
+      (set row (get-index items entries::0)))))
+
+(let update-prompt [] ->
+  (let key (term/get-key))
+  (if (== key '\3')
+    (set is-running false)
+   elif (== key term/enter)
+    (set prompt '')
+    (set search-mode false)
+
+    (if (< prompt-history-pos (len prompt-history))
+      (let buffer prompt-history::prompt-history-pos)
+     else
+      (let buffer prompt-buffer))
+
+    (if (and (> (len buffer) 0) (not search-mode))
+      (run-command (join [buffer prompt-file] ' '))
+      (set prev-row -1)
+      (set items (get-directory-items prompt-file 0 term-size::'rows'))
+      (if (unit? (last prompt-history))
+        (set prompt-history (+ prompt-history buffer))
+       elif (!= buffer (last prompt-history))
+        (set prompt-history (+ prompt-history buffer))))
+    (let term-size (term/get-size))
+    (print (term/go-to 1 term-size::'rows')
+           term/clear-line)
+   elif (== key term/right)
+    (if (< prompt-pos (len prompt-buffer))
+      (set prompt-pos (+ prompt-pos 1)))
+   elif (== key term/left)
+    (if (> prompt-pos 0)
+      (set prompt-pos (- prompt-pos 1)))
+   elif (== key term/up)
+    (if (> prompt-history-pos 0)
+      (set prompt-history-pos (- prompt-history-pos 1))
+      (set prompt-pos (len prompt-history::prompt-history-pos))
+      (print term/clear-line))
+   elif (== key term/down)
+    (if (< prompt-history-pos (len prompt-history))
+      (set prompt-history-pos (+ prompt-history-pos 1))
+      (if (< prompt-history-pos (len prompt-history))
+        (set prompt-pos (len prompt-history::prompt-history-pos))
+       else
+        (set prompt-pos (len prompt-buffer)))
+      (print term/clear-line))
+   elif (== key term/backspace)
+    (if (> prompt-pos 0)
+      (set prompt-pos (- prompt-pos 1))
+      (set prompt-buffer (str-remove prompt-buffer 1 prompt-pos)))
+      (try-go-to-search-target)
+   elif (!= key '\0')
+    (set prompt-buffer (str-insert prompt-buffer prompt-pos key))
+    (set prompt-pos (+ prompt-pos 1))
+    (try-go-to-search-target)))
+
+(let base-directory '.')
+
+(let args (get-args))
+(if (> (len args) 2)
+  (set base-directory args::2))
+
+(let row 0)
+(let prev-row -1)
+(let term-size (term/get-size))
+(let items (get-directory-items base-directory 0 term-size::'rows'))
+(let search-mode false)
+
+(let prompt '')
+(let prompt-buffer '')
+(let prompt-pos 0)
+(let prompt-file '')
+(let prompt-history [])
+(let prompt-history-pos 0)
+
+(term/raw-mode-on)
+
+(let is-running true)
+(while is-running
+  (set term-size (term/get-size))
+  (render-view)
+  (set prev-row row)
+  (if prompt
+    (render-prompt)
+    (update-prompt)
+   else
+    (update-view)))
+
+(print term/show term/clear (term/go-to 1 1))
+(term/raw-mode-off)
