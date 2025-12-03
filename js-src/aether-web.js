@@ -1,38 +1,38 @@
-let _aether_eval_compiled = null;
-let _aether_eval = null;
+let _aetherEvalCompiled = null;
+let _aetherEval = null;
 
-function aether_init(init_callback) {
+function aether_init(aetherJSPath, initCallback) {
   Module = {
     onRuntimeInitialized: async function() {
-      const aether_create = Module.cwrap('emscripten_create', 'null', []);
-      _aether_eval_compiled =
+      const aetherCreate = Module.cwrap('emscripten_create', 'null', []);
+      _aetherEvalCompiled =
         Module.cwrap('emscripten_eval_compiled', 'string', ['array', 'number']);
-      _aether_eval = Module.cwrap('emscripten_eval', 'string', ['string', 'string']);
+      _aetherEval = Module.cwrap('emscripten_eval', 'string', ['string', 'string']);
 
-      aether_create();
+      aetherCreate();
 
-      aether_eval('(use "std/core.ae")');
-      aether_eval('(use "std/base.ae")');
+      aetherEval('(use "std/core.ae")');
+      aetherEval('(use "std/base.ae")');
 
       const response = await fetch('app.abc');
       const content = await response.blob();
       const array = new Uint8Array(await content.arrayBuffer());
 
-      aether_eval_compiled(array);
+      aetherEvalCompiled(array);
 
-      init_callback();
+      initCallback();
     },
   };
 
   const script = document.createElement('script');
-  script.src = 'aether.js';
+  script.src = aetherJSPath;
   document.head.appendChild(script);
 }
 
-function aether_eval_compiled(bytecode) {
-  return _aether_eval_compiled(bytecode, bytecode.length);
+function aetherEvalCompiled(bytecode) {
+  return _aetherEvalCompiled(bytecode, bytecode.length);
 }
 
-function aether_eval(code) {
-  return _aether_eval(code, 'aether-web.js');
+function aetherEval(code) {
+  return _aetherEval(code, 'aether-web.js');
 }
