@@ -78,8 +78,8 @@
 
 (let repl [] ->
   (let env (make-env []))
-  (load-module env 'core' core-path)
-  (load-module env 'base' base-path)
+  (load-module env 'core' core-paths)
+  (load-module env 'base' base-paths)
 
   (term/raw-mode-on)
   (unblock-input)
