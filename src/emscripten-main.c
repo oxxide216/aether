@@ -1,13 +1,8 @@
-#include <dirent.h>
-
-#define SHL_LOG_H
-
 #include "emscripten-main.h"
-#include "emscripten-log.h"
-#include "io.h"
 #include "aether/deserializer.h"
 #include "aether/vm.h"
 #include "aether/misc.h"
+#include "shl/shl-defs.h"
 
 static Arena persistent_arena = {0};
 static Macros macros = {0};
@@ -26,7 +21,13 @@ char *value_to_cstr(Value *value) {
   StringBuilder sb = {0};
   sb_push_value(&sb, value, 0, false, &vm);
 
-  return sb.buffer;
+  char *cstr = arena_alloc(&persistent_arena, sb.len + 1);
+  memcpy(cstr, sb.buffer, sb.len);
+  cstr[sb.len] = '\0';
+
+  free(sb.buffer);
+
+  return cstr;
 }
 
 EMSCRIPTEN_KEEPALIVE

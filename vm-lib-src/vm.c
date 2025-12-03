@@ -533,7 +533,6 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       vm->exit_code = 1;
 
       free(sb.buffer);
-
       return value_unit(vm_get_frame(vm), vm->current_frame_index);
     }
 
