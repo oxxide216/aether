@@ -31,7 +31,7 @@
         (print '/')))
     (print '\n')
 
-    (<-> item (+ path (+ '/' item)) (+ offset 1))))
+    (print-directory item (+ path (+ '/' item)) (+ offset 1))))
 
 (let base-directory (get-args)::1)
 (print-directory base-directory base-directory 0)
