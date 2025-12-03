@@ -60,5 +60,9 @@ char *emscripten_eval(char *code, char *path) {
 EMSCRIPTEN_KEEPALIVE
 void emscripten_destroy(void) {
   arena_free(&persistent_arena);
+  free(macros.items);
+  macros = (Macros) {0};
+  free(included_files.items);
+  included_files = (FilePaths) {0};
   vm_destroy(&vm);
 }
