@@ -11,7 +11,7 @@ static void load_str_data(Str *str, u8 *data, u32 *end, Arena *persistent_arena)
   str->ptr = arena_alloc(persistent_arena, str->len);
   for (u32 i = 0; i < str->len; ++i) {
     str->ptr[i] = *(char *) (data + *end);
-    *end += sizeof(char);
+    *end += 1;
   }
 }
 
@@ -143,11 +143,11 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
     args->cap = args->len;
     *end += sizeof(u32);
 
-    args->items = arena_alloc(arena, args->cap * sizeof(Str));
+    args->items = arena_alloc(persistent_arena, args->cap * sizeof(Str));
     for (u32 i = 0; i < args->len; ++i)
       load_str_data(args->items + i, data, end, persistent_arena);
 
-    load_block_data(&expr->as.lambda.body, data, end, arena, persistent_arena);
+    load_block_data(&expr->as.lambda.body, data, end, persistent_arena, persistent_arena);
     load_str_data(&expr->as.lambda.intrinsic_name, data, end, persistent_arena);
   } break;
 

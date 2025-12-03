@@ -43,7 +43,7 @@ typedef struct {
   FilePaths *included_files;
   Arena     *arena;
   Arena     *persistent_arena;
-  bool       is_in_macro;
+  bool       persistent;
   Ir         ir;
 } Parser;
 
@@ -224,8 +224,7 @@ static Token *lex(Str code, char *file_path, Arena *arena) {
 
       bool is_escaped = false;
       while (code.len > 0 &&
-             ((code.ptr[0] != '"' &&
-               code.ptr[0] != '\'') ||
+             (code.ptr[0] != sb.buffer[0] ||
               is_escaped)) {
 
         if (is_escaped || code.ptr[0] != '\\') {
@@ -357,7 +356,7 @@ static Str copy_str(Str str, Arena *arena) {
 }
 
 static Arena *get_arena(Parser *parser) {
-  if (parser->is_in_macro)
+  if (parser->persistent)
     return parser->persistent_arena;
   return parser->arena;
 }
@@ -401,13 +400,13 @@ static void parser_parse_macro_def(Parser *parser) {
   parser_expect_token(parser, MASK(TT_CBRACKET));
   parser_expect_token(parser, MASK(TT_RIGHT_ARROW));
 
-  bool prev_is_in_macro = parser->is_in_macro;
+  bool prev_persistent = parser->persistent;
 
-  parser->is_in_macro = true;
+  parser->persistent = true;
 
   macro.body = parser_parse_block(parser, MASK(TT_CPAREN));
 
-  parser->is_in_macro = prev_is_in_macro;
+  parser->persistent = prev_persistent;
 
   parser_expect_token(parser, MASK(TT_CPAREN));
 
@@ -450,7 +449,9 @@ static IrExprLambda parser_parse_lambda(Parser *parser) {
   Token *arg_token = parser_expect_token(parser, MASK(TT_IDENT) |
                                                  MASK(TT_CBRACKET));
   while (arg_token->id != TT_CBRACKET) {
-    DA_APPEND(args, arg_token->lexeme);
+    Str arg = copy_str(arg_token->lexeme, parser->persistent_arena);
+    DA_APPEND(args, arg);
+
     arg_token = parser_expect_token(parser, MASK(TT_IDENT) |
                                             MASK(TT_CBRACKET));
   }
@@ -459,7 +460,7 @@ static IrExprLambda parser_parse_lambda(Parser *parser) {
 
   lambda.args.len = args.len;
   lambda.args.cap = lambda.args.len;
-  lambda.args.items = arena_alloc(get_arena(parser), lambda.args.cap * sizeof(Str));
+  lambda.args.items = arena_alloc(parser->persistent_arena, lambda.args.cap * sizeof(Str));
   memcpy(lambda.args.items, args.items, args.len * sizeof(Str));
 
   free(args.items);
@@ -475,9 +476,15 @@ static IrExprLambda parser_parse_lambda(Parser *parser) {
     };
     lambda.intrinsic_name = copy_str(intrinsic_name, parser->persistent_arena);
   } else {
+    bool prev_persistent = parser->persistent;
+
+    parser->persistent = true;
+
     lambda.body = parser_parse_block(parser, MASK(TT_CPAREN) |
                                              MASK(TT_CBRACKET) |
                                              MASK(TT_RHOMBUS));
+
+    parser->persistent = prev_persistent;
 
     if (parser_peek_token(parser) &&
         parser_peek_token(parser)->id == TT_RHOMBUS)
@@ -848,7 +855,7 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
   IrBlock block = {0};
 
   Arena *arena = parser->arena;
-  if (parser->is_in_macro)
+  if (parser->persistent)
     arena = parser->persistent_arena;
 
   Token *token = parser_peek_token(parser);
