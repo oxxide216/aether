@@ -312,6 +312,53 @@ Value *sort_intrinsic(Vm *vm, Value **args) {
   return value_list(result, vm_get_frame(vm), vm->current_frame_index);
 }
 
+Value *for_each_intrinsic(Vm *vm, Value **args) {
+  Value *collection = args[0];
+  Value *func = args[1];
+
+  if (collection->kind == ValueKindList) {
+    ListNode *node = collection->as.list->next;
+    while (node) {
+      execute_func(vm, &node->value, &func->as.func, NULL, false);
+      if (vm->state != ExecStateContinue)
+        break;
+
+      node = node->next;
+    }
+  } else if (collection->kind == ValueKindString) {
+    Value *_char = value_string(STR_LIT(" "), vm_get_frame(vm),
+                                vm->current_frame_index);
+    for (u32 i = 0; i < collection->as.string.len; ++i) {
+      _char->as.string.ptr[0] = collection->as.string.ptr[i];
+
+      execute_func(vm, &_char, &func->as.func, NULL, false);
+      if (vm->state != ExecStateContinue)
+        break;
+    }
+  } else if (collection->kind == ValueKindDict) {
+    Dict _pair = {0};
+
+    dict_push_value_str_key(vm_get_frame(vm), vm->current_frame_index,
+                            &_pair, STR_LIT("key"), NULL);
+    dict_push_value_str_key(vm_get_frame(vm), vm->current_frame_index,
+                            &_pair, STR_LIT("value"), NULL);
+
+    Value *pair = value_dict(_pair, vm_get_frame(vm),
+                             vm->current_frame_index);
+
+    for (u32 i = 0; i < collection->as.dict.len; ++i) {
+      pair->as.dict.items[0].value = collection->as.dict.items[i].key;
+      pair->as.dict.items[1].value = collection->as.dict.items[i].value;
+
+      execute_func(vm, &pair, &func->as.func, NULL, false);
+      if (vm->state != ExecStateContinue)
+        break;
+    }
+  }
+
+  return value_unit(vm_get_frame(vm), vm->current_frame_index);
+}
+
 Value *to_str_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
@@ -812,6 +859,9 @@ Intrinsic core_intrinsics[] = {
     { ValueKindFunc, ValueKindUnit, ValueKindList },
     &fold_intrinsic },
   { STR_LIT("sort"), true, 1, { ValueKindList }, &sort_intrinsic },
+  { STR_LIT("for-each"), false, 2, { ValueKindList, ValueKindFunc }, &for_each_intrinsic },
+  { STR_LIT("for-each"), false, 2, { ValueKindString, ValueKindFunc }, &for_each_intrinsic },
+  { STR_LIT("for-each"), false, 2, { ValueKindDict, ValueKindFunc }, &for_each_intrinsic },
   // Conversions
   { STR_LIT("to-str"), true, 1, { ValueKindUnit }, &to_str_intrinsic },
   { STR_LIT("byte-64-to-str"), true, 1, { ValueKindInt }, &byte_64_to_str_intrinsic },

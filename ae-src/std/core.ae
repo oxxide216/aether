@@ -10,6 +10,7 @@
 (let filter [func list] -> import 'filter')
 (let fold [func accumulator list] -> import 'fold')
 (let sort [list] -> import 'sort')
+(let for-each [collection func] -> import 'for-each')
 
 ; Conversions
 (let to-str [value] -> import 'to-str')
@@ -61,9 +62,6 @@
 
 (let exit [exit-code] -> import 'exit')
 
-(macro for [element in list ...body] ->
-  (let -list list)
-  (while -list
-    (let element (head -list))
-    body
-    (set -list (tail -list))))
+(macro for [element in collection ...body] ->
+  (for-each collection
+            [-] -> (let element -) body))
