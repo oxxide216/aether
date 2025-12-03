@@ -447,6 +447,8 @@ void expand_macros(IrExpr *expr, Macros *macros,
 
           Str new_arg_name = copy_str(sb_to_str(sb), arena);
           DA_APPEND(new_arg_names, new_arg_name);
+
+          free(sb.buffer);
         };
 
         expr->kind = IrExprKindBlock;
