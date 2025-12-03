@@ -1,12 +1,22 @@
 #!/usr/bin/bash
 
-rm -rf dest/
-cp -r /usr/include/aether/wasm dest/
-
-if [ "$1" != "" ]; then
-  cp -r "$1"/* dest/
+if [ "$1" == "" ]; then
+  echo "Output directory was not provided"
+  exit 1
 fi
 
-if [ "$2" != "" ]; then
-  aether -o dest/app.abc "$2"
+if [ "$2" == "" ]; then
+  echo "Input directory was not provided"
+  exit 1
 fi
+
+if [ "$3" == "" ]; then
+  echo "Input file was not provided"
+  exit 1
+fi
+
+rm -rf "$1"
+mkdir -p "$1"
+cp -r /usr/include/aether/wasm/* "$1"
+cp -r "$2"/* "$1"
+aether -o "$1"/app.abc "$3"
