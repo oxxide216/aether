@@ -94,6 +94,10 @@ static void clone_expr(IrExpr **expr, Arena *arena) {
   case IrExprKindBool:   break;
 
   case IrExprKindLambda: {
+    Str *new_items = arena_alloc(arena, new_expr->as.lambda.args.len * sizeof(Str));
+    memcpy(new_items, new_expr->as.lambda.args.items, new_expr->as.lambda.args.len * sizeof(Str));
+    new_expr->as.lambda.args.items = new_items;
+
     clone_block(&new_expr->as.lambda.body, arena);
   } break;
 
