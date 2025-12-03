@@ -1,8 +1,0 @@
-(let input-str (input))
-(let input-num (str-to-int input-str))
-(println (int-to-str input-num))
-
-(println (bool-to-str true))
-(println (bool-to-str false))
-(println (int-to-str (bool-to-int true)))
-(println (int-to-str (bool-to-int false)))

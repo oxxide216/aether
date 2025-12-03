@@ -1,3 +1,0 @@
-(use 'std/system.ae')
-
-(println (run-command 'ls -la'))

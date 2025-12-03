@@ -1,3 +1,0 @@
-(let array ['a' 'f' 'b' '0'])
-(let sorted (sort array))
-(println sorted)

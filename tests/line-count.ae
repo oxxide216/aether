@@ -1,7 +1,0 @@
-(use 'std/str.ae')
-(use 'std/io.ae')
-
-(if (< (len (get-args)) 3)
-  (println 'ERROR: input file was not provided')
- else
-  (println (len (split (read-file (head (tail (tail (get-args))))) '\n'))))

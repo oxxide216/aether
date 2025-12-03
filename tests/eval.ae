@@ -1,5 +1,0 @@
-(use 'std/io.ae')
-
-(let code (read-file 'tests/eval-test.ae'))
-(let bytecode (compile code))
-(eval-compiled bytecode)

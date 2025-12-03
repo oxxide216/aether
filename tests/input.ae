@@ -1,5 +1,0 @@
-(let a (input))
-(let b (input))
-(let c (+ a b))
-
-(println c)

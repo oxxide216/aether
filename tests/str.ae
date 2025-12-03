@@ -1,4 +1,0 @@
-(let str 'Hello, World!')
-(print str)
-(print ':')
-(println (len str))

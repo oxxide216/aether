@@ -1,8 +1,0 @@
-(let a (str-to-int (input)))
-(let b (str-to-int (input)))
-
-(println (int-to-str (+ a b)))
-(println (int-to-str (- a b)))
-(println (int-to-str (* a b)))
-(println (int-to-str (/ a b)))
-(println (int-to-str (% a b)))

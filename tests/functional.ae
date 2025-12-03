@@ -1,7 +1,0 @@
-(let list [0 1 2 3])
-(set list (map [num] -> (+ num 1) <> list))
-(println list)
-(set list (filter [num] -> (not (and num 1)) <> list))
-(println list)
-(let sum (fold [acc num] -> (+ acc num) <> 0 list))
-(println sum)
