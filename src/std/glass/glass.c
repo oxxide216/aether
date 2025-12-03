@@ -321,16 +321,16 @@ Value *run_intrinsic(Vm *vm, Value **args) {
       break;
 
     if (i++ == MAIN_LOOP_FRAME_LENGTH) {
-      StackFrame *prev_frame = vm->current_frame - 1;
+      StackFrame *prev_frame = vm->current_frame->prev;
 
-      state = value_clone(state, prev_frame - 1);
+      state = value_clone(state, prev_frame->prev);
 
       end_frame(vm);
       begin_frame(vm);
 
       StackFrame temp_frame = *prev_frame;
-      *prev_frame = *vm->current_frame;
-      *vm->current_frame = temp_frame;
+      memcpy(prev_frame, vm->current_frame, offsetof(StackFrame, next));
+      memcpy(vm->current_frame, &temp_frame, offsetof(StackFrame, next));
 
       i = 0;
     }
