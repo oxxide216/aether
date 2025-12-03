@@ -241,9 +241,9 @@ Value *zip_intrinsic(Vm *vm,Value **args) {
 
     ListNode *pair = arena_alloc(&vm_get_frame(vm)->arena, sizeof(ListNode));
     pair->next = arena_alloc(&vm_get_frame(vm)->arena, sizeof(ListNode));
-    pair->next->value = value_clone(node_a->value, vm_get_frame(vm), vm->current_frame_index);
+    pair->next->value = node_a->value;
     pair->next->next = arena_alloc(&vm_get_frame(vm)->arena, sizeof(ListNode));
-    pair->next->next->value = value_clone(node_b->value, vm_get_frame(vm), vm->current_frame_index);
+    pair->next->next->value = node_b->value;
 
     (*new_list_next)->value = value_list(pair, vm_get_frame(vm), vm->current_frame_index);
     new_list_next = &(*new_list_next)->next;
