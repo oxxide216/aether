@@ -36,10 +36,9 @@
 (load-module env 'core' core-paths)
 (load-module env 'base' base-paths)
 
-(if (== mode mode-default)
-  (eval env input-content input-path)
- elif (== mode mode-eval-bytecode)
-  (eval-compiled env input-content)
- elif (== mode mode-compile-only)
-  (let compiled (compile env input-content input-path))
-  (write-file output-path compiled))
+(match mode
+  mode-default -> (eval env input-content input-path)
+  mode-eval-bytecode -> (eval-compiled env input-content)
+  mode-compile-only -> (do
+    (let compiled (compile env input-content input-path))
+    (write-file output-path compiled)))
