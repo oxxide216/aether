@@ -345,16 +345,6 @@ Ir parse_ex(Str code, char *file_path, Macros *macros,
   return parser.ir;
 }
 
-static Str copy_str(Str str, Arena *arena) {
-  Str copy;
-
-  copy.len = str.len;
-  copy.ptr = arena_alloc(arena, str.len);
-  memcpy(copy.ptr, str.ptr, copy.len);
-
-  return copy;
-}
-
 static Arena *get_arena(Parser *parser) {
   if (parser->persistent)
     return parser->persistent_arena;

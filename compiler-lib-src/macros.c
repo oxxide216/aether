@@ -20,6 +20,16 @@ void ir_block_append(IrBlock *block, IrExpr *expr, Arena *arena) {
   block->items[block->len++] = expr;
 }
 
+Str copy_str(Str str, Arena *arena) {
+  Str copy;
+
+  copy.len = str.len;
+  copy.ptr = arena_alloc(arena, str.len);
+  memcpy(copy.ptr, str.ptr, copy.len);
+
+  return copy;
+}
+
 static void clone_block(IrBlock *block, Arena *arena);
 
 static void clone_expr(IrExpr **expr, Arena *arena) {
@@ -139,21 +149,23 @@ static Macro *get_macro(Macros *macros, Str name, u32 args_len) {
   return NULL;
 }
 
-static void rename_args_block(IrBlock *block, IrArgs *prev_arg_names, IrArgs *new_arg_names);
+static void rename_args_block(IrBlock *block, IrArgs *prev_arg_names,
+                              IrArgs *new_arg_names, Arena *arena);
 
-static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names, IrArgs *new_arg_names) {
+static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names,
+                             IrArgs *new_arg_names, Arena *arena) {
   switch (expr->kind) {
   case IrExprKindBlock: {
-    rename_args_block(&expr->as.block, prev_arg_names, new_arg_names);
+    rename_args_block(&expr->as.block, prev_arg_names, new_arg_names, arena);
   } break;
 
   case IrExprKindFuncCall: {
-    rename_args_expr(expr->as.func_call.func, prev_arg_names, new_arg_names);
-    rename_args_block(&expr->as.func_call.args, prev_arg_names, new_arg_names);
+    rename_args_expr(expr->as.func_call.func, prev_arg_names, new_arg_names, arena);
+    rename_args_block(&expr->as.func_call.args, prev_arg_names, new_arg_names, arena);
   } break;
 
   case IrExprKindVarDef: {
-    rename_args_expr(expr->as.var_def.expr, prev_arg_names, new_arg_names);
+    rename_args_expr(expr->as.var_def.expr, prev_arg_names, new_arg_names, arena);
 
     for (u32 i = 0; i < prev_arg_names->len; ++i) {
       if (str_eq(expr->as.var_def.name, prev_arg_names->items[i])) {
@@ -165,25 +177,25 @@ static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names, IrArgs *new_a
   } break;
 
   case IrExprKindIf: {
-    rename_args_expr(expr->as._if.cond, prev_arg_names, new_arg_names);
-    rename_args_block(&expr->as._if.if_body, prev_arg_names, new_arg_names);
+    rename_args_expr(expr->as._if.cond, prev_arg_names, new_arg_names, arena);
+    rename_args_block(&expr->as._if.if_body, prev_arg_names, new_arg_names, arena);
 
     for (u32 i = 0; i < expr->as._if.elifs.len; ++i) {
-      rename_args_expr(expr->as._if.elifs.items[i].cond, prev_arg_names, new_arg_names);
-      rename_args_block(&expr->as._if.elifs.items[i].body, prev_arg_names, new_arg_names);
+      rename_args_expr(expr->as._if.elifs.items[i].cond, prev_arg_names, new_arg_names, arena);
+      rename_args_block(&expr->as._if.elifs.items[i].body, prev_arg_names, new_arg_names, arena);
     }
 
     if (expr->as._if.has_else)
-      rename_args_block(&expr->as._if.else_body, prev_arg_names, new_arg_names);
+      rename_args_block(&expr->as._if.else_body, prev_arg_names, new_arg_names, arena);
   } break;
 
   case IrExprKindWhile: {
-    rename_args_expr(expr->as._while.cond, prev_arg_names, new_arg_names);
-    rename_args_block(&expr->as._while.body, prev_arg_names, new_arg_names);
+    rename_args_expr(expr->as._while.cond, prev_arg_names, new_arg_names, arena);
+    rename_args_block(&expr->as._while.body, prev_arg_names, new_arg_names, arena);
   } break;
 
   case IrExprKindSet: {
-    rename_args_expr(expr->as.set.src, prev_arg_names, new_arg_names);
+    rename_args_expr(expr->as.set.src, prev_arg_names, new_arg_names, arena);
 
     for (u32 i = 0; i < prev_arg_names->len; ++i) {
       if (str_eq(expr->as.set.dest, prev_arg_names->items[i])) {
@@ -195,13 +207,13 @@ static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names, IrArgs *new_a
   } break;
 
   case IrExprKindGetAt: {
-    rename_args_expr(expr->as.get_at.src, prev_arg_names, new_arg_names);
-    rename_args_expr(expr->as.get_at.key, prev_arg_names, new_arg_names);
+    rename_args_expr(expr->as.get_at.src, prev_arg_names, new_arg_names, arena);
+    rename_args_expr(expr->as.get_at.key, prev_arg_names, new_arg_names, arena);
   } break;
 
   case IrExprKindSetAt: {
-    rename_args_expr(expr->as.set_at.key, prev_arg_names, new_arg_names);
-    rename_args_expr(expr->as.set_at.value, prev_arg_names, new_arg_names);
+    rename_args_expr(expr->as.set_at.key, prev_arg_names, new_arg_names, arena);
+    rename_args_expr(expr->as.set_at.value, prev_arg_names, new_arg_names, arena);
 
     for (u32 i = 0; i < prev_arg_names->len; ++i) {
       if (str_eq(expr->as.set_at.dest, prev_arg_names->items[i])) {
@@ -213,7 +225,7 @@ static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names, IrArgs *new_a
   } break;
 
   case IrExprKindList: {
-    rename_args_block(&expr->as.list.content, prev_arg_names, new_arg_names);
+    rename_args_block(&expr->as.list.content, prev_arg_names, new_arg_names, arena);
   } break;
 
   case IrExprKindIdent: {
@@ -232,27 +244,37 @@ static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names, IrArgs *new_a
   case IrExprKindBool:   break;
 
   case IrExprKindLambda: {
-    rename_args_block(&expr->as.lambda.body, prev_arg_names, new_arg_names);
+    for (u32 i = 0; i < expr->as.lambda.args.len; ++i) {
+      for (u32 j = 0; j < prev_arg_names->len; ++j) {
+        if (str_eq(expr->as.lambda.args.items[i], prev_arg_names->items[j])) {
+          expr->as.lambda.args.items[i] = new_arg_names->items[j];
+
+          break;
+        }
+      }
+    }
+
+    rename_args_block(&expr->as.lambda.body, prev_arg_names, new_arg_names, arena);
   } break;
 
   case IrExprKindDict: {
     for (u32 i = 0; i < expr->as.dict.len; ++i) {
-      rename_args_expr(expr->as.dict.items[i].key, prev_arg_names, new_arg_names);
-      rename_args_expr(expr->as.dict.items[i].expr, prev_arg_names, new_arg_names);
+      rename_args_expr(expr->as.dict.items[i].key, prev_arg_names, new_arg_names, arena);
+      rename_args_expr(expr->as.dict.items[i].expr, prev_arg_names, new_arg_names, arena);
     }
   } break;
 
   case IrExprKindRet: {
     if (expr->as.ret.has_expr)
-      rename_args_expr(expr->as.ret.expr, prev_arg_names, new_arg_names);
+      rename_args_expr(expr->as.ret.expr, prev_arg_names, new_arg_names, arena);
   } break;
 
   case IrExprKindMatch: {
-    rename_args_expr(expr->as.match.src, prev_arg_names, new_arg_names);
+    rename_args_expr(expr->as.match.src, prev_arg_names, new_arg_names, arena);
 
     for (u32 i = 0; i < expr->as.match.cases.len; ++i) {
-      rename_args_expr(expr->as.match.cases.items[i].pattern, prev_arg_names, new_arg_names);
-      rename_args_expr(expr->as.match.cases.items[i].expr, prev_arg_names, new_arg_names);
+      rename_args_expr(expr->as.match.cases.items[i].pattern, prev_arg_names, new_arg_names, arena);
+      rename_args_expr(expr->as.match.cases.items[i].expr, prev_arg_names, new_arg_names, arena);
     }
   } break;
 
@@ -260,9 +282,10 @@ static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names, IrArgs *new_a
   }
 }
 
-static void rename_args_block(IrBlock *block, IrArgs *prev_arg_names, IrArgs *new_arg_names) {
+static void rename_args_block(IrBlock *block, IrArgs *prev_arg_names,
+                              IrArgs *new_arg_names, Arena *arena) {
   for (u32 i = 0; i < block->len; ++i)
-    rename_args_expr(block->items[i], prev_arg_names, new_arg_names);
+    rename_args_expr(block->items[i], prev_arg_names, new_arg_names, arena);
 }
 
 static u32 get_macro_arg_index(Str name, IrArgs *arg_names) {
@@ -403,7 +426,7 @@ void expand_macros(IrExpr *expr, Macros *macros,
           sb_push_char(&sb, '@');
           sb_push_str(&sb, macro->arg_names.items[i]);
 
-          Str new_arg_name = sb_to_str(sb);
+          Str new_arg_name = copy_str(sb_to_str(sb), arena);
           DA_APPEND(new_arg_names, new_arg_name);
         };
 
@@ -411,13 +434,11 @@ void expand_macros(IrExpr *expr, Macros *macros,
         expr->as.block = macro->body;
 
         clone_block(&expr->as.block, arena);
-        rename_args_block(&expr->as.block, &macro->arg_names, &new_arg_names);
+        rename_args_block(&expr->as.block, &macro->arg_names, &new_arg_names, arena);
         expand_macros_block(&expr->as.block, macros,
                             &new_arg_names, &new_args,
                             macro->has_unpack, arena);
 
-        for (u32 i = 0; i < new_arg_names.len; ++i)
-          free(new_arg_names.items[i].ptr);
         free(new_arg_names.items);
       }
     }

@@ -516,7 +516,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
   switch (expr->kind) {
   case IrExprKindBlock: {
-    EXECUTE_BLOCK(vm, &expr->as.block, value_expected);
+    EXECUTE_BLOCK_SET(vm, result, &expr->as.block, value_expected);
   } break;
 
   case IrExprKindFuncCall: {
