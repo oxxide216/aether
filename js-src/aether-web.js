@@ -1,9 +1,13 @@
 let _aetherEvalCompiled = null;
 let _aetherEval = null;
 
-function aetherInit(dataPrefix, initCallback) {
+async function aetherInit(dataPrefix, initCallback) {
+  const response = await fetch(dataPrefix + '/app.abc');
+  const content = await response.blob();
+  const array = new Uint8Array(await content.arrayBuffer());
+
   Module = {
-    onRuntimeInitialized: async function() {
+    onRuntimeInitialized: function() {
       const aetherCreate = Module.cwrap('emscripten_create', 'null', []);
       _aetherEvalCompiled =
         Module.cwrap('emscripten_eval_compiled', 'string', ['array', 'number']);
@@ -13,15 +17,11 @@ function aetherInit(dataPrefix, initCallback) {
 
       aetherEval('(use "std/core.ae")');
       aetherEval('(use "std/base.ae")');
-
-      const response = await fetch(dataPrefix + '/app.abc');
-      const content = await response.blob();
-      const array = new Uint8Array(await content.arrayBuffer());
-
       aetherEvalCompiled(array);
 
       initCallback();
     },
+
     locateFile: function(path) {
         if (path.endsWith('.data'))
             return dataPrefix + '/aether.data';
