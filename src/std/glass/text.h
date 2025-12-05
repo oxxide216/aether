@@ -18,6 +18,7 @@ typedef struct {
 typedef Da(Glyph) Glyphs;
 
 typedef struct {
+  u8             *buffer;
   stbtt_fontinfo  info;
   GlassTexture    texture;
   Glyphs          glyphs;

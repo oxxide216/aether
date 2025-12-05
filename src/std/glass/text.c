@@ -1,5 +1,3 @@
-// FREE
-
 #include "text.h"
 #include "glass.h"
 #include "io.h"
@@ -17,12 +15,10 @@ void load_font(Fonts *fonts, char *path) {
   if (data.len == (u32) -1)
     return;
 
-  if (!stbtt_InitFont(&font.info, (u8 *) data.ptr, 0)) {
-    free(data.ptr);
-    return;
-  }
+  font.buffer = (u8 *) data.ptr;
 
-  free(data.ptr);
+  if (!stbtt_InitFont(&font.info, font.buffer, 0))
+    return;
 
   font.texture = glass_init_texture(GlassFilteringModeLinear);
 
@@ -74,6 +70,10 @@ static Glyph *load_glyph(Font *font, u32 _char, u32 line_height, f32 scale) {
   if (glyph)
     return glyph;
 
+  bool is_space = _char == ' ';
+  if (is_space)
+    _char = 'n';
+
   i32 y_offset;
   stbtt_GetCodepointBitmapBox(&font->info, _char, scale, scale, NULL,
                               &y_offset, NULL, NULL);
@@ -87,8 +87,10 @@ static Glyph *load_glyph(Font *font, u32 _char, u32 line_height, f32 scale) {
   grow_glyphs_buffer(&font->glyphs_buffer, &font->glyphs_width,
                      &font->glyphs_height, font->glyphs_filled,
                      width, height);
-  render_glyph(font->glyphs_buffer, font->glyphs_width,
-               font->glyphs_filled, bitmap, width, height);
+
+  if (!is_space)
+    render_glyph(font->glyphs_buffer, font->glyphs_width,
+                 font->glyphs_filled, bitmap, width, height);
 
   free(bitmap);
 
@@ -97,7 +99,7 @@ static Glyph *load_glyph(Font *font, u32 _char, u32 line_height, f32 scale) {
                          GlassPixelKindSingleColor);
 
   Glyph new_glyph = {
-    _char,
+    is_space ? ' ' : _char,
     line_height,
     { width, height },
     font->glyphs_filled,

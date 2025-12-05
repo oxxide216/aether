@@ -1,4 +1,5 @@
 (use 'std/glass.ae')
+(use 'std/str.ae')
 
 (let quad-offset 60.0)
 (let quad-width 25.0)
@@ -7,6 +8,8 @@
 (let circle-radius 10.0)
 (let circle-diameter (* circle-radius 2.0))
 (let circle-speed 2.5)
+(let font-size 35)
+(let text-offset 15.0)
 
 (let boxes-collide [a-pos-x a-pos-y a-width a-height
                     b-pos-x b-pos-y b-width b-height] ->
@@ -15,18 +18,36 @@
        (and (>= (+ a-pos-y a-height) b-pos-y)
             (<= a-pos-y (+ b-pos-y b-height)))))
 
-(let init [] -> {
-  'left-move': 0.0
-  'right-move': 0.0
-  'left-pos-x': quad-offset
-  'left-pos-y': 0.0
-  'right-pos-x': 0.0
-  'right-pos-y': 0.0
-  'circle-move-x': 1.0
-  'circle-move-y': -1.0
-  'circle-pos-x': 0.0
-  'circle-pos-y': 0.0
-})
+(let reset-game [state] ->
+  (let window-size (glass/window-size))
+
+  (set state::'left-pos-y' (/ (- window-size::'height' quad-height) 2.0))
+  (set state::'right-pos-y' (/ (- window-size::'height' quad-height) 2.0))
+  (set state::'circle-pos-x' (/ (- window-size::'width' circle-radius) 2.0))
+  (set state::'circle-pos-y' (/ (- window-size::'height' circle-radius) 2.0)))
+
+(let init [] ->
+  (let state {
+    'left-move': 0.0
+    'right-move': 0.0
+    'left-pos-x': quad-offset
+    'left-pos-y': 0.0
+    'right-pos-x': 0.0
+    'right-pos-y': 0.0
+    'left-score': 0
+    'right-score': 0
+    'circle-move-x': 1.0
+    'circle-move-y': -1.0
+    'circle-pos-x': 0.0
+    'circle-pos-y': 0.0
+
+    'font': (glass/load-font 'examples/pong/monaspace-krypton-regular.otf')
+  })
+
+  (reset-game state)
+
+  state
+)
 
 (let event-handler [state event] ->
   (if (== event::'type' 'key-press')
@@ -66,8 +87,11 @@
                                 (* state::'circle-move-x' circle-speed)))
   (if (< state::'circle-pos-x' circle-radius)
     (set state::'circle-move-x' 1.0)
+    (set state::'right-score' (+ state::'right-score' 1))
+    (reset-game state)
    elif (> (+ state::'circle-pos-x' circle-radius) size::'width')
-    (set state::'circle-move-x' -1.0))
+    (set state::'left-score' (+ state::'left-score' 1))
+    (reset-game state))
 
   (set state::'circle-pos-y' (+ state::'circle-pos-y'
                                 (* state::'circle-move-y' circle-speed)))
@@ -102,6 +126,16 @@
 
 (let render [state] ->
   (glass/clear 0.0 0.0 0.0 1.0)
+
+  (let score-text (join [(to-str state::'left-score')
+                         ' : '
+                         (to-str state::'right-score')] ''))
+  (let text-width (glass/text-width font-size state::'font' score-text))
+  (let window-width (glass/window-size)::'width')
+
+  (glass/text (/ (- window-width text-width) 2.0)
+              (+ (to-float font-size) text-offset)
+              font-size state::'font' score-text)
   (glass/quad state::'left-pos-x' state::'left-pos-y'
               quad-width quad-height 1.0 1.0 1.0 1.0)
   (glass/quad state::'right-pos-x' state::'right-pos-y'

@@ -367,6 +367,9 @@ Value *run_intrinsic(Vm *vm, Value **args) {
   winx_destroy_window(&glass.window);
   winx_cleanup(&glass.winx);
 
+  for (u32 i = 0; i < glass.fonts.len; ++i)
+    free(glass.fonts.items[i].buffer);
+
   initialized = false;
 
   return value_unit(vm->current_frame);
