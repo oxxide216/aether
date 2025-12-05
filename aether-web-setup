@@ -16,6 +16,7 @@ if [ "$3" == "" ]; then
 fi
 
 rm -rf "$1"
+mkdir -p "$1"
 cp -r /usr/include/aether/wasm/* "$1"
 cp -r "$2"/* "$1"
 aether -c "$1"/app.abc "$3"

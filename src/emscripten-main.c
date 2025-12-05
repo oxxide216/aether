@@ -17,7 +17,7 @@ void emscripten_create(void) {
   vm = vm_create(argc, argv, &intrinsics);
 }
 
-char *value_to_cstr(Value *value) {
+static char *value_to_cstr(Value *value) {
   StringBuilder sb = {0};
   sb_push_value(&sb, value, 0, false, &vm);
 

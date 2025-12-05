@@ -2,7 +2,7 @@
 
 #include "aether/vm.h"
 
-#ifndef __emscripten__
+#ifndef EMSCRIPTEN
 Value *run_command_intrinsic(Vm *vm, Value **args) {
   Value *path = args[0];
 
@@ -27,7 +27,7 @@ Value *sleep_intrinsic(Vm *vm, Value **args) {
 #endif
 
 Intrinsic system_intrinsics[] = {
-#ifndef __emscripten__
+#ifndef EMSCRIPTEN
   { STR_LIT("run-command"), true, 1, { ValueKindString }, &run_command_intrinsic },
   { STR_LIT("sleep"), false, 1, { ValueKindFloat }, &sleep_intrinsic },
 #endif

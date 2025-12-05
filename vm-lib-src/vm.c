@@ -1061,6 +1061,9 @@ void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics) {
 #ifdef GLASS
   intrinsics_append(intrinsics, glass_intrinsics, glass_intrinsics_len);
 #endif
+#ifdef EMSCRIPTEN
+  intrinsics_append(intrinsics, web_intrinsics, web_intrinsics_len);
+#endif
 
   vm->intrinsics = *intrinsics;
   vm->args = args;
@@ -1069,7 +1072,7 @@ void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics) {
   Var unit_var = { STR_LIT("unit"), unit_value, VarKindGlobal };
   DA_APPEND(vm->global_vars, unit_var);
 
-#ifdef __emscripten__
+#ifdef EMSCRIPTEN
   Value *platform_value = value_string(STR_LIT("web"), vm->current_frame);
 #else
   Value *platform_value = value_string(STR_LIT("linux"), vm->current_frame);

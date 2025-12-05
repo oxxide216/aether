@@ -8,12 +8,19 @@
 MODULE(core);
 MODULE(math);
 MODULE(str);
+#ifndef NOSYSTEM
 MODULE(base);
 MODULE(io);
 MODULE(path);
 MODULE(net);
 MODULE(term);
 MODULE(system);
+#endif
+#ifdef GLASS
 MODULE(glass);
+#endif
+#ifdef EMSCRIPTEN
+MODULE(web);
+#endif
 
 #endif // INTRINSICS_H

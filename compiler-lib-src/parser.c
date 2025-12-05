@@ -11,7 +11,7 @@
 #define STD_PREFIX_RT "/usr/include/aether/"
 #define STD_PREFIX_CT "ae-src/"
 
-#ifdef __emscripten__
+#ifdef EMSCRIPTEN
 #define SHL_STR_IMPLEMENTATION
 #include "shl/shl-str.h"
 

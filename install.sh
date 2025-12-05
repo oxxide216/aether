@@ -9,10 +9,9 @@ if [ "$DEL" == "" ]; then
   sudo cp ae-src/*.ae /usr/include/aether/load
 
   if [ "$WASM" != "" ]; then
-    sudo mkdir /usr/include/aether/wasm/
     sudo cp -r dest/ /usr/include/aether/wasm/
   fi
 else
   sudo rm /usr/bin/aether /usr/bin/aether-web-setup
-  sudo rm -rf /usr/include/aether
+  sudo rm -rf /usr/include/aether/
 fi

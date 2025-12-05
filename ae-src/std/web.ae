@@ -1,0 +1,6 @@
+(let alert [text] -> import 'alert')
+(let update-html [name html] -> import 'update-html')
+(let update-text [name text] -> import 'update-text')
+(let get-html [name] -> import 'get-html')
+(let get-text [name] -> import 'get-text')
+(let add-callback [name callback] -> import 'add-callback')
