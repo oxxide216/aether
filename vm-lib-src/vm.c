@@ -489,7 +489,7 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool val
     DA_APPEND(frame->vars, var);
   }
 
-  for (u32 i = 0; i < func->catched_frame.values.len; ++i) {
+  for (u32 i = 0; i < func->catched_values_names.len; ++i) {
     Var var = {
       func->catched_values_names.items[i].name,
       func->catched_values_names.items[i].value,
@@ -860,7 +860,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     for (u32 i = 0; i < expr->as.list.content.len; ++i) {
       ListNode *new_node = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
       EXECUTE_EXPR_SET(vm, new_node->value, expr->as.list.content.items[i], true);
-      new_node->next = NULL;;
+      new_node->next = NULL;
 
       if (list_end) {
         list_end->next = new_node;
