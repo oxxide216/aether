@@ -578,19 +578,10 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Value *value;
     EXECUTE_EXPR_SET(vm, value, expr->as.var_def.expr, true);
 
-    Var *prev_var = get_var(vm, expr->as.var_def.name);
-    if (prev_var) {
-      if (prev_var->value != value) {
-        if (value->frame == prev_var->value->frame)
-          ++value->refs_count;
-        else
-          value = value_clone(value, prev_var->value->frame);
-
-        prev_var->value = value;
-      }
-
-      break;
-    }
+    if (value->frame == vm->current_frame)
+      ++value->refs_count;
+    else
+      value = value_clone(value, vm->current_frame);
 
     Var var = {0};
     var.name = expr->as.var_def.name;
@@ -667,7 +658,14 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     if (dest_var->value == src)
       break;
 
-    dest_var->value = value_clone(src, dest_var->value->frame);
+    --dest_var->value->refs_count;
+
+    if (src->frame == dest_var->value->frame)
+      ++src->refs_count;
+    else
+      src = value_clone(src, dest_var->value->frame);
+
+    dest_var->value = src;
 
     if (value_expected)
       return value_unit(vm->current_frame);
@@ -783,12 +781,16 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         return value_unit(vm->current_frame);
       }
 
+      --node->value->refs_count;
+
       node->value = value;
     } else if (dest_var->value->kind == ValueKindDict) {
       bool found = false;
 
       for (u32 i = 0; i < dest_var->value->as.dict.len; ++i) {
         if (value_eq(dest_var->value->as.dict.items[i].key, key)) {
+          --dest_var->value->as.dict.items[i].value->refs_count;
+
           dest_var->value->as.dict.items[i].value = value;
           found = true;
 
@@ -814,9 +816,9 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
           memcpy(new_items, dest_var->value->as.dict.items,
                  dest_var->value->as.dict.len * sizeof(DictValue));
           dest_var->value->as.dict.items = new_items;
-        }
 
-        dest_var->value->as.dict.items[dest_var->value->as.dict.len++] = dict_value;
+          dest_var->value->as.dict.items[dest_var->value->as.dict.len++] = dict_value;
+        }
       }
     } else {
       StringBuilder sb = {0};
@@ -1025,7 +1027,8 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
     *new_arg->value = (Value) {
       ValueKindString,
       { .string = { buffer, len } },
-      NULL, 1,
+      vm.current_frame,
+      1,
     };
     new_arg->is_static = true;
 
