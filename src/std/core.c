@@ -544,7 +544,10 @@ Value *add_intrinsic(Vm *vm, Value **args) {
     while (last && last->next)
       last = last->next;
 
-    last->next = list_clone(b->as.list->next, vm->current_frame);
+    if (a->is_atom)
+      last->next = list_clone(b->as.list->next, a->frame);
+    else
+      last->next = list_clone(b->as.list->next, vm->current_frame);
 
     if (a->is_atom)
       return a;
@@ -560,8 +563,16 @@ Value *add_intrinsic(Vm *vm, Value **args) {
     while (last && last->next)
       last = last->next;
 
-    last->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-    last->next->value = b;
+    if (a->is_atom)
+      last->next = arena_alloc(&a->frame->arena, sizeof(ListNode));
+    else
+      last->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+
+    if (a->is_atom && b->frame != a->frame)
+      last->next->value = value_clone(b, a->frame);
+    else
+      last->next->value = b;
+
     last->next->next = NULL;
 
     if (a->is_atom)
@@ -569,8 +580,6 @@ Value *add_intrinsic(Vm *vm, Value **args) {
     return value_list(new_list, vm->current_frame);
   } else if (b->kind == ValueKindList) {
     ListNode *new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-    new_list->next = list_clone(b->as.list->next, vm->current_frame);
-
     new_list->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
     new_list->next->value = a;
     new_list->next->next = list_clone(b->as.list->next, vm->current_frame);
