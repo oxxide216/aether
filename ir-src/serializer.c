@@ -182,13 +182,48 @@ static void save_block_data(IrBlock *block, u8 **data, u32 *data_size, u32 *end)
 }
 
 u8 *serialize(Ir *ir, u32 *size) {
-  *size = sizeof(u32);
-  u32 data_size = sizeof(u32);
+  *size = sizeof(u32) * 2;
+  u32 data_size = sizeof(u32) * 2;
   u8 *data = malloc(data_size);
 
   save_block_data(ir, &data, &data_size, size);
 
-  *(u32 *) data = *size;
+  *(u32 *) data = *(u32 *) "ABC\0";
+  *(u32 *) (data + sizeof(u32)) = *size;
+
+  return data;
+}
+
+u8 *serialize_macros(Macros *macros, u32 *size) {
+  *size = sizeof(u32) * 2;
+  u32 data_size = sizeof(u32) * 2;
+  u8 *data = malloc(data_size);
+
+  reserve_space(sizeof(u32) + macros->len, &data, &data_size, size);
+  *(u32 *) (data + *size) = macros->len;
+  *size += sizeof(u32);
+
+  for (u32 i = 0; i < macros->len; ++i) {
+    Macro *macro = macros->items + i;
+
+    save_str_data(macro->name, &data, &data_size, size);
+
+    reserve_space(sizeof(u32), &data, &data_size, size);
+    *(u32 *) (data + *size) = macro->arg_names.len;
+    *size += sizeof(u32);
+
+    for (u32 i = 0; i < macro->arg_names.len; ++i)
+      save_str_data(macro->arg_names.items[i], &data, &data_size, size);
+
+    save_block_data(&macro->body, &data, &data_size, size);
+
+    reserve_space(sizeof(u8), &data, &data_size, size);
+    *(u8 *) (data + *size) = macro->has_unpack;
+    *size += sizeof(u8);
+  }
+
+  *(u32 *) data = *(u32 *) "ABM\0";
+  *(u32 *) (data + sizeof(u32)) = *size;
 
   return data;
 }

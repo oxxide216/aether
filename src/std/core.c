@@ -791,11 +791,14 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Value *env = args[0];
   Value *code = args[1];
   Value *path = args[2];
+  Value *with_macros = args[3];
 
   char *path_cstr = malloc(path->as.string.len + 1);
   memcpy(path_cstr, path->as.string.ptr,
          path->as.string.len);
   path_cstr[path->as.string.len] = '\0';
+
+  u32 prev_macros_len = env->as.env->macros.len;
 
   Arena ir_arena = {0};
   FilePaths included_files = {0};
@@ -803,18 +806,36 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
                    &included_files, &ir_arena, &env->as.env->arena);
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false, &env->as.env->arena);
 
+  ListNode *result = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+  result->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+  result->next->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+
   Str bytecode = {0};
   bytecode.ptr = (char *) serialize(&ir, &bytecode.len);
   char *new_ptr = arena_alloc(&vm->current_frame->arena, bytecode.len);
   memcpy(new_ptr, bytecode.ptr, bytecode.len);
   free(bytecode.ptr);
   bytecode.ptr = new_ptr;
+  result->next->value = value_string(bytecode, vm->current_frame);
+
+  if (with_macros->as._bool && env->as.env->macros.len != prev_macros_len) {
+    Str macro_bytecode = {0};
+    macro_bytecode.ptr = (char *) serialize_macros(&env->as.env->macros,
+                                                   &macro_bytecode.len);
+    char *new_ptr = arena_alloc(&vm->current_frame->arena, macro_bytecode.len);
+    memcpy(new_ptr, macro_bytecode.ptr, macro_bytecode.len);
+    free(macro_bytecode.ptr);
+    macro_bytecode.ptr = new_ptr;
+    result->next->next->value = value_string(macro_bytecode, vm->current_frame);
+  } else {
+    result->next->next->value = value_unit(vm->current_frame);
+  }
 
   free(path_cstr);
   arena_free(&ir_arena);
   free(included_files.items);
 
-  return value_string(bytecode, vm->current_frame);
+  return value_list(result, vm->current_frame);
 }
 
 Value *eval_compiled_intrinsic(Vm *vm, Value **args) {
@@ -832,6 +853,33 @@ Value *eval_compiled_intrinsic(Vm *vm, Value **args) {
   arena_free(&ir_arena);
 
   return value_clone(result, vm->current_frame);
+}
+
+Value *eval_macros_intrinsic(Vm *vm, Value **args) {
+  (void) vm;
+
+  Value *env = args[0];
+  Value *macro_bytecode = args[1];
+
+  Arena ir_arena = {0};
+  Macros macros = deserialize_macros((u8 *) macro_bytecode->as.string.ptr,
+                                     macro_bytecode->as.string.len,
+                                     &ir_arena, &env->as.env->arena);
+
+  if (env->as.env->macros.cap < env->as.env->macros.len + macros.len) {
+    env->as.env->macros.cap = env->as.env->macros.len + macros.len;
+    env->as.env->macros.items = realloc(env->as.env->macros.items,
+                                        env->as.env->macros.cap * sizeof(Macro));
+  }
+
+  memcpy(env->as.env->macros.items + env->as.env->macros.len,
+         macros.items, macros.len * sizeof(Macro));
+  env->as.env->macros.len += macros.len;
+
+  free(macros.items);
+  arena_free(&ir_arena);
+
+  return value_unit(vm->current_frame);
 }
 
 Value *eval_intrinsic(Vm *vm, Value **args) {
@@ -951,12 +999,15 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("is-dict"), true, 1, { ValueKindUnit }, &is_dict_intrinsic },
   // Env
   { STR_LIT("make-env"), true, 1, { ValueKindList }, &make_env_intrinsic },
-  { STR_LIT("compile"), true, 3,
-    { ValueKindEnv, ValueKindString, ValueKindString },
+  { STR_LIT("compile"), true, 4,
+    { ValueKindEnv, ValueKindString, ValueKindString, ValueKindBool },
     &compile_intrinsic },
   { STR_LIT("eval-compiled"), true, 2,
     { ValueKindEnv, ValueKindString },
     &eval_compiled_intrinsic },
+  { STR_LIT("eval-macros"), false, 2,
+    { ValueKindEnv, ValueKindString },
+    &eval_macros_intrinsic },
   { STR_LIT("eval"), true, 3,
     { ValueKindEnv, ValueKindString, ValueKindString },
     &eval_intrinsic },

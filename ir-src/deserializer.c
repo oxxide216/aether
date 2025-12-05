@@ -218,20 +218,74 @@ static void load_block_data(IrBlock *block, u8 *data, u32 *end,
 Ir deserialize(u8 *data, u32 size, Arena *arena, Arena *persistent_arena) {
   Ir ir = {0};
 
-  if (size < sizeof(u32)) {
+  if (size < sizeof(u32) * 2) {
     ERROR("Corrupted bytecode: not enough data\n");
     exit(1);
   }
 
-  u32 expected_size = *(u32 *) data;
+  if (!str_eq(STR((char *) data, 4), STR_LIT("ABC\0"))) {
+    ERROR("Corrupted bytecode: wrong magic\n");
+    exit(1);
+  }
+
+  u32 expected_size = *(u32 *) (data + sizeof(u32));
   if (size != expected_size) {
     ERROR("Corrupted bytecode: expected %u, but got %u bytes\n",
           expected_size, size);
     exit(1);
   }
 
-  u32 end = sizeof(u32);
+  u32 end = sizeof(u32) * 2;
   load_block_data(&ir, data, &end, arena, persistent_arena);
 
   return ir;
+}
+
+Macros deserialize_macros(u8 *data, u32 size, Arena *arena, Arena *persistent_arena) {
+  Macros macros = {0};
+
+  if (size < sizeof(u32)) {
+    ERROR("Corrupted bytecode: not enough data\n");
+    exit(1);
+  }
+
+  if (!str_eq(STR((char *) data, 4), STR_LIT("ABM\0"))) {
+    ERROR("Corrupted bytecode: wrong magic\n");
+    exit(1);
+  }
+
+  u32 expected_size = *(u32 *) (data + sizeof(u32));
+  if (size != expected_size) {
+    ERROR("Corrupted bytecode: expected %u, but got %u bytes\n",
+          expected_size, size);
+    exit(1);
+  }
+
+  u32 end = sizeof(u32) * 2;
+
+  macros.len = *(u32 *) (data + end);
+  macros.cap = macros.len;
+  end += sizeof(u32);
+
+  macros.items = arena_alloc(persistent_arena, macros.cap * sizeof(Macro));
+  for (u32 i = 0; i < macros.len; ++i) {
+    Macro *macro = macros.items + i;
+
+    load_str_data(&macro->name, data, &end, persistent_arena);
+
+    macro->arg_names.len = *(u32 *) (data + end);
+    macro->arg_names.cap = macro->arg_names.len;
+    end += sizeof(u32);
+
+    macro->arg_names.items = arena_alloc(persistent_arena, macro->arg_names.cap * sizeof(Str));
+    for (u32 j = 0; j < macro->arg_names.len; ++j)
+      load_str_data(macro->arg_names.items + j, data, &end, persistent_arena);
+
+    load_block_data(&macro->body, data, &end, arena, persistent_arena);
+
+    macro->has_unpack = *(u8 *) (data + end);
+    end += sizeof(u8);
+  }
+
+  return macros;
 }

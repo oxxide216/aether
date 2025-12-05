@@ -21,15 +21,20 @@
 (let input-path (head parsed-args))
 (let mode parsed::'mode')
 (let output-path parsed::'output-path')
+(let output-macros-path parsed::'output-macros-path')
 
 (if (unit? input-path)
   (error 'No input file was provided')
   (exit 1))
 
-(let input-content (read-file input-path))
-(if (unit? input-content)
-  (error 'Could not open input file ' input-path)
+(let input-file-content (read-file input-path))
+(if (unit? input-file-content)
+  (error 'Could not open file ' input-path)
   (exit 1))
+
+(if (== mode mode-default)
+  (if (== (get-range input-file-content 0 4) 'ABC\0')
+    (set mode mode-eval-bytecode)))
 
 (let env (make-env parsed-args))
 
@@ -37,8 +42,16 @@
 (load-module env 'base' base-paths)
 
 (match mode
-  mode-default -> (eval env input-content input-path)
-  mode-eval-bytecode -> (eval-compiled env input-content)
-  mode-compile-only -> (do
-    (let compiled (compile env input-content input-path))
-    (write-file output-path compiled)))
+  mode-default -> (eval env input-file-content input-path)
+  mode-eval-bytecode -> (eval-compiled env input-file-content)
+  mode-compile-only ->
+    (do
+      (let compiled (compile env input-file-content input-path
+                             (to-bool output-macros-path)))
+
+      (if output-path
+        (write-file output-path compiled::0))
+      (if compiled::1
+        (write-file output-macros-path compiled::1)
+       elif output-macros-path
+        (info 'There were no macros found in ' input-path))))

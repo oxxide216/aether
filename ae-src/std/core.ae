@@ -57,8 +57,9 @@
 (let not-unit? [value] -> (not (unit? value)))
 
 (let make-env [args] -> import 'make-env')
-(let compile [env code path] -> import 'compile')
+(let compile [env code path with-macros] -> import 'compile')
 (let eval-compiled [env bytecode] -> import 'eval-compiled')
+(let eval-macros [env macro-bytecode] -> import 'eval-macros')
 (let eval [env code path] -> import 'eval')
 
 (let exit [exit-code] -> import 'exit')

@@ -6,7 +6,6 @@ OUT=aether
 CFLAGS="-Wall -Wextra -Icompiler-lib-include -Ivm-lib-include -Iir-include \
         -Ilibs -Imisc -lm"
 BUILD_FLAGS="${@:1}"
-
 LDFLAGS="-z execstack"
 SRC="src/main.c"
 COMPILER_SRC="$(find compiler-lib-src -name "*.c")"
@@ -53,7 +52,6 @@ if [ "$WASM" != "" ]; then
   rm -rf dest/
   mkdir dest/
   cp js-src/aether-web.js dest/
-  cp -r ae-src/std/ dest/
 
   if [ "$EMCC_PATH" != "" ]; then
     PATH="$PATH:$EMCC_PATH:$EMCC_PATH/upstream/emscripten:$EMCC_PATH/upstream/bin"
@@ -61,15 +59,13 @@ if [ "$WASM" != "" ]; then
 
   CC=emcc
   OUT=dest/aether.js
-  CFLAGS="$CFLAGS -D__emscripten__ --preload-file dest/ \
+  CFLAGS="$CFLAGS -D__emscripten__ \
                   -s EXPORTED_RUNTIME_METHODS='cwrap' \
                   -s WASM=1 -s MEMORY64 -s FULL_ES3=1 \
                   -s USE_WEBGL2=1 -s USE_GLFW=0 \
                   -s ENVIRONMENT=web -s SINGLE_FILE=1"
   LDFLAGS=
   SRC="src/emscripten-main.c"
-
-  ./aether -o dest/loader.abc ae-src/loader.ae
 
   $CC -o $OUT $COMPILER_SRC $VM_SRC $IR_SRC $LEXGEN_RUNTIME_SRC \
               $LIB_SRC $STD_SRC $SRC $CFLAGS $LDFLAGS $BUILD_FLAGS

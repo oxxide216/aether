@@ -104,7 +104,7 @@ void sb_push_value(StringBuilder *sb, Value *value,
 
   case ValueKindBool: {
     if (kind) {
-      sb_push(sb, "str");
+      sb_push(sb, "bool");
     } else {
       if (value->as._bool)
         sb_push(sb, "true");

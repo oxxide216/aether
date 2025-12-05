@@ -491,7 +491,8 @@ static IrExprMatch parser_parse_match(Parser *parser) {
 
   IrCases cases = {0};
 
-  while (parser_peek_token(parser)->id != TT_CPAREN) {
+  Token *token;
+  while ((token = parser_peek_token(parser)) && token->id != TT_CPAREN) {
     IrExpr *pattern = parser_parse_expr(parser, false);
     parser_expect_token(parser, MASK(TT_RIGHT_ARROW));
     IrExpr *expr = parser_parse_expr(parser, false);

@@ -4,3 +4,4 @@ test.ac
 eval.ac
 compiler-lib-src/grammar.h
 dest/
+example-dest

@@ -44,6 +44,27 @@ char *emscripten_eval_compiled(u8 *bytecode, u32 bytecode_len) {
 }
 
 EMSCRIPTEN_KEEPALIVE
+void emscripten_eval_macros(u8 *macro_bytecode, u32 macro_bytecode_len) {
+  Arena ir_arena = {0};
+  Macros temp_macros = deserialize_macros(macro_bytecode,
+                                          macro_bytecode_len,
+                                          &ir_arena, &persistent_arena);
+
+  if (macros.cap < macros.len + temp_macros.len) {
+    macros.cap = macros.len + temp_macros.len;
+    macros.items = realloc(macros.items, macros.cap * sizeof(Macro));
+  }
+
+  memcpy(macros.items + macros.len,
+         temp_macros.items,
+         temp_macros.len * sizeof(Macro));
+  macros.len += temp_macros.len;
+
+  free(temp_macros.items);
+  arena_free(&ir_arena);
+}
+
+EMSCRIPTEN_KEEPALIVE
 char *emscripten_eval(char *code, char *path) {
   Arena ir_arena = {0};
   Ir ir = parse_ex(STR(code, strlen(code)), path, &macros,
