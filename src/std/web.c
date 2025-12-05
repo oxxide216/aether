@@ -4,6 +4,19 @@
 #include "aether/vm.h"
 #include "aether/misc.h"
 
+#define SET_CALLBACK(set_func_name, set_func, callback_func)                    \
+  Value *set_func_name##_intrinsic(Vm *vm, Value **args) {                      \
+    Value *name = args[0];                                                      \
+    Value *callback = args[1];                                                  \
+    char *name_cstr = str_to_cstr(name->as.string);                             \
+    EventData *event_data = arena_alloc(&vm->frames->arena, sizeof(EventData)); \
+    event_data->vm = vm;                                                        \
+    event_data->callback = callback->as.func;                                   \
+    set_func(name_cstr, event_data, false, callback_func);                      \
+    free(name_cstr);                                                            \
+    return value_unit(vm->current_frame);                                       \
+  }
+
 typedef struct {
   Vm   *vm;
   Func  callback;
@@ -108,18 +121,10 @@ Value *get_text_intrinsic(Vm *vm, Value **args) {
 }
 
 bool key_event_callback(i32 event_type, const EmscriptenKeyboardEvent *key_event, void *data) {
-  EventData *event_data = data;
-  Str event_type_str = {0};
-  Dict event_data_dict = {0};
+  (void) event_type;
 
-  if (event_type == EMSCRIPTEN_EVENT_KEYPRESS)
-    event_type_str = STR_LIT("keypress");
-  else if (event_type == EMSCRIPTEN_EVENT_KEYDOWN)
-    event_type_str = STR_LIT("keydown");
-  else if (event_type == EMSCRIPTEN_EVENT_KEYUP)
-    event_type_str = STR_LIT("keyup");
-  else
-    return false;
+  EventData *event_data = data;
+  Dict event_data_dict = {0};
 
   u32 key_len = strlen(key_event->key);
   Str key_str = { (char *) key_event->key, key_len };
@@ -141,36 +146,19 @@ bool key_event_callback(i32 event_type, const EmscriptenKeyboardEvent *key_event
   dict_push_value_str_key(event_data->vm->current_frame, &event_data_dict, STR_LIT("repeat"),
                           value_bool(key_event->repeat, event_data->vm->current_frame));
 
-  Value *event_type_value = value_string(event_type_str, event_data->vm->current_frame);
   Value *event_data_value = value_dict(event_data_dict, event_data->vm->current_frame);
 
-  Value *args[] = { event_type_value, event_data_value };
+  Value *args[] = { event_data_value };
   execute_func(event_data->vm, args, &event_data->callback, NULL, false);
 
   return true;
 }
 
 bool mouse_event_callback(i32 event_type, const EmscriptenMouseEvent *mouse_event, void *data) {
-  EventData *event_data = data;
-  Str event_type_str = {0};
-  Dict event_data_dict = {0};
+  (void) event_type;
 
-  if (event_type == EMSCRIPTEN_EVENT_CLICK)
-    event_type_str = STR_LIT("click");
-  else if (event_type == EMSCRIPTEN_EVENT_MOUSEDOWN)
-    event_type_str = STR_LIT("mousedown");
-  else if (event_type == EMSCRIPTEN_EVENT_MOUSEUP)
-    event_type_str = STR_LIT("mouseup");
-  else if (event_type == EMSCRIPTEN_EVENT_DBLCLICK)
-    event_type_str = STR_LIT("doubleclick");
-  else if (event_type == EMSCRIPTEN_EVENT_MOUSEMOVE)
-    event_type_str = STR_LIT("mousemove");
-  else if (event_type == EMSCRIPTEN_EVENT_MOUSEENTER)
-    event_type_str = STR_LIT("mouseenter");
-  else if (event_type == EMSCRIPTEN_EVENT_MOUSELEAVE)
-    event_type_str = STR_LIT("mouseleave");
-  else
-    return false;
+  EventData *event_data = data;
+  Dict event_data_dict = {0};
 
   dict_push_value_str_key(event_data->vm->current_frame, &event_data_dict, STR_LIT("x"),
                           value_int(mouse_event->screenX, event_data->vm->current_frame));
@@ -179,40 +167,24 @@ bool mouse_event_callback(i32 event_type, const EmscriptenMouseEvent *mouse_even
   dict_push_value_str_key(event_data->vm->current_frame, &event_data_dict, STR_LIT("button"),
                           value_int(mouse_event->button, event_data->vm->current_frame));
 
-  Value *event_type_value = value_string(event_type_str, event_data->vm->current_frame);
   Value *event_data_value = value_dict(event_data_dict, event_data->vm->current_frame);
 
-  Value *args[] = { event_type_value, event_data_value };
+  Value *args[] = { event_data_value };
   execute_func(event_data->vm, args, &event_data->callback, NULL, false);
 
   return true;
 }
 
-Value *add_callback_intrinsic(Vm *vm, Value **args) {
-  Value *name = args[0];
-  Value *callback = args[1];
-
-  char *name_cstr = str_to_cstr(name->as.string);
-
-  EventData *event_data = arena_alloc(&vm->frames->arena, sizeof(EventData));
-  event_data->vm = vm;
-  event_data->callback = callback->as.func;
-
-  emscripten_set_keypress_callback(name_cstr, event_data, false, key_event_callback);
-  emscripten_set_keydown_callback(name_cstr, event_data, false, key_event_callback);
-  emscripten_set_keyup_callback(name_cstr, event_data, false, key_event_callback);
-  emscripten_set_click_callback(name_cstr, event_data, false, mouse_event_callback);
-  emscripten_set_mousedown_callback(name_cstr, event_data, false, mouse_event_callback);
-  emscripten_set_mouseup_callback(name_cstr, event_data, false, mouse_event_callback);
-  emscripten_set_dblclick_callback(name_cstr, event_data, false, mouse_event_callback);
-  emscripten_set_mousemove_callback(name_cstr, event_data, false, mouse_event_callback);
-  emscripten_set_mouseenter_callback(name_cstr, event_data, false, mouse_event_callback);
-  emscripten_set_mouseleave_callback(name_cstr, event_data, false, mouse_event_callback);
-
-  free(name_cstr);
-
-  return value_unit(vm->current_frame);
-}
+SET_CALLBACK(on_key_press, emscripten_set_keypress_callback, key_event_callback);
+SET_CALLBACK(on_key_down, emscripten_set_keydown_callback, key_event_callback);
+SET_CALLBACK(on_key_up, emscripten_set_keyup_callback, key_event_callback);
+SET_CALLBACK(on_click, emscripten_set_click_callback, mouse_event_callback);
+SET_CALLBACK(on_mouse_down, emscripten_set_mousedown_callback, mouse_event_callback);
+SET_CALLBACK(on_mouse_up, emscripten_set_mouseup_callback, mouse_event_callback);
+SET_CALLBACK(on_double_click, emscripten_set_dblclick_callback, mouse_event_callback);
+SET_CALLBACK(on_mouse_move, emscripten_set_mousemove_callback, mouse_event_callback);
+SET_CALLBACK(on_mouse_enter, emscripten_set_mouseenter_callback, mouse_event_callback);
+SET_CALLBACK(on_mouse_leave, emscripten_set_mouseleave_callback, mouse_event_callback);
 
 Intrinsic web_intrinsics[] = {
   { STR_LIT("alert"), false, 1, { ValueKindString }, &alert_intrinsic },
@@ -220,7 +192,16 @@ Intrinsic web_intrinsics[] = {
   { STR_LIT("update-text"), false, 2, { ValueKindString, ValueKindString }, &update_text_intrinsic },
   { STR_LIT("get-html"), true, 1, { ValueKindString }, &get_html_intrinsic },
   { STR_LIT("get-text"), true, 1, { ValueKindString }, &get_text_intrinsic },
-  { STR_LIT("add-callback"), false, 2, { ValueKindString, ValueKindFunc }, &add_callback_intrinsic },
+  { STR_LIT("on-key-press"), false, 2, { ValueKindString, ValueKindFunc }, &on_key_press_intrinsic },
+  { STR_LIT("on-key-down"), false, 2, { ValueKindString, ValueKindFunc }, &on_key_down_intrinsic },
+  { STR_LIT("on-key-up"), false, 2, { ValueKindString, ValueKindFunc }, &on_key_up_intrinsic },
+  { STR_LIT("on-click"), false, 2, { ValueKindString, ValueKindFunc }, &on_click_intrinsic },
+  { STR_LIT("on-mouse-down"), false, 2, { ValueKindString, ValueKindFunc }, &on_mouse_down_intrinsic },
+  { STR_LIT("on-mouse-up"), false, 2, { ValueKindString, ValueKindFunc }, &on_mouse_up_intrinsic },
+  { STR_LIT("on-double-click"), false, 2, { ValueKindString, ValueKindFunc }, &on_double_click_intrinsic },
+  { STR_LIT("on-mouse-move"), false, 2, { ValueKindString, ValueKindFunc }, &on_mouse_move_intrinsic },
+  { STR_LIT("on-mouse-enter"), false, 2, { ValueKindString, ValueKindFunc }, &on_mouse_enter_intrinsic },
+  { STR_LIT("on-mouse-leave"), false, 2, { ValueKindString, ValueKindFunc }, &on_mouse_leave_intrinsic },
 };
 
 u32 web_intrinsics_len = ARRAY_LEN(web_intrinsics);
