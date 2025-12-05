@@ -175,6 +175,36 @@ bool mouse_event_callback(i32 event_type, const EmscriptenMouseEvent *mouse_even
   return true;
 }
 
+Value *console_log_intrinsic(Vm *vm, Value **args) {
+  Value *message = args[0];
+
+  char *message_cstr = str_to_cstr(message->as.string);
+  emscripten_console_log(message_cstr);
+  free(message_cstr);
+
+  return value_unit(vm->current_frame);
+}
+
+Value *console_warn_intrinsic(Vm *vm, Value **args) {
+  Value *message = args[0];
+
+  char *message_cstr = str_to_cstr(message->as.string);
+  emscripten_console_warn(message_cstr);
+  free(message_cstr);
+
+  return value_unit(vm->current_frame);
+}
+
+Value *console_error_intrinsic(Vm *vm, Value **args) {
+  Value *message = args[0];
+
+  char *message_cstr = str_to_cstr(message->as.string);
+  emscripten_console_error(message_cstr);
+  free(message_cstr);
+
+  return value_unit(vm->current_frame);
+}
+
 SET_CALLBACK(on_key_press, emscripten_set_keypress_callback, key_event_callback);
 SET_CALLBACK(on_key_down, emscripten_set_keydown_callback, key_event_callback);
 SET_CALLBACK(on_key_up, emscripten_set_keyup_callback, key_event_callback);
@@ -202,6 +232,9 @@ Intrinsic web_intrinsics[] = {
   { STR_LIT("on-mouse-move"), false, 2, { ValueKindString, ValueKindFunc }, &on_mouse_move_intrinsic },
   { STR_LIT("on-mouse-enter"), false, 2, { ValueKindString, ValueKindFunc }, &on_mouse_enter_intrinsic },
   { STR_LIT("on-mouse-leave"), false, 2, { ValueKindString, ValueKindFunc }, &on_mouse_leave_intrinsic },
+  { STR_LIT("console-log"), false, 1, { ValueKindString }, &console_log_intrinsic },
+  { STR_LIT("console-warn"), false, 1, { ValueKindString }, &console_warn_intrinsic },
+  { STR_LIT("console-error"), false, 1, { ValueKindString }, &console_error_intrinsic },
 };
 
 u32 web_intrinsics_len = ARRAY_LEN(web_intrinsics);
