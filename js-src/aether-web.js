@@ -12,7 +12,7 @@ async function aetherInit(dataPrefix, initCallback) {
   const appArray = await fetchBinaryFile(dataPrefix + '/app.abc');
 
   Module = {
-    onRuntimeInitialized: function() {
+    onRuntimeInitialized: () => {
       const aetherCreate = Module.cwrap('emscripten_create', 'null', []);
       _aetherEvalCompiled =
         Module.cwrap('emscripten_eval_compiled', 'string', ['array', 'number']);
@@ -24,12 +24,6 @@ async function aetherInit(dataPrefix, initCallback) {
       aetherEvalCompiled(appArray);
 
       initCallback();
-    },
-
-    locateFile: function(path) {
-        if (path.endsWith('.data'))
-            return dataPrefix + '/aether.data';
-        return path;
     },
   };
 
