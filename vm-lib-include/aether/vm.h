@@ -168,6 +168,7 @@ struct Value {
   ValueAs     as;
   StackFrame *frame;
   u32         refs_count;
+  bool        is_atom;
 };
 
 struct ListNode {

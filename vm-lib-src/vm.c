@@ -25,7 +25,7 @@
 
 typedef Da(Str) Strs;
 
-static Value unit = { ValueKindUnit, {}, NULL, 0 };
+static Value unit = { ValueKindUnit, {}, NULL, 0, false };
 
 ListNode *list_clone(ListNode *nodes, StackFrame *frame) {
   if (!nodes)
@@ -68,7 +68,8 @@ Value *value_unit(StackFrame *frame) {
 
 Value *value_list(ListNode *nodes, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  *value = (Value) { ValueKindList, { .list = nodes }, frame, 0 };
+  *value = (Value) { ValueKindList, { .list = nodes },
+                     frame, 0, false };
   return value;
 }
 
@@ -76,37 +77,43 @@ Value *value_string(Str string, StackFrame *frame) {
   Value *value = value_alloc(frame);
   Str new_string = { arena_alloc(&frame->arena, string.len), string.len };
   memcpy(new_string.ptr, string.ptr, new_string.len);
-  *value = (Value) { ValueKindString, { .string = new_string }, frame, 0 };
+  *value = (Value) { ValueKindString, { .string = new_string },
+                     frame, 0, false };
   return value;
 }
 
 Value *value_int(i64 _int, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  *value = (Value) { ValueKindInt, { ._int = _int }, frame, 0 };
+  *value = (Value) { ValueKindInt, { ._int = _int },
+                     frame, 0, false };
   return value;
 }
 
 Value *value_float(f64 _float, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  *value = (Value) { ValueKindFloat, { ._float = _float }, frame, 0 };
+  *value = (Value) { ValueKindFloat, { ._float = _float },
+                     frame, 0, false };
   return value;
 }
 
 Value *value_bool(bool _bool, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  *value = (Value) { ValueKindBool, { ._bool = _bool }, frame, 0 };
+  *value = (Value) { ValueKindBool, { ._bool = _bool },
+                     frame, 0, false };
   return value;
 }
 
 Value *value_dict(Dict dict, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  *value = (Value) { ValueKindDict, { .dict = dict }, frame, 0 };
+  *value = (Value) { ValueKindDict, { .dict = dict },
+                     frame, 0, false };
   return value;
 }
 
 Value *value_func(Func func, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  *value = (Value) { ValueKindFunc, { .func = func }, frame, 0 };
+  *value = (Value) { ValueKindFunc, { .func = func },
+                     frame, 0, false };
   return value;
 }
 
@@ -116,7 +123,8 @@ Value *value_env(Vm vm, StackFrame *frame) {
   *env = (Env) {0};
   env->vm = vm;
   env->refs_count = 1;
-  *value = (Value) { ValueKindEnv, { .env = env }, frame, 0 };
+  *value = (Value) { ValueKindEnv, { .env = env },
+                     frame, 0, false };
   return value;
 }
 
@@ -742,7 +750,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       return value_unit(vm->current_frame);
     }
 
-    if (dest_var->value->refs_count > 1)
+    if (dest_var->value->refs_count > 1 && !dest_var->value->is_atom)
       dest_var->value = value_clone(dest_var->value, dest_var->value->frame);
 
     Value *key;
@@ -933,7 +941,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         },
       },
       vm->current_frame,
-      0,
+      0, false,
     };
 
     free(local_names.items);
@@ -1028,7 +1036,7 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
       ValueKindString,
       { .string = { buffer, len } },
       vm.current_frame,
-      1,
+      1, false,
     };
     new_arg->is_static = true;
 

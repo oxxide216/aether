@@ -37,8 +37,7 @@ void dict_push_value_str_key(StackFrame *frame, Dict *dict, Str string, Value *v
   *key = (Value) {
     ValueKindString,
     { .string = string },
-    frame,
-    1,
+    frame, 1, false,
   };
   DictValue dict_value = { key, value };
   dict->items[dict->len++] = dict_value;

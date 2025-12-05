@@ -62,6 +62,8 @@
 (let eval-macros [env macro-bytecode] -> import 'eval-macros')
 (let eval [env code path] -> import 'eval')
 
+; Other
+(let atom [value] -> import 'atom')
 (let exit [exit-code] -> import 'exit')
 
 (macro for [element in collection ...body] ->

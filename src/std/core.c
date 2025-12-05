@@ -156,8 +156,13 @@ Value *map_intrinsic(Vm *vm, Value **args) {
   Value *func = args[0];
   Value *list = args[1];
 
-  ListNode *new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-  ListNode **new_list_next = &new_list->next;
+  ListNode *new_list = NULL;
+  ListNode **new_list_next = NULL;
+  if (!list->is_atom) {
+    new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+    new_list_next = &new_list->next;
+  }
+
   ListNode *node = list->as.list->next;
   while (node) {
     Value *func_args[] = { node->value };
@@ -166,13 +171,20 @@ Value *map_intrinsic(Vm *vm, Value **args) {
     if (vm->state != ExecStateContinue)
       break;
 
-    *new_list_next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-    (*new_list_next)->value = replacement;
-    new_list_next = &(*new_list_next)->next;
+    if (list->is_atom) {
+      --node->value->refs_count;
+      node->value = replacement;
+    } else {
+      *new_list_next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+      (*new_list_next)->value = replacement;
+      new_list_next = &(*new_list_next)->next;
+    }
 
     node = node->next;
   }
 
+  if (list->is_atom)
+    return list;
   return value_list(new_list, vm->current_frame);
 }
 
@@ -180,8 +192,14 @@ Value *filter_intrinsic(Vm *vm, Value **args) {
   Value *func = args[0];
   Value *list = args[1];
 
-  ListNode *new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-  ListNode **new_list_next = &new_list->next;
+  ListNode *new_list = NULL;
+  ListNode **new_list_next = NULL;
+  if (!list->is_atom) {
+    new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+    new_list_next = &new_list->next;
+  }
+
+  ListNode *prev_node = list->as.list;
   ListNode *node = list->as.list->next;
   while (node) {
     Value *func_args[] = { node->value };
@@ -194,14 +212,22 @@ Value *filter_intrinsic(Vm *vm, Value **args) {
       PANIC(vm->current_frame, "filter: wrong argument kinds\n");
 
     if (is_ok->as._bool) {
-      *new_list_next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-      (*new_list_next)->value = node->value;
-      new_list_next = &(*new_list_next)->next;
+      if (!list->is_atom) {
+        *new_list_next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+        (*new_list_next)->value = node->value;
+        new_list_next = &(*new_list_next)->next;
+      }
+    } else if (list->is_atom) {
+      --prev_node->next->value->refs_count;
+      prev_node->next = node->next;
     }
 
+    prev_node = prev_node->next;
     node = node->next;
   }
 
+  if (list->is_atom)
+    return list;
   return value_list(new_list, vm->current_frame);
 }
 
@@ -231,8 +257,12 @@ Value *zip_intrinsic(Vm *vm,Value **args) {
   Value *list_a = args[0];
   Value *list_b = args[1];
 
-  ListNode *new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-  ListNode **new_list_next = &new_list->next;
+  ListNode *new_list = NULL;
+  ListNode **new_list_next = NULL;
+  if (!list_a->is_atom) {
+    new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+    new_list_next = &new_list->next;
+  }
 
   ListNode *node_a = list_a->as.list->next;
   ListNode *node_b = list_b->as.list->next;
@@ -245,8 +275,12 @@ Value *zip_intrinsic(Vm *vm,Value **args) {
     pair->next->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
     pair->next->next->value = node_b->value;
 
-    (*new_list_next)->value = value_list(pair, vm->current_frame);
-    new_list_next = &(*new_list_next)->next;
+    if (list_a->is_atom) {
+      node_a->value = value_list(pair, vm->current_frame);
+    } else {
+      (*new_list_next)->value = value_list(pair, vm->current_frame);
+      new_list_next = &(*new_list_next)->next;
+    }
 
     node_a = node_a->next;
     node_b = node_b->next;
@@ -324,6 +358,18 @@ Value *sort_intrinsic(Vm *vm, Value **args) {
 
       sorted[k] = temp;
     }
+  }
+
+  if (list->is_atom) {
+    ListNode *node = list->as.list->next;
+    for (u32 i = 0; i < (u32) len->as._int; ++i) {
+      node->value = sorted[i];
+      node = node->next;
+    }
+
+    free(sorted);
+
+    return list;
   }
 
   ListNode *result = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
@@ -488,29 +534,38 @@ Value *add_intrinsic(Vm *vm, Value **args) {
     return value_string(new_string, vm->current_frame);
   } else if (a->kind == ValueKindList &&
              b->kind == ValueKindList) {
-    ListNode *new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-    new_list->next = list_clone(a->as.list->next, vm->current_frame);
+    ListNode *new_list = a->as.list;
+    if (!a->is_atom) {
+      new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+      new_list->next = list_clone(a->as.list->next, vm->current_frame);
+    }
 
-    ListNode *node = new_list;
-    while (node && node->next)
-      node = node->next;
+    ListNode *last = new_list;
+    while (last && last->next)
+      last = last->next;
 
-    if (node)
-      node->next = list_clone(b->as.list->next, vm->current_frame);
+    last->next = list_clone(b->as.list->next, vm->current_frame);
 
+    if (a->is_atom)
+      return a;
     return value_list(new_list, vm->current_frame);
   } else if (a->kind == ValueKindList) {
-    ListNode *new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-    new_list->next = list_clone(a->as.list->next, vm->current_frame);
-    ListNode *node = new_list;
+    ListNode *new_list = a->as.list;
+    if (!a->is_atom) {
+      new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+      new_list->next = list_clone(a->as.list->next, vm->current_frame);
+    }
 
-    while (node && node->next)
-      node = node->next;
+    ListNode *last = new_list;
+    while (last && last->next)
+      last = last->next;
 
-    node->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-    node->next->value = b;
-    node->next->next = NULL;
+    last->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+    last->next->value = b;
+    last->next->next = NULL;
 
+    if (a->is_atom)
+      return a;
     return value_list(new_list, vm->current_frame);
   } else if (b->kind == ValueKindList) {
     ListNode *new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
@@ -906,6 +961,16 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
   return value_clone(result, vm->current_frame);
 }
 
+Value *atom_intrinsic(Vm *vm, Value **args) {
+  (void) vm;
+
+  Value *value = args[0];
+
+  value->is_atom = true;
+
+  return value;
+}
+
 Value *exit_intrinsic(Vm *vm, Value **args) {
   Value *exit_code = args[0];
 
@@ -1012,6 +1077,7 @@ Intrinsic core_intrinsics[] = {
     { ValueKindEnv, ValueKindString, ValueKindString },
     &eval_intrinsic },
   // Other
+  { STR_LIT("atom"), true, 1, { ValueKindUnit }, &atom_intrinsic },
   { STR_LIT("exit"), false, 1, { ValueKindInt }, &exit_intrinsic },
 };
 
