@@ -22,7 +22,7 @@ void dict_push_value(Dict *dict, Value *key, Value *value) {
   DA_APPEND(*dict, dict_value);
 }
 
-void dict_push_value_str_key(StackFrame *frame, Dict *dict, Str key, Value *value) {
+void dict_push_value_str_key(StackFrame *frame, Dict *dict, Str string, Value *value) {
   if (dict->len == dict->cap) {
     if (dict->cap == 0)
       dict->cap = 1;
@@ -33,20 +33,21 @@ void dict_push_value_str_key(StackFrame *frame, Dict *dict, Str key, Value *valu
     dict->items = new_items;
   }
 
-  Value *string = value_alloc(frame);
-  *string = (Value) {
+  Value *key = value_alloc(frame);
+  *key = (Value) {
     ValueKindString,
-    { .string = key },
+    { .string = string },
     frame,
+    1,
   };
-  DictValue dict_value = { string, value };
+  DictValue dict_value = { key, value };
   dict->items[dict->len++] = dict_value;
 }
 
-Value *dict_get_value_str_key(StackFrame *frame, Dict *dict, Str key) {
+Value *dict_get_value_str_key(StackFrame *frame, Dict *dict, Str string) {
   for (u32 i = 0; i < dict->len; ++i)
     if (dict->items[i].key->kind == ValueKindString &&
-        str_eq(dict->items[i].key->as.string, key))
+        str_eq(dict->items[i].key->as.string, string))
       return dict->items[i].value;
 
   Value *result = value_alloc(frame);

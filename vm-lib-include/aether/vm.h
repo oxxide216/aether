@@ -167,6 +167,7 @@ struct Value {
   ValueKind   kind;
   ValueAs     as;
   StackFrame *frame;
+  u32         refs_count;
 };
 
 struct ListNode {

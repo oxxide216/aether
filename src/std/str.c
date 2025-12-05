@@ -89,6 +89,7 @@ Value *split_intrinsic(Vm *vm, Value **args) {
         ValueKindString,
         { .string = new_string },
         vm->current_frame,
+        1,
       };
 
       index = i + 1;
@@ -109,6 +110,7 @@ Value *split_intrinsic(Vm *vm, Value **args) {
       ValueKindString,
       { .string = new_string },
       vm->current_frame,
+      1,
     };
   }
 
@@ -181,7 +183,7 @@ Value *eat_str_intrinsic(Vm *vm, Value **args) {
 
   new_list->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
   new_list->next->value = value_alloc(vm->current_frame);
-  *new_list->next->value = (Value) { ValueKindBool, { ._bool = matches }, vm->current_frame };
+  *new_list->next->value = (Value) { ValueKindBool, { ._bool = matches }, vm->current_frame, 1 };
 
   new_list->next->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
   Str new_string = {
@@ -193,6 +195,7 @@ Value *eat_str_intrinsic(Vm *vm, Value **args) {
     ValueKindString,
     { .string = new_string },
     vm->current_frame,
+    1,
   };
 
   return value_list(new_list, vm->current_frame);
@@ -216,7 +219,7 @@ static Value *eat_byte(Vm *vm, Value **args, u32 size) {
 
   new_list->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
   new_list->next->value = value_alloc(vm->current_frame);
-  *new_list->next->value = (Value) { ValueKindInt, { ._int = _int }, vm->current_frame };
+  *new_list->next->value = (Value) { ValueKindInt, { ._int = _int }, vm->current_frame, 1 };
 
   new_list->next->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
   Str new_string = {
@@ -228,6 +231,7 @@ static Value *eat_byte(Vm *vm, Value **args, u32 size) {
     ValueKindString,
     { .string = new_string },
     vm->current_frame,
+    1,
   };
 
   return value_list(new_list, vm->current_frame);

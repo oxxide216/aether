@@ -25,6 +25,8 @@
 
 typedef Da(Str) Strs;
 
+static Value unit = { ValueKindUnit, {}, NULL, 0 };
+
 ListNode *list_clone(ListNode *nodes, StackFrame *frame) {
   if (!nodes)
     return NULL;
@@ -59,14 +61,14 @@ Dict dict_clone(Dict *dict, StackFrame *frame) {
 }
 
 Value *value_unit(StackFrame *frame) {
-  Value *value = value_alloc(frame);
-  *value = (Value) { ValueKindUnit, {}, frame };
-  return value;
+  (void) frame;
+
+  return &unit;
 }
 
 Value *value_list(ListNode *nodes, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  *value = (Value) { ValueKindList, { .list = nodes }, frame };
+  *value = (Value) { ValueKindList, { .list = nodes }, frame, 0 };
   return value;
 }
 
@@ -74,37 +76,37 @@ Value *value_string(Str string, StackFrame *frame) {
   Value *value = value_alloc(frame);
   Str new_string = { arena_alloc(&frame->arena, string.len), string.len };
   memcpy(new_string.ptr, string.ptr, new_string.len);
-  *value = (Value) { ValueKindString, { .string = new_string }, frame };
+  *value = (Value) { ValueKindString, { .string = new_string }, frame, 0 };
   return value;
 }
 
 Value *value_int(i64 _int, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  *value = (Value) { ValueKindInt, { ._int = _int }, frame };
+  *value = (Value) { ValueKindInt, { ._int = _int }, frame, 0 };
   return value;
 }
 
 Value *value_float(f64 _float, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  *value = (Value) { ValueKindFloat, { ._float = _float }, frame };
+  *value = (Value) { ValueKindFloat, { ._float = _float }, frame, 0 };
   return value;
 }
 
 Value *value_bool(bool _bool, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  *value = (Value) { ValueKindBool, { ._bool = _bool }, frame };
+  *value = (Value) { ValueKindBool, { ._bool = _bool }, frame, 0 };
   return value;
 }
 
 Value *value_dict(Dict dict, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  *value = (Value) { ValueKindDict, { .dict = dict }, frame };
+  *value = (Value) { ValueKindDict, { .dict = dict }, frame, 0 };
   return value;
 }
 
 Value *value_func(Func func, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  *value = (Value) { ValueKindFunc, { .func = func }, frame };
+  *value = (Value) { ValueKindFunc, { .func = func }, frame, 0 };
   return value;
 }
 
@@ -114,7 +116,7 @@ Value *value_env(Vm vm, StackFrame *frame) {
   *env = (Env) {0};
   env->vm = vm;
   env->refs_count = 1;
-  *value = (Value) { ValueKindEnv, { .env = env }, frame };
+  *value = (Value) { ValueKindEnv, { .env = env }, frame, 0 };
   return value;
 }
 
@@ -126,9 +128,13 @@ Value *value_alloc(StackFrame *frame) {
 }
 
 Value *value_clone(Value *value, StackFrame *frame) {
+  if (value->kind == ValueKindUnit)
+    return value;
+
   Value *copy = value_alloc(frame);
   *copy = *value;
   copy->frame = frame;
+  copy->refs_count = 1;
 
   if (value->kind == ValueKindList) {
     copy->as.list = arena_alloc(&frame->arena, sizeof(ListNode));
@@ -572,12 +578,16 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Value *value;
     EXECUTE_EXPR_SET(vm, value, expr->as.var_def.expr, true);
 
-    value = value_clone(value, vm->current_frame);
-
     Var *prev_var = get_var(vm, expr->as.var_def.name);
     if (prev_var) {
-      if (prev_var->value != value)
+      if (prev_var->value != value) {
+        if (value->frame == prev_var->value->frame)
+          ++value->refs_count;
+        else
+          value = value_clone(value, prev_var->value->frame);
+
         prev_var->value = value;
+      }
 
       break;
     }
@@ -734,12 +744,18 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       return value_unit(vm->current_frame);
     }
 
+    if (dest_var->value->refs_count > 1)
+      dest_var->value = value_clone(dest_var->value, dest_var->value->frame);
+
     Value *key;
     EXECUTE_EXPR_SET(vm, key, expr->as.set_at.key, true);
     Value *value;
     EXECUTE_EXPR_SET(vm, value, expr->as.set_at.value, true);
 
-    value = value_clone(value, dest_var->value->frame);
+    if (value->frame == dest_var->value->frame)
+      ++value->refs_count;
+    else
+      value = value_clone(value, dest_var->value->frame);
 
     if (dest_var->value->kind == ValueKindList) {
       if (key->kind != ValueKindInt) {
@@ -768,34 +784,6 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       }
 
       node->value = value;
-    } else if (dest_var->value->kind == ValueKindString) {
-      if (key->kind != ValueKindInt) {
-        PERROR(META_FMT, "set: only integer can be used as a string index\n",
-               META_ARG(expr->meta));
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
-
-        return value_unit(vm->current_frame);
-      }
-
-      if ((u32) key->as._int >= dest_var->value->as.string.len) {
-        PERROR(META_FMT, "set: index out of bounds\n",
-               META_ARG(expr->meta));
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
-
-        return value_unit(vm->current_frame);
-      }
-
-      if (value->as.string.len != 1) {
-        PERROR(META_FMT, "set: only string of length 1 can be assigned\n",
-               META_ARG(expr->meta));
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
-        return value_unit(vm->current_frame);
-      }
-
-      dest_var->value->as.string.ptr[key->as._int] = value->as.string.ptr[0];
     } else if (dest_var->value->kind == ValueKindDict) {
       bool found = false;
 
@@ -809,7 +797,10 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       }
 
       if (!found) {
-        key = value_clone(key, dest_var->value->frame);
+        if (key->frame == dest_var->value->frame)
+          ++key->refs_count;
+        else
+          key = value_clone(key, dest_var->value->frame);
 
         DictValue dict_value = { key, value };
 
@@ -831,7 +822,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       StringBuilder sb = {0};
       sb_push_value(&sb, dest_var->value, 0, true, vm);
 
-      PERROR(META_FMT, "set: destination should be list, string or dictionary, but got "STR_FMT"\n",
+      PERROR(META_FMT, "set: destination should be list or dictionary, but got "STR_FMT"\n",
              META_ARG(expr->meta), STR_ARG(sb_to_str(sb)));
       vm->state = ExecStateExit;
       vm->exit_code = 1;
@@ -940,6 +931,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         },
       },
       vm->current_frame,
+      0,
     };
 
     free(local_names.items);
@@ -1033,7 +1025,7 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
     *new_arg->value = (Value) {
       ValueKindString,
       { .string = { buffer, len } },
-      0,
+      NULL, 1,
     };
     new_arg->is_static = true;
 
