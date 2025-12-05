@@ -209,7 +209,7 @@ Value *filter_intrinsic(Vm *vm, Value **args) {
       break;
 
     if (is_ok->kind != ValueKindBool)
-      PANIC(vm->current_frame, "filter: wrong argument kinds\n");
+      PANIC(vm->current_frame, "filter: predicate should return bool\n");
 
     if (is_ok->as._bool) {
       if (!list->is_atom) {
@@ -217,12 +217,13 @@ Value *filter_intrinsic(Vm *vm, Value **args) {
         (*new_list_next)->value = node->value;
         new_list_next = &(*new_list_next)->next;
       }
+
+      prev_node = prev_node->next;
     } else if (list->is_atom) {
       --prev_node->next->value->refs_count;
       prev_node->next = node->next;
     }
 
-    prev_node = prev_node->next;
     node = node->next;
   }
 
