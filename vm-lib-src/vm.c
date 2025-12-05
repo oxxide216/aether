@@ -136,7 +136,7 @@ Value *value_alloc(StackFrame *frame) {
 }
 
 Value *value_clone(Value *value, StackFrame *frame) {
-  if (value->kind == ValueKindUnit)
+  if (value->kind == ValueKindUnit || !frame)
     return value;
 
   Value *copy = value_alloc(frame);
@@ -674,9 +674,6 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       src = value_clone(src, dest_var->value->frame);
 
     dest_var->value = src;
-
-    if (value_expected)
-      return value_unit(vm->current_frame);
   } break;
 
   case IrExprKindGetAt: {
