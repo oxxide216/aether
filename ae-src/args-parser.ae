@@ -13,9 +13,9 @@
     (if (or (== (head args) '-h') (== (head args) '--help'))
       (print 'Usage: aether [FLAGS] [FILE] [ARGS]...\n\n'
              'With no FILE, start REPL.\n\n'
-             '  -h --help                 show this message\n'
-             '  -c [FILE]                 output bytecode into [FILE]\n'
-             '  -m [FILE]                 output macros bytecode into [FILE]\n')
+             '  -h --help                 show this message.\n'
+             '  -c [FILE]                 output bytecode into [FILE].\n'
+             '  -m [FILE]                 output macros bytecode into [FILE].\n')
       (exit 0)
      elif (== (head args) '-c')
       (set args (tail args))
