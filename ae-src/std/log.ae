@@ -2,27 +2,17 @@
 (use 'std/str.ae')
 (use 'std/term.ae')
 
-(if (== current-platform 'web')
-  (macro error [...messages] ->
-    (println '[ERROR] ' (join [messages] '')))
+(macro error [...messages] ->
+  (println term/fg-red term/bold '[ERROR]'
+           term/reset ' ' (join [messages] '')))
 
-  (macro warn [...messages] ->
-    (println '[WARN] ' (join [messages] '')))
+(macro warn [...messages] ->
+  (println term/fg-yellow term/bold '[WARN]'
+           term/reset ' ' (join [messages] '')))
 
-  (macro info [...messages] ->
-    (println '[INFO] ' (join [messages] '')))
- else
-  (macro error [...messages] ->
-    (println term/fg-red term/bold '[ERROR]'
-             term/reset ' ' (join [messages] '')))
-
-  (macro warn [...messages] ->
-    (println term/fg-yellow term/bold '[WARN]'
-             term/reset ' ' (join [messages] '')))
-
-  (macro info [...messages] ->
-    (println term/fg-white term/bold '[INFO]'
-             term/reset ' ' (join [messages] ''))))
+(macro info [...messages] ->
+  (println term/fg-white term/bold '[INFO]'
+           term/reset ' ' (join [messages] '')))
 
 (macro panic [...messages] ->
   (error messages)
