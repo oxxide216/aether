@@ -331,6 +331,9 @@ Ir parse_ex(Str code, char *file_path, Macros *macros,
             Arena *persistent_arena) {
   Parser parser = {0};
 
+  Str current_file_path = { file_path, strlen(file_path) };
+  DA_APPEND(*included_files, current_file_path);
+
   parser.tokens = lex(code, file_path, arena);
   parser.current_token = parser.tokens;
   parser.macros = macros;

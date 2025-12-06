@@ -1,6 +1,8 @@
 #include "aether/serializer.h"
+#include "aether/optimizer.h"
 
-static void save_block_data(Ir *ir, u8 **data, u32 *data_size, u32 *end);
+static void save_block_data(Ir *ir, u8 **data, u32 *data_size,
+                            u32 *end, FilePathOffsets *path_offsets);
 
 static void reserve_space(u32 amount, u8 **data, u32 *data_size, u32 *end) {
   u32 new_data_size = *data_size;
@@ -24,37 +26,41 @@ static void save_str_data(Str str, u8 **data, u32 *data_size, u32 *end) {
   }
 }
 
-static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
+static bool save_expr_data(IrExpr *expr, u8 **data, u32 *data_size,
+                           u32 *end, FilePathOffsets *path_offsets) {
+  if (!expr->is_used)
+    return false;
+
   reserve_space(sizeof(u32), data, data_size, end);
   *(u32 *) (*data + *end) = expr->kind;
   *end += sizeof(u32);
 
   switch (expr->kind) {
   case IrExprKindBlock: {
-    save_block_data(&expr->as.block, data, data_size, end);
+    save_block_data(&expr->as.block, data, data_size, end, path_offsets);
   } break;
 
   case IrExprKindFuncCall: {
-    save_expr_data(expr->as.func_call.func, data, data_size, end);
-    save_block_data(&expr->as.func_call.args, data, data_size, end);
+    save_expr_data(expr->as.func_call.func, data, data_size, end, path_offsets);
+    save_block_data(&expr->as.func_call.args, data, data_size, end, path_offsets);
   } break;
 
   case IrExprKindVarDef: {
     save_str_data(expr->as.var_def.name, data, data_size, end);
-    save_expr_data(expr->as.var_def.expr, data, data_size, end);
+    save_expr_data(expr->as.var_def.expr, data, data_size, end, path_offsets);
   } break;
 
   case IrExprKindIf: {
-    save_expr_data(expr->as._if.cond, data, data_size, end);
-    save_block_data(&expr->as._if.if_body, data, data_size, end);
+    save_expr_data(expr->as._if.cond, data, data_size, end, path_offsets);
+    save_block_data(&expr->as._if.if_body, data, data_size, end, path_offsets);
 
     reserve_space(sizeof(u32), data, data_size, end);
     *(u32 *) (*data + *end) = expr->as._if.elifs.len;
     *end += sizeof(u32);
 
     for (u32 i = 0; i < expr->as._if.elifs.len; ++i) {
-      save_expr_data(expr->as._if.elifs.items[i].cond, data, data_size, end);
-      save_block_data(&expr->as._if.elifs.items[i].body, data, data_size, end);
+      save_expr_data(expr->as._if.elifs.items[i].cond, data, data_size, end, path_offsets);
+      save_block_data(&expr->as._if.elifs.items[i].body, data, data_size, end, path_offsets);
     }
 
     reserve_space(sizeof(u8), data, data_size, end);
@@ -62,28 +68,28 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
     *end += sizeof(u8);
 
     if (expr->as._if.has_else)
-      save_block_data(&expr->as._if.else_body, data, data_size, end);
+      save_block_data(&expr->as._if.else_body, data, data_size, end, path_offsets);
   } break;
 
   case IrExprKindWhile: {
-    save_expr_data(expr->as._while.cond, data, data_size, end);
-    save_block_data(&expr->as._while.body, data, data_size, end);
+    save_expr_data(expr->as._while.cond, data, data_size, end, path_offsets);
+    save_block_data(&expr->as._while.body, data, data_size, end, path_offsets);
   } break;
 
   case IrExprKindSet: {
     save_str_data(expr->as.set.dest, data, data_size, end);
-    save_expr_data(expr->as.set.src, data, data_size, end);
+    save_expr_data(expr->as.set.src, data, data_size, end, path_offsets);
   } break;
 
   case IrExprKindGetAt: {
-    save_expr_data(expr->as.get_at.src, data, data_size, end);
-    save_expr_data(expr->as.get_at.key, data, data_size, end);
+    save_expr_data(expr->as.get_at.src, data, data_size, end, path_offsets);
+    save_expr_data(expr->as.get_at.key, data, data_size, end, path_offsets);
   } break;
 
   case IrExprKindSetAt: {
     save_str_data(expr->as.set_at.dest, data, data_size, end);
-    save_expr_data(expr->as.set_at.key, data, data_size, end);
-    save_expr_data(expr->as.set_at.value, data, data_size, end);
+    save_expr_data(expr->as.set_at.key, data, data_size, end, path_offsets);
+    save_expr_data(expr->as.set_at.value, data, data_size, end, path_offsets);
   } break;
 
   case IrExprKindRet: {
@@ -92,11 +98,11 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
     *end += sizeof(u8);
 
     if (expr->as.ret.has_expr)
-      save_expr_data(expr->as.ret.expr, data, data_size, end);
+      save_expr_data(expr->as.ret.expr, data, data_size, end, path_offsets);
   } break;
 
   case IrExprKindList: {
-    save_block_data(&expr->as.list.content, data, data_size, end);
+    save_block_data(&expr->as.list.content, data, data_size, end, path_offsets);
   } break;
 
   case IrExprKindIdent: {
@@ -133,7 +139,7 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
     for (u32 i = 0; i < expr->as.lambda.args.len; ++i)
       save_str_data(expr->as.lambda.args.items[i], data, data_size, end);
 
-    save_block_data(&expr->as.lambda.body, data, data_size, end);
+    save_block_data(&expr->as.lambda.body, data, data_size, end, path_offsets);
     save_str_data(expr->as.lambda.intrinsic_name, data, data_size, end);
   } break;
 
@@ -143,50 +149,86 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size, u32 *end) {
     *end += sizeof(u32);
 
     for (u32 i = 0; i < expr->as.dict.len; ++i) {
-      save_expr_data(expr->as.dict.items[i].key, data, data_size, end);
-      save_expr_data(expr->as.dict.items[i].expr, data, data_size, end);
+      save_expr_data(expr->as.dict.items[i].key, data, data_size, end, path_offsets);
+      save_expr_data(expr->as.dict.items[i].expr, data, data_size, end, path_offsets);
     }
   } break;
 
   case IrExprKindMatch: {
-    save_expr_data(expr->as.match.src, data, data_size, end);
+    save_expr_data(expr->as.match.src, data, data_size, end, path_offsets);
 
     reserve_space(sizeof(u32), data, data_size, end);
     *(u32 *) (*data + *end) = expr->as.match.cases.len;
     *end += sizeof(u32);
 
     for (u32 i = 0; i < expr->as.match.cases.len; ++i) {
-      save_expr_data(expr->as.match.cases.items[i].pattern, data, data_size, end);
-      save_expr_data(expr->as.match.cases.items[i].expr, data, data_size, end);
+      save_expr_data(expr->as.match.cases.items[i].pattern, data, data_size, end, path_offsets);
+      save_expr_data(expr->as.match.cases.items[i].expr, data, data_size, end, path_offsets);
     }
   } break;
 
   case IrExprKindSelf: break;
   }
 
-  save_str_data(expr->meta.file_path, data, data_size, end);
+  for (u32 i = 0; i < path_offsets->len; ++i) {
+    if (str_eq(path_offsets->items[i].path, expr->meta.file_path)) {
+      reserve_space(sizeof(u32), data, data_size, end);
+      *(u32 *) (*data + *end) = path_offsets->items[i].offset;
+      *end += sizeof(u32);
+
+      break;
+    }
+  }
+
   reserve_space(2 * sizeof(u32), data, data_size, end);
   *(u32 *) (*data + *end) = expr->meta.row;
   *end += sizeof(u32);
   *(u32 *) (*data + *end) = expr->meta.col;
   *end += sizeof(u32);
+
+  return true;
 }
 
-static void save_block_data(IrBlock *block, u8 **data, u32 *data_size, u32 *end) {
+static void save_block_data(IrBlock *block, u8 **data, u32 *data_size,
+                            u32 *end, FilePathOffsets *path_offsets) {
+  u32 *len = (u32 *) (*data + *end);
+
   reserve_space(sizeof(u32), data, data_size, end);
-  *(u32 *) (*data + *end) = block->len;
+  *len = block->len;
   *end += sizeof(u32);
 
   for (u32 i = 0; i < block->len; ++i)
-    save_expr_data(block->items[i], data, data_size, end);
+    if (!save_expr_data(block->items[i], data, data_size, end, path_offsets))
+      --*len;
 }
 
-u8 *serialize(Ir *ir, u32 *size) {
+static void save_included_files(u8 **data, u32 *data_size, u32 *end,
+                                FilePaths *included_files,
+                                FilePathOffsets *path_offsets) {
+  u32 *len = (u32 *) (*data + *end);
+
+  reserve_space(sizeof(u32), data, data_size, end);
+  *len = included_files->len;
+  *end += sizeof(u32);
+
+  for (u32 i = 0; i < included_files->len; ++i) {
+    FilePathOffset path_offset = { included_files->items[i], *end };
+    DA_APPEND(*path_offsets, path_offset);
+
+    save_str_data(included_files->items[i], data, data_size, end);
+  }
+}
+
+u8 *serialize(Ir *ir, u32 *size, FilePaths *included_files) {
   *size = sizeof(u32) * 2;
   u32 data_size = sizeof(u32) * 2;
   u8 *data = malloc(data_size);
 
-  save_block_data(ir, &data, &data_size, size);
+  FilePathOffsets path_offsets = {0};
+
+  eliminate_dead_code(ir);
+  save_included_files(&data, &data_size, size, included_files, &path_offsets);
+  save_block_data(ir, &data, &data_size, size, &path_offsets);
 
   *(u32 *) data = *(u32 *) "ABC\0";
   *(u32 *) (data + sizeof(u32)) = *size;
@@ -194,7 +236,7 @@ u8 *serialize(Ir *ir, u32 *size) {
   return data;
 }
 
-u8 *serialize_macros(Macros *macros, u32 *size) {
+u8 *serialize_macros(Macros *macros, u32 *size, FilePaths *included_files) {
   *size = sizeof(u32) * 2;
   u32 data_size = sizeof(u32) * 2;
   u8 *data = malloc(data_size);
@@ -215,7 +257,11 @@ u8 *serialize_macros(Macros *macros, u32 *size) {
     for (u32 i = 0; i < macro->arg_names.len; ++i)
       save_str_data(macro->arg_names.items[i], &data, &data_size, size);
 
-    save_block_data(&macro->body, &data, &data_size, size);
+    FilePathOffsets *path_offsets = {0};
+
+    eliminate_dead_code(&macro->body);
+    save_included_files(&data, &data_size, size, included_files, path_offsets);
+    save_block_data(&macro->body, &data, &data_size, size, path_offsets);
 
     reserve_space(sizeof(u8), &data, &data_size, size);
     *(u8 *) (data + *size) = macro->has_unpack;

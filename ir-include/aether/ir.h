@@ -164,6 +164,7 @@ struct IrExpr {
   IrExprKind kind;
   IrExprAs   as;
   IrMetaData meta;
+  bool       is_used;
 };
 
 typedef IrBlock Ir;

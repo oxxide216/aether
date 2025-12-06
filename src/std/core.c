@@ -876,7 +876,7 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   result->next->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
 
   Str bytecode = {0};
-  bytecode.ptr = (char *) serialize(&ir, &bytecode.len);
+  bytecode.ptr = (char *) serialize(&ir, &bytecode.len, &included_files);
   char *new_ptr = arena_alloc(&vm->current_frame->arena, bytecode.len);
   memcpy(new_ptr, bytecode.ptr, bytecode.len);
   free(bytecode.ptr);
@@ -886,7 +886,8 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   if (with_macros->as._bool && env->as.env->macros.len != prev_macros_len) {
     Str macro_bytecode = {0};
     macro_bytecode.ptr = (char *) serialize_macros(&env->as.env->macros,
-                                                   &macro_bytecode.len);
+                                                   &macro_bytecode.len,
+                                                   &included_files);
     char *new_ptr = arena_alloc(&vm->current_frame->arena, macro_bytecode.len);
     memcpy(new_ptr, macro_bytecode.ptr, macro_bytecode.len);
     free(macro_bytecode.ptr);
