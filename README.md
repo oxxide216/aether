@@ -11,6 +11,17 @@ Still in active development, only for Linux and WebAssembly for now.
 - **Lisp Macros**: Full hygienic macro system
 - **Graphics API**: Built-in OpenGL 2D rendering
 - **REPL**: Interactive development environment
+- **Optimize it all!!!** - Built-in COW + DCE optimizations
+- **Development speed** From `git init` to wasm target + HTTP server + web framework + graphics library in 90 days
+
+## Why Aether?
+
+### Full Stack in One Language
+
+Same code runs as:
+ - Native HTTP server (Linux)
+ - Web app (browser via WASM)
+ - CLI tools
 
 ## Dependencies
 
@@ -24,6 +35,8 @@ That's it!
 ### Linux
 
 ```shell
+git clone https://github.com/oxxide216/aether --recursive
+cd aether
 ./build.sh
 ./install.sh
 echo "(println 'Hello, World!')" > main.ae
@@ -52,17 +65,17 @@ Where:
 ### Build your project
 
 ```shell
-aether-web-setup [out] [in] [source]
+aether-web-setup [out]
+aether -c [out]/app.abc [src]
 ```
 
 Where:
 - [out] - directory for generated bundle
-- [in] - directory for your .html|.css|.js files and assets
-- [source] - your main aether source file (main.ae)
+- [src] - your Aether source file
 
-Then just start http server inside of [out] directory!
+Then just start http server inside of [out] directory (you can write it in Aether too)!
 
-## Build-in graphics
+## Built-in graphics
 
 #### Linux
 
@@ -73,8 +86,18 @@ GLASS=on ./build.sh
 
 ## Examples
 
-See [examples](examples) directory!
+Check out [examples](examples) for:
+- hello-world.ae - you know it
+- fl.ae - TUI file manager
+- web - basic website built with Aether + WebAssembly
+- And other stuff!
 
 ## Screenshots
 
 ![Pong game implemented in Aether](screenshots/pong.png)
+
+## ❤️ Support
+
+ - ⭐ Star the repo (helps visibility!)
+ - 🐛 [Report Issues](https://github.com/oxxide216/aether/issues)
+ - 🏗️ Contribute - help to improve this project!
