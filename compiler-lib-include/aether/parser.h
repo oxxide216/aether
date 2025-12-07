@@ -17,8 +17,7 @@ typedef struct {
 typedef Da(CachedIr) CachedIrs;
 
 Ir parse_ex(Str code, char *file_path, Macros *macros,
-            FilePaths *included_files, Arena arena,
-            Arena *persistent_arena);
-Ir parse(Str code, char *file_path, Arena *persistent_arena);
+            FilePaths *included_files, Arena arena);
+Ir parse(Str code, char *file_path);
 
 #endif // COMPILER_H

@@ -862,8 +862,9 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   FilePaths included_files = {0};
-  Ir ir = parse_ex(code->as.string, path_cstr, &env->as.env->macros,
-                   &included_files, ir_arena, &env->as.env->arena);
+  Ir ir = parse_ex(code->as.string, path_cstr,
+                   &env->as.env->macros,
+                   &included_files, ir_arena);
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false,
                       &env->as.env->arena, vm->current_file_path);
 
@@ -906,8 +907,7 @@ Value *eval_compiled_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   Ir ir = deserialize((u8 *) bytecode->as.string.ptr,
-                      bytecode->as.string.len,
-                      &ir_arena, &env->as.env->arena);
+                      bytecode->as.string.len, &ir_arena);
 
   env->as.env->vm.current_file_path = path->as.string;
   Value *result = execute_block(&env->as.env->vm, &ir, true);
@@ -921,8 +921,7 @@ Value *eval_macros_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   Macros macros = deserialize_macros((u8 *) macro_bytecode->as.string.ptr,
-                                     macro_bytecode->as.string.len,
-                                     &ir_arena, &env->as.env->arena);
+                                     macro_bytecode->as.string.len, &ir_arena);
 
   if (env->as.env->macros.cap < env->as.env->macros.len + macros.len) {
     env->as.env->macros.cap = env->as.env->macros.len + macros.len;
@@ -951,8 +950,7 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   Ir ir = parse_ex(code->as.string, path_cstr, &env->as.env->macros,
-                   &env->as.env->included_files, ir_arena,
-                   &env->as.env->arena);
+                   &env->as.env->included_files, ir_arena);
 
   env->as.env->vm.current_file_path = path->as.string;
 

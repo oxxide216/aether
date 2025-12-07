@@ -17,7 +17,6 @@ static char *loader_paths[] = {
   "ae-src/loader.ae",
 };
 
-static Arena persistent_arena = {0};
 static Vm vm = {0};
 
 void cleanup(void) {
@@ -28,7 +27,6 @@ void cleanup(void) {
     arena_free(&cached_irs.items[i].arena);
   free(cached_irs.items);
 
-  arena_free(&persistent_arena);
   vm_destroy(&vm);
 }
 
@@ -58,7 +56,7 @@ i32 main(i32 argc, char **argv) {
 
   signal(SIGINT, sigint_handler);
 
-  Ir ir = parse(code, path_found, &persistent_arena);
+  Ir ir = parse(code, path_found);
 
   free(code.ptr);
 
