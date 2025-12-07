@@ -341,12 +341,13 @@ static Token parser_expect_token(Parser *parser, u64 id_mask) {
 static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask);
 
 Ir parse_ex(Str code, char *file_path, Macros *macros,
-            FilePaths *included_files, Arena arena) {
+            FilePaths *included_files, Arena *arena) {
   for (u32 i = 0; i < cached_irs.len; ++i) {
     CachedIr *cached_ir = cached_irs.items + i;
 
     if (strcmp(cached_ir->path, file_path) == 0) {
       DA_EXTEND(*macros, cached_ir->macros);
+      *arena = cached_ir->arena;
 
       return cached_ir->ir;
     }
@@ -362,16 +363,16 @@ Ir parse_ex(Str code, char *file_path, Macros *macros,
   parser.macros = macros;
   parser.file_path = STR(file_path, strlen(file_path));
   parser.included_files = included_files;
-  parser.arena = &arena;
+  parser.arena = arena;
   parser.ir = parser_parse_block(&parser, 0);
 
   Macros cached_macros;
   cached_macros.len = macros->len;
   cached_macros.cap = cached_macros.len;
-  cached_macros.items = arena_alloc(&arena, cached_macros.len * sizeof(Macro));
+  cached_macros.items = arena_alloc(arena, cached_macros.len * sizeof(Macro));
   memcpy(cached_macros.items, macros->items, cached_macros.len * sizeof(Macro));
 
-  CachedIr cached_ir = { file_path, parser.ir, cached_macros, arena };
+  CachedIr cached_ir = { file_path, parser.ir, cached_macros, *arena };
   DA_APPEND(cached_irs, cached_ir);
 
   free(parser.lexer.temp_sb.buffer);
@@ -782,7 +783,7 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
       Arena arena = {0};
       expr->kind = IrExprKindBlock;
       expr->as.block.block = parse_ex(code, path.ptr, parser->macros,
-                                      parser->included_files, arena);
+                                      parser->included_files, &arena);
       expr->as.block.file_path = path;
 
       free(prefix);
@@ -892,7 +893,7 @@ Ir parse(Str code, char *file_path) {
   FilePaths included_files = {0};
   Arena arena = {0};
   Str file_path_str = { file_path, strlen(file_path) };
-  Ir ir = parse_ex(code, file_path, &macros, &included_files, arena);
+  Ir ir = parse_ex(code, file_path, &macros, &included_files, &arena);
   expand_macros_block(&ir, &macros, NULL, NULL, false, &arena, file_path_str);
 
   if (macros.items)

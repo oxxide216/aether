@@ -864,9 +864,9 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   FilePaths included_files = {0};
   Ir ir = parse_ex(code->as.string, path_cstr,
                    &env->as.env->macros,
-                   &included_files, ir_arena);
+                   &included_files, &ir_arena);
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false,
-                      &env->as.env->arena, vm->current_file_path);
+                      &ir_arena, vm->current_file_path);
 
   ListNode *result = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
   result->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
@@ -950,12 +950,12 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   Ir ir = parse_ex(code->as.string, path_cstr, &env->as.env->macros,
-                   &env->as.env->included_files, ir_arena);
+                   &env->as.env->included_files, &ir_arena);
 
   env->as.env->vm.current_file_path = path->as.string;
 
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false,
-                      &env->as.env->arena, env->as.env->vm.current_file_path);
+                      &ir_arena, env->as.env->vm.current_file_path);
 
   Value *result = execute_block(&env->as.env->vm, &ir, true);
 

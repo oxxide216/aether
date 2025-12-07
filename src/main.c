@@ -11,6 +11,9 @@
 
 extern InternStrings intern_strings;
 extern CachedIrs cached_irs;
+#ifndef NOSYSTEM
+extern StringBuilder printf_sb;
+#endif
 
 static char *loader_paths[] = {
   "/usr/include/aether/load/loader.ae",
@@ -26,6 +29,8 @@ void cleanup(void) {
   for (u32 i = 0; i < cached_irs.len; ++i)
     arena_free(&cached_irs.items[i].arena);
   free(cached_irs.items);
+
+  free(printf_sb.buffer);
 
   vm_destroy(&vm);
 }

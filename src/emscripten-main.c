@@ -10,6 +10,9 @@ typedef Da(char *) CStrs;
 
 extern InternStrings intern_strings;
 extern CachedIrs cached_irs;
+#ifndef NOSYSTEM
+extern StringBuilder printf_sb;
+#endif
 
 static Macros macros = {0};
 static FilePaths included_files = {0};
@@ -95,6 +98,8 @@ void emscripten_destroy(void) {
     arena_free(&cached_irs.items[i].arena);
   if (cached_irs.items)
     free(cached_irs.items);
+
+  free(printf_sb.buffer);
 
   free(macros.items);
   macros = (Macros) {0};

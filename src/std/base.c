@@ -5,7 +5,7 @@
 
 #define DEFAULT_INPUT_BUFFER_SIZE   64
 
-static StringBuilder printf_sb = {0};
+StringBuilder printf_sb = {0};
 
 Value *printf_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
