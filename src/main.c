@@ -1,3 +1,5 @@
+#include <signal.h>
+
 #include "io.h"
 #include "aether/parser.h"
 #include "aether/common.h"
@@ -7,13 +9,34 @@
 #define SHL_STR_IMPLEMENTATION
 #include "shl/shl-str.h"
 
+extern InternStrings intern_strings;
+extern CachedIrs cached_irs;
+
 static char *loader_paths[] = {
   "/usr/include/aether/load/loader.ae",
   "ae-src/loader.ae",
 };
 
-extern InternStrings intern_strings;
-extern CachedIrs cached_irs;
+static Arena persistent_arena = {0};
+static Vm vm = {0};
+
+void cleanup(void) {
+  if (intern_strings.items)
+    free(intern_strings.items);
+
+  for (u32 i = 0; i < cached_irs.len; ++i)
+    arena_free(&cached_irs.items[i].arena);
+  free(cached_irs.items);
+
+  arena_free(&persistent_arena);
+  vm_destroy(&vm);
+}
+
+void sigint_handler(i32 signal) {
+  (void) signal;
+
+  vm_stop(&vm);
+}
 
 i32 main(i32 argc, char **argv) {
   Str code = { NULL, (u32) -1 };
@@ -33,24 +56,18 @@ i32 main(i32 argc, char **argv) {
     exit(1);
   }
 
-  Arena persistent_arena = {0};
+  signal(SIGINT, sigint_handler);
+
   Ir ir = parse(code, path_found, &persistent_arena);
 
+  free(code.ptr);
+
   Intrinsics intrinsics = {0};
-  Vm vm = vm_create(argc, argv, &intrinsics);
+  vm = vm_create(argc, argv, &intrinsics);
   vm.current_file_path = STR(path_found, strlen(path_found));
   execute_block(&vm, &ir, false);
 
-  if (intern_strings.items)
-    free(intern_strings.items);
-
-  for (u32 i = 0; i < cached_irs.len; ++i)
-    arena_free(&cached_irs.items[i].arena);
-  free(cached_irs.items);
-
-  free(code.ptr);
-  arena_free(&persistent_arena);
-  vm_destroy(&vm);
+  cleanup();
 
   return vm.exit_code;
 }

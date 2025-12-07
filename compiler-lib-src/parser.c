@@ -371,7 +371,7 @@ Ir parse_ex(Str code, char *file_path, Macros *macros,
   Macros cached_macros;
   cached_macros.len = macros->len;
   cached_macros.cap = cached_macros.len;
-  cached_macros.items = malloc(cached_macros.len * sizeof(Macro));
+  cached_macros.items = arena_alloc(&arena, cached_macros.len * sizeof(Macro));
   memcpy(cached_macros.items, macros->items, cached_macros.len * sizeof(Macro));
 
   CachedIr cached_ir = { file_path, parser.ir, cached_macros, arena };

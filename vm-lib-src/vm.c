@@ -173,6 +173,14 @@ void value_free(Value *value) {
       value_free(value->as.dict.items[i].value);
     }
   } else if (value->kind == ValueKindFunc) {
+    for (u32 i = 0; i < value->as.func.catched_values_names.len; ++i)
+      value_free(value->as.func.catched_values_names.items[i].value);
+    free(value->as.func.catched_values_names.items);
+
+    for (u32 i = 0; i < value->as.func.catched_frame.values.len; ++i)
+      value_free(value->as.func.catched_frame.values.items[i]);
+    free(value->as.func.catched_frame.values.items);
+
     arena_free(&value->as.func.catched_frame.arena);
   } else if (value->kind == ValueKindEnv) {
     if (--value->as.env->refs_count == 0) {
@@ -929,25 +937,17 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     catch_vars_block(vm, &local_names, &catched_values_names,
                      &frame, &expr->as.lambda.body);
 
-    Value *func_value = arena_alloc(&vm->current_frame->arena, sizeof(Value));
-    *func_value = (Value) {
-      ValueKindFunc,
-      {
-        .func = {
-          expr->as.lambda.args,
-          expr->as.lambda.body,
-          catched_values_names,
-          frame,
-          expr->as.lambda.intrinsic_name,
-        },
-      },
-      vm->current_frame,
-      0, false,
-    };
-
     free(local_names.items);
 
-    result = func_value;
+    Func func = {
+      expr->as.lambda.args,
+      expr->as.lambda.body,
+      catched_values_names,
+      frame,
+      expr->as.lambda.intrinsic_name,
+    };
+
+    result = value_func(func, vm->current_frame);
   } break;
 
   case IrExprKindDict: {
@@ -1084,6 +1084,19 @@ void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics) {
 
   Var platform_var = { STR_LIT("current-platform"), platform_value, VarKindGlobal };
   DA_APPEND(vm->global_vars, platform_var);
+}
+
+void vm_stop(Vm *vm) {
+  vm->state = ExecStateExit;
+
+  StackFrame *frame = vm->frames;
+  while (frame) {
+    for (u32 i = 0; i < frame->values.len; ++i)
+      if (frame->values.items[i]->kind == ValueKindEnv)
+        vm_stop(&frame->values.items[i]->as.env->vm);
+
+    frame = frame->next;
+  }
 }
 
 void vm_destroy(Vm *vm) {

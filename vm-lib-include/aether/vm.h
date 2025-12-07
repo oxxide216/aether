@@ -215,6 +215,7 @@ u32    execute(Ir *ir, i32 argc, char **argv, Arena *arena,
 
 Vm   vm_create(i32 argc, char **argv, Intrinsics *intrinsics);
 void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics);
+void vm_stop(Vm *Vm);
 void vm_destroy(Vm *vm);
 
 void begin_frame(Vm *vm);
