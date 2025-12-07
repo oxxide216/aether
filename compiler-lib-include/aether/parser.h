@@ -7,10 +7,18 @@
 
 typedef Da(Str) FilePaths;
 
+typedef struct {
+  char  *path;
+  Ir     ir;
+  Macros macros;
+  Arena  arena;
+} CachedIr;
+
+typedef Da(CachedIr) CachedIrs;
+
 Ir parse_ex(Str code, char *file_path, Macros *macros,
-            FilePaths *included_files, Arena *arena,
+            FilePaths *included_files, Arena arena,
             Arena *persistent_arena);
-Ir parse(Str code, char *file_path, Arena *arena,
-         Arena *persistent_arena);
+Ir parse(Str code, char *file_path, Arena *persistent_arena);
 
 #endif // COMPILER_H

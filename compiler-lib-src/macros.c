@@ -1,142 +1,44 @@
 #include "aether/macros.h"
 
-#define INLINE_THEN_EXPAND(expr)                                         \
-  do {                                                                   \
-    try_inline_macro_arg(&(expr), arg_names, args, NULL, unpack, arena); \
-    expand_macros(expr, macros, arg_names, args, unpack, arena);         \
+#define INLINE_THEN_EXPAND(expr)                                            \
+  do {                                                                      \
+    try_inline_macro_arg(&(expr), arg_names, args, NULL, unpack, arena);    \
+    expand_macros(expr, macros, arg_names, args, unpack, arena, file_path); \
   } while (0)
 
-void ir_block_append(IrBlock *block, IrExpr *expr, Arena *arena) {
-  if (!block->items) {
-    block->cap = 1;
-    block->items = arena_alloc(arena, sizeof(IrExpr *));
-  } else if (block->len >= block->cap) {
-    IrExpr **prev_items = block->items;
-    block->cap *= 2;
-    block->items = arena_alloc(arena, block->cap * sizeof(IrExpr *));
-    memcpy(block->items, prev_items, block->len * sizeof(IrExpr *));
+static u32 get_macro_arg_index(Str name, IrArgs *arg_names) {
+  for (u32 i = 0; i < arg_names->len; ++i)
+    if (str_eq(arg_names->items[i], name))
+      return i;
+
+  return (u32) -1;
+}
+
+static bool needs_cloning(IrExpr *expr, IrArgs *arg_names) {
+  switch (expr->kind) {
+    case IrExprKindIdent: {
+      return get_macro_arg_index(expr->as.ident, arg_names) != (u32) -1;
+    }
+
+    case IrExprKindInt:
+    case IrExprKindFloat:
+    case IrExprKindBool:
+    case IrExprKindString: {
+      return false;
+    }
+
+    case IrExprKindRet: {
+      return expr->as.ret.has_expr;
+    }
+
+    case IrExprKindSelf: {
+      return false;
+    }
+
+    default: {
+      return true;
+    }
   }
-
-  block->items[block->len++] = expr;
-}
-
-Str copy_str(Str str, Arena *arena) {
-  Str copy;
-
-  copy.len = str.len;
-  copy.ptr = arena_alloc(arena, str.len);
-  memcpy(copy.ptr, str.ptr, copy.len);
-
-  return copy;
-}
-
-static void clone_block(IrBlock *block, Arena *arena);
-
-static void clone_expr(IrExpr **expr, Arena *arena) {
-  IrExpr *new_expr = arena_alloc(arena, sizeof(IrExpr));
-  *new_expr = **expr;
-  *expr = new_expr;
-
-  switch (new_expr->kind) {
-  case IrExprKindBlock: {
-    clone_block(&new_expr->as.block, arena);
-  } break;
-
-  case IrExprKindFuncCall: {
-    clone_expr(&new_expr->as.func_call.func, arena);
-    clone_block(&new_expr->as.func_call.args, arena);
-  } break;
-
-  case IrExprKindVarDef: {
-    clone_expr(&new_expr->as.var_def.expr, arena);
-  } break;
-
-  case IrExprKindIf: {
-    clone_expr(&new_expr->as._if.cond, arena);
-    clone_block(&new_expr->as._if.if_body, arena);
-
-    for (u32 i = 0; i < new_expr->as._if.elifs.len; ++i) {
-      clone_expr(&new_expr->as._if.elifs.items[i].cond, arena);
-      clone_block(&new_expr->as._if.elifs.items[i].body, arena);
-    }
-
-    if (new_expr->as._if.has_else)
-      clone_block(&new_expr->as._if.else_body, arena);
-  } break;
-
-  case IrExprKindWhile: {
-    clone_expr(&new_expr->as._while.cond, arena);
-    clone_block(&new_expr->as._while.body, arena);
-  } break;
-
-  case IrExprKindSet: {
-    clone_expr(&new_expr->as.set.src, arena);
-  } break;
-
-  case IrExprKindGetAt: {
-    clone_expr(&new_expr->as.get_at.src, arena);
-    clone_expr(&new_expr->as.get_at.key, arena);
-  } break;
-
-  case IrExprKindSetAt: {
-    clone_expr(&new_expr->as.set_at.key, arena);
-    clone_expr(&new_expr->as.set_at.value, arena);
-  } break;
-
-  case IrExprKindList: {
-    clone_block(&new_expr->as.list.content, arena);
-  } break;
-
-  case IrExprKindIdent:  break;
-  case IrExprKindString: break;
-  case IrExprKindInt:    break;
-  case IrExprKindFloat:  break;
-  case IrExprKindBool:   break;
-
-  case IrExprKindLambda: {
-    Str *new_items = arena_alloc(arena, new_expr->as.lambda.args.len * sizeof(Str));
-    memcpy(new_items, new_expr->as.lambda.args.items, new_expr->as.lambda.args.len * sizeof(Str));
-    new_expr->as.lambda.args.items = new_items;
-
-    clone_block(&new_expr->as.lambda.body, arena);
-  } break;
-
-  case IrExprKindDict: {
-    for (u32 i = 0; i < new_expr->as.dict.len; ++i) {
-      clone_expr(&new_expr->as.dict.items[i].key, arena);
-      clone_expr(&new_expr->as.dict.items[i].expr, arena);
-    }
-  } break;
-
-  case IrExprKindRet: {
-    if (new_expr->as.ret.has_expr)
-      clone_expr(&new_expr->as.ret.expr, arena);
-  } break;
-
-  case IrExprKindMatch: {
-    clone_expr(&new_expr->as.match.src, arena);
-
-    for (u32 i = 0; i < new_expr->as.match.cases.len; ++i) {
-      clone_expr(&new_expr->as.match.cases.items[i].pattern, arena);
-      clone_expr(&new_expr->as.match.cases.items[i].expr, arena);
-    }
-  } break;
-
-  case IrExprKindSelf: break;
-  }
-}
-
-static void clone_block(IrBlock *block, Arena *arena) {
-  IrBlock new_block = {0};
-  new_block.len = block->len;
-  new_block.cap = block->len;
-  new_block.items = arena_alloc(arena, new_block.cap * sizeof(IrExpr *));
-  memcpy(new_block.items, block->items, new_block.len * sizeof(IrExpr *));
-
-  for (u32 i = 0; i < new_block.len; ++i)
-    clone_expr(new_block.items + i, arena);
-
-  *block = new_block;
 }
 
 static Macro *get_macro(Macros *macros, Str name, u32 args_len) {
@@ -153,6 +55,117 @@ static Macro *get_macro(Macros *macros, Str name, u32 args_len) {
   return NULL;
 }
 
+static void clone_block(IrBlock *block, IrArgs *arg_names, Arena *arena);
+
+static void clone_expr(IrExpr **expr, IrArgs *arg_names, Arena *arena) {
+  if (!arg_names || !needs_cloning(*expr, arg_names))
+    return;
+
+  IrExpr *new_expr = arena_alloc(arena, sizeof(IrExpr));
+  *new_expr = **expr;
+  *expr = new_expr;
+
+  switch (new_expr->kind) {
+  case IrExprKindBlock: {
+    clone_block(&new_expr->as.block.block, arg_names, arena);
+  } break;
+
+  case IrExprKindFuncCall: {
+    clone_expr(&new_expr->as.func_call.func, arg_names, arena);
+    clone_block(&new_expr->as.func_call.args, arg_names, arena);
+  } break;
+
+  case IrExprKindVarDef: {
+    clone_expr(&new_expr->as.var_def.expr, arg_names, arena);
+  } break;
+
+  case IrExprKindIf: {
+    clone_expr(&new_expr->as._if.cond, arg_names, arena);
+    clone_block(&new_expr->as._if.if_body, arg_names, arena);
+
+    for (u32 i = 0; i < new_expr->as._if.elifs.len; ++i) {
+      clone_expr(&new_expr->as._if.elifs.items[i].cond, arg_names, arena);
+      clone_block(&new_expr->as._if.elifs.items[i].body, arg_names, arena);
+    }
+
+    if (new_expr->as._if.has_else)
+      clone_block(&new_expr->as._if.else_body, arg_names, arena);
+  } break;
+
+  case IrExprKindWhile: {
+    clone_expr(&new_expr->as._while.cond, arg_names, arena);
+    clone_block(&new_expr->as._while.body, arg_names, arena);
+  } break;
+
+  case IrExprKindSet: {
+    clone_expr(&new_expr->as.set.src, arg_names, arena);
+  } break;
+
+  case IrExprKindGetAt: {
+    clone_expr(&new_expr->as.get_at.src, arg_names, arena);
+    clone_expr(&new_expr->as.get_at.key, arg_names, arena);
+  } break;
+
+  case IrExprKindSetAt: {
+    clone_expr(&new_expr->as.set_at.key, arg_names, arena);
+    clone_expr(&new_expr->as.set_at.value, arg_names, arena);
+  } break;
+
+  case IrExprKindList: {
+    clone_block(&new_expr->as.list, arg_names, arena);
+  } break;
+
+  case IrExprKindIdent:  break;
+  case IrExprKindString: break;
+  case IrExprKindInt:    break;
+  case IrExprKindFloat:  break;
+  case IrExprKindBool:   break;
+
+  case IrExprKindLambda: {
+    Str *new_items = arena_alloc(arena, new_expr->as.lambda.args.len * sizeof(Str));
+    memcpy(new_items, new_expr->as.lambda.args.items, new_expr->as.lambda.args.len * sizeof(Str));
+    new_expr->as.lambda.args.items = new_items;
+
+    clone_block(&new_expr->as.lambda.body, arg_names, arena);
+  } break;
+
+  case IrExprKindDict: {
+    for (u32 i = 0; i < new_expr->as.dict.len; ++i) {
+      clone_expr(&new_expr->as.dict.items[i].key, arg_names, arena);
+      clone_expr(&new_expr->as.dict.items[i].expr, arg_names, arena);
+    }
+  } break;
+
+  case IrExprKindRet: {
+    if (new_expr->as.ret.has_expr)
+      clone_expr(&new_expr->as.ret.expr, arg_names, arena);
+  } break;
+
+  case IrExprKindMatch: {
+    clone_expr(&new_expr->as.match.src, arg_names, arena);
+
+    for (u32 i = 0; i < new_expr->as.match.cases.len; ++i) {
+      clone_expr(&new_expr->as.match.cases.items[i].pattern, arg_names, arena);
+      clone_expr(&new_expr->as.match.cases.items[i].expr, arg_names, arena);
+    }
+  } break;
+
+  case IrExprKindSelf: break;
+  }
+}
+
+static void clone_block(IrBlock *block, IrArgs *arg_names, Arena *arena) {
+  IrBlock new_block = {0};
+  new_block.len = block->len;
+  new_block.items = arena_alloc(arena, new_block.len * sizeof(IrExpr *));
+  memcpy(new_block.items, block->items, new_block.len * sizeof(IrExpr *));
+
+  for (u32 i = 0; i < new_block.len; ++i)
+    clone_expr(new_block.items + i, arg_names, arena);
+
+  *block = new_block;
+}
+
 static void rename_args_block(IrBlock *block, IrArgs *prev_arg_names,
                               IrArgs *new_arg_names, Arena *arena);
 
@@ -160,7 +173,7 @@ static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names,
                              IrArgs *new_arg_names, Arena *arena) {
   switch (expr->kind) {
   case IrExprKindBlock: {
-    rename_args_block(&expr->as.block, prev_arg_names, new_arg_names, arena);
+    rename_args_block(&expr->as.block.block, prev_arg_names, new_arg_names, arena);
   } break;
 
   case IrExprKindFuncCall: {
@@ -229,13 +242,13 @@ static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names,
   } break;
 
   case IrExprKindList: {
-    rename_args_block(&expr->as.list.content, prev_arg_names, new_arg_names, arena);
+    rename_args_block(&expr->as.list, prev_arg_names, new_arg_names, arena);
   } break;
 
   case IrExprKindIdent: {
     for (u32 i = 0; i < prev_arg_names->len; ++i) {
-      if (str_eq(expr->as.ident.ident, prev_arg_names->items[i])) {
-        expr->as.ident.ident = new_arg_names->items[i];
+      if (str_eq(expr->as.ident, prev_arg_names->items[i])) {
+        expr->as.ident = new_arg_names->items[i];
 
         break;
       }
@@ -292,47 +305,39 @@ static void rename_args_block(IrBlock *block, IrArgs *prev_arg_names,
     rename_args_expr(block->items[i], prev_arg_names, new_arg_names, arena);
 }
 
-static u32 get_macro_arg_index(Str name, IrArgs *arg_names) {
-  for (u32 i = 0; i < arg_names->len; ++i)
-    if (str_eq(arg_names->items[i], name))
-      return i;
-
-  return (u32) -1;
-}
-
 static void try_replace_macro_arg_ident(Str *ident, IrArgs *arg_names, IrBlock *args) {
   u32 arg_index = get_macro_arg_index(*ident, arg_names);
   if (arg_index != (u32) -1 && args->items[arg_index]->kind == IrExprKindIdent)
-    *ident = args->items[arg_index]->as.ident.ident;
+    *ident = args->items[arg_index]->as.ident;
 }
 
 static bool try_inline_macro_arg(IrExpr **expr, IrArgs *arg_names,
-                                 IrBlock *args, IrBlock *dest,
+                                 IrBlock *args, Block *dest,
                                  bool unpack, Arena *arena);
 
 static void append_macro_arg(u32 index, IrArgs *arg_names,
-                             IrBlock *args, IrBlock *dest,
+                             IrBlock *args, Block *dest,
                              bool unpack, Arena *arena) {
   IrExpr *arg = args->items[index];
 
   if (unpack && index + 1 == arg_names->len) {
-    IrBlock *variadic_args = &args->items[args->len - 1]->as.list.content;
+    IrBlock *variadic_args = &args->items[args->len - 1]->as.list;
     for (u32 i = 0; i < variadic_args->len; ++i) {
       IrExpr *new_arg = variadic_args->items[i];
 
       if (!try_inline_macro_arg(&new_arg, arg_names, args, dest, unpack, arena)) {
-        clone_expr(&new_arg, arena);
-        ir_block_append(dest, new_arg, arena);
+        clone_expr(&new_arg, arg_names, arena);
+        block_append(dest, new_arg, arena);
       }
     }
   } else {
-    clone_expr(&arg, arena);
-    ir_block_append(dest, arg, arena);
+    clone_expr(&arg, arg_names, arena);
+    block_append(dest, arg, arena);
   }
 }
 
 static bool try_inline_macro_arg(IrExpr **expr, IrArgs *arg_names,
-                                 IrBlock *args, IrBlock *dest,
+                                 IrBlock *args, Block *dest,
                                  bool unpack, Arena *arena) {
   if (!arg_names || !args)
     return false;
@@ -363,13 +368,13 @@ static bool try_inline_macro_arg(IrExpr **expr, IrArgs *arg_names,
   }
 
   if ((*expr)->kind == IrExprKindIdent) {
-    u32 arg_index = get_macro_arg_index((*expr)->as.ident.ident, arg_names);
+    u32 arg_index = get_macro_arg_index((*expr)->as.ident, arg_names);
     if (arg_index != (u32) -1) {
       if (dest) {
         append_macro_arg(arg_index, arg_names, args, dest, unpack, arena);
       } else {
         IrExpr *arg = args->items[arg_index];
-        clone_expr(&arg, arena);
+        clone_expr(&arg, arg_names, arena);
         *expr = arg;
       }
 
@@ -382,48 +387,54 @@ static bool try_inline_macro_arg(IrExpr **expr, IrArgs *arg_names,
 
 void expand_macros_block(IrBlock *block, Macros *macros,
                          IrArgs *arg_names, IrBlock *args,
-                         bool unpack, Arena *arena) {
-  IrBlock new_block = {0};
+                         bool unpack, Arena *arena,
+                         Str file_path) {
+  Block new_block = {0};
 
   for (u32 i = 0; i < block->len; ++i) {
     IrExpr *new_expr = block->items[i];
 
     if (!try_inline_macro_arg(&new_expr, arg_names, args, &new_block, unpack, arena)) {
-      clone_expr(&new_expr, arena);
-      ir_block_append(&new_block, new_expr, arena);
+      clone_expr(&new_expr, arg_names, arena);
+      block_append(&new_block, new_expr, arena);
     }
   }
 
   for (u32 i = 0; i < new_block.len; ++i)
-    expand_macros(new_block.items[i], macros, arg_names, args, unpack, arena);
+    expand_macros(new_block.items[i], macros, arg_names, args, unpack, arena, file_path);
 
-  *block = new_block;
+  block->items = new_block.items;
+  block->len = new_block.len;
 }
 
 void expand_macros(IrExpr *expr, Macros *macros,
                    IrArgs *arg_names, IrBlock *args,
-                   bool unpack, Arena *arena) {
+                   bool unpack, Arena *arena,
+                   Str file_path) {
   switch (expr->kind) {
   case IrExprKindBlock: {
-    expand_macros_block(&expr->as.block, macros, arg_names, args, unpack, arena);
+    expand_macros_block(&expr->as.block.block, macros, arg_names,
+                        args, unpack, arena, file_path);
   } break;
 
   case IrExprKindFuncCall: {
     INLINE_THEN_EXPAND(expr->as.func_call.func);
-    expand_macros_block(&expr->as.func_call.args, macros, arg_names, args, unpack, arena);
 
     if (expr->as.func_call.func->kind == IrExprKindIdent) {
-      Str name = expr->as.func_call.func->as.ident.ident;
+      Str name = expr->as.func_call.func->as.ident;
       Macro *macro = get_macro(macros, name, expr->as.func_call.args.len);
 
       if (macro) {
-        IrBlock new_args = expr->as.func_call.args;
-        new_args.len = macro->arg_names.len;
+        Block new_args = {
+          expr->as.func_call.args.items,
+          macro->arg_names.len,
+          macro->arg_names.len,
+        };
 
         if (macro->has_unpack) {
           --new_args.len;
 
-          IrBlock variadic_block;
+          Block variadic_block;
           variadic_block.len = expr->as.func_call.args.len - new_args.len;
           variadic_block.cap = variadic_block.len;
           variadic_block.items = arena_alloc(arena, variadic_block.cap * sizeof(IrExpr *));
@@ -433,11 +444,12 @@ void expand_macros(IrExpr *expr, Macros *macros,
 
           IrExpr *variadic_args = arena_alloc(arena, sizeof(IrExpr));
           variadic_args->kind = IrExprKindList;
-          variadic_args->as.list.content = variadic_block;
+          variadic_args->as.list.items = variadic_block.items;
+          variadic_args->as.list.len = variadic_block.len;
           DA_APPEND(new_args, variadic_args);
         }
 
-        IrArgs new_arg_names = {0};
+        Args new_arg_names = {0};
 
         for (u32 i = 0; i < macro->arg_names.len; ++i) {
           StringBuilder sb = {0};
@@ -452,17 +464,37 @@ void expand_macros(IrExpr *expr, Macros *macros,
         };
 
         expr->kind = IrExprKindBlock;
-        expr->as.block = macro->body;
+        expr->as.block.block = macro->body;
+        expr->as.block.file_path = file_path;
 
-        clone_block(&expr->as.block, arena);
-        rename_args_block(&expr->as.block, &macro->arg_names, &new_arg_names, arena);
-        expand_macros_block(&expr->as.block, macros,
-                            &new_arg_names, &new_args,
-                            macro->has_unpack, arena);
+        IrExpr **new_items = arena_alloc(arena, expr->as.block.block.len * sizeof(IrExpr *));
+        memcpy(new_items, expr->as.block.block.items, expr->as.block.block.len * sizeof(IrExpr *));
+        expr->as.block.block.items = new_items;
+
+        IrArgs ir_new_arg_names = {
+          new_arg_names.items,
+          new_arg_names.len,
+        };
+
+        IrBlock ir_new_args = {
+          new_args.items,
+          new_args.len,
+        };
+
+        rename_args_block(&expr->as.block.block, &macro->arg_names,
+                          &ir_new_arg_names, arena);
+        expand_macros_block(&expr->as.block.block, macros,
+                            &ir_new_arg_names, &ir_new_args,
+                            macro->has_unpack, arena, file_path);
 
         free(new_arg_names.items);
+
+        break;
       }
     }
+
+    expand_macros_block(&expr->as.func_call.args, macros, arg_names,
+                        args, unpack, arena, file_path);
   } break;
 
   case IrExprKindVarDef: {
@@ -471,21 +503,24 @@ void expand_macros(IrExpr *expr, Macros *macros,
 
   case IrExprKindIf: {
     INLINE_THEN_EXPAND(expr->as._if.cond);
-    expand_macros_block(&expr->as._if.if_body, macros, arg_names, args, unpack, arena);
+    expand_macros_block(&expr->as._if.if_body, macros, arg_names,
+                        args, unpack, arena, file_path);
 
     for (u32 i = 0; i < expr->as._if.elifs.len; ++i) {
       INLINE_THEN_EXPAND(expr->as._if.elifs.items[i].cond);
       expand_macros_block(&expr->as._if.elifs.items[i].body, macros,
-                          arg_names, args, unpack, arena);
+                          arg_names, args, unpack, arena, file_path);
     }
 
     if (expr->as._if.has_else)
-      expand_macros_block(&expr->as._if.else_body, macros, arg_names, args, unpack, arena);
+      expand_macros_block(&expr->as._if.else_body, macros, arg_names,
+                          args, unpack, arena, file_path);
   } break;
 
   case IrExprKindWhile: {
     INLINE_THEN_EXPAND(expr->as._while.cond);
-    expand_macros_block(&expr->as._while.body, macros, arg_names, args, unpack, arena);
+    expand_macros_block(&expr->as._while.body, macros, arg_names,
+                        args, unpack, arena, file_path);
   } break;
 
   case IrExprKindSet: {
@@ -503,7 +538,7 @@ void expand_macros(IrExpr *expr, Macros *macros,
   } break;
 
   case IrExprKindList: {
-    expand_macros_block(&expr->as.list.content, macros, arg_names, args, unpack, arena);
+    expand_macros_block(&expr->as.list, macros, arg_names, args, unpack, arena, file_path);
   } break;
 
   case IrExprKindIdent:  break;
@@ -513,7 +548,7 @@ void expand_macros(IrExpr *expr, Macros *macros,
   case IrExprKindBool:   break;
 
   case IrExprKindLambda: {
-    expand_macros_block(&expr->as.lambda.body, macros, arg_names, args, unpack, arena);
+    expand_macros_block(&expr->as.lambda.body, macros, arg_names, args, unpack, arena, file_path);
   } break;
 
   case IrExprKindDict: {

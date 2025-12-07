@@ -20,12 +20,17 @@ static void load_str_data(Str *str, u8 *data, u32 *end, Arena *persistent_arena)
 static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
                            FilePathOffsets *path_offsets,Arena *arena,
                            Arena *persistent_arena) {
-  expr->kind = *(u32 *) (data + *end);
-  *end += sizeof(u32);
+  expr->kind = *(u8 *) (data + *end);
+  *end += sizeof(u8);
 
   switch (expr->kind) {
   case IrExprKindBlock: {
-    load_block_data(&expr->as.block, data, end, path_offsets, arena, persistent_arena);
+    load_block_data(&expr->as.block.block, data, end, path_offsets, arena, persistent_arena);
+
+    u32 file_path_offset = *(u32 *) (data + *end);
+    *end += sizeof(u32);
+
+    load_str_data(&expr->as.block.file_path, data, &file_path_offset, persistent_arena);
   } break;
 
   case IrExprKindFuncCall: {
@@ -49,10 +54,9 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
     load_block_data(&expr->as._if.if_body, data, end, path_offsets, arena, persistent_arena);
 
     expr->as._if.elifs.len = *(u32 *) (data + *end);
-    expr->as._if.elifs.cap = expr->as._if.elifs.len;
     *end += sizeof(u32);
 
-    expr->as._if.elifs.items = arena_alloc(arena, expr->as._if.elifs.cap * sizeof(IrElif));
+    expr->as._if.elifs.items = arena_alloc(arena, expr->as._if.elifs.len * sizeof(IrElif));
     for (u32 i = 0; i < expr->as._if.elifs.len; ++i) {
       IrElif elif = {0};
       elif.cond = arena_alloc(arena, sizeof(IrExpr));
@@ -113,29 +117,29 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
   } break;
 
   case IrExprKindList: {
-    load_block_data(&expr->as.list.content, data, end, path_offsets, arena, persistent_arena);
+    load_block_data(&expr->as.list, data, end, path_offsets, arena, persistent_arena);
   } break;
 
   case IrExprKindIdent: {
-    load_str_data(&expr->as.ident.ident, data, end, persistent_arena);
+    load_str_data(&expr->as.ident, data, end, persistent_arena);
   } break;
 
   case IrExprKindString: {
-    load_str_data(&expr->as.string.lit, data, end, persistent_arena);
+    load_str_data(&expr->as.string, data, end, persistent_arena);
   } break;
 
   case IrExprKindInt: {
-    expr->as._int._int = *(i64 *) (data + *end);
+    expr->as._int = *(i64 *) (data + *end);
     *end += sizeof(i64);
   } break;
 
   case IrExprKindFloat: {
-    expr->as._float._float = *(f64 *) (data + *end);
+    expr->as._float = *(f64 *) (data + *end);
     *end += sizeof(f64);
   } break;
 
   case IrExprKindBool: {
-    expr->as._bool._bool = *(u8 *) (data + *end);
+    expr->as._bool = *(u8 *) (data + *end);
     *end += sizeof(u8);
   } break;
 
@@ -143,10 +147,9 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
     IrArgs *args = &expr->as.lambda.args;
 
     args->len = *(u32 *) (data + *end);
-    args->cap = args->len;
     *end += sizeof(u32);
 
-    args->items = arena_alloc(persistent_arena, args->cap * sizeof(Str));
+    args->items = arena_alloc(persistent_arena, args->len * sizeof(Str));
     for (u32 i = 0; i < args->len; ++i)
       load_str_data(args->items + i, data, end, persistent_arena);
 
@@ -157,10 +160,9 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
 
   case IrExprKindDict: {
     expr->as.dict.len = *(u32 *) (data + *end);
-    expr->as.dict.cap = expr->as.dict.len;
     *end += sizeof(u32);
 
-    expr->as.dict.items = arena_alloc(arena, expr->as.dict.cap * sizeof(IrField));
+    expr->as.dict.items = arena_alloc(arena, expr->as.dict.len * sizeof(IrField));
     for (u32 i = 0; i < expr->as.dict.len; ++i) {
       expr->as.dict.items[i].key = arena_alloc(arena, sizeof(IrExpr));
       expr->as.dict.items[i].expr = arena_alloc(arena, sizeof(IrExpr));
@@ -176,10 +178,9 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
     load_expr_data(expr->as.match.src, data, end, path_offsets, arena, persistent_arena);
 
     expr->as.match.cases.len = *(u32 *) (data + *end);
-    expr->as.match.cases.cap = expr->as.match.cases.len;
     *end += sizeof(u32);
 
-    expr->as.match.cases.items = arena_alloc(arena, expr->as.match.cases.cap * sizeof(IrCase));
+    expr->as.match.cases.items = arena_alloc(arena, expr->as.match.cases.len * sizeof(IrCase));
     for (u32 i = 0; i < expr->as.match.cases.len; ++i) {
       expr->as.match.cases.items[i].pattern = arena_alloc(arena, sizeof(IrExpr));
       expr->as.match.cases.items[i].expr = arena_alloc(arena, sizeof(IrExpr));
@@ -199,11 +200,6 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
   } break;
   }
 
-  u32 file_path_offset = *(u32 *) (data + *end);
-  *end += sizeof(u32);
-
-  load_str_data(&expr->meta.file_path, data, &file_path_offset, persistent_arena);
-
   expr->meta.row = *(u32 *) (data + *end);
   *end += sizeof(u32);
   expr->meta.col = *(u32 *) (data + *end);
@@ -214,10 +210,9 @@ static void load_block_data(IrBlock *block, u8 *data, u32 *end,
                             FilePathOffsets *path_offsets, Arena *arena,
                             Arena *persistent_arena) {
   block->len = *(u32 *) (data + *end);
-  block->cap = block->len;
   *end += sizeof(u32);
 
-  block->items = arena_alloc(arena, block->cap * sizeof(IrExpr *));
+  block->items = arena_alloc(arena, block->len * sizeof(IrExpr *));
 
   for (u32 i = 0; i < block->len; ++i) {
     block->items[i] = arena_alloc(arena, sizeof(IrExpr));
@@ -302,10 +297,9 @@ Macros deserialize_macros(u8 *data, u32 size, Arena *arena, Arena *persistent_ar
     load_str_data(&macro->name, data, &end, persistent_arena);
 
     macro->arg_names.len = *(u32 *) (data + end);
-    macro->arg_names.cap = macro->arg_names.len;
     end += sizeof(u32);
 
-    macro->arg_names.items = arena_alloc(persistent_arena, macro->arg_names.cap * sizeof(Str));
+    macro->arg_names.items = arena_alloc(persistent_arena, macro->arg_names.len * sizeof(Str));
     for (u32 j = 0; j < macro->arg_names.len; ++j)
       load_str_data(macro->arg_names.items + j, data, &end, persistent_arena);
 

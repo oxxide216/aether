@@ -2,6 +2,7 @@
 #define MACROS_H
 
 #include "aether/ir.h"
+#include "aether/common.h"
 #include "arena.h"
 
 typedef struct {
@@ -13,14 +14,13 @@ typedef struct {
 
 typedef Da(Macro) Macros;
 
-void ir_block_append(IrBlock *block, IrExpr *expr, Arena *arena);
-Str  copy_str(Str str, Arena *arena);
-
 void expand_macros_block(IrBlock *block, Macros *macros,
                          IrArgs *arg_names, IrBlock *args,
-                         bool unpack, Arena *arena);
+                         bool unpack, Arena *arena,
+                         Str file_path);
 void expand_macros(IrExpr *expr, Macros *macros,
                    IrArgs *arg_names, IrBlock *args,
-                   bool unpack, Arena *arena);
+                   bool unpack, Arena *arena,
+                   Str file_path);
 
 #endif // MACROS_H

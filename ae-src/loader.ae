@@ -43,7 +43,7 @@
 
 (match mode
   mode-default -> (eval env input-file-content input-path)
-  mode-eval-bytecode -> (eval-compiled env input-file-content)
+  mode-eval-bytecode -> (eval-compiled env input-file-content input-path)
   mode-compile-only ->
     (do
       (let compiled (compile env input-file-content input-path

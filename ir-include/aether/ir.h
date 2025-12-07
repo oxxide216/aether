@@ -6,7 +6,10 @@
 
 typedef struct IrExpr IrExpr;
 
-typedef Da(IrExpr *) IrBlock;
+typedef struct {
+  IrExpr **items;
+  u32      len;
+} IrBlock;
 
 typedef enum {
   IrExprKindBlock = 0,
@@ -30,7 +33,15 @@ typedef enum {
   IrExprKindSelf,
 } IrExprKind;
 
-typedef Da(Str) IrArgs;
+typedef struct {
+  Str *items;
+  u32  len;
+} IrArgs;
+
+typedef struct {
+  IrBlock block;
+  Str     file_path;
+} IrExprBlock;
 
 typedef struct {
   IrExpr  *func;
@@ -47,7 +58,10 @@ typedef struct {
   IrBlock  body;
 } IrElif;
 
-typedef Da(IrElif) IrElifs;
+typedef struct {
+  IrElif *items;
+  u32     len;
+} IrElifs;
 
 typedef struct {
   IrExpr  *cond;
@@ -113,9 +127,12 @@ typedef struct {
   IrExpr *expr;
 } IrField;
 
-typedef Da(IrField) IrFields;
+typedef struct {
+  IrField *items;
+  u32      len;
+} IrFields;
 
-typedef Da(IrField) IrExprDict;
+typedef IrFields IrExprDict;
 
 typedef struct {
   bool    has_expr;
@@ -127,15 +144,19 @@ typedef struct {
   IrExpr *expr;
 } IrCase;
 
-typedef Da(IrCase) IrCases;
+typedef struct {
+  IrCase *items;
+  u32     len;
+} IrCases;
 
 typedef struct {
   IrExpr  *src;
   IrCases  cases;
 } IrExprMatch;
 
+#pragma pack(push, 1)
 typedef union {
-  IrBlock        block;
+  IrExprBlock    block;
   IrExprFuncCall func_call;
   IrExprVarDef   var_def;
   IrExprIf       _if;
@@ -143,29 +164,31 @@ typedef union {
   IrExprSet      set;
   IrExprGetAt    get_at;
   IrExprSetAt    set_at;
-  IrExprList     list;
-  IrExprIdent    ident;
-  IrExprString   string;
-  IrExprInt      _int;
-  IrExprFloat    _float;
-  IrExprBool     _bool;
+  IrBlock        list;
+  Str            ident;
+  Str            string;
+  i64            _int;
+  f64            _float;
+  bool           _bool;
   IrExprLambda   lambda;
   IrExprDict     dict;
   IrExprRet      ret;
   IrExprMatch    match;
 } IrExprAs;
+#pragma pack(pop)
 
 typedef struct {
-  Str file_path;
-  u32 row, col;
-} IrMetaData;
+  u16 row, col;
+} IrExprMeta;
 
+#pragma pack(push, 1)
 struct IrExpr {
-  IrExprKind kind;
+  u8         kind;
   IrExprAs   as;
-  IrMetaData meta;
+  IrExprMeta meta;
   bool       is_used;
 };
+#pragma pack(pop)
 
 typedef IrBlock Ir;
 

@@ -142,6 +142,7 @@ struct Vm {
   i64         exit_code;
   bool        is_inside_of_func;
   Func        current_func_value;
+  Str         current_file_path;
 };
 
 typedef struct {
@@ -206,7 +207,7 @@ void   value_free(Value *value);
 bool   value_eq(Value *a, Value *b);
 
 Value *execute_func(Vm *vm, Value **args, Func *func,
-                    IrMetaData *meta, bool value_expected);
+                    IrExprMeta *meta, bool value_expected);
 Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected);
 Value *execute_block(Vm *vm, IrBlock *block, bool value_expected);
 u32    execute(Ir *ir, i32 argc, char **argv, Arena *arena,

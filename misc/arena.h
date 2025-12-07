@@ -3,7 +3,7 @@
 
 #include "shl/shl-defs.h"
 
-#define DEFAULT_ARENA_SEGMENT_SIZE 4096
+#define DEFAULT_ARENA_SEGMENT_SIZE 1024 * 4
 
 typedef struct Segment Segment;
 

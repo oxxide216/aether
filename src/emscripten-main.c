@@ -1,8 +1,13 @@
-#include "emscripten-main.h"
+#include <emscripten.h>
+
 #include "aether/deserializer.h"
+#include "aether/common.h"
 #include "aether/vm.h"
 #include "aether/misc.h"
 #include "shl/shl-defs.h"
+
+extern InternStrings intern_strings;
+extern CachedIrs cached_irs;
 
 static Arena persistent_arena = {0};
 static Macros macros = {0};
@@ -31,11 +36,12 @@ static char *value_to_cstr(Value *value) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-char *emscripten_eval_compiled(u8 *bytecode, u32 bytecode_len) {
+char *emscripten_eval_compiled(u8 *bytecode, u32 bytecode_len, char *file_path) {
   Arena ir_arena = {0};
   Ir ir = deserialize(bytecode, bytecode_len,
                       &ir_arena, &persistent_arena);
 
+  vm.current_file_path = STR(file_path, strlen(file_path));
   Value *result = execute_block(&vm, &ir, true);
 
   arena_free(&ir_arena);
@@ -65,21 +71,31 @@ void emscripten_eval_macros(u8 *macro_bytecode, u32 macro_bytecode_len) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-char *emscripten_eval(char *code, char *path) {
+char *emscripten_eval(char *code, char *file_path) {
   Arena ir_arena = {0};
-  Ir ir = parse_ex(STR(code, strlen(code)), path, &macros,
-                   &included_files, &ir_arena, &persistent_arena);
-  expand_macros_block(&ir, &macros, NULL, NULL, false, &persistent_arena);
+  Str file_path_str = { file_path, strlen(file_path) };
+  Ir ir = parse_ex(STR(code, strlen(code)), file_path, &macros,
+                   &included_files, ir_arena, &persistent_arena);
+
+  vm.current_file_path = STR(file_path, strlen(file_path));
+  expand_macros_block(&ir, &macros, NULL, NULL, false,
+                      &persistent_arena, file_path_str);
 
   Value *result = execute_block(&vm, &ir, true);
-
-  arena_free(&ir_arena);
 
   return value_to_cstr(result);
 }
 
 EMSCRIPTEN_KEEPALIVE
 void emscripten_destroy(void) {
+  if (intern_strings.items)
+    free(intern_strings.items);
+
+  for (u32 i = 0; i < cached_irs.len; ++i)
+    arena_free(&cached_irs.items[i].arena);
+  if (cached_irs.items)
+    free(cached_irs.items);
+
   arena_free(&persistent_arena);
   free(macros.items);
   macros = (Macros) {0};

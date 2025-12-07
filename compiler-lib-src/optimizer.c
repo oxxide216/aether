@@ -14,7 +14,7 @@ void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
 
   switch (expr->kind) {
   case IrExprKindBlock: {
-    eliminate_dead_code_block(&expr->as.block, defs);
+    eliminate_dead_code_block(&expr->as.block.block, defs);
   } break;
 
   case IrExprKindFuncCall: {
@@ -59,14 +59,14 @@ void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
   } break;
 
   case IrExprKindList: {
-    eliminate_dead_code_block(&expr->as.list.content, defs);
+    eliminate_dead_code_block(&expr->as.list, defs);
   } break;
 
   case IrExprKindIdent: {
     for (u32 i = defs->len; i > 0; --i) {
       Def *def = defs->items + i - 1;
 
-      if (str_eq(def->name, expr->as.ident.ident)) {
+      if (str_eq(def->name, expr->as.ident)) {
         def->expr->is_used = true;
         if (def->expr->as.var_def.expr->kind == IrExprKindLambda)
           eliminate_dead_code_block(&def->expr->as.var_def.expr->as.lambda.body, defs);
@@ -118,5 +118,9 @@ void eliminate_dead_code_block(IrBlock *block, Defs *defs) {
 
 void eliminate_dead_code(Ir *ir) {
   Defs defs = {0};
+
   eliminate_dead_code_block(ir, &defs);
+
+  if (defs.items)
+    free(defs.items);
 }

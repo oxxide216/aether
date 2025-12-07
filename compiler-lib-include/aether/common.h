@@ -1,0 +1,18 @@
+#ifndef COMMON_H
+#define COMMON_H
+
+#include "aether/ir.h"
+#include "arena.h"
+
+typedef Da(Str) InternStrings;
+
+typedef Da(Str) Args;
+typedef Da(IrExpr *) Block;
+typedef Da(IrElif) Elifs;
+typedef Da(IrField) Fields;
+typedef Da(IrCase) Cases;
+
+void block_append(Block *block, IrExpr *expr, Arena *arena);
+Str  copy_str(Str str, Arena *arena);
+
+#endif // COMMON_H

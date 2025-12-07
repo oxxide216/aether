@@ -7,7 +7,7 @@
 #define WHILE_FRAME_LENGTH 100
 
 #define META_FMT       STR_FMT":%u:%u: "
-#define META_ARG(meta) STR_ARG((meta).file_path), (meta).row + 1, (meta).col + 1
+#define META_ARG(meta) STR_ARG(vm->current_file_path), (meta).row + 1, (meta).col + 1
 
 #define CATCH_VARS(vm, local_names, catched_values, frame, expr) \
   do {                                                           \
@@ -75,9 +75,7 @@ Value *value_list(ListNode *nodes, StackFrame *frame) {
 
 Value *value_string(Str string, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  Str new_string = { arena_alloc(&frame->arena, string.len), string.len };
-  memcpy(new_string.ptr, string.ptr, new_string.len);
-  *value = (Value) { ValueKindString, { .string = new_string },
+  *value = (Value) { ValueKindString, { .string = string },
                      frame, 0, false };
   return value;
 }
@@ -285,7 +283,7 @@ static void catch_vars(Vm *vm, Strs *local_names,
                        IrExpr *expr) {
   switch (expr->kind) {
   case IrExprKindBlock: {
-    CATCH_VARS_BLOCK(vm, local_names, catched_values, frame, &expr->as.block);
+    CATCH_VARS_BLOCK(vm, local_names, catched_values, frame, &expr->as.block.block);
   } break;
 
   case IrExprKindFuncCall: {
@@ -349,15 +347,15 @@ static void catch_vars(Vm *vm, Strs *local_names,
   } break;
 
   case IrExprKindList: {
-    CATCH_VARS_BLOCK(vm, local_names, catched_values, frame, &expr->as.list.content);
+    CATCH_VARS_BLOCK(vm, local_names, catched_values, frame, &expr->as.list);
   } break;
 
   case IrExprKindIdent: {
     for (u32 i = 0; i < local_names->len; ++i)
-      if (str_eq(expr->as.ident.ident, local_names->items[i]))
+      if (str_eq(expr->as.ident, local_names->items[i]))
         return;
 
-    Var *var = get_var(vm, expr->as.ident.ident);
+    Var *var = get_var(vm, expr->as.ident);
     if (var && var->kind != VarKindGlobal) {
       NamedValue value = {
         var->name,
@@ -429,7 +427,7 @@ static Intrinsic *get_intrinsic(Vm *vm, Str name, u32 args_count, Value **args) 
   return NULL;
 }
 
-Value *execute_func(Vm *vm, Value **args, Func *func, IrMetaData *meta, bool value_expected) {
+Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool value_expected) {
   if (func->intrinsic_name.len > 0) {
     Intrinsic *intrinsic = get_intrinsic(vm, func->intrinsic_name, func->args.len, args);
 
@@ -527,7 +525,13 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
   switch (expr->kind) {
   case IrExprKindBlock: {
-    EXECUTE_BLOCK_SET(vm, result, &expr->as.block, value_expected);
+    Str prev_current_file_path = vm->current_file_path;
+
+    vm->current_file_path = expr->as.block.file_path;
+
+    EXECUTE_BLOCK_SET(vm, result, &expr->as.block.block, value_expected);
+
+    vm->current_file_path = prev_current_file_path;
   } break;
 
   case IrExprKindFuncCall: {
@@ -571,7 +575,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     if (vm->state != ExecStateContinue && vm->exit_code != 0) {
       Str name = STR_LIT("<lambda>");
       if (expr->as.func_call.func->kind == IrExprKindIdent)
-        name = expr->as.func_call.func->as.ident.ident;
+        name = expr->as.func_call.func->as.ident;
 
       INFO("Trace: "META_FMT STR_FMT"\n", META_ARG(expr->meta), STR_ARG(name));
 
@@ -653,7 +657,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     if (!dest_var) {
       PERROR(META_FMT, "Symbol "STR_FMT" was not defined before usage\n",
-        META_ARG(expr->meta), STR_ARG(expr->as.ident.ident));
+        META_ARG(expr->meta), STR_ARG(expr->as.ident));
       vm->state = ExecStateExit;
       vm->exit_code = 1;
 
@@ -857,9 +861,9 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     ListNode *list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
     ListNode *list_end = list;
 
-    for (u32 i = 0; i < expr->as.list.content.len; ++i) {
+    for (u32 i = 0; i < expr->as.list.len; ++i) {
       ListNode *new_node = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-      EXECUTE_EXPR_SET(vm, new_node->value, expr->as.list.content.items[i], true);
+      EXECUTE_EXPR_SET(vm, new_node->value, expr->as.list.items[i], true);
       new_node->next = NULL;
 
       if (list_end) {
@@ -878,10 +882,10 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     if (!value_expected)
       break;
 
-    Var *var = get_var(vm, expr->as.ident.ident);
+    Var *var = get_var(vm, expr->as.ident);
     if (!var) {
       PERROR(META_FMT, "Symbol "STR_FMT" was not defined before usage\n",
-             META_ARG(expr->meta), STR_ARG(expr->as.ident.ident));
+             META_ARG(expr->meta), STR_ARG(expr->as.ident));
       vm->state = ExecStateExit;
       vm->exit_code = 1;
 
@@ -893,22 +897,22 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
   case IrExprKindString: {
     if (value_expected)
-      result = value_string(expr->as.string.lit, vm->current_frame);
+      result = value_string(expr->as.string, vm->current_frame);
   } break;
 
   case IrExprKindInt: {
     if (value_expected)
-      result = value_int(expr->as._int._int, vm->current_frame);
+      result = value_int(expr->as._int, vm->current_frame);
   } break;
 
   case IrExprKindFloat: {
     if (value_expected)
-      result = value_float(expr->as._float._float, vm->current_frame);
+      result = value_float(expr->as._float, vm->current_frame);
   } break;
 
   case IrExprKindBool: {
     if (value_expected)
-      result = value_bool(expr->as._bool._bool, vm->current_frame);
+      result = value_bool(expr->as._bool, vm->current_frame);
   } break;
 
   case IrExprKindLambda: {

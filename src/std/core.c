@@ -868,8 +868,9 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Arena ir_arena = {0};
   FilePaths included_files = {0};
   Ir ir = parse_ex(code->as.string, path_cstr, &env->as.env->macros,
-                   &included_files, &ir_arena, &env->as.env->arena);
-  expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false, &env->as.env->arena);
+                   &included_files, ir_arena, &env->as.env->arena);
+  expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false,
+                      &env->as.env->arena, vm->current_file_path);
 
   ListNode *result = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
   result->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
@@ -898,32 +899,28 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   }
 
   free(path_cstr);
-  arena_free(&ir_arena);
   free(included_files.items);
 
   return value_list(result, vm->current_frame);
 }
 
 Value *eval_compiled_intrinsic(Vm *vm, Value **args) {
-  (void) vm;
-
   Value *env = args[0];
   Value *bytecode = args[1];
+  Value *path = args[2];
 
   Arena ir_arena = {0};
   Ir ir = deserialize((u8 *) bytecode->as.string.ptr,
                       bytecode->as.string.len,
                       &ir_arena, &env->as.env->arena);
-  Value *result = execute_block(&env->as.env->vm, &ir, true);
 
-  arena_free(&ir_arena);
+  env->as.env->vm.current_file_path = path->as.string;
+  Value *result = execute_block(&env->as.env->vm, &ir, true);
 
   return value_clone(result, vm->current_frame);
 }
 
 Value *eval_macros_intrinsic(Vm *vm, Value **args) {
-  (void) vm;
-
   Value *env = args[0];
   Value *macro_bytecode = args[1];
 
@@ -943,14 +940,11 @@ Value *eval_macros_intrinsic(Vm *vm, Value **args) {
   env->as.env->macros.len += macros.len;
 
   free(macros.items);
-  arena_free(&ir_arena);
 
   return value_unit(vm->current_frame);
 }
 
 Value *eval_intrinsic(Vm *vm, Value **args) {
-  (void) vm;
-
   Value *env = args[0];
   Value *code = args[1];
   Value *path = args[2];
@@ -962,12 +956,17 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   Ir ir = parse_ex(code->as.string, path_cstr, &env->as.env->macros,
-                   &env->as.env->included_files, &ir_arena, &env->as.env->arena);
-  expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false, &env->as.env->arena);
+                   &env->as.env->included_files, ir_arena,
+                   &env->as.env->arena);
+
+  env->as.env->vm.current_file_path = path->as.string;
+
+  expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false,
+                      &env->as.env->arena, env->as.env->vm.current_file_path);
+
   Value *result = execute_block(&env->as.env->vm, &ir, true);
 
   free(path_cstr);
-  arena_free(&ir_arena);
 
   return value_clone(result, vm->current_frame);
 }
@@ -1055,7 +1054,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("gt"), true, 2, { ValueKindFloat }, &gt_intrinsic },
   { STR_LIT("ge"), true, 2, { ValueKindInt }, &ge_intrinsic },
   { STR_LIT("ge"), true, 2, { ValueKindFloat }, &ge_intrinsic },
-  // Boolean
+  // Boolean/binary
   { STR_LIT("and"), true, 2, { ValueKindInt, ValueKindInt }, &and_intrinsic },
   { STR_LIT("and"), true, 2, { ValueKindBool, ValueKindBool }, &and_intrinsic },
   { STR_LIT("or"), true, 2, { ValueKindInt, ValueKindInt }, &or_intrinsic },
@@ -1078,8 +1077,8 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("compile"), true, 4,
     { ValueKindEnv, ValueKindString, ValueKindString, ValueKindBool },
     &compile_intrinsic },
-  { STR_LIT("eval-compiled"), true, 2,
-    { ValueKindEnv, ValueKindString },
+  { STR_LIT("eval-compiled"), true, 3,
+    { ValueKindEnv, ValueKindString, ValueKindString },
     &eval_compiled_intrinsic },
   { STR_LIT("eval-macros"), false, 2,
     { ValueKindEnv, ValueKindString },
