@@ -842,12 +842,7 @@ Value *make_env_intrinsic(Vm *vm, Value **args) {
   }
 
   Intrinsics intrinsics = {0};
-  Vm new_vm = {0};
-  new_vm.frames = malloc(sizeof(StackFrame));
-  *new_vm.frames = (StackFrame) {0};
-  new_vm.frames_end = new_vm.frames;
-  new_vm.current_frame = new_vm.frames;
-  vm_init(&new_vm, cmd_args->as.list, &intrinsics);
+  Vm new_vm = vm_create(0, NULL, &intrinsics);
 
   return value_env(new_vm, vm->current_frame);
 }

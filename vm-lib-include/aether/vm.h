@@ -101,16 +101,17 @@ struct StackFrame {
   Arena       arena;
   Vars        vars;
   bool        can_lookup_through;
+  bool        is_used;
   StackFrame *next;
   StackFrame *prev;
 };
 
 typedef struct {
-  IrArgs      args;
-  IrBlock     body;
-  NamedValues catched_values_names;
-  StackFrame  catched_frame;
-  Str         intrinsic_name;
+  IrArgs       args;
+  IrBlock      body;
+  NamedValues  catched_values_names;
+  StackFrame  *catched_frame;
+  Str          intrinsic_name;
 } Func;
 
 typedef enum {
@@ -137,6 +138,7 @@ struct Vm {
   StackFrame *frames;
   StackFrame *frames_end;
   StackFrame *current_frame;
+  StackFrame *clojure_frames;
   ListNode   *args;
   ExecState   state;
   i64         exit_code;

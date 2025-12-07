@@ -175,13 +175,13 @@ void value_free(Value *value) {
   } else if (value->kind == ValueKindFunc) {
     for (u32 i = 0; i < value->as.func.catched_values_names.len; ++i)
       value_free(value->as.func.catched_values_names.items[i].value);
-    free(value->as.func.catched_values_names.items);
 
-    for (u32 i = 0; i < value->as.func.catched_frame.values.len; ++i)
-      value_free(value->as.func.catched_frame.values.items[i]);
-    free(value->as.func.catched_frame.values.items);
+    for (u32 i = 0; i < value->as.func.catched_frame->values.len; ++i)
+      value_free(value->as.func.catched_frame->values.items[i]);
+    value->as.func.catched_frame->values.len = 0;
 
-    arena_free(&value->as.func.catched_frame.arena);
+    arena_reset(&value->as.func.catched_frame->arena);
+    value->as.func.catched_frame->is_used = false;
   } else if (value->kind == ValueKindEnv) {
     if (--value->as.env->refs_count == 0) {
       if (value->as.env->macros.items)
@@ -302,7 +302,16 @@ static void catch_vars(Vm *vm, Strs *local_names,
   case IrExprKindVarDef: {
     CATCH_VARS(vm, local_names, catched_values, frame, expr->as.var_def.expr);
 
-    DA_APPEND(*local_names, expr->as.var_def.name);
+    if (local_names->cap == local_names->len) {
+      if (local_names->cap == 0)
+        local_names->cap = 1;
+      else
+        local_names->cap *= 2;
+      Str *new_items = arena_alloc(&frame->arena, local_names->cap * sizeof(Str));
+      memcpy(new_items, local_names->items, local_names->len * sizeof(Str));
+      local_names->items = new_items;
+    }
+    local_names->items[local_names->len++] = expr->as.var_def.name;
   } break;
 
   case IrExprKindIf: {
@@ -334,19 +343,6 @@ static void catch_vars(Vm *vm, Strs *local_names,
   case IrExprKindSetAt: {
     CATCH_VARS(vm, local_names, catched_values, frame, expr->as.set_at.key);
     CATCH_VARS(vm, local_names, catched_values, frame, expr->as.set_at.value);
-
-    for (u32 i = 0; i < local_names->len; ++i)
-      if (str_eq(expr->as.set_at.dest, local_names->items[i]))
-        return;
-
-    Var *var = get_var(vm, expr->as.set_at.dest);
-    if (var && var->kind != VarKindGlobal) {
-      NamedValue value = {
-        var->name,
-        value_clone(var->value, frame),
-      };
-      DA_APPEND(*catched_values, value);
-    }
   } break;
 
   case IrExprKindRet: {
@@ -369,7 +365,17 @@ static void catch_vars(Vm *vm, Strs *local_names,
         var->name,
         value_clone(var->value, frame),
       };
-      DA_APPEND(*catched_values, value);
+
+      if (catched_values->cap == catched_values->len) {
+        if (catched_values->cap == 0)
+          catched_values->cap = 1;
+        else
+          catched_values->cap *= 2;
+        NamedValue *new_items = arena_alloc(&frame->arena, catched_values->cap * sizeof(NamedValue));
+        memcpy(new_items, catched_values->items, catched_values->len * sizeof(NamedValue));
+        catched_values->items = new_items;
+      }
+      catched_values->items[catched_values->len++] = value;
     }
   } break;
 
@@ -379,8 +385,15 @@ static void catch_vars(Vm *vm, Strs *local_names,
   case IrExprKindBool:   break;
 
   case IrExprKindLambda: {
+    if (local_names->cap < local_names->len + expr->as.lambda.args.len) {
+      local_names->cap = local_names->len + expr->as.lambda.args.len;
+      Str *new_items = arena_alloc(&frame->arena, local_names->cap * sizeof(Str));
+      memcpy(new_items, local_names->items, local_names->len * sizeof(Str));
+      local_names->items = new_items;
+    }
+
     for (u32 i = 0; i < expr->as.lambda.args.len; ++i)
-      DA_APPEND(*local_names, expr->as.lambda.args.items[i]);
+      local_names->items[local_names->len++] = expr->as.lambda.args.items[i];
 
     CATCH_VARS_BLOCK(vm, local_names, catched_values, frame, &expr->as.lambda.body);
   } break;
@@ -485,6 +498,15 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool val
 
   StackFrame *frame = vm->current_frame;
 
+  frame->vars.len = func->args.len + func->catched_values_names.len;
+  if (frame->vars.cap < frame->vars.len) {
+    frame->vars.cap = frame->vars.len;
+    if (frame->vars.items)
+      frame->vars.items = realloc(frame->vars.items, frame->vars.cap * sizeof(Var));
+    else
+      frame->vars.items = malloc(frame->vars.cap * sizeof(Var));
+  }
+
   for (u32 i = 0; i < func->args.len; ++i) {
     Var var = {
       func->args.items[i],
@@ -492,7 +514,7 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool val
       VarKindLocal,
     };
 
-    DA_APPEND(frame->vars, var);
+    frame->vars.items[i] = var;
   }
 
   for (u32 i = 0; i < func->catched_values_names.len; ++i) {
@@ -502,7 +524,7 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool val
       VarKindCatched,
     };
 
-    DA_APPEND(frame->vars, var);
+    frame->vars.items[i + func->args.len] = var;
   }
 
   Value *result = execute_block(vm, &func->body, value_expected);
@@ -569,14 +591,13 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       return value_unit(vm->current_frame);
     }
 
-    Value **func_args = malloc(expr->as.func_call.args.len * sizeof(Value *));
+    Value **func_args = arena_alloc(&vm->current_frame->arena,
+                                    expr->as.func_call.args.len * sizeof(Value *));
 
     for (u32 i = 0; i < expr->as.func_call.args.len; ++i) {
       func_args[i] = execute_expr(vm, expr->as.func_call.args.items[i], true);
-      if (vm->state != ExecStateContinue) {
-        free(func_args);
+      if (vm->state != ExecStateContinue)
         return value_unit(vm->current_frame);
-      }
     }
 
     result = execute_func(vm, func_args, &func_value->as.func, &expr->meta, value_expected);
@@ -587,11 +608,8 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
       INFO("Trace: "META_FMT STR_FMT"\n", META_ARG(expr->meta), STR_ARG(name));
 
-      free(func_args);
       return value_unit(vm->current_frame);
     }
-
-    free(func_args);
   } break;
 
   case IrExprKindVarDef: {
@@ -923,21 +941,39 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       result = value_bool(expr->as._bool, vm->current_frame);
   } break;
 
-  case IrExprKindLambda: {
+   case IrExprKindLambda: {
     if (!value_expected)
       break;
 
-    Strs local_names = {0};
     NamedValues catched_values_names = {0};
-    StackFrame frame = {0};
+    StackFrame *frame = vm->clojure_frames;
 
-    for (u32 i = 0; i < expr->as.lambda.args.len; ++i)
-      DA_APPEND(local_names, expr->as.lambda.args.items[i]);
+    while (frame && frame->next && frame->is_used)
+      frame = frame->next;
+
+    if (frame->is_used) {
+      StackFrame *next = frame->next;
+
+      frame->next = malloc(sizeof(StackFrame));
+      *frame->next = (StackFrame) {0};
+      frame = frame->next;
+
+      if (next) {
+        frame->next = next;
+        next->prev = frame;
+      }
+    }
+
+    frame->is_used = true;
+
+    Strs local_names;
+    local_names.len = expr->as.lambda.args.len;
+    local_names.cap = local_names.len;
+    local_names.items = arena_alloc(&frame->arena, local_names.len * sizeof(Str));
+    memcpy(local_names.items, expr->as.lambda.args.items, local_names.len * sizeof(Str));
 
     catch_vars_block(vm, &local_names, &catched_values_names,
-                     &frame, &expr->as.lambda.body);
-
-    free(local_names.items);
+                     frame, &expr->as.lambda.body);
 
     Func func = {
       expr->as.lambda.args,
@@ -1019,10 +1055,15 @@ static void intrinsics_append(Intrinsics *a, Intrinsic *b, u32 b_len) {
 
 Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
   Vm vm = {0};
+
   vm.frames = malloc(sizeof(StackFrame));
   *vm.frames = (StackFrame) {0};
   vm.frames_end = vm.frames;
+
   vm.current_frame = vm.frames;
+
+  vm.clojure_frames = malloc(sizeof(StackFrame));
+  *vm.clojure_frames = (StackFrame) {0};
 
   ListNode *args = arena_alloc(&vm.current_frame->arena, sizeof(ListNode));
   ListNode *args_end = args;
@@ -1099,6 +1140,15 @@ void vm_stop(Vm *vm) {
   }
 }
 
+static void frame_free(StackFrame *frame) {
+  for (u32 j = 0; j < frame->values.len; ++j)
+    value_free(frame->values.items[j]);
+  free(frame->values.items);
+  arena_free(&frame->arena);
+  free(frame->vars.items);
+  free(frame);
+}
+
 void vm_destroy(Vm *vm) {
   if (vm->global_vars.items)
     free(vm->global_vars.items);
@@ -1107,14 +1157,15 @@ void vm_destroy(Vm *vm) {
 
   StackFrame *frame = vm->frames;
   while (frame) {
-    for (u32 j = 0; j < frame->values.len; ++j)
-      value_free(frame->values.items[j]);
-    free(frame->values.items);
-    arena_free(&frame->arena);
-    free(frame->vars.items);
-
     StackFrame *next = frame->next;
-    free(frame);
+    frame_free(frame);
+    frame = next;
+  }
+
+  frame = vm->clojure_frames;
+  while (frame) {
+    StackFrame *next = frame->next;
+    frame_free(frame);
     frame = next;
   }
 }
