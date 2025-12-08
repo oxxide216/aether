@@ -48,6 +48,8 @@ static bool save_expr_data(IrExpr *expr, u8 **data, u32 *data_size,
         break;
       }
     }
+
+    save_str_data(expr->as.block.file_path, data, data_size, end);
   } break;
 
   case IrExprKindFuncCall: {
