@@ -22,7 +22,7 @@ extern StringBuilder printf_sb;
 #endif
 
 static Path loader_paths[] = {
-  { "/usr/include/aether/load/loader.abc", true },
+  { "/usr/include/aether/loader.abc", true },
   { "ae-src/loader.ae", false },
 };
 
