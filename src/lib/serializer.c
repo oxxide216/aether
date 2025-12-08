@@ -39,17 +39,19 @@ static bool save_expr_data(IrExpr *expr, u8 **data, u32 *data_size,
   case IrExprKindBlock: {
     save_block_data(&expr->as.block.block, data, data_size, end, path_offsets);
 
+    printf("begin: "STR_FMT"\n", STR_ARG(expr->as.block.file_path));
+
     for (u32 i = 0; i < path_offsets->len; ++i) {
       if (str_eq(path_offsets->items[i].path, expr->as.block.file_path)) {
         reserve_space(sizeof(u32), data, data_size, end);
         *(u32 *) (*data + *end) = path_offsets->items[i].offset;
         *end += sizeof(u32);
 
+        printf("end\n");
+
         break;
       }
     }
-
-    save_str_data(expr->as.block.file_path, data, data_size, end);
   } break;
 
   case IrExprKindFuncCall: {

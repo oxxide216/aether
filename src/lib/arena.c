@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "arena.h"
+#include "aether/arena.h"
 
 void *arena_alloc(Arena *arena, u32 size) {
   Segment *segment = arena->segments;

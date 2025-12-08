@@ -1,7 +1,7 @@
 /aether
 libs/
-test.ac
-eval.ac
-compiler-lib-src/grammar.h
+test.abc
+eval.abc
+src/lib/grammar.h
 dest/
-example-dest
+example-dest/

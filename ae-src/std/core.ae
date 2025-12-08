@@ -54,6 +54,7 @@
 (let bool? [value] -> import 'is-bool')
 (let func? [value] -> import 'is-func')
 (let dict? [value] -> import 'is-dict')
+(let env? [value] -> import 'is-env')
 (let not-unit? [value] -> (not (unit? value)))
 
 (let make-env [args] -> import 'make-env')

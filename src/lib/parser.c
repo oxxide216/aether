@@ -3,7 +3,7 @@
 #include "aether/parser.h"
 #include "aether/macros.h"
 #include "aether/common.h"
-#include "io.h"
+#include "aether/io.h"
 #include "lexgen/runtime-src/runtime.h"
 #define LEXGEN_TRANSITION_TABLE_IMPLEMENTATION
 #include "grammar.h"
@@ -340,12 +340,14 @@ static Token parser_expect_token(Parser *parser, u64 id_mask) {
 
 static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask);
 
-Ir parse_ex(Str code, char *file_path, Macros *macros,
+Ir parse_ex(Str code, Str file_path, Macros *macros,
             FilePaths *included_files, Arena *arena) {
+  DA_APPEND(*included_files, file_path);
+
   for (u32 i = 0; i < cached_irs.len; ++i) {
     CachedIr *cached_ir = cached_irs.items + i;
 
-    if (strcmp(cached_ir->path, file_path) == 0) {
+    if (str_eq(cached_ir->path, file_path)) {
       DA_EXTEND(*macros, cached_ir->macros);
       *arena = cached_ir->arena;
 
@@ -355,13 +357,10 @@ Ir parse_ex(Str code, char *file_path, Macros *macros,
 
   Parser parser = {0};
 
-  Str current_file_path = { file_path, strlen(file_path) };
-  DA_APPEND(*included_files, current_file_path);
-
   parser.lexer.code = code;
   parser.lexer.table = get_transition_table();
   parser.macros = macros;
-  parser.file_path = STR(file_path, strlen(file_path));
+  parser.file_path = file_path;
   parser.included_files = included_files;
   parser.arena = arena;
   parser.ir = parser_parse_block(&parser, 0);
@@ -369,7 +368,7 @@ Ir parse_ex(Str code, char *file_path, Macros *macros,
   Macros cached_macros;
   cached_macros.len = macros->len;
   cached_macros.cap = cached_macros.len;
-  cached_macros.items = arena_alloc(arena, cached_macros.len * sizeof(Macro));
+  cached_macros.items = arena_alloc(arena, cached_macros.cap * sizeof(Macro));
   memcpy(cached_macros.items, macros->items, cached_macros.len * sizeof(Macro));
 
   CachedIr cached_ir = { file_path, parser.ir, cached_macros, *arena };
@@ -379,6 +378,7 @@ Ir parse_ex(Str code, char *file_path, Macros *macros,
 
   return parser.ir;
 }
+
 
 static Arena *get_arena(Parser *parser) {
   if (parser->persistent)
@@ -759,8 +759,6 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
           memcpy(new_ptr, path.ptr, path.len);
           path.ptr = new_ptr;
 
-          DA_APPEND(*parser->included_files, path);
-
           break;
         }
       }
@@ -770,7 +768,8 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
 
       if (already_included) {
         free(prefix);
-        break;
+
+        return NULL;
       }
 
       if (code.len == (u32) -1) {
@@ -782,7 +781,7 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
 
       Arena arena = {0};
       expr->kind = IrExprKindBlock;
-      expr->as.block.block = parse_ex(code, path.ptr, parser->macros,
+      expr->as.block.block = parse_ex(code, path, parser->macros,
                                       parser->included_files, &arena);
       expr->as.block.file_path = path;
 
@@ -888,13 +887,12 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
   };
 }
 
-Ir parse(Str code, char *file_path) {
+Ir parse(Str code, Str file_path) {
   Macros macros = {0};
   FilePaths included_files = {0};
   Arena arena = {0};
-  Str file_path_str = { file_path, strlen(file_path) };
   Ir ir = parse_ex(code, file_path, &macros, &included_files, &arena);
-  expand_macros_block(&ir, &macros, NULL, NULL, false, &arena, file_path_str);
+  expand_macros_block(&ir, &macros, NULL, NULL, false, &arena, file_path);
 
   if (macros.items)
     free(macros.items);

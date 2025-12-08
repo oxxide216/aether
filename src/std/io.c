@@ -8,7 +8,7 @@
 
 #include "aether/vm.h"
 #include "aether/misc.h"
-#include "io.h"
+#include "aether/io.h"
 
 #ifndef __emscripten
 Value *unblock_input_intrinsic(Vm *vm, Value **args) {

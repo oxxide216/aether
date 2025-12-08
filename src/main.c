@@ -1,10 +1,10 @@
 #include <signal.h>
 
-#include "io.h"
 #include "aether/parser.h"
 #include "aether/deserializer.h"
 #include "aether/common.h"
 #include "aether/vm.h"
+#include "aether/io.h"
 #include "shl/shl-defs.h"
 #include "shl/shl-log.h"
 #define SHL_STR_IMPLEMENTATION
@@ -70,10 +70,12 @@ i32 main(i32 argc, char **argv) {
   signal(SIGINT, sigint_handler);
 
   Ir ir;
-  if (path->is_precompiled)
+  if (path->is_precompiled) {
     ir = deserialize((u8 *) code.ptr, code.len, &arena);
-  else
-    ir = parse(code, path->cstr);
+  } else {
+    Str path_str = { path->cstr, strlen(path->cstr) };
+    ir = parse(code, path_str);
+  }
 
   free(code.ptr);
 

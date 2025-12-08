@@ -3,15 +3,14 @@
 # Compiler
 CC=cc
 OUT=aether
-CFLAGS="-Wall -Wextra -Iinclude -Ilibs -Isrc/misc \
+CFLAGS="-Wall -Wextra -Iinclude -Ilibs \
         -Ilibs/winx/include -Ilibs/glass/include -lm"
 BUILD_FLAGS="${@:1}"
 LDFLAGS="-z execstack"
-BIN_SRC="src/bin/main.c"
-MISC_SRC="$(find src/misc -name "*.c")"
+BIN_SRC="src/main.c"
 LIB_SRC="$(find src/lib -name "*.c")"
-LIBS_SRC="$(find libs/lexgen/runtime-src -name "*.c")"
 STD_SRC="src/std/core.c src/std/math.c src/std/str.c"
+LIBS_SRC="$(find libs/lexgen/runtime-src -name "*.c")"
 
 if [ "$AETHER_GRAPHICS" == "" ]; then
   AETHER_GRAPHICS=x11
@@ -27,24 +26,24 @@ fi
 
 if [ "$GLASS" != "" ]; then
   CFLAGS="$CFLAGS -DGLASS -Ilibs/winx/include -Ilibs/glass/include"
-  LIBS_SRC="$LIB_SRC $(find libs/winx/src -name "*.c" -not -name "io.c" \
+  LIBS_SRC="$LIBS_SRC $(find libs/winx/src -name "*.c" -not -name "io.c" \
                             -not -path "libs/winx/src/platform/*")"
-  LIBS_SRC="$LIB_SRC $(find libs/glass/src -name "*.c" -not -name "io.c")"
+  LIBS_SRC="$LIBS_SRC $(find libs/glass/src -name "*.c" -not -name "io.c")"
   STD_SRC="$STD_SRC src/std/glass/*"
   if [ "$AETHER_GRAPHICS" == "x11" ]; then
     CFLAGS="$CFLAGS -DX11"
     LDFLAGS="$LDFLAGS -lX11 -lGL -lGLEW"
-    LIBS_SRC="$LIB_SRC $(find libs/winx/src/platform/x11 -name "*.c")"
+    LIBS_SRC="$LIBS_SRC $(find libs/winx/src/platform/x11 -name "*.c")"
   elif [ "$AETHER_GRAPHICS" == "web" ]; then
     CFLAGS="$CFLAGS -DWEB"
-    LIBS_SRC="$LIB_SRC $(find libs/winx/src/platform/web -name "*.c")"
+    LIBS_SRC="$LIBS_SRC $(find libs/winx/src/platform/web -name "*.c")"
   fi
 fi
 
-lexgen compiler-lib-src/grammar.h compiler-lib-src/grammar.lg
+lexgen src/lib/grammar.h src/lib/grammar.lg
 
-$CC -o $OUT $BIN_SRC $MISC_SRC $LIB_SRC $LIBS_SRC \
-            $STD_SRC $CFLAGS $LDFLAGS $BUILD_FLAGS
+$CC -o $OUT $BIN_SRC $MISC_SRC $LIB_SRC $STD_SRC \
+            $LIBS_SRC $CFLAGS $LDFLAGS $BUILD_FLAGS
 
 if [ "$WASM" != "" ]; then
   rm -rf dest/
@@ -67,6 +66,6 @@ if [ "$WASM" != "" ]; then
   BIN_SRC="src/emscripten-main.c"
   STD_SRC="$STD_SRC src/std/web.c"
 
-  $CC -o $OUT $BIN_SRC $MISC_SRC $LIB_SRC $LIBS_SRC \
-              $STD_SRC $CFLAGS $LDFLAGS $BUILD_FLAGS
+  $CC -o $OUT $BIN_SRC $MISC_SRC $LIB_SRC $STD_SRC \
+              $LIBS_SRC $CFLAGS $LDFLAGS $BUILD_FLAGS
 fi

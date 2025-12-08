@@ -4,7 +4,7 @@
 #include "aether/deserializer.h"
 #include "aether/misc.h"
 #include "aether/macros.h"
-#include "arena.h"
+#include "aether/arena.h"
 
 Value *head_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
@@ -829,6 +829,10 @@ Value *is_dict_intrinsic(Vm *vm, Value **args) {
   return value_bool(args[0]->kind == ValueKindDict, vm->current_frame);
 }
 
+Value *is_env_intrinsic(Vm *vm, Value **args) {
+  return value_bool(args[0]->kind == ValueKindEnv, vm->current_frame);
+}
+
 Value *make_env_intrinsic(Vm *vm, Value **args) {
   Value *cmd_args = args[0];
 
@@ -853,20 +857,18 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Value *path = args[2];
   Value *with_macros = args[3];
 
-  char *path_cstr = malloc(path->as.string.len + 1);
-  memcpy(path_cstr, path->as.string.ptr,
-         path->as.string.len);
-  path_cstr[path->as.string.len] = '\0';
-
   u32 prev_macros_len = env->as.env->macros.len;
+
+  printf("----------\n");
 
   Arena ir_arena = {0};
   FilePaths included_files = {0};
-  Ir ir = parse_ex(code->as.string, path_cstr,
+  Ir ir = parse_ex(code->as.string, path->as.string,
                    &env->as.env->macros,
                    &included_files, &ir_arena);
-  expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false,
-                      &ir_arena, vm->current_file_path);
+
+  expand_macros_block(&ir, &env->as.env->macros, NULL, NULL,
+                      false, &ir_arena, path->as.string);
 
   ListNode *result = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
   result->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
@@ -894,7 +896,6 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
     result->next->next->value = value_unit(vm->current_frame);
   }
 
-  free(path_cstr);
   free(included_files.items);
 
   return value_list(result, vm->current_frame);
@@ -943,13 +944,8 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
   Value *code = args[1];
   Value *path = args[2];
 
-  char *path_cstr = malloc(path->as.string.len + 1);
-  memcpy(path_cstr, path->as.string.ptr,
-         path->as.string.len);
-  path_cstr[path->as.string.len] = '\0';
-
   Arena ir_arena = {0};
-  Ir ir = parse_ex(code->as.string, path_cstr, &env->as.env->macros,
+  Ir ir = parse_ex(code->as.string, path->as.string, &env->as.env->macros,
                    &env->as.env->included_files, &ir_arena);
 
   env->as.env->vm.current_file_path = path->as.string;
@@ -958,8 +954,6 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
                       &ir_arena, env->as.env->vm.current_file_path);
 
   Value *result = execute_block(&env->as.env->vm, &ir, true);
-
-  free(path_cstr);
 
   return value_clone(result, vm->current_frame);
 }
@@ -1065,6 +1059,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("is-bool"), true, 1, { ValueKindUnit }, &is_bool_intrinsic },
   { STR_LIT("is-func"), true, 1, { ValueKindUnit }, &is_func_intrinsic },
   { STR_LIT("is-dict"), true, 1, { ValueKindUnit }, &is_dict_intrinsic },
+  { STR_LIT("is-env"), true, 1, { ValueKindUnit }, &is_env_intrinsic },
   // Env
   { STR_LIT("make-env"), true, 1, { ValueKindList }, &make_env_intrinsic },
   { STR_LIT("compile"), true, 4,

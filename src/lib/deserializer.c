@@ -254,7 +254,6 @@ Ir deserialize(u8 *data, u32 size, Arena *arena) {
 
   FilePathOffsets path_offsets = {0};
   load_path_offsets_data(&path_offsets, data, &end, arena);
-
   load_block_data(&ir, data, &end, &path_offsets, arena);
 
   return ir;

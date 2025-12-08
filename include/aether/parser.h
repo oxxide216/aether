@@ -8,16 +8,16 @@
 typedef Da(Str) FilePaths;
 
 typedef struct {
-  char   *path;
-  Ir      ir;
-  Macros  macros;
-  Arena   arena;
+  Str    path;
+  Ir     ir;
+  Macros macros;
+  Arena  arena;
 } CachedIr;
 
 typedef Da(CachedIr) CachedIrs;
 
-Ir parse_ex(Str code, char *file_path, Macros *macros,
+Ir parse_ex(Str code, Str file_path, Macros *macros,
             FilePaths *included_files, Arena *arena);
-Ir parse(Str code, char *file_path);
+Ir parse(Str code, Str file_path);
 
 #endif // COMPILER_H
