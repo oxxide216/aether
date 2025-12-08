@@ -12,17 +12,9 @@
 #define STD_PREFIX_RT "/usr/include/aether/"
 #define STD_PREFIX_CT "ae-src/"
 
-#ifdef EMSCRIPTEN
-#define SHL_STR_IMPLEMENTATION
-#include "shl/shl-str.h"
-
-#define EMSCRIPTEN_STD_PREFIX "dest/"
-#define INCLUDE_PATHS(current_file_path) { current_file_path, STD_PREFIX_RT, \
-                                           STD_PREFIX_CT, EMSCRIPTEN_STD_PREFIX }
-#else
-#define INCLUDE_PATHS(current_file_path) { current_file_path, STD_PREFIX_RT, \
+#define INCLUDE_PATHS(current_file_path) { current_file_path, \
+                                           STD_PREFIX_RT,     \
                                            STD_PREFIX_CT }
-#endif
 
 #define MASK(id) (1 << (id))
 
@@ -52,7 +44,6 @@ typedef struct {
   Str        file_path;
   FilePaths *included_files;
   Arena     *arena;
-  bool       persistent;
   Ir         ir;
 } Parser;
 
@@ -342,18 +333,19 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask);
 
 Ir parse_ex(Str code, Str file_path, Macros *macros,
             FilePaths *included_files, Arena *arena) {
-  DA_APPEND(*included_files, file_path);
-
   for (u32 i = 0; i < cached_irs.len; ++i) {
     CachedIr *cached_ir = cached_irs.items + i;
 
     if (str_eq(cached_ir->path, file_path)) {
       DA_EXTEND(*macros, cached_ir->macros);
+      DA_EXTEND(*included_files, cached_ir->included_files);
       *arena = cached_ir->arena;
 
       return cached_ir->ir;
     }
   }
+
+  DA_APPEND(*included_files, file_path);
 
   Parser parser = {0};
 
@@ -371,19 +363,19 @@ Ir parse_ex(Str code, Str file_path, Macros *macros,
   cached_macros.items = arena_alloc(arena, cached_macros.cap * sizeof(Macro));
   memcpy(cached_macros.items, macros->items, cached_macros.len * sizeof(Macro));
 
-  CachedIr cached_ir = { file_path, parser.ir, cached_macros, *arena };
+  FilePaths cached_included_files;
+  cached_included_files.len = included_files->len;
+  cached_included_files.cap = cached_included_files.len;
+  cached_included_files.items = arena_alloc(arena, cached_included_files.cap * sizeof(Str));
+  memcpy(cached_included_files.items, included_files->items,
+         cached_included_files.len * sizeof(Str));
+
+  CachedIr cached_ir = { file_path, parser.ir, cached_macros, cached_included_files, *arena };
   DA_APPEND(cached_irs, cached_ir);
 
   free(parser.lexer.temp_sb.buffer);
 
   return parser.ir;
-}
-
-
-static Arena *get_arena(Parser *parser) {
-  if (parser->persistent)
-    return parser->arena;
-  return parser->arena;
 }
 
 static void parser_parse_macro_def(Parser *parser) {
@@ -424,13 +416,7 @@ static void parser_parse_macro_def(Parser *parser) {
   parser_expect_token(parser, MASK(TT_CBRACKET));
   parser_expect_token(parser, MASK(TT_RIGHT_ARROW));
 
-  bool prev_persistent = parser->persistent;
-
-  parser->persistent = true;
-
   macro.body = parser_parse_block(parser, MASK(TT_CPAREN));
-
-  parser->persistent = prev_persistent;
 
   parser_expect_token(parser, MASK(TT_CPAREN));
 
@@ -454,7 +440,7 @@ static IrExprDict parser_parse_dict(Parser *parser) {
   }
 
   dict.len = fields.len;
-  dict.items = arena_alloc(get_arena(parser), dict.len * sizeof(IrField));
+  dict.items = arena_alloc(parser->arena, dict.len * sizeof(IrField));
   memcpy(dict.items, fields.items, dict.len * sizeof(IrField));
 
   free(fields.items);
@@ -498,15 +484,9 @@ static IrExprLambda parser_parse_lambda(Parser *parser) {
     };
     lambda.intrinsic_name = copy_str(intrinsic_name, parser->arena);
   } else {
-    bool prev_persistent = parser->persistent;
-
-    parser->persistent = true;
-
     lambda.body = parser_parse_block(parser, MASK(TT_CPAREN) |
                                              MASK(TT_CBRACKET) |
                                              MASK(TT_RHOMBUS));
-
-    parser->persistent = prev_persistent;
 
     if (!parser_peek_token(parser).eof &&
         parser_peek_token(parser).id == TT_RHOMBUS)
@@ -534,7 +514,7 @@ static IrExprMatch parser_parse_match(Parser *parser) {
   }
 
   match.cases.len = cases.len;
-  match.cases.items = arena_alloc(get_arena(parser), match.cases.len * sizeof(IrCase));
+  match.cases.items = arena_alloc(parser->arena, match.cases.len * sizeof(IrCase));
   memcpy(match.cases.items, cases.items, match.cases.len * sizeof(IrCase));
 
   free(cases.items);
@@ -561,7 +541,7 @@ static Str get_file_dir(Str path) {
 }
 
 static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
-  IrExpr *expr = arena_alloc(get_arena(parser), sizeof(IrExpr));
+  IrExpr *expr = arena_alloc(parser->arena, sizeof(IrExpr));
   *expr = (IrExpr) {0};
 
   Token token = parser_expect_token(parser, MASK(TT_OPAREN) | MASK(TT_STR) |
@@ -683,7 +663,7 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
 
       expr->as._if.elifs.len = elifs.len;
       expr->as._if.elifs.items =
-        arena_alloc(get_arena(parser), expr->as._if.elifs.len * sizeof(IrElif));
+        arena_alloc(parser->arena, expr->as._if.elifs.len * sizeof(IrElif));
       memcpy(expr->as._if.elifs.items, elifs.items, expr->as._if.elifs.len * sizeof(IrElif));
 
       free(elifs.items);
@@ -752,10 +732,10 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
         if (already_included)
           break;
 
-        code = read_file_arena(path.ptr, get_arena(parser));
+        code = read_file_arena(path.ptr, parser->arena);
 
         if (code.len != (u32) -1) {
-          char *new_ptr = arena_alloc(get_arena(parser), path.len);
+          char *new_ptr = arena_alloc(parser->arena, path.len);
           memcpy(new_ptr, path.ptr, path.len);
           path.ptr = new_ptr;
 
@@ -854,7 +834,7 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
            token.id == TT_QOLON) {
       parser_next_token(parser);
 
-      IrExpr *get_at = arena_alloc(get_arena(parser), sizeof(IrExpr));
+      IrExpr *get_at = arena_alloc(parser->arena, sizeof(IrExpr));
       get_at->kind = IrExprKindGetAt;
       get_at->as.get_at.src = expr;
       get_at->as.get_at.key = parser_parse_expr(parser, true);

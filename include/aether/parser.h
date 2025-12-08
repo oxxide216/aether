@@ -8,10 +8,11 @@
 typedef Da(Str) FilePaths;
 
 typedef struct {
-  Str    path;
-  Ir     ir;
-  Macros macros;
-  Arena  arena;
+  Str       path;
+  Ir        ir;
+  Macros    macros;
+  FilePaths included_files;
+  Arena     arena;
 } CachedIr;
 
 typedef Da(CachedIr) CachedIrs;

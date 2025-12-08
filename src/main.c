@@ -71,17 +71,16 @@ i32 main(i32 argc, char **argv) {
 
   Ir ir;
   if (path->is_precompiled) {
-    ir = deserialize((u8 *) code.ptr, code.len, &arena);
+    ir = deserialize((u8 *) code.ptr, code.len, &arena, &vm.current_file_path);
   } else {
-    Str path_str = { path->cstr, strlen(path->cstr) };
-    ir = parse(code, path_str);
+    vm.current_file_path = (Str) { path->cstr, strlen(path->cstr) };
+    ir = parse(code, vm.current_file_path);
   }
 
   free(code.ptr);
 
   Intrinsics intrinsics = {0};
   vm = vm_create(argc, argv, &intrinsics);
-  vm.current_file_path = STR(path->cstr, strlen(path->cstr));
   execute_block(&vm, &ir, false);
 
   cleanup();

@@ -26,11 +26,8 @@ static void save_str_data(Str str, u8 **data, u32 *data_size, u32 *end) {
   }
 }
 
-static bool save_expr_data(IrExpr *expr, u8 **data, u32 *data_size,
+static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size,
                            u32 *end, FilePathOffsets *path_offsets) {
-  if (!expr->is_used)
-    return false;
-
   reserve_space(sizeof(u8), data, data_size, end);
   *(u8 *) (*data + *end) = expr->kind;
   *end += sizeof(u8);
@@ -39,15 +36,11 @@ static bool save_expr_data(IrExpr *expr, u8 **data, u32 *data_size,
   case IrExprKindBlock: {
     save_block_data(&expr->as.block.block, data, data_size, end, path_offsets);
 
-    printf("begin: "STR_FMT"\n", STR_ARG(expr->as.block.file_path));
-
     for (u32 i = 0; i < path_offsets->len; ++i) {
       if (str_eq(path_offsets->items[i].path, expr->as.block.file_path)) {
         reserve_space(sizeof(u32), data, data_size, end);
         *(u32 *) (*data + *end) = path_offsets->items[i].offset;
         *end += sizeof(u32);
-
-        printf("end\n");
 
         break;
       }
@@ -189,8 +182,6 @@ static bool save_expr_data(IrExpr *expr, u8 **data, u32 *data_size,
   *end += sizeof(u32);
   *(u32 *) (*data + *end) = expr->meta.col;
   *end += sizeof(u32);
-
-  return true;
 }
 
 static void save_block_data(IrBlock *block, u8 **data, u32 *data_size,
@@ -198,12 +189,15 @@ static void save_block_data(IrBlock *block, u8 **data, u32 *data_size,
   u32 offset = *end;
 
   reserve_space(sizeof(u32), data, data_size, end);
-  *(u32 *) (*data + offset) = block->len;
+  *(u32 *) (*data + offset) = 0;
   *end += sizeof(u32);
 
-  for (u32 i = 0; i < block->len; ++i)
-    if (!save_expr_data(block->items[i], data, data_size, end, path_offsets))
-      --*(u32 *) (*data + offset);
+  for (u32 i = 0; i < block->len; ++i) {
+    if (!block->items[i]->is_dead) {
+      save_expr_data(block->items[i], data, data_size, end, path_offsets);
+      ++*(u32 *) (*data + offset);
+    }
+  }
 }
 
 static void save_included_files(u8 **data, u32 *data_size, u32 *end,
@@ -226,9 +220,9 @@ u8 *serialize(Ir *ir, u32 *size, FilePaths *included_files) {
   u32 data_size = sizeof(u32) * 2;
   u8 *data = malloc(data_size);
 
-  FilePathOffsets path_offsets = {0};
-
   eliminate_dead_code(ir);
+
+  FilePathOffsets path_offsets = {0};
   save_included_files(&data, &data_size, size, included_files, &path_offsets);
   save_block_data(ir, &data, &data_size, size, &path_offsets);
 
@@ -246,6 +240,9 @@ u8 *serialize_macros(Macros *macros, u32 *size, FilePaths *included_files) {
   u32 data_size = sizeof(u32) * 2;
   u8 *data = malloc(data_size);
 
+  FilePathOffsets path_offsets = {0};
+  save_included_files(&data, &data_size, size, included_files, &path_offsets);
+
   reserve_space(sizeof(u32) + macros->len, &data, &data_size, size);
   *(u32 *) (data + *size) = macros->len;
   *size += sizeof(u32);
@@ -262,14 +259,9 @@ u8 *serialize_macros(Macros *macros, u32 *size, FilePaths *included_files) {
     for (u32 i = 0; i < macro->arg_names.len; ++i)
       save_str_data(macro->arg_names.items[i], &data, &data_size, size);
 
-    FilePathOffsets path_offsets = {0};
-
     eliminate_dead_code(&macro->body);
-    save_included_files(&data, &data_size, size, included_files, &path_offsets);
-    save_block_data(&macro->body, &data, &data_size, size, &path_offsets);
 
-    if (path_offsets.items)
-      free(path_offsets.items);
+    save_block_data(&macro->body, &data, &data_size, size, &path_offsets);
 
     reserve_space(sizeof(u8), &data, &data_size, size);
     *(u8 *) (data + *size) = macro->has_unpack;
@@ -278,6 +270,9 @@ u8 *serialize_macros(Macros *macros, u32 *size, FilePaths *included_files) {
 
   *(u32 *) data = *(u32 *) "ABM\0";
   *(u32 *) (data + sizeof(u32)) = *size;
+
+  if (path_offsets.items)
+    free(path_offsets.items);
 
   return data;
 }

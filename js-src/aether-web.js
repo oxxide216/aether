@@ -15,7 +15,7 @@ async function aetherInit(dataPrefix, initCallback) {
     onRuntimeInitialized: () => {
       const aetherCreate = Module.cwrap('emscripten_create', 'null', []);
       _aetherEvalCompiled =
-        Module.cwrap('emscripten_eval_compiled', 'string', ['array', 'number', 'string']);
+        Module.cwrap('emscripten_eval_compiled', 'string', ['array', 'number']);
       _aetherEvalMacros =
         Module.cwrap('emscripten_eval_macros', 'null', ['string', 'number']);
       _aetherEval = Module.cwrap('emscripten_eval', 'string', ['string', 'string']);
@@ -33,7 +33,7 @@ async function aetherInit(dataPrefix, initCallback) {
 }
 
 function aetherEvalCompiled(bytecode) {
-  return _aetherEvalCompiled(bytecode, bytecode.length, 'aether-web.js');
+  return _aetherEvalCompiled(bytecode, bytecode.length);
 }
 
 function aetherEvalMacros(macro_bytecode) {

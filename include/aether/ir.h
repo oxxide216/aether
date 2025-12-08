@@ -184,9 +184,9 @@ typedef struct {
 #pragma pack(push, 1)
 struct IrExpr {
   u8         kind;
+  u8         is_dead;
   IrExprAs   as;
   IrExprMeta meta;
-  bool       is_used;
 };
 #pragma pack(pop)
 

@@ -59,7 +59,7 @@
 
 (let make-env [args] -> import 'make-env')
 (let compile [env code path with-macros] -> import 'compile')
-(let eval-compiled [env bytecode path] -> import 'eval-compiled')
+(let eval-compiled [env bytecode] -> import 'eval-compiled')
 (let eval-macros [env macro-bytecode] -> import 'eval-macros')
 (let eval [env code path] -> import 'eval')
 

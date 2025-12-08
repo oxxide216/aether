@@ -10,7 +10,7 @@ typedef Da(Def) Defs;
 void eliminate_dead_code_block(IrBlock *block, Defs *defs);
 
 void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
-  expr->is_used = expr->kind != IrExprKindVarDef;
+  expr->is_dead = expr->kind == IrExprKindVarDef;
 
   switch (expr->kind) {
   case IrExprKindBlock: {
@@ -67,11 +67,13 @@ void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
       Def *def = defs->items + i - 1;
 
       if (str_eq(def->name, expr->as.ident)) {
-        def->expr->is_used = true;
-        if (def->expr->as.var_def.expr->kind == IrExprKindLambda)
-          eliminate_dead_code_block(&def->expr->as.var_def.expr->as.lambda.body, defs);
-        else
-          eliminate_dead_code_expr(def->expr->as.var_def.expr, defs);
+        if (def->expr->is_dead) {
+          def->expr->is_dead = false;
+          if (def->expr->as.var_def.expr->kind == IrExprKindLambda)
+            eliminate_dead_code_block(&def->expr->as.var_def.expr->as.lambda.body, defs);
+          else
+            eliminate_dead_code_expr(def->expr->as.var_def.expr, defs);
+        }
 
         break;
       }
@@ -83,7 +85,9 @@ void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
   case IrExprKindFloat: break;
   case IrExprKindBool: break;
 
-  case IrExprKindLambda: break;
+  case IrExprKindLambda: {
+    eliminate_dead_code_block(&expr->as.lambda.body, defs);
+  } break;
 
   case IrExprKindDict: {
     for (u32 i = 0; i < expr->as.dict.len; ++i) {
@@ -111,9 +115,8 @@ void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
 }
 
 void eliminate_dead_code_block(IrBlock *block, Defs *defs) {
-  for (u32 i = 0; i < block->len; ++i) {
+  for (u32 i = 0; i < block->len; ++i)
     eliminate_dead_code_expr(block->items[i], defs);
-  }
 }
 
 void eliminate_dead_code(Ir *ir) {

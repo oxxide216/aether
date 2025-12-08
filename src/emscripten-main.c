@@ -5,6 +5,8 @@
 #include "aether/vm.h"
 #include "aether/misc.h"
 #include "shl/shl-defs.h"
+#define SHL_STR_IMPLEMENTATION
+#include "shl/shl-str.h"
 
 typedef Da(char *) CStrs;
 
@@ -43,11 +45,10 @@ static char *value_to_cstr(Value *value) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-char *emscripten_eval_compiled(u8 *bytecode, u32 bytecode_len, char *file_path) {
+char *emscripten_eval_compiled(u8 *bytecode, u32 bytecode_len) {
   Arena ir_arena = {0};
-  Ir ir = deserialize(bytecode, bytecode_len, &ir_arena);
+  Ir ir = deserialize(bytecode, bytecode_len, &ir_arena, &vm.current_file_path);
 
-  vm.current_file_path = STR(file_path, strlen(file_path));
   Value *result = execute_block(&vm, &ir, true);
 
   arena_free(&ir_arena);
@@ -78,10 +79,10 @@ EMSCRIPTEN_KEEPALIVE
 char *emscripten_eval(char *code, char *file_path) {
   Arena ir_arena = {0};
   Str file_path_str = { file_path, strlen(file_path) };
-  Ir ir = parse_ex(STR(code, strlen(code)), file_path,
+  Ir ir = parse_ex(STR(code, strlen(code)), file_path_str,
                    &macros, &included_files, &ir_arena);
 
-  vm.current_file_path = STR(file_path, strlen(file_path));
+  vm.current_file_path = file_path_str;
   expand_macros_block(&ir, &macros, NULL, NULL, false, &ir_arena, file_path_str);
 
   Value *result = execute_block(&vm, &ir, true);

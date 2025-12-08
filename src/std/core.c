@@ -859,8 +859,6 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
 
   u32 prev_macros_len = env->as.env->macros.len;
 
-  printf("----------\n");
-
   Arena ir_arena = {0};
   FilePaths included_files = {0};
   Ir ir = parse_ex(code->as.string, path->as.string,
@@ -904,13 +902,12 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
 Value *eval_compiled_intrinsic(Vm *vm, Value **args) {
   Value *env = args[0];
   Value *bytecode = args[1];
-  Value *path = args[2];
 
   Arena ir_arena = {0};
   Ir ir = deserialize((u8 *) bytecode->as.string.ptr,
-                      bytecode->as.string.len, &ir_arena);
+                      bytecode->as.string.len, &ir_arena,
+                      &env->as.env->vm.current_file_path);
 
-  env->as.env->vm.current_file_path = path->as.string;
   Value *result = execute_block(&env->as.env->vm, &ir, true);
 
   return value_clone(result, vm->current_frame);
@@ -1065,8 +1062,8 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("compile"), true, 4,
     { ValueKindEnv, ValueKindString, ValueKindString, ValueKindBool },
     &compile_intrinsic },
-  { STR_LIT("eval-compiled"), true, 3,
-    { ValueKindEnv, ValueKindString, ValueKindString },
+  { STR_LIT("eval-compiled"), true, 2,
+    { ValueKindEnv, ValueKindString },
     &eval_compiled_intrinsic },
   { STR_LIT("eval-macros"), false, 2,
     { ValueKindEnv, ValueKindString },

@@ -217,20 +217,20 @@ static void load_block_data(IrBlock *block, u8 *data, u32 *end,
   }
 }
 
-static void load_path_offsets_data(FilePathOffsets *path_offsets, u8 *data,
-                                   u32 *end, Arena *arena) {
+static void load_path_offsets_data(FilePathOffsets *path_offsets,
+                                   u8 *data, u32 *end, Arena *arena) {
   path_offsets->len = *(u32 *) (data + *end);
   path_offsets->cap = path_offsets->len;
   *end += sizeof(u32);
 
-  path_offsets->items = arena_alloc(arena, path_offsets->cap * sizeof(Str));
+  path_offsets->items = arena_alloc(arena, path_offsets->cap * sizeof(FilePathOffset));
   for (u32 i = 0; i < path_offsets->len; ++i) {
     path_offsets->items[i].offset = *end;
     load_str_data(&path_offsets->items[i].path, data, end, arena);
   }
 }
 
-Ir deserialize(u8 *data, u32 size, Arena *arena) {
+Ir deserialize(u8 *data, u32 size, Arena *arena, Str *file_path) {
   Ir ir = {0};
 
   if (size < sizeof(u32) * 2) {
@@ -254,6 +254,9 @@ Ir deserialize(u8 *data, u32 size, Arena *arena) {
 
   FilePathOffsets path_offsets = {0};
   load_path_offsets_data(&path_offsets, data, &end, arena);
+
+  *file_path = path_offsets.items[0].path;
+
   load_block_data(&ir, data, &end, &path_offsets, arena);
 
   return ir;
@@ -281,6 +284,9 @@ Macros deserialize_macros(u8 *data, u32 size, Arena *arena) {
 
   u32 end = sizeof(u32) * 2;
 
+  FilePathOffsets path_offsets = {0};
+  load_path_offsets_data(&path_offsets, data, &end, arena);
+
   macros.len = *(u32 *) (data + end);
   macros.cap = macros.len;
   end += sizeof(u32);
@@ -297,9 +303,6 @@ Macros deserialize_macros(u8 *data, u32 size, Arena *arena) {
     macro->arg_names.items = arena_alloc(arena, macro->arg_names.len * sizeof(Str));
     for (u32 j = 0; j < macro->arg_names.len; ++j)
       load_str_data(macro->arg_names.items + j, data, &end, arena);
-
-    FilePathOffsets path_offsets = {0};
-    load_path_offsets_data(&path_offsets, data, &end, arena);
 
     load_block_data(&macro->body, data, &end, &path_offsets, arena);
 
