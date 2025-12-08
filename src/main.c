@@ -2,6 +2,7 @@
 
 #include "io.h"
 #include "aether/parser.h"
+#include "aether/deserializer.h"
 #include "aether/common.h"
 #include "aether/vm.h"
 #include "shl/shl-defs.h"
@@ -9,17 +10,23 @@
 #define SHL_STR_IMPLEMENTATION
 #include "shl/shl-str.h"
 
+typedef struct {
+  char *cstr;
+  bool  is_precompiled;
+} Path;
+
 extern InternStrings intern_strings;
 extern CachedIrs cached_irs;
 #ifndef NOSYSTEM
 extern StringBuilder printf_sb;
 #endif
 
-static char *loader_paths[] = {
-  "/usr/include/aether/load/loader.ae",
-  "ae-src/loader.ae",
+static Path loader_paths[] = {
+  { "/usr/include/aether/load/loader.abc", true },
+  { "ae-src/loader.ae", false },
 };
 
+static Arena arena = {0};
 static Vm vm = {0};
 
 void cleanup(void) {
@@ -32,6 +39,7 @@ void cleanup(void) {
 
   free(printf_sb.buffer);
 
+  arena_free(&arena);
   vm_destroy(&vm);
 }
 
@@ -43,13 +51,13 @@ void sigint_handler(i32 signal) {
 
 i32 main(i32 argc, char **argv) {
   Str code = { NULL, (u32) -1 };
-  char *path_found = NULL;
+  Path *path = NULL;
 
   for (u32 i = 0; i < ARRAY_LEN(loader_paths); ++i) {
-    code = read_file(loader_paths[i]);
+    code = read_file(loader_paths[i].cstr);
 
     if (code.len != (u32) -1) {
-      path_found = loader_paths[i];
+      path = loader_paths + i;
       break;
     }
   }
@@ -61,13 +69,17 @@ i32 main(i32 argc, char **argv) {
 
   signal(SIGINT, sigint_handler);
 
-  Ir ir = parse(code, path_found);
+  Ir ir;
+  if (path->is_precompiled)
+    ir = deserialize((u8 *) code.ptr, code.len, &arena);
+  else
+    ir = parse(code, path->cstr);
 
   free(code.ptr);
 
   Intrinsics intrinsics = {0};
   vm = vm_create(argc, argv, &intrinsics);
-  vm.current_file_path = STR(path_found, strlen(path_found));
+  vm.current_file_path = STR(path->cstr, strlen(path->cstr));
   execute_block(&vm, &ir, false);
 
   cleanup();

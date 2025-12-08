@@ -17,7 +17,7 @@ static void load_str_data(Str *str, u8 *data, u32 *end, Arena *arena) {
 }
 
 static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
-                           FilePathOffsets *path_offsets,Arena *arena) {
+                           FilePathOffsets *path_offsets, Arena *arena) {
   expr->kind = *(u8 *) (data + *end);
   *end += sizeof(u8);
 

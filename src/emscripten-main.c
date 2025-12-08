@@ -79,7 +79,7 @@ char *emscripten_eval(char *code, char *file_path) {
   Arena ir_arena = {0};
   Str file_path_str = { file_path, strlen(file_path) };
   Ir ir = parse_ex(STR(code, strlen(code)), file_path,
-                   &macros, &included_files, ir_arena);
+                   &macros, &included_files, &ir_arena);
 
   vm.current_file_path = STR(file_path, strlen(file_path));
   expand_macros_block(&ir, &macros, NULL, NULL, false, &ir_arena, file_path_str);
