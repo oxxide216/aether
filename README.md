@@ -27,8 +27,18 @@ Same code runs as:
 
 - **C compiler**
 - **Bash**
+- **Lexgen**
 
 That's it!
+
+### Installing Lexgen
+
+```shell
+git clone https://github.com/oxxide216/lexgen --recursive
+cd lexgen
+./build.sh
+sudo cp lexgen /usr/bin
+```
 
 ## Quick start
 
