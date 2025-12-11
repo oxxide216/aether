@@ -40,7 +40,11 @@ if [ "$GLASS" != "" ]; then
   fi
 fi
 
-lexgen src/lib/grammar.h src/lib/grammar.lg
+cd libs/lexgen
+./build.sh
+cd ../..
+
+libs/lexgen/lexgen src/lib/grammar.h src/lib/grammar.lg
 
 $CC -o $OUT $BIN_SRC $MISC_SRC $LIB_SRC $STD_SRC \
             $LIBS_SRC $CFLAGS $LDFLAGS $BUILD_FLAGS
