@@ -234,10 +234,12 @@ static TokenStatus lex(Lexer *lexer, Token *token, Str file_path, Arena *arena) 
         wchar next = get_next_wchar(lexer->code, 0, &next_len);
 
         if (is_escaped || next != U'\\') {
-          if (is_escaped)
+          if (is_escaped) {
             sb_push_char(&lexer->temp_sb, escape_char(&lexer->code, &lexer->col));
-          else
-            sb_push_wchar(&lexer->temp_sb, next);
+          } else {
+            for (u32 i = 0; i < next_len; ++i)
+              sb_push_char(&lexer->temp_sb, lexer->code.ptr[i]);
+          }
         }
 
         if (is_escaped)
