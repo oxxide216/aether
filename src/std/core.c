@@ -5,6 +5,7 @@
 #include "aether/misc.h"
 #include "aether/macros.h"
 #include "aether/arena.h"
+#include "lexgen/runtime.h"
 
 Value *head_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
@@ -55,12 +56,11 @@ Value *get_index_intrinsic(Vm *vm, Value **args) {
       ++i;
     }
   } else if (collection->kind == ValueKindString) {
-    if (item->as.string.len != 1)
-      PANIC(vm->current_frame, "get-index: item should be one-sized\n");
-
-    for (u32 i = 0; i < collection->as.string.len; ++i)
-      if (collection->as.string.ptr[i] == item->as.string.ptr[0])
-        return value_int(i, vm->current_frame);
+    if (item->as.string.len <= collection->as.string.len) {
+      for (u32 i = 0; i < collection->as.string.len - item->as.string.len; ++i)
+        if (str_eq(STR(collection->as.string.ptr + i, item->as.string.len), item->as.string))
+          return value_int(i, vm->current_frame);
+    }
   }
 
   return value_unit(vm->current_frame);
@@ -79,7 +79,16 @@ Value *len_intrinsic(Vm *vm, Value **args) {
 
     return value_int(len, vm->current_frame);
   } else if (value->kind == ValueKindString) {
-    return value_int(value->as.string.len, vm->current_frame);
+    u32 len = 0;
+    u32 index = 0;
+    u32 wchar_len;
+
+    while (get_next_wchar(value->as.string, index, &wchar_len)) {
+      ++len;
+      index += wchar_len;
+    }
+
+    return value_int(len, vm->current_frame);
   }
 
   return value_unit(vm->current_frame);

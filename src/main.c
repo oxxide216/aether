@@ -1,4 +1,5 @@
 #include <signal.h>
+#include <locale.h>
 
 #include "aether/parser.h"
 #include "aether/deserializer.h"
@@ -50,6 +51,8 @@ void sigint_handler(i32 signal) {
 }
 
 i32 main(i32 argc, char **argv) {
+  setlocale(LC_ALL, "");
+
   Str code = { NULL, (u32) -1 };
   Path *path = NULL;
 

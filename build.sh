@@ -3,14 +3,14 @@
 # Compiler
 CC=cc
 OUT=aether
-CFLAGS="-Wall -Wextra -Iinclude -Ilibs \
-        -Ilibs/winx/include -Ilibs/glass/include -lm"
+CFLAGS="-Wall -Wextra -Iinclude -Ilibs -Ilibs/winx/include \
+        -Ilibs/glass/include -Ilibs/lexgen/include -lm"
 BUILD_FLAGS="${@:1}"
 LDFLAGS="-z execstack"
 BIN_SRC="src/main.c"
 LIB_SRC="$(find src/lib -name "*.c")"
 STD_SRC="src/std/core.c src/std/math.c src/std/str.c"
-LIBS_SRC="$(find libs/lexgen/runtime-src -name "*.c")"
+LIBS_SRC="$(find libs/lexgen/src/runtime -name "*.c") libs/lexgen/src/common/wstr.c"
 
 if [ "$AETHER_GRAPHICS" == "" ]; then
   AETHER_GRAPHICS=x11
