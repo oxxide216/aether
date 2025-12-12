@@ -865,6 +865,7 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Value *code = args[1];
   Value *path = args[2];
   Value *with_macros = args[3];
+  Value *dce = args[4];
 
   u32 prev_macros_len = env->as.env->macros.len;
 
@@ -882,7 +883,8 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   result->next->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
 
   Str bytecode = {0};
-  bytecode.ptr = (char *) serialize(&ir, &bytecode.len, &included_files);
+  bytecode.ptr = (char *) serialize(&ir, &bytecode.len,
+                                    &included_files, dce->as._bool);
   char *new_ptr = arena_alloc(&vm->current_frame->arena, bytecode.len);
   memcpy(new_ptr, bytecode.ptr, bytecode.len);
   free(bytecode.ptr);
@@ -893,7 +895,8 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
     Str macro_bytecode = {0};
     macro_bytecode.ptr = (char *) serialize_macros(&env->as.env->macros,
                                                    &macro_bytecode.len,
-                                                   &included_files);
+                                                   &included_files,
+                                                   dce->as._bool);
     char *new_ptr = arena_alloc(&vm->current_frame->arena, macro_bytecode.len);
     memcpy(new_ptr, macro_bytecode.ptr, macro_bytecode.len);
     free(macro_bytecode.ptr);
@@ -918,6 +921,12 @@ Value *eval_compiled_intrinsic(Vm *vm, Value **args) {
                       &env->as.env->vm.current_file_path);
 
   Value *result = execute_block(&env->as.env->vm, &ir, true);
+
+  if (env->as.env->vm.state != ExecStateContinue)
+    env->as.env->vm.state = ExecStateContinue;
+
+  if (env->as.env->vm.exit_code != 0)
+    env->as.env->vm.exit_code = 0;
 
   return value_clone(result, vm->current_frame);
 }
@@ -960,6 +969,12 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
                       &ir_arena, env->as.env->vm.current_file_path);
 
   Value *result = execute_block(&env->as.env->vm, &ir, true);
+
+  if (env->as.env->vm.state != ExecStateContinue)
+    env->as.env->vm.state = ExecStateContinue;
+
+  if (env->as.env->vm.exit_code != 0)
+    env->as.env->vm.exit_code = 0;
 
   return value_clone(result, vm->current_frame);
 }
@@ -1068,8 +1083,9 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("is-env"), true, 1, { ValueKindUnit }, &is_env_intrinsic },
   // Env
   { STR_LIT("make-env"), true, 1, { ValueKindList }, &make_env_intrinsic },
-  { STR_LIT("compile"), true, 4,
-    { ValueKindEnv, ValueKindString, ValueKindString, ValueKindBool },
+  { STR_LIT("compile"), true, 5,
+    { ValueKindEnv, ValueKindString, ValueKindString,
+      ValueKindBool, ValueKindBool },
     &compile_intrinsic },
   { STR_LIT("eval-compiled"), true, 2,
     { ValueKindEnv, ValueKindString },

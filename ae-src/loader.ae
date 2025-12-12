@@ -22,6 +22,7 @@
 (let mode parsed::'mode')
 (let output-path parsed::'output-path')
 (let output-macros-path parsed::'output-macros-path')
+(let dce parsed::'dce')
 
 (if (unit? input-path)
   (error 'No input file was provided')
@@ -47,7 +48,7 @@
   mode-compile-only ->
     (do
       (let compiled (compile env input-file-content input-path
-                             (to-bool output-macros-path)))
+                             (to-bool output-macros-path) dce))
 
       (if output-path
         (write-file output-path compiled::0))

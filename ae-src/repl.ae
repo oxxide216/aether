@@ -10,6 +10,7 @@
 
 (let history [])
 (let is-running true)
+(let i 0)
 
 (let read-line [prompt] ->
   (let buffer '')
@@ -88,19 +89,19 @@
     (let command (read-line (+ term/fg-magenta (+ ' > ' term/reset))))
     (if (or (unit? command) (== command 'quit'))
       (set is-running false)
-      (println '')
-     elif command
+      (print '\n')
+     else
       (if (unit? (last history))
         (set history (+ history command))
        elif (!= (last history) command)
         (set history (+ history command)))
 
       (print '\n')
-      (let result (eval env command '<repl>'))
+      (let result (eval env command (join ['<repl:' (to-str i) '>'] '')))
       (if result
         (println term/fg-green '=> ' term/reset result))
-     else
-      (print '\n')))
+
+    (set i (+ i 1))))
 
   (block-input)
   (term/raw-mode-off))

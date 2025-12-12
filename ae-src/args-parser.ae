@@ -8,6 +8,7 @@
   (let mode mode-default)
   (let output-path unit)
   (let output-macros-path unit)
+  (let dce true)
 
   (while (head args)
     (if (or (== (head args) '-h') (== (head args) '--help'))
@@ -15,7 +16,8 @@
              'With no FILE, start REPL.\n\n'
              '  -h --help                 show this message.\n'
              '  -c [FILE]                 output bytecode into [FILE].\n'
-             '  -m [FILE]                 output macros bytecode into [FILE].\n')
+             '  -m [FILE]                 output macros bytecode into [FILE].\n'
+             '  --no-dce                  don\'t apply dead code ellimination.\n')
       (exit 0)
      elif (== (head args) '-c')
       (set args (tail args))
@@ -31,6 +33,8 @@
         (exit 1))
       (set output-macros-path (head args))
       (set mode mode-compile-only)
+     elif (== (head args) '--no-dce')
+        (set dce false)
      elif (begins-with (head args) '-')
       (error 'Unknown flag: ' (head args))
       (exit 1)
@@ -40,6 +44,7 @@
         'mode': mode
         'output-path': output-path
         'output-macros-path': output-macros-path
+        'dce': dce
       }))
     (set args (tail args)))
 
@@ -48,4 +53,5 @@
     'mode': mode
     'output-path': output-path
     'output-macros-path': output-macros-path
+    'dce': dce
   })

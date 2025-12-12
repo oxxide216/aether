@@ -215,12 +215,13 @@ static void save_included_files(u8 **data, u32 *data_size, u32 *end,
   }
 }
 
-u8 *serialize(Ir *ir, u32 *size, FilePaths *included_files) {
+u8 *serialize(Ir *ir, u32 *size, FilePaths *included_files, bool dce) {
   *size = sizeof(u32) * 2;
   u32 data_size = sizeof(u32) * 2;
   u8 *data = malloc(data_size);
 
-  eliminate_dead_code(ir);
+  if (dce)
+    eliminate_dead_code(ir);
 
   FilePathOffsets path_offsets = {0};
   save_included_files(&data, &data_size, size, included_files, &path_offsets);
@@ -235,7 +236,8 @@ u8 *serialize(Ir *ir, u32 *size, FilePaths *included_files) {
   return data;
 }
 
-u8 *serialize_macros(Macros *macros, u32 *size, FilePaths *included_files) {
+u8 *serialize_macros(Macros *macros, u32 *size,
+                     FilePaths *included_files, bool dce) {
   *size = sizeof(u32) * 2;
   u32 data_size = sizeof(u32) * 2;
   u8 *data = malloc(data_size);
@@ -259,7 +261,8 @@ u8 *serialize_macros(Macros *macros, u32 *size, FilePaths *included_files) {
     for (u32 i = 0; i < macro->arg_names.len; ++i)
       save_str_data(macro->arg_names.items[i], &data, &data_size, size);
 
-    eliminate_dead_code(&macro->body);
+    if (dce)
+      eliminate_dead_code(&macro->body);
 
     save_block_data(&macro->body, &data, &data_size, size, &path_offsets);
 
