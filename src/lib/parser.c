@@ -1,22 +1,25 @@
 #include <wchar.h>
+#include <unistd.h>
 
 #define SHL_DEFS_LL_ALLOC(size) arena_alloc(arena, size)
 
 #include "aether/parser.h"
 #include "aether/macros.h"
 #include "aether/common.h"
+#include "aether/deserializer.h"
 #include "aether/io.h"
 #include "lexgen/runtime.h"
 #define LEXGEN_TRANSITION_TABLE_IMPLEMENTATION
 #include "grammar.h"
 #include "shl/shl-log.h"
 
-#define STD_PREFIX_RT "/usr/include/aether/"
 #define STD_PREFIX_CT "ae-src/"
+#define STD_PREFIX_RT "/usr/include/aether/"
 
-#define INCLUDE_PATHS(current_file_path) { current_file_path, \
-                                           STD_PREFIX_RT,     \
-                                           STD_PREFIX_CT }
+#define INCLUDE_PATHS { NULL,           \
+                        STD_PREFIX_CT,  \
+                        STD_PREFIX_RT }
+#define INCLUDE_PATHS_LEN 3
 
 #define MASK(id) (1 << (id))
 
@@ -219,7 +222,7 @@ static TokenStatus lex(Lexer *lexer, Token *token, Str file_path, Arena *arena) 
       wchar _wchar = get_next_wchar(lexer->code, 0, &wchar_len);
 
       PERROR(STR_FMT":%u:%u: ", "Unexpected `%lc`\n", STR_ARG(file_path),
-             row + 1, col + 1, (wint_t) _wchar);
+             lexer->row + 1, lexer->col + 1, (wint_t) _wchar);
       exit(1);
     }
 
@@ -357,7 +360,7 @@ Ir parse_ex(Str code, Str file_path, Macros *macros,
   for (u32 i = 0; i < cached_irs.len; ++i) {
     CachedIr *cached_ir = cached_irs.items + i;
 
-    if (str_eq(cached_ir->path, file_path)) {
+    if (str_eq(cached_ir->file_path, file_path)) {
       DA_EXTEND(*macros, cached_ir->macros);
       DA_EXTEND(*included_files, cached_ir->included_files);
       *arena = cached_ir->arena;
@@ -391,7 +394,10 @@ Ir parse_ex(Str code, Str file_path, Macros *macros,
   memcpy(cached_included_files.items, included_files->items,
          cached_included_files.len * sizeof(Str));
 
-  CachedIr cached_ir = { file_path, parser.ir, cached_macros, cached_included_files, *arena };
+  CachedIr cached_ir = {
+    file_path, parser.ir, cached_macros,
+    cached_included_files, *arena,
+  };
   DA_APPEND(cached_irs, cached_ir);
 
   free(parser.lexer.temp_sb.buffer);
@@ -717,76 +723,87 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
     case TT_USE: {
       parser_next_token(parser);
 
-      Str current_file_path = parser->file_path;
-
-      Str new_file_path = parser_expect_token(parser, MASK(TT_STR)).lexeme;
-      new_file_path.ptr += 1;
-      new_file_path.len -= 2;
+      Str module_path = parser_expect_token(parser, MASK(TT_STR)).lexeme;
+      module_path.ptr += 1;
+      module_path.len -= 2;
 
       parser_expect_token(parser, MASK(TT_CPAREN));
 
-      char *prefix = str_to_cstr(get_file_dir(current_file_path));
-      char *include_paths[] = INCLUDE_PATHS(prefix);
+      Str prefix = get_file_dir(parser->file_path);
+      char *prefix_cstr = str_to_cstr(prefix);
+      char *include_paths[INCLUDE_PATHS_LEN] = INCLUDE_PATHS;
+      include_paths[0] = prefix_cstr;
       StringBuilder path_sb = {0};
-      Str path = {0};
       Str code = { NULL, (u32) -1 };
-      bool already_included = false;
+      Str path = {0};
+
+      Arena arena = {0};
 
       for (u32 i = 0; i < ARRAY_LEN(include_paths); ++i) {
         sb_push(&path_sb, include_paths[i]);
-        sb_push_str(&path_sb, new_file_path);
-        sb_push_char(&path_sb, '\0');
+        sb_push_str(&path_sb, module_path);
+        sb_push_str(&path_sb, STR_LIT(".abm\0"));
 
-        path = (Str) { path_sb.buffer, path_sb.len };
+        code = read_file_arena(path_sb.buffer, &arena);
 
-        path_sb.len = 0;
+        if (code.len != (u32) -1) {
+          --path_sb.len; // exclude NULL-terminator
+          path = copy_str(sb_to_str(path_sb), &arena);
 
-        already_included = false;
-        for (u32 j = 0; j < parser->included_files->len; ++j) {
-          if (str_eq(parser->included_files->items[j], path)) {
-            already_included = true;
+          break;
+        } else {
+          path_sb.len -= 5;
+
+          sb_push_str(&path_sb, STR_LIT(".ae\0"));
+
+          code = read_file_arena(path_sb.buffer, &arena);
+
+          if (code.len != (u32) -1) {
+            --path_sb.len; // exclude NULL-terminator
+            path = copy_str(sb_to_str(path_sb), &arena);
 
             break;
           }
         }
 
-        if (already_included)
-          break;
-
-        code = read_file_arena(path.ptr, parser->arena);
-
-        if (code.len != (u32) -1) {
-          char *new_ptr = arena_alloc(parser->arena, path.len);
-          memcpy(new_ptr, path.ptr, path.len);
-          path.ptr = new_ptr;
-
-          break;
-        }
+        path_sb.len = 0;
       }
 
+      if (prefix_cstr)
+        free(prefix_cstr);
       if (path_sb.buffer)
         free(path_sb.buffer);
 
-      if (already_included) {
-        free(prefix);
-
+      if (code.len == (u32) -1) {
+        PERROR(STR_FMT":%u:%u: ", "Could not import `"STR_FMT"` module\n",
+               STR_ARG(parser->file_path), token.row + 1,
+               token.col + 1, STR_ARG(module_path));
         return NULL;
       }
 
-      if (code.len == (u32) -1) {
-        PERROR(STR_FMT":%u:%u: ", "File "STR_FMT" was not found\n",
-               STR_ARG(parser->file_path), token.row + 1, token.col + 1,
-               STR_ARG(new_file_path));
-        exit(1);
-      }
-
-      Arena arena = {0};
       expr->kind = IrExprKindBlock;
-      expr->as.block.block = parse_ex(code, path, parser->macros,
-                                      parser->included_files, &arena);
       expr->as.block.file_path = path;
 
-      free(prefix);
+      bool already_included = false;
+
+      for (u32 i = 0; i < parser->included_files->len; ++i) {
+        if (str_eq(parser->included_files->items[i], path)) {
+          str_println(parser->included_files->items[i]);
+
+          already_included = true;
+
+          expr->as.block.file_path = path;
+
+          return expr;
+        }
+      }
+
+      if (!already_included) {
+        DA_APPEND(*parser->included_files, path);
+
+        expr->as.block.block = parse_ex(code, path, parser->macros,
+                                        parser->included_files, &arena);
+      }
     } break;
 
     case TT_SET: {

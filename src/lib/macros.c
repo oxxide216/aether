@@ -419,6 +419,8 @@ void expand_macros(IrExpr *expr, Macros *macros,
 
   case IrExprKindFuncCall: {
     INLINE_THEN_EXPAND(expr->as.func_call.func);
+    expand_macros_block(&expr->as.func_call.args, macros, arg_names,
+                        args, unpack, arena, file_path);
 
     if (expr->as.func_call.func->kind == IrExprKindIdent) {
       Str name = expr->as.func_call.func->as.ident;
@@ -492,9 +494,6 @@ void expand_macros(IrExpr *expr, Macros *macros,
         break;
       }
     }
-
-    expand_macros_block(&expr->as.func_call.args, macros, arg_names,
-                        args, unpack, arena, file_path);
   } break;
 
   case IrExprKindVarDef: {

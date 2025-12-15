@@ -1,4 +1,4 @@
-(use 'std/base.ae')
+(use 'std/base')
 
 (let term/up        '\e[A')
 (let term/down      '\e[B')

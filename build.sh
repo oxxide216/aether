@@ -51,8 +51,7 @@ $CC -o $OUT $BIN_SRC $MISC_SRC $LIB_SRC $STD_SRC \
 
 if [ "$WASM" != "" ]; then
   rm -rf dest/
-  mkdir dest/
-  cp js-src/aether-web.js dest/
+  mkdir -p dest/std
 
   if [ "$EMCC_PATH" != "" ]; then
     PATH="$PATH:$EMCC_PATH:$EMCC_PATH/upstream/emscripten:$EMCC_PATH/upstream/bin"
@@ -72,4 +71,11 @@ if [ "$WASM" != "" ]; then
 
   $CC -o $OUT $BIN_SRC $MISC_SRC $LIB_SRC $STD_SRC \
               $LIBS_SRC $CFLAGS $LDFLAGS $BUILD_FLAGS
+
+  for FILE in ae-src/std/*.ae; do
+    FILE_NAME="${FILE##*/}"
+    ./aether --no-dce -m "dest/std/${FILE_NAME%.*}.abm" "$FILE" > /dev/null
+  done
+
+  cp -r dest/* js-src/aether-web.js docs/
 fi

@@ -1,8 +1,8 @@
-(use 'std/core.ae')
-(use 'std/base.ae')
-(use 'std/str.ae')
+(use 'std/core')
+(use 'std/base')
+(use 'std/str')
 
-(use 'config.ae')
+(use 'config')
 
 (let parse-args [args] ->
   (let mode mode-default)

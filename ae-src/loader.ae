@@ -1,14 +1,14 @@
-(use 'std/core.ae')
-(use 'std/base.ae')
-(use 'std/term.ae')
-(use 'std/str.ae')
-(use 'std/io.ae')
-(use 'std/log.ae')
+(use 'std/core')
+(use 'std/base')
+(use 'std/term')
+(use 'std/str')
+(use 'std/io')
+(use 'std/log')
 
-(use 'config.ae')
-(use 'module-loader.ae')
-(use 'args-parser.ae')
-(use 'repl.ae')
+(use 'config')
+(use 'module-loader')
+(use 'args-parser')
+(use 'repl')
 
 (let args (get-args))
 
@@ -35,7 +35,9 @@
 
 (if (== mode mode-default)
   (if (== (get-range input-file-content 0 4) 'ABC\0')
-    (set mode mode-eval-bytecode)))
+    (set mode mode-eval-bytecode)
+   elif (== (get-range input-file-content 0 4) 'ABM\0'))
+    (set mode mode-eval-macros))
 
 (let env (make-env parsed-args))
 
@@ -45,14 +47,17 @@
 (match mode
   mode-default -> (eval env input-file-content input-path)
   mode-eval-bytecode -> (eval-compiled env input-file-content input-path)
+  mode-eval-macros -> (eval-macros env dce)
   mode-compile-only ->
     (do
       (let compiled (compile env input-file-content input-path
                              (to-bool output-macros-path) dce))
 
       (if output-path
-        (write-file output-path compiled::0))
-      (if compiled::1
-        (write-file output-macros-path compiled::1)
-       elif output-macros-path
-        (info 'There were no macros found in ' input-path))))
+        (write-file output-path compiled::'compiled'))
+
+      (if output-macros-path
+        (if (unit? compiled::'compiled-macros')
+          (info 'No macros found in ' input-path)
+         elif
+          (write-file output-macros-path compiled::'compiled-macros')))))

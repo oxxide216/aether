@@ -2,6 +2,8 @@ let _aetherEvalCompiled = null;
 let _aetherEvalMacros = null;
 let _aetherEval = null;
 
+let aetherI = 0;
+
 async function fetchBinaryFile(path) {
   const response = await fetch(path);
   const content = await response.blob();
@@ -41,5 +43,5 @@ function aetherEvalMacros(macro_bytecode) {
 }
 
 function aetherEval(code) {
-  return _aetherEval(code, 'aether-web.js');
+  return _aetherEval(code, 'aether-web:' + aetherI++);
 }

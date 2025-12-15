@@ -8,7 +8,7 @@
 typedef Da(Str) FilePaths;
 
 typedef struct {
-  Str       path;
+  Str       file_path;
   Ir        ir;
   Macros    macros;
   FilePaths included_files;

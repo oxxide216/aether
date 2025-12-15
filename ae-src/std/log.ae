@@ -1,6 +1,6 @@
-(use 'std/base.ae')
-(use 'std/str.ae')
-(use 'std/term.ae')
+(use 'std/base')
+(use 'std/str')
+(use 'std/term')
 
 (macro error [...messages] ->
   (println term/fg-red term/bold '[ERROR]'

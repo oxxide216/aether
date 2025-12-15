@@ -262,9 +262,9 @@ bool value_eq(Value *a, Value *b) {
 static Var *get_var(Vm *vm, Str name) {
   StackFrame *frame = vm->current_frame;
   while (frame) {
-    for (u32 j = frame->vars.len; j > 0; --j)
-      if (str_eq(frame->vars.items[j - 1].name, name))
-        return frame->vars.items + j - 1;
+    for (u32 i = frame->vars.len; i > 0; --i)
+      if (str_eq(frame->vars.items[i - 1].name, name))
+        return frame->vars.items + i - 1;
 
     if (!frame->can_lookup_through)
       break;

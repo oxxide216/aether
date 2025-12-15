@@ -1,4 +1,4 @@
-(use 'std/str.ae')
+(use 'std/str')
 
 (let button-left 0)
 (let button-middle 1)

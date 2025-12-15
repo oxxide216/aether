@@ -38,7 +38,8 @@ void cleanup(void) {
     arena_free(&cached_irs.items[i].arena);
   free(cached_irs.items);
 
-  free(printf_sb.buffer);
+  if (printf_sb.buffer)
+    free(printf_sb.buffer);
 
   arena_free(&arena);
   vm_destroy(&vm);

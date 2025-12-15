@@ -864,7 +864,7 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Value *env = args[0];
   Value *code = args[1];
   Value *path = args[2];
-  Value *with_macros = args[3];
+  Value *compile_macros = args[3];
   Value *dce = args[4];
 
   u32 prev_macros_len = env->as.env->macros.len;
@@ -885,30 +885,41 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Str bytecode = {0};
   bytecode.ptr = (char *) serialize(&ir, &bytecode.len,
                                     &included_files, dce->as._bool);
+
   char *new_ptr = arena_alloc(&vm->current_frame->arena, bytecode.len);
   memcpy(new_ptr, bytecode.ptr, bytecode.len);
   free(bytecode.ptr);
   bytecode.ptr = new_ptr;
-  result->next->value = value_string(bytecode, vm->current_frame);
 
-  if (with_macros->as._bool && env->as.env->macros.len != prev_macros_len) {
-    Str macro_bytecode = {0};
-    macro_bytecode.ptr = (char *) serialize_macros(&env->as.env->macros,
-                                                   &macro_bytecode.len,
-                                                   &included_files,
-                                                   dce->as._bool);
-    char *new_ptr = arena_alloc(&vm->current_frame->arena, macro_bytecode.len);
-    memcpy(new_ptr, macro_bytecode.ptr, macro_bytecode.len);
-    free(macro_bytecode.ptr);
-    macro_bytecode.ptr = new_ptr;
-    result->next->next->value = value_string(macro_bytecode, vm->current_frame);
-  } else {
-    result->next->next->value = value_unit(vm->current_frame);
+  Dict dict = {0};
+
+  Value *compiled = value_string(bytecode, vm->current_frame);
+  dict_push_value_str_key(vm->current_frame, &dict, STR_LIT("compiled"), compiled);
+
+  if (compile_macros->as._bool && env->as.env->macros.len > prev_macros_len) {
+    Macros new_macros = {
+      env->as.env->macros.items + prev_macros_len,
+      env->as.env->macros.len - prev_macros_len,
+      env->as.env->macros.len - prev_macros_len,
+    };
+    Str macros_bytecode = {0};
+    FilePaths included_files = {0};
+    macros_bytecode.ptr = (char *) serialize_macros(&new_macros,
+                                                    &macros_bytecode.len,
+                                                    &included_files, dce->as._bool);
+
+    Value *compiled_macros = value_string(macros_bytecode, vm->current_frame);
+    dict_push_value_str_key(vm->current_frame, &dict, STR_LIT("compiled-macros"), compiled_macros);
+  }
+
+  if (dict.len == 1) {
+    Value *compiled_macros = value_unit(vm->current_frame);
+    dict_push_value_str_key(vm->current_frame, &dict, STR_LIT("compiled-macros"), compiled_macros);
   }
 
   free(included_files.items);
 
-  return value_list(result, vm->current_frame);
+  return value_dict(dict, vm->current_frame);
 }
 
 Value *eval_compiled_intrinsic(Vm *vm, Value **args) {
@@ -960,15 +971,18 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
   Value *path = args[2];
 
   Arena ir_arena = {0};
-  Ir ir = parse_ex(code->as.string, path->as.string, &env->as.env->macros,
-                   &env->as.env->included_files, &ir_arena);
-
-  env->as.env->vm.current_file_path = path->as.string;
+  FilePaths included_files = {0};
+  Ir ir = parse_ex(code->as.string, path->as.string,
+                   &env->as.env->macros,
+                   &included_files, &ir_arena);
 
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false,
                       &ir_arena, env->as.env->vm.current_file_path);
 
   Value *result = execute_block(&env->as.env->vm, &ir, true);
+
+  if (included_files.items)
+    free(included_files.items);
 
   if (env->as.env->vm.state != ExecStateContinue)
     env->as.env->vm.state = ExecStateContinue;
@@ -1084,8 +1098,7 @@ Intrinsic core_intrinsics[] = {
   // Env
   { STR_LIT("make-env"), true, 1, { ValueKindList }, &make_env_intrinsic },
   { STR_LIT("compile"), true, 5,
-    { ValueKindEnv, ValueKindString, ValueKindString,
-      ValueKindBool, ValueKindBool },
+    { ValueKindEnv, ValueKindString, ValueKindString, ValueKindBool, ValueKindBool },
     &compile_intrinsic },
   { STR_LIT("eval-compiled"), true, 2,
     { ValueKindEnv, ValueKindString },

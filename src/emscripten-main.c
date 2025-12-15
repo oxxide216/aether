@@ -46,10 +46,14 @@ static char *value_to_cstr(Value *value) {
 
 EMSCRIPTEN_KEEPALIVE
 char *emscripten_eval_compiled(u8 *bytecode, u32 bytecode_len) {
+  Str prev_file_path = vm.current_file_path;
+
   Arena ir_arena = {0};
   Ir ir = deserialize(bytecode, bytecode_len, &ir_arena, &vm.current_file_path);
 
   Value *result = execute_block(&vm, &ir, true);
+
+  vm.current_file_path = prev_file_path;
 
   arena_free(&ir_arena);
 
@@ -82,10 +86,15 @@ char *emscripten_eval(char *code, char *file_path) {
   Ir ir = parse_ex(STR(code, strlen(code)), file_path_str,
                    &macros, &included_files, &ir_arena);
 
-  vm.current_file_path = file_path_str;
   expand_macros_block(&ir, &macros, NULL, NULL, false, &ir_arena, file_path_str);
 
+  Str prev_file_path = vm.current_file_path;
+
+  vm.current_file_path = file_path_str;
+
   Value *result = execute_block(&vm, &ir, true);
+
+  vm.current_file_path = prev_file_path;
 
   return value_to_cstr(result);
 }
