@@ -904,6 +904,8 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
     };
     Str macros_bytecode = {0};
     FilePaths included_files = {0};
+    DA_APPEND(included_files, path->as.string);
+
     macros_bytecode.ptr = (char *) serialize_macros(&new_macros,
                                                     &macros_bytecode.len,
                                                     &included_files, dce->as._bool);
@@ -1101,7 +1103,7 @@ Intrinsic core_intrinsics[] = {
     { ValueKindEnv, ValueKindString, ValueKindString, ValueKindBool, ValueKindBool },
     &compile_intrinsic },
   { STR_LIT("eval-compiled"), true, 2,
-    { ValueKindEnv, ValueKindString },
+    { ValueKindEnv, ValueKindBool },
     &eval_compiled_intrinsic },
   { STR_LIT("eval-macros"), false, 2,
     { ValueKindEnv, ValueKindString },
