@@ -32,7 +32,7 @@
         (error '-m flag requires an argument')
         (exit 1))
       (set output-macros-path (head args))
-      (set mode mode-compile-only)
+      (set mode mode-compile-macros-only)
      elif (== (head args) '--no-dce')
         (set dce false)
      elif (begins-with (head args) '-')

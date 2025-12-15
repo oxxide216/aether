@@ -799,6 +799,31 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
       if (!already_included) {
         DA_APPEND(*parser->included_files, path);
 
+        Str magic = {
+          code.ptr,
+          sizeof(u32),
+        };
+
+        if (str_eq(magic, STR_LIT("ABM\0"))) {
+          Macros macros = deserialize_macros((u8 *) code.ptr, code.len, parser->arena);
+
+          if (parser->macros->cap < parser->macros->len + macros.len) {
+             parser->macros->cap = parser->macros->len + macros.len;
+
+            if (parser->macros->cap == 0)
+              parser->macros->items = malloc(sizeof(Macro));
+            else
+              parser->macros->items = realloc(parser->macros->items, parser->macros->cap * sizeof(Macro));
+
+            memcpy(parser->macros->items + parser->macros->len, macros.items,
+                   macros.len * sizeof(Macro));
+
+            parser->macros->len += macros.len;
+          }
+
+          return expr;
+        }
+
         expr->as.block.block = parse_ex(code, path, parser->macros,
                                         parser->included_files, &arena);
       }

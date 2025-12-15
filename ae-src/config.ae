@@ -7,5 +7,6 @@
 
 (let mode-default 0)
 (let mode-compile-only 1)
-(let mode-eval-bytecode 2)
-(let mode-eval-macros 3)
+(let mode-compile-macros-only 2)
+(let mode-eval-bytecode 3)
+(let mode-eval-macros 5)

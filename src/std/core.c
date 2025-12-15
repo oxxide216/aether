@@ -867,6 +867,15 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Value *compile_macros = args[3];
   Value *dce = args[4];
 
+  Str magic = {
+    code->as.string.ptr,
+    sizeof(u32),
+  };
+
+  if (str_eq(magic, STR_LIT("ABC\0")) ||
+      str_eq(magic, STR_LIT("ABM\0")))
+    return value_unit(vm->current_frame);
+
   u32 prev_macros_len = env->as.env->macros.len;
 
   Arena ir_arena = {0};

@@ -50,14 +50,14 @@
   mode-eval-macros -> (eval-macros env input-file-content)
   mode-compile-only ->
     (do
-      (let compiled (compile env input-file-content input-path
-                             (to-bool output-macros-path) dce))
+      (let compiled (compile env input-file-content input-path false dce))
 
-      (if output-path
-        (write-file output-path compiled::'compiled'))
+      (write-file output-path compiled::'compiled'))
+  mode-compile-macros-only ->
+    (do
+      (let compiled (compile env input-file-content input-path true dce))
 
-      (if output-macros-path
-        (if (unit? compiled::'compiled-macros')
-          (info 'No macros found in ' input-path)
-         elif
-          (write-file output-macros-path compiled::'compiled-macros')))))
+      (if (unit? compiled::'compiled-macros')
+        (info 'No macros found in ' input-path)
+       elif
+        (write-file output-macros-path compiled::'compiled-macros'))))
