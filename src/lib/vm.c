@@ -494,9 +494,11 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool val
 
   bool prev_is_inside_of_func = vm->is_inside_of_func;
   Func prev_func_value = vm->current_func_value;
+  Str prev_file_path = vm->current_file_path;
 
   vm->is_inside_of_func = true;
   vm->current_func_value = *func;
+  vm->current_file_path = func->file_path;
 
   begin_frame(vm);
 
@@ -550,6 +552,7 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool val
 
   vm->is_inside_of_func = prev_is_inside_of_func;
   vm->current_func_value = prev_func_value;
+  vm->current_file_path = prev_file_path;
 
   return result_stable;
 }
@@ -984,6 +987,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       expr->as.lambda.body,
       catched_values_names,
       frame,
+      vm->current_file_path,
       expr->as.lambda.intrinsic_name,
     };
 

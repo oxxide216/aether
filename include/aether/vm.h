@@ -111,6 +111,7 @@ typedef struct {
   IrBlock      body;
   NamedValues  catched_values_names;
   StackFrame  *catched_frame;
+  Str          file_path;
   Str          intrinsic_name;
 } Func;
 
