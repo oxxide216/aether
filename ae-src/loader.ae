@@ -36,8 +36,8 @@
 (if (== mode mode-default)
   (if (== (get-range input-file-content 0 4) 'ABC\0')
     (set mode mode-eval-bytecode)
-   elif (== (get-range input-file-content 0 4) 'ABM\0'))
-    (set mode mode-eval-macros))
+   elif (== (get-range input-file-content 0 4) 'ABM\0')
+    (set mode mode-eval-macros)))
 
 (let env (make-env parsed-args))
 
