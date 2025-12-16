@@ -173,15 +173,19 @@ void value_free(Value *value) {
       value_free(value->as.dict.items[i].value);
     }
   } else if (value->kind == ValueKindFunc) {
-    for (u32 i = 0; i < value->as.func.catched_values_names.len; ++i)
-      value_free(value->as.func.catched_values_names.items[i].value);
+    if (value->as.func.catched_frame->is_used) {
+      value->as.func.catched_frame->is_used = false;
 
-    for (u32 i = 0; i < value->as.func.catched_frame->values.len; ++i)
-      value_free(value->as.func.catched_frame->values.items[i]);
-    value->as.func.catched_frame->values.len = 0;
+      for (u32 i = 0; i < value->as.func.catched_values_names.len; ++i)
+        value_free(value->as.func.catched_values_names.items[i].value);
+      value->as.func.catched_values_names.len = 0;
 
-    arena_reset(&value->as.func.catched_frame->arena);
-    value->as.func.catched_frame->is_used = false;
+      for (u32 i = 0; i < value->as.func.catched_frame->values.len; ++i)
+        value_free(value->as.func.catched_frame->values.items[i]);
+      value->as.func.catched_frame->values.len = 0;
+
+      arena_reset(&value->as.func.catched_frame->arena);
+    }
   } else if (value->kind == ValueKindEnv) {
     if (--value->as.env->refs_count == 0) {
       if (value->as.env->macros.items)
@@ -374,6 +378,7 @@ static void catch_vars(Vm *vm, Strs *local_names,
         memcpy(new_items, catched_values->items, catched_values->len * sizeof(NamedValue));
         catched_values->items = new_items;
       }
+
       catched_values->items[catched_values->len++] = value;
     }
   } break;
@@ -1140,11 +1145,15 @@ void vm_stop(Vm *vm) {
 }
 
 static void frame_free(StackFrame *frame) {
-  for (u32 j = 0; j < frame->values.len; ++j)
-    value_free(frame->values.items[j]);
-  free(frame->values.items);
+  for (u32 i = 0; i < frame->values.len; ++i)
+    value_free(frame->values.items[i]);
+  if (frame->values.items)
+    free(frame->values.items);
+  frame->values.len = 0;
   arena_free(&frame->arena);
-  free(frame->vars.items);
+  if (frame->vars.items)
+    free(frame->vars.items);
+  frame->vars.len = 0;
   free(frame);
 }
 
