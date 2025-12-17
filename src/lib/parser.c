@@ -49,6 +49,7 @@ typedef struct {
   Str        file_path;
   FilePaths *included_files;
   Arena     *arena;
+  bool       use_macros;
   Ir         ir;
 } Parser;
 
@@ -356,7 +357,8 @@ static Token parser_expect_token(Parser *parser, u64 id_mask) {
 static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask);
 
 Ir parse_ex(Str code, Str file_path, Macros *macros,
-            FilePaths *included_files, Arena *arena) {
+            FilePaths *included_files, Arena *arena,
+            bool use_macros) {
   for (u32 i = 0; i < cached_irs.len; ++i) {
     CachedIr *cached_ir = cached_irs.items + i;
 
@@ -379,6 +381,7 @@ Ir parse_ex(Str code, Str file_path, Macros *macros,
   parser.file_path = file_path;
   parser.included_files = included_files;
   parser.arena = arena;
+  parser.use_macros = use_macros;
   parser.ir = parser_parse_block(&parser, 0);
 
   Macros cached_macros;
@@ -410,6 +413,8 @@ static void parser_parse_macro_def(Parser *parser) {
 
   Token name_token = parser_expect_token(parser, MASK(TT_IDENT));
   macro.name = copy_str(name_token.lexeme, parser->arena);
+  macro.row = name_token.row;
+  macro.col = name_token.col;
 
   parser_expect_token(parser, MASK(TT_OBRACKET));
 
@@ -742,9 +747,12 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
       for (u32 i = 0; i < ARRAY_LEN(include_paths); ++i) {
         sb_push(&path_sb, include_paths[i]);
         sb_push_str(&path_sb, module_path);
-        sb_push_str(&path_sb, STR_LIT(".abm\0"));
 
-        code = read_file_arena(path_sb.buffer, &arena);
+        if (parser->use_macros) {
+          sb_push_str(&path_sb, STR_LIT(".abm\0"));
+
+          code = read_file_arena(path_sb.buffer, &arena);
+        }
 
         if (code.len != (u32) -1) {
           --path_sb.len; // exclude NULL-terminator
@@ -752,7 +760,8 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
 
           break;
         } else {
-          path_sb.len -= 5;
+          if (parser->use_macros)
+            path_sb.len -= 5;
 
           sb_push_str(&path_sb, STR_LIT(".ae\0"));
 
@@ -778,7 +787,7 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
         PERROR(STR_FMT":%u:%u: ", "Could not import `"STR_FMT"` module\n",
                STR_ARG(parser->file_path), token.row + 1,
                token.col + 1, STR_ARG(module_path));
-        return NULL;
+        exit(1);
       }
 
       expr->kind = IrExprKindBlock;
@@ -790,15 +799,11 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
         if (str_eq(parser->included_files->items[i], path)) {
           already_included = true;
 
-          expr->as.block.file_path = path;
-
-          return expr;
+          break;
         }
       }
 
       if (!already_included) {
-        DA_APPEND(*parser->included_files, path);
-
         Str magic = {
           code.ptr,
           sizeof(u32),
@@ -810,22 +815,22 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
           if (parser->macros->cap < parser->macros->len + macros.len) {
              parser->macros->cap = parser->macros->len + macros.len;
 
-            if (parser->macros->cap == 0)
+            if (parser->macros->len == 0)
               parser->macros->items = malloc(sizeof(Macro));
             else
-              parser->macros->items = realloc(parser->macros->items, parser->macros->cap * sizeof(Macro));
+              parser->macros->items = realloc(parser->macros->items,
+                                              parser->macros->cap * sizeof(Macro));
 
-            memcpy(parser->macros->items + parser->macros->len, macros.items,
-                   macros.len * sizeof(Macro));
+            memcpy(parser->macros->items + parser->macros->len,
+                   macros.items, macros.len * sizeof(Macro));
 
             parser->macros->len += macros.len;
           }
-
-          return expr;
+        } else {
+          expr->as.block.block = parse_ex(code, path, parser->macros,
+                                          parser->included_files, &arena,
+                                          parser->use_macros);
         }
-
-        expr->as.block.block = parse_ex(code, path, parser->macros,
-                                        parser->included_files, &arena);
       }
     } break;
 
@@ -884,6 +889,7 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
       expr->kind = IrExprKindFuncCall;
       expr->as.func_call.func = parser_parse_expr(parser, false);
       expr->as.func_call.args = parser_parse_block(parser, MASK(TT_CPAREN));
+      expr->as.func_call.file_path = parser->file_path;
 
       parser_expect_token(parser, MASK(TT_CPAREN));
     } break;
@@ -932,8 +938,8 @@ Ir parse(Str code, Str file_path) {
   Macros macros = {0};
   FilePaths included_files = {0};
   Arena arena = {0};
-  Ir ir = parse_ex(code, file_path, &macros, &included_files, &arena);
-  expand_macros_block(&ir, &macros, NULL, NULL, false, &arena, file_path);
+  Ir ir = parse_ex(code, file_path, &macros, &included_files, &arena, false);
+  expand_macros_block(&ir, &macros, NULL, NULL, false, &arena, file_path, 0, 0);
 
   if (macros.items)
     free(macros.items);

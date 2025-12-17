@@ -23,8 +23,8 @@ extern StringBuilder printf_sb;
 #endif
 
 static Path loader_paths[] = {
-  { "/usr/include/aether/loader.abc", true },
   { "ae-src/loader.ae", false },
+  { "/usr/include/aether/loader.abc", true },
 };
 
 static Arena arena = {0};
@@ -73,6 +73,9 @@ i32 main(i32 argc, char **argv) {
 
   signal(SIGINT, sigint_handler);
 
+  Intrinsics intrinsics = {0};
+  vm = vm_create(argc, argv, &intrinsics);
+
   Ir ir;
   if (path->is_precompiled) {
     ir = deserialize((u8 *) code.ptr, code.len, &arena, &vm.current_file_path);
@@ -83,8 +86,6 @@ i32 main(i32 argc, char **argv) {
 
   free(code.ptr);
 
-  Intrinsics intrinsics = {0};
-  vm = vm_create(argc, argv, &intrinsics);
   execute_block(&vm, &ir, false);
 
   cleanup();

@@ -10,6 +10,7 @@ typedef struct {
   IrArgs  arg_names;
   IrBlock body;
   bool    has_unpack;
+  u32     row, col;
 } Macro;
 
 typedef Da(Macro) Macros;
@@ -17,10 +18,10 @@ typedef Da(Macro) Macros;
 void expand_macros_block(IrBlock *block, Macros *macros,
                          IrArgs *arg_names, IrBlock *args,
                          bool unpack, Arena *arena,
-                         Str file_path);
+                         Str file_path, i16 row, i16 col);
 void expand_macros(IrExpr *expr, Macros *macros,
                    IrArgs *arg_names, IrBlock *args,
                    bool unpack, Arena *arena,
-                   Str file_path);
+                   Str file_path, i16 row, i16 col);
 
 #endif // MACROS_H

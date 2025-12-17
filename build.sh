@@ -60,7 +60,8 @@ if [ "$WASM" != "" ]; then
   CC=emcc
   OUT=dest/aether.js
   CFLAGS="$CFLAGS -DEMSCRIPTEN \
-                  -s EXPORTED_RUNTIME_METHODS='cwrap' \
+                  -s EXPORTED_RUNTIME_METHODS=['cwrap','HEAPU8'] \
+                  -s EXPORTED_FUNCTIONS=['_malloc','_free'] \
                   -s DEFAULT_LIBRARY_FUNCS_TO_INCLUDE='\$stringToNewUTF8' \
                   -s WASM=1 -s MEMORY64 -s FULL_ES3=1 \
                   -s USE_WEBGL2=1 -s USE_GLFW=0 \

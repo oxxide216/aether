@@ -67,7 +67,11 @@ void emscripten_eval_macros(u8 *macro_bytecode, u32 macro_bytecode_len) {
 
   if (macros.cap < macros.len + temp_macros.len) {
     macros.cap = macros.len + temp_macros.len;
-    macros.items = realloc(macros.items, macros.cap * sizeof(Macro));
+
+    if (macros.len == 0)
+      macros.items = malloc(macros.cap * sizeof(Macro));
+    else
+      macros.items = realloc(macros.items, macros.cap * sizeof(Macro));
   }
 
   memcpy(macros.items + macros.len,
@@ -75,7 +79,6 @@ void emscripten_eval_macros(u8 *macro_bytecode, u32 macro_bytecode_len) {
          temp_macros.len * sizeof(Macro));
   macros.len += temp_macros.len;
 
-  free(temp_macros.items);
   arena_free(&ir_arena);
 }
 
@@ -84,9 +87,10 @@ char *emscripten_eval(char *code, char *file_path) {
   Arena ir_arena = {0};
   Str file_path_str = { file_path, strlen(file_path) };
   Ir ir = parse_ex(STR(code, strlen(code)), file_path_str,
-                   &macros, &included_files, &ir_arena);
+                   &macros, &included_files, &ir_arena, false);
 
-  expand_macros_block(&ir, &macros, NULL, NULL, false, &ir_arena, file_path_str);
+  expand_macros_block(&ir, &macros, NULL, NULL, false,
+                      &ir_arena, file_path_str, 0, 0);
 
   Str prev_file_path = vm.current_file_path;
 

@@ -46,6 +46,7 @@ typedef struct {
 typedef struct {
   IrExpr  *func;
   IrBlock  args;
+  Str      file_path;
 } IrExprFuncCall;
 
 typedef struct {

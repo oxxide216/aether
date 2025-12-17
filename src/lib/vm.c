@@ -492,14 +492,6 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool val
     return result;
   }
 
-  bool prev_is_inside_of_func = vm->is_inside_of_func;
-  Func prev_func_value = vm->current_func_value;
-  Str prev_file_path = vm->current_file_path;
-
-  vm->is_inside_of_func = true;
-  vm->current_func_value = *func;
-  vm->current_file_path = func->file_path;
-
   begin_frame(vm);
 
   StackFrame *frame = vm->current_frame;
@@ -550,10 +542,6 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool val
 
   end_frame(vm);
 
-  vm->is_inside_of_func = prev_is_inside_of_func;
-  vm->current_func_value = prev_func_value;
-  vm->current_file_path = prev_file_path;
-
   return result_stable;
 }
 
@@ -574,6 +562,12 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   case IrExprKindFuncCall: {
     Value *func_value;
     EXECUTE_EXPR_SET(vm, func_value, expr->as.func_call.func, true);
+
+    bool prev_is_inside_of_func = vm->is_inside_of_func;
+    Func prev_func = vm->current_func;
+
+    vm->is_inside_of_func = true;
+    vm->current_func = func_value->as.func;
 
     if (func_value->kind != ValueKindFunc) {
       StringBuilder sb = {0};
@@ -613,10 +607,15 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       if (expr->as.func_call.func->kind == IrExprKindIdent)
         name = expr->as.func_call.func->as.ident;
 
-      INFO("Trace: "META_FMT STR_FMT"\n", META_ARG(expr->meta), STR_ARG(name));
+      INFO("Trace: "STR_FMT":"STR_FMT":%u\n",
+           STR_ARG(vm->current_file_path),
+           STR_ARG(name), expr->meta.row + 1);
 
       return value_unit(vm->current_frame);
     }
+
+    vm->is_inside_of_func = prev_is_inside_of_func;
+    vm->current_func = prev_func;
   } break;
 
   case IrExprKindVarDef: {
@@ -1031,7 +1030,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
   case IrExprKindSelf: {
     if (value_expected)
-      result = value_func(vm->current_func_value, vm->current_frame);
+      result = value_func(vm->current_func, vm->current_frame);
   } break;
   }
 

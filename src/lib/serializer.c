@@ -67,6 +67,27 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size,
                    end, path_offsets, file_path);
     save_block_data(&expr->as.func_call.args, data, data_size,
                     end, path_offsets, file_path);
+
+    bool found = false;
+
+    for (u32 i = 0; i < path_offsets->len; ++i) {
+      if (str_eq(path_offsets->items[i].path, expr->as.func_call.file_path)) {
+        reserve_space(sizeof(u32), data, data_size, end);
+        *(u32 *) (*data + *end) = path_offsets->items[i].offset;
+        *end += sizeof(u32);
+
+        found = true;
+
+        break;
+      }
+    }
+
+    if (!found) {
+      PERROR(STR_FMT":%u:%u: ", "File offset for "STR_FMT" was not found\n",
+            STR_ARG(file_path), expr->meta.row + 1, expr->meta.col + 1,
+            STR_ARG(expr->as.func_call.file_path));
+      exit(1);
+    }
   } break;
 
   case IrExprKindVarDef: {

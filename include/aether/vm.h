@@ -144,7 +144,7 @@ struct Vm {
   ExecState   state;
   i64         exit_code;
   bool        is_inside_of_func;
-  Func        current_func_value;
+  Func        current_func;
   Str         current_file_path;
 };
 

@@ -12,6 +12,7 @@ async function fetchBinaryFile(path) {
 
 async function aetherInit(dataPrefix, initCallback) {
   const appArray = await fetchBinaryFile(dataPrefix + '/app.abc');
+  const appMacrosArray = await fetchBinaryFile(dataPrefix + '/app.abm');
 
   Module = {
     onRuntimeInitialized: () => {
@@ -19,11 +20,26 @@ async function aetherInit(dataPrefix, initCallback) {
       _aetherEvalCompiled =
         Module.cwrap('emscripten_eval_compiled', 'string', ['array', 'number']);
       _aetherEvalMacros =
-        Module.cwrap('emscripten_eval_macros', 'null', ['string', 'number']);
+        Module.cwrap('emscripten_eval_macros', 'null', ['array', 'number']);
       _aetherEval = Module.cwrap('emscripten_eval', 'string', ['string', 'string']);
 
       aetherCreate();
-      aetherEvalCompiled(appArray);
+
+      let dataPtr = Module._malloc(appArray.length);
+      let dataOnHeap = new Uint8Array(Module.HEAPU8.buffer, dataPtr, appArray.length);
+      dataOnHeap.set(appArray);
+
+      aetherEvalCompiled(dataOnHeap);
+
+      Module._free(dataPtr);
+
+      dataPtr = Module._malloc(appMacrosArray.length);
+      dataOnHeap = new Uint8Array(Module.HEAPU8.buffer, dataPtr, appMacrosArray.length);
+      dataOnHeap.set(appMacrosArray);
+
+      aetherEvalMacros(dataOnHeap);
+
+      Module._free(dataPtr);
 
       initCallback();
     },

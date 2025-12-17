@@ -36,6 +36,11 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
 
     load_expr_data(expr->as.func_call.func, data, end, path_offsets, arena);
     load_block_data(&expr->as.func_call.args, data, end, path_offsets, arena);
+
+    u32 file_path_offset = *(u32 *) (data + *end);
+    *end += sizeof(u32);
+
+    load_str_data(&expr->as.func_call.file_path, data, &file_path_offset, arena);
   } break;
 
   case IrExprKindVarDef: {
