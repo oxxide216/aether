@@ -30,10 +30,11 @@ typedef enum {
 } TokenStatus;
 
 typedef struct {
-  u64    id;
-  Str    lexeme;
-  u16    row, col;
-  bool   eof;
+  u64   id;
+  Str   lexeme;
+  Str  *file_path;
+  u16   row, col;
+  bool  eof;
 } Token;
 
 typedef struct {
@@ -46,7 +47,7 @@ typedef struct {
 typedef struct {
   Lexer      lexer;
   Macros    *macros;
-  Str        file_path;
+  Str       *file_path;
   FilePaths *included_files;
   Arena     *arena;
   bool       use_macros;
@@ -188,7 +189,7 @@ static char escape_char(Str *str, u32 *col) {
   }
 }
 
-static TokenStatus lex(Lexer *lexer, Token *token, Str file_path, Arena *arena) {
+static TokenStatus lex(Lexer *lexer, Token *token, Str *file_path, Arena *arena) {
   if (lexer->code.len > 0) {
     u64 id = 0;
     u32 char_len;
@@ -222,7 +223,7 @@ static TokenStatus lex(Lexer *lexer, Token *token, Str file_path, Arena *arena) 
       u32 wchar_len;
       wchar _wchar = get_next_wchar(lexer->code, 0, &wchar_len);
 
-      PERROR(STR_FMT":%u:%u: ", "Unexpected `%lc`\n", STR_ARG(file_path),
+      PERROR(STR_FMT":%u:%u: ", "Unexpected `%lc`\n", STR_ARG(*file_path),
              lexer->row + 1, lexer->col + 1, (wint_t) _wchar);
       exit(1);
     }
@@ -258,7 +259,7 @@ static TokenStatus lex(Lexer *lexer, Token *token, Str file_path, Arena *arena) 
 
       if (lexer->code.len == 0) {
         PERROR(STR_FMT":%u:%u: ", "String literal was not closed\n",
-               STR_ARG(file_path), row + 1, col + 1);
+               STR_ARG(*file_path), row + 1, col + 1);
         exit(1);
       }
 
@@ -275,7 +276,7 @@ static TokenStatus lex(Lexer *lexer, Token *token, Str file_path, Arena *arena) 
       lexer->col += char_len;
     }
 
-    *token = (Token) { id, lexeme, row, col, false };
+    *token = (Token) { id, lexeme, file_path, row, col, false };
 
     return TokenStatusOk;
   }
@@ -336,7 +337,7 @@ static void print_id_mask(u64 id_mask) {
 static Token parser_expect_token(Parser *parser, u64 id_mask) {
   Token token = parser_next_token(parser);
   if (token.eof) {
-    PERROR(STR_FMT": ", "Expected ", STR_ARG(parser->file_path));
+    PERROR(STR_FMT": ", "Expected ", STR_ARG(*parser->file_path));
     print_id_mask(id_mask);
     fprintf(stderr, ", but got EOF\n");
     exit(1);
@@ -346,7 +347,7 @@ static Token parser_expect_token(Parser *parser, u64 id_mask) {
     return token;
 
   PERROR(STR_FMT":%u:%u: ", "Expected ",
-         STR_ARG(parser->file_path),
+         STR_ARG(*token.file_path),
          token.row + 1, token.col + 1);
   print_id_mask(id_mask);
   fprintf(stderr, ", but got `"STR_FMT"`\n",
@@ -356,13 +357,13 @@ static Token parser_expect_token(Parser *parser, u64 id_mask) {
 
 static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask);
 
-Ir parse_ex(Str code, Str file_path, Macros *macros,
+Ir parse_ex(Str code, Str *file_path, Macros *macros,
             FilePaths *included_files, Arena *arena,
             bool use_macros) {
   for (u32 i = 0; i < cached_irs.len; ++i) {
     CachedIr *cached_ir = cached_irs.items + i;
 
-    if (str_eq(cached_ir->file_path, file_path)) {
+    if (str_eq(*cached_ir->file_path, *file_path)) {
       DA_EXTEND(*macros, cached_ir->macros);
       DA_EXTEND(*included_files, cached_ir->included_files);
       *arena = cached_ir->arena;
@@ -408,13 +409,14 @@ Ir parse_ex(Str code, Str file_path, Macros *macros,
   return parser.ir;
 }
 
-static void parser_parse_macro_def(Parser *parser) {
+static void parser_parse_macro_def(Parser *parser, u32 row, u32 col) {
   Macro macro = {0};
 
   Token name_token = parser_expect_token(parser, MASK(TT_IDENT));
   macro.name = copy_str(name_token.lexeme, parser->arena);
-  macro.row = name_token.row;
-  macro.col = name_token.col;
+
+  macro.row = row;
+  macro.col = col;
 
   parser_expect_token(parser, MASK(TT_OBRACKET));
 
@@ -582,6 +584,7 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
                                             MASK(TT_OCURLY) | MASK(TT_OBRACKET) |
                                             MASK(TT_DOUBLE_ARROW));
 
+  expr->meta.file_path = token.file_path;
   expr->meta.row = token.row;
   expr->meta.col = token.col;
 
@@ -710,9 +713,9 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
     case TT_MACRO: {
       parser_next_token(parser);
 
-      parser_parse_macro_def(parser);
+      parser_parse_macro_def(parser, expr->meta.row, expr->meta.col);
 
-      return NULL;
+      return expr;
     } break;
 
     case TT_WHILE: {
@@ -734,13 +737,13 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
 
       parser_expect_token(parser, MASK(TT_CPAREN));
 
-      Str prefix = get_file_dir(parser->file_path);
+      Str prefix = get_file_dir(*parser->file_path);
       char *prefix_cstr = str_to_cstr(prefix);
       char *include_paths[INCLUDE_PATHS_LEN] = INCLUDE_PATHS;
       include_paths[0] = prefix_cstr;
       StringBuilder path_sb = {0};
       Str code = { NULL, (u32) -1 };
-      Str path = {0};
+      Str *path = NULL;
 
       Arena arena = {0};
 
@@ -756,7 +759,8 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
 
         if (code.len != (u32) -1) {
           --path_sb.len; // exclude NULL-terminator
-          path = copy_str(sb_to_str(path_sb), &arena);
+          path = arena_alloc(&arena, sizeof(Str));
+          *path = copy_str(sb_to_str(path_sb), &arena);
 
           break;
         } else {
@@ -769,7 +773,8 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
 
           if (code.len != (u32) -1) {
             --path_sb.len; // exclude NULL-terminator
-            path = copy_str(sb_to_str(path_sb), &arena);
+            path = arena_alloc(&arena, sizeof(Str));
+            *path = copy_str(sb_to_str(path_sb), &arena);
 
             break;
           }
@@ -785,18 +790,15 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
 
       if (code.len == (u32) -1) {
         PERROR(STR_FMT":%u:%u: ", "Could not import `"STR_FMT"` module\n",
-               STR_ARG(parser->file_path), token.row + 1,
+               STR_ARG(*token.file_path), token.row + 1,
                token.col + 1, STR_ARG(module_path));
         exit(1);
       }
 
-      expr->kind = IrExprKindBlock;
-      expr->as.block.file_path = path;
-
       bool already_included = false;
 
       for (u32 i = 0; i < parser->included_files->len; ++i) {
-        if (str_eq(parser->included_files->items[i], path)) {
+        if (str_eq(*parser->included_files->items[i], *path)) {
           already_included = true;
 
           break;
@@ -827,9 +829,9 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
             parser->macros->len += macros.len;
           }
         } else {
-          expr->as.block.block = parse_ex(code, path, parser->macros,
-                                          parser->included_files, &arena,
-                                          parser->use_macros);
+          expr->as.block = parse_ex(code, path, parser->macros,
+                                    parser->included_files, &arena,
+                                    parser->use_macros);
         }
       }
     } break;
@@ -879,8 +881,7 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
       parser_next_token(parser);
 
       expr->kind = IrExprKindBlock;
-      expr->as.block.block = parser_parse_block(parser, MASK(TT_CPAREN));
-      expr->as.block.file_path = parser->file_path;
+      expr->as.block = parser_parse_block(parser, MASK(TT_CPAREN));
 
       parser_expect_token(parser, MASK(TT_CPAREN));
     } break;
@@ -889,7 +890,6 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
       expr->kind = IrExprKindFuncCall;
       expr->as.func_call.func = parser_parse_expr(parser, false);
       expr->as.func_call.args = parser_parse_block(parser, MASK(TT_CPAREN));
-      expr->as.func_call.file_path = parser->file_path;
 
       parser_expect_token(parser, MASK(TT_CPAREN));
     } break;
@@ -906,6 +906,7 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
       get_at->as.get_at.src = expr;
       get_at->as.get_at.key = parser_parse_expr(parser, true);
 
+      get_at->meta.file_path = token.file_path;
       get_at->meta.row = token.row;
       get_at->meta.col = token.col;
 
@@ -922,8 +923,7 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
   Token token = parser_peek_token(parser);
   while (!token.eof && !(MASK(token.id) & end_id_mask)) {
     IrExpr *expr = parser_parse_expr(parser, false);
-    if (expr)
-      block_append(&block, expr, parser->arena);
+    block_append(&block, expr, parser->arena);
 
     token = parser_peek_token(parser);
   }
@@ -934,7 +934,7 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
   };
 }
 
-Ir parse(Str code, Str file_path) {
+Ir parse(Str code, Str *file_path) {
   Macros macros = {0};
   FilePaths included_files = {0};
   Arena arena = {0};

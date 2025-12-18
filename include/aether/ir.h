@@ -39,14 +39,8 @@ typedef struct {
 } IrArgs;
 
 typedef struct {
-  IrBlock block;
-  Str     file_path;
-} IrExprBlock;
-
-typedef struct {
   IrExpr  *func;
   IrBlock  args;
-  Str      file_path;
 } IrExprFuncCall;
 
 typedef struct {
@@ -157,7 +151,7 @@ typedef struct {
 
 #pragma pack(push, 1)
 typedef union {
-  IrExprBlock    block;
+  IrBlock        block;
   IrExprFuncCall func_call;
   IrExprVarDef   var_def;
   IrExprIf       _if;
@@ -179,7 +173,8 @@ typedef union {
 #pragma pack(pop)
 
 typedef struct {
-  u16 row, col;
+  Str *file_path;
+  u16  row, col;
 } IrExprMeta;
 
 #pragma pack(push, 1)

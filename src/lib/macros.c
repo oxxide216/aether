@@ -1,12 +1,21 @@
 #include "aether/macros.h"
 
-#define INLINE_THEN_EXPAND(expr)                                                      \
-  do {                                                                                \
-    if (try_inline_macro_arg(&(expr), arg_names, args, NULL, unpack, arena)) {        \
-      row = 0;                                                                        \
-      col = 0;                                                                        \
-    }                                                                                 \
-    expand_macros(expr, macros, arg_names, args, unpack, arena, file_path, row, col); \
+#define INLINE_THEN_EXPAND(expr)                                                        \
+  do {                                                                                  \
+    bool inlined = try_inline_macro_arg(&(expr), arg_names, args, NULL, unpack, arena); \
+    if (inlined) {                                                                      \
+      row = 0;                                                                          \
+      col = 0;                                                                          \
+    }                                                                                   \
+    expand_macros(expr, macros, arg_names, args, unpack,                                \
+                  arena, file_path, row, col, is_inlined & inlined);                    \
+  } while (0)
+
+#define INLINE_THEN_EXPAND_BLOCK(block)                 \
+  do {                                                  \
+    expand_macros_block(&block, macros, arg_names,      \
+                        args, unpack, arena, file_path, \
+                        row, col);                      \
   } while (0)
 
 static u32 get_macro_arg_index(Str name, IrArgs *arg_names) {
@@ -70,7 +79,7 @@ static void clone_expr(IrExpr **expr, IrArgs *arg_names, Arena *arena) {
 
   switch (new_expr->kind) {
   case IrExprKindBlock: {
-    clone_block(&new_expr->as.block.block, arg_names, arena);
+    clone_block(&new_expr->as.block, arg_names, arena);
   } break;
 
   case IrExprKindFuncCall: {
@@ -176,7 +185,7 @@ static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names,
                              IrArgs *new_arg_names, Arena *arena) {
   switch (expr->kind) {
   case IrExprKindBlock: {
-    rename_args_block(&expr->as.block.block, prev_arg_names, new_arg_names, arena);
+    rename_args_block(&expr->as.block, prev_arg_names, new_arg_names, arena);
   } break;
 
   case IrExprKindFuncCall: {
@@ -390,44 +399,58 @@ static bool try_inline_macro_arg(IrExpr **expr, IrArgs *arg_names,
 
 void expand_macros_block(IrBlock *block, Macros *macros,
                          IrArgs *arg_names, IrBlock *args,
-                         bool unpack, Arena *arena,
-                         Str file_path, i16 row, i16 col) {
+                         bool unpack, Arena *arena, Str *file_path,
+                         i16 row, i16 col) {
   Block new_block = {0};
+  Da(bool) inlined_exprs = {0};
 
   for (u32 i = 0; i < block->len; ++i) {
     IrExpr *new_expr = block->items[i];
 
-    if (!try_inline_macro_arg(&new_expr, arg_names, args, &new_block, unpack, arena)) {
+    bool inlined = try_inline_macro_arg(&new_expr, arg_names, args,
+                                        &new_block, unpack, arena);
+    if (!inlined) {
       clone_expr(&new_expr, arg_names, arena);
       block_append(&new_block, new_expr, arena);
-    } else {
-      row = 0;
-      col = 0;
     }
+
+    for (u32 j = i; j < new_block.len; ++j)
+      DA_APPEND(inlined_exprs, inlined);
   }
 
-  for (u32 i = 0; i < new_block.len; ++i)
-    expand_macros(new_block.items[i], macros, arg_names, args,
-                  unpack, arena, file_path, row, col);
+  for (u32 i = 0; i < new_block.len; ++i) {
+    bool inlined = inlined_exprs.items[i];
+
+    i16 temp_row = inlined ? 0 : row;
+    i16 temp_col = inlined ? 0 : col;
+
+    expand_macros(new_block.items[i], macros, arg_names,
+                  args, unpack, arena, file_path,
+                  temp_row, temp_col, inlined);
+  }
 
   block->items = new_block.items;
   block->len = new_block.len;
+
+  if (inlined_exprs.items)
+    free(inlined_exprs.items);
 }
 
 void expand_macros(IrExpr *expr, Macros *macros,
                    IrArgs *arg_names, IrBlock *args,
-                   bool unpack, Arena *arena,
-                   Str file_path, i16 row, i16 col) {
+                   bool unpack, Arena *arena, Str *file_path,
+                   i16 row, i16 col, bool is_inlined) {
+  if (arg_names && args && !is_inlined)
+    expr->meta.file_path = file_path;
+
   switch (expr->kind) {
   case IrExprKindBlock: {
-    expand_macros_block(&expr->as.block.block, macros, arg_names,
-                        args, unpack, arena, expr->as.block.file_path, row, col);
+    INLINE_THEN_EXPAND_BLOCK(expr->as.block);
   } break;
 
   case IrExprKindFuncCall: {
     INLINE_THEN_EXPAND(expr->as.func_call.func);
-    expand_macros_block(&expr->as.func_call.args, macros, arg_names,
-                        args, unpack, arena, expr->as.func_call.file_path, row, col);
+    INLINE_THEN_EXPAND_BLOCK(expr->as.func_call.args);
 
     if (expr->as.func_call.func->kind == IrExprKindIdent) {
       Str name = expr->as.func_call.func->as.ident;
@@ -459,26 +482,30 @@ void expand_macros(IrExpr *expr, Macros *macros,
         }
 
         Args new_arg_names = {0};
+        StringBuilder sb = {0};
+
+        sb_push_str(&sb, macro->name);
+        sb_push_char(&sb, '@');
+
+        u32 prev_len = sb.len;
 
         for (u32 i = 0; i < macro->arg_names.len; ++i) {
-          StringBuilder sb = {0};
-          sb_push_str(&sb, macro->name);
-          sb_push_char(&sb, '@');
           sb_push_str(&sb, macro->arg_names.items[i]);
 
           Str new_arg_name = copy_str(sb_to_str(sb), arena);
           DA_APPEND(new_arg_names, new_arg_name);
 
-          free(sb.buffer);
+          sb.len = prev_len;
         };
 
-        expr->kind = IrExprKindBlock;
-        expr->as.block.block = macro->body;
-        expr->as.block.file_path = file_path;
+        free(sb.buffer);
 
-        IrExpr **new_items = arena_alloc(arena, expr->as.block.block.len * sizeof(IrExpr *));
-        memcpy(new_items, expr->as.block.block.items, expr->as.block.block.len * sizeof(IrExpr *));
-        expr->as.block.block.items = new_items;
+        expr->kind = IrExprKindBlock;
+        expr->as.block = macro->body;
+
+        IrExpr **new_items = arena_alloc(arena, expr->as.block.len * sizeof(IrExpr *));
+        memcpy(new_items, expr->as.block.items, expr->as.block.len * sizeof(IrExpr *));
+        expr->as.block.items = new_items;
 
         IrArgs ir_new_arg_names = {
           new_arg_names.items,
@@ -490,17 +517,16 @@ void expand_macros(IrExpr *expr, Macros *macros,
           new_args.len,
         };
 
-        rename_args_block(&expr->as.block.block, &macro->arg_names,
+        rename_args_block(&expr->as.block, &macro->arg_names,
                           &ir_new_arg_names, arena);
-        expand_macros_block(&expr->as.block.block, macros,
+        expand_macros_block(&expr->as.block, macros,
                             &ir_new_arg_names, &ir_new_args,
-                            macro->has_unpack, arena, file_path,
-                            expr->meta.row - macro->row,
+                            macro->has_unpack, arena,
+                            file_path, expr->meta.row - macro->row,
                             expr->meta.col - macro->col);
 
-        free(new_arg_names.items);
-
-        break;
+        if (new_arg_names.items)
+          free(new_arg_names.items);
       }
     }
   } break;
@@ -511,24 +537,20 @@ void expand_macros(IrExpr *expr, Macros *macros,
 
   case IrExprKindIf: {
     INLINE_THEN_EXPAND(expr->as._if.cond);
-    expand_macros_block(&expr->as._if.if_body, macros, arg_names,
-                        args, unpack, arena, file_path, row, col);
+    INLINE_THEN_EXPAND_BLOCK(expr->as._if.if_body);
 
     for (u32 i = 0; i < expr->as._if.elifs.len; ++i) {
       INLINE_THEN_EXPAND(expr->as._if.elifs.items[i].cond);
-      expand_macros_block(&expr->as._if.elifs.items[i].body, macros,
-                          arg_names, args, unpack, arena, file_path, row, col);
+      INLINE_THEN_EXPAND_BLOCK(expr->as._if.elifs.items[i].body);
     }
 
     if (expr->as._if.has_else)
-      expand_macros_block(&expr->as._if.else_body, macros, arg_names,
-                          args, unpack, arena, file_path, row, col);
+      INLINE_THEN_EXPAND_BLOCK(expr->as._if.else_body);
   } break;
 
   case IrExprKindWhile: {
     INLINE_THEN_EXPAND(expr->as._while.cond);
-    expand_macros_block(&expr->as._while.body, macros, arg_names,
-                        args, unpack, arena, file_path, row, col);
+    INLINE_THEN_EXPAND_BLOCK(expr->as._while.body);
   } break;
 
   case IrExprKindSet: {
@@ -546,8 +568,7 @@ void expand_macros(IrExpr *expr, Macros *macros,
   } break;
 
   case IrExprKindList: {
-    expand_macros_block(&expr->as.list, macros, arg_names,
-                        args, unpack, arena, file_path, row, col);
+    INLINE_THEN_EXPAND_BLOCK(expr->as.list);
   } break;
 
   case IrExprKindIdent:  break;
@@ -557,8 +578,7 @@ void expand_macros(IrExpr *expr, Macros *macros,
   case IrExprKindBool:   break;
 
   case IrExprKindLambda: {
-    expand_macros_block(&expr->as.lambda.body, macros, arg_names,
-                        args, unpack, arena, file_path, row, col);
+    INLINE_THEN_EXPAND_BLOCK(expr->as.lambda.body);
   } break;
 
   case IrExprKindDict: {

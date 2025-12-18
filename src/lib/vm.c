@@ -7,7 +7,7 @@
 #define WHILE_FRAME_LENGTH 100
 
 #define META_FMT       STR_FMT":%u:%u: "
-#define META_ARG(meta) STR_ARG(vm->current_file_path), (meta).row + 1, (meta).col + 1
+#define META_ARG(meta) STR_ARG(*(meta).file_path), (meta).row + 1, (meta).col + 1
 
 #define CATCH_VARS(vm, local_names, catched_values, frame, expr) \
   do {                                                           \
@@ -294,7 +294,7 @@ static void catch_vars(Vm *vm, Strs *local_names,
                        IrExpr *expr) {
   switch (expr->kind) {
   case IrExprKindBlock: {
-    CATCH_VARS_BLOCK(vm, local_names, catched_values, frame, &expr->as.block.block);
+    CATCH_VARS_BLOCK(vm, local_names, catched_values, frame, &expr->as.block);
   } break;
 
   case IrExprKindFuncCall: {
@@ -550,13 +550,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
   switch (expr->kind) {
   case IrExprKindBlock: {
-    Str prev_current_file_path = vm->current_file_path;
-
-    vm->current_file_path = expr->as.block.file_path;
-
-    EXECUTE_BLOCK_SET(vm, result, &expr->as.block.block, value_expected);
-
-    vm->current_file_path = prev_current_file_path;
+    EXECUTE_BLOCK_SET(vm, result, &expr->as.block, value_expected);
   } break;
 
   case IrExprKindFuncCall: {
@@ -602,13 +596,14 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     }
 
     result = execute_func(vm, func_args, &func_value->as.func, &expr->meta, value_expected);
+
     if (vm->state != ExecStateContinue && vm->exit_code != 0) {
       Str name = STR_LIT("<lambda>");
       if (expr->as.func_call.func->kind == IrExprKindIdent)
         name = expr->as.func_call.func->as.ident;
 
       INFO("Trace: "STR_FMT":"STR_FMT":%u\n",
-           STR_ARG(vm->current_file_path),
+           STR_ARG(*expr->meta.file_path),
            STR_ARG(name), expr->meta.row + 1);
 
       return value_unit(vm->current_frame);
@@ -986,7 +981,6 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       expr->as.lambda.body,
       catched_values_names,
       frame,
-      vm->current_file_path,
       expr->as.lambda.intrinsic_name,
     };
 

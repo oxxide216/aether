@@ -4,7 +4,7 @@
 
 static void save_block_data(Ir *ir, u8 **data, u32 *data_size,
                             u32 *end, FilePathOffsets *path_offsets,
-                            Str file_path);
+                            Str *file_path);
 
 static void reserve_space(u32 amount, u8 **data, u32 *data_size, u32 *end) {
   u32 new_data_size = *data_size;
@@ -30,36 +30,15 @@ static void save_str_data(Str str, u8 **data, u32 *data_size, u32 *end) {
 
 static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size,
                            u32 *end, FilePathOffsets *path_offsets,
-                           Str file_path) {
+                           Str *file_path) {
   reserve_space(sizeof(u8), data, data_size, end);
   *(u8 *) (*data + *end) = expr->kind;
   *end += sizeof(u8);
 
   switch (expr->kind) {
   case IrExprKindBlock: {
-    save_block_data(&expr->as.block.block, data, data_size,
-                    end, path_offsets, expr->as.block.file_path);
-
-    bool found = false;
-
-    for (u32 i = 0; i < path_offsets->len; ++i) {
-      if (str_eq(path_offsets->items[i].path, expr->as.block.file_path)) {
-        reserve_space(sizeof(u32), data, data_size, end);
-        *(u32 *) (*data + *end) = path_offsets->items[i].offset;
-        *end += sizeof(u32);
-
-        found = true;
-
-        break;
-      }
-    }
-
-    if (!found) {
-      PERROR(STR_FMT":%u:%u: ", "File offset for "STR_FMT" was not found\n",
-            STR_ARG(file_path), expr->meta.row + 1, expr->meta.col + 1,
-            STR_ARG(expr->as.block.file_path));
-      exit(1);
-    }
+    save_block_data(&expr->as.block, data, data_size,
+                    end, path_offsets, file_path);
   } break;
 
   case IrExprKindFuncCall: {
@@ -67,27 +46,6 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size,
                    end, path_offsets, file_path);
     save_block_data(&expr->as.func_call.args, data, data_size,
                     end, path_offsets, file_path);
-
-    bool found = false;
-
-    for (u32 i = 0; i < path_offsets->len; ++i) {
-      if (str_eq(path_offsets->items[i].path, expr->as.func_call.file_path)) {
-        reserve_space(sizeof(u32), data, data_size, end);
-        *(u32 *) (*data + *end) = path_offsets->items[i].offset;
-        *end += sizeof(u32);
-
-        found = true;
-
-        break;
-      }
-    }
-
-    if (!found) {
-      PERROR(STR_FMT":%u:%u: ", "File offset for "STR_FMT" was not found\n",
-            STR_ARG(file_path), expr->meta.row + 1, expr->meta.col + 1,
-            STR_ARG(expr->as.func_call.file_path));
-      exit(1);
-    }
   } break;
 
   case IrExprKindVarDef: {
@@ -236,6 +194,27 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size,
   case IrExprKindSelf: break;
   }
 
+  bool found = false;
+
+  for (u32 i = 0; i < path_offsets->len; ++i) {
+    if (str_eq(path_offsets->items[i].path, *expr->meta.file_path)) {
+      reserve_space(sizeof(u32), data, data_size, end);
+      *(u32 *) (*data + *end) = path_offsets->items[i].offset;
+      *end += sizeof(u32);
+
+      found = true;
+
+      break;
+    }
+  }
+
+  if (!found) {
+    PERROR(STR_FMT":%u:%u: ", "File offset for "STR_FMT" was not found\n",
+          STR_ARG(*file_path), expr->meta.row + 1, expr->meta.col + 1,
+          STR_ARG(*expr->meta.file_path));
+    exit(1);
+  }
+
   reserve_space(2 * sizeof(u32), data, data_size, end);
   *(u32 *) (*data + *end) = expr->meta.row;
   *end += sizeof(u32);
@@ -245,7 +224,7 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size,
 
 static void save_block_data(IrBlock *block, u8 **data, u32 *data_size,
                             u32 *end, FilePathOffsets *path_offsets,
-                            Str file_path) {
+                            Str *file_path) {
   u32 offset = *end;
 
   reserve_space(sizeof(u32), data, data_size, end);
@@ -269,10 +248,10 @@ static void save_included_files(u8 **data, u32 *data_size, u32 *end,
   *end += sizeof(u32);
 
   for (u32 i = 0; i < included_files->len; ++i) {
-    FilePathOffset path_offset = { included_files->items[i], *end };
+    FilePathOffset path_offset = { *included_files->items[i], *end };
     DA_APPEND(*path_offsets, path_offset);
 
-    save_str_data(included_files->items[i], data, data_size, end);
+    save_str_data(*included_files->items[i], data, data_size, end);
   }
 }
 

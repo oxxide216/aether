@@ -86,11 +86,11 @@ EMSCRIPTEN_KEEPALIVE
 char *emscripten_eval(char *code, char *file_path) {
   Arena ir_arena = {0};
   Str file_path_str = { file_path, strlen(file_path) };
-  Ir ir = parse_ex(STR(code, strlen(code)), file_path_str,
+  Ir ir = parse_ex(STR(code, strlen(code)), &file_path_str,
                    &macros, &included_files, &ir_arena, false);
 
   expand_macros_block(&ir, &macros, NULL, NULL, false,
-                      &ir_arena, file_path_str, 0, 0);
+                      &ir_arena, &file_path_str, 0, 0);
 
   Str prev_file_path = vm.current_file_path;
 
@@ -99,6 +99,8 @@ char *emscripten_eval(char *code, char *file_path) {
   Value *result = execute_block(&vm, &ir, true);
 
   vm.current_file_path = prev_file_path;
+
+  arena_free(&ir_arena);
 
   return value_to_cstr(result);
 }

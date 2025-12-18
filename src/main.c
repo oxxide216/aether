@@ -81,7 +81,7 @@ i32 main(i32 argc, char **argv) {
     ir = deserialize((u8 *) code.ptr, code.len, &arena, &vm.current_file_path);
   } else {
     vm.current_file_path = (Str) { path->cstr, strlen(path->cstr) };
-    ir = parse(code, vm.current_file_path);
+    ir = parse(code, &vm.current_file_path);
   }
 
   free(code.ptr);

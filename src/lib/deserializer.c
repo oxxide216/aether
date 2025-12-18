@@ -23,12 +23,7 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
 
   switch (expr->kind) {
   case IrExprKindBlock: {
-    load_block_data(&expr->as.block.block, data, end, path_offsets, arena);
-
-    u32 file_path_offset = *(u32 *) (data + *end);
-    *end += sizeof(u32);
-
-    load_str_data(&expr->as.block.file_path, data, &file_path_offset, arena);
+    load_block_data(&expr->as.block, data, end, path_offsets, arena);
   } break;
 
   case IrExprKindFuncCall: {
@@ -36,11 +31,6 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
 
     load_expr_data(expr->as.func_call.func, data, end, path_offsets, arena);
     load_block_data(&expr->as.func_call.args, data, end, path_offsets, arena);
-
-    u32 file_path_offset = *(u32 *) (data + *end);
-    *end += sizeof(u32);
-
-    load_str_data(&expr->as.func_call.file_path, data, &file_path_offset, arena);
   } break;
 
   case IrExprKindVarDef: {
@@ -201,6 +191,12 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
     exit(1);
   } break;
   }
+
+  u32 file_path_offset = *(u32 *) (data + *end);
+  *end += sizeof(u32);
+
+  expr->meta.file_path = arena_alloc(arena, sizeof(Str));
+  load_str_data(expr->meta.file_path, data, &file_path_offset, arena);
 
   expr->meta.row = *(u32 *) (data + *end);
   *end += sizeof(u32);

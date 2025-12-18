@@ -17,11 +17,11 @@ typedef Da(Macro) Macros;
 
 void expand_macros_block(IrBlock *block, Macros *macros,
                          IrArgs *arg_names, IrBlock *args,
-                         bool unpack, Arena *arena,
-                         Str file_path, i16 row, i16 col);
+                         bool unpack, Arena *arena, Str *file_path,
+                         i16 row, i16 col);
 void expand_macros(IrExpr *expr, Macros *macros,
                    IrArgs *arg_names, IrBlock *args,
-                   bool unpack, Arena *arena,
-                   Str file_path, i16 row, i16 col);
+                   bool unpack, Arena *arena, Str *file_path,
+                   i16 row, i16 col, bool is_inlined);
 
 #endif // MACROS_H

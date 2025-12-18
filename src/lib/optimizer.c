@@ -14,7 +14,7 @@ void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
 
   switch (expr->kind) {
   case IrExprKindBlock: {
-    eliminate_dead_code_block(&expr->as.block.block, defs);
+    eliminate_dead_code_block(&expr->as.block, defs);
   } break;
 
   case IrExprKindFuncCall: {

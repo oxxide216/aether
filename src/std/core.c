@@ -880,12 +880,12 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   FilePaths included_files = {0};
-  Ir ir = parse_ex(code->as.string, path->as.string,
+  Ir ir = parse_ex(code->as.string, &path->as.string,
                    &env->as.env->macros,
                    &included_files, &ir_arena, true);
 
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL,
-                      false, &ir_arena, path->as.string, 0, 0);
+                      false, &ir_arena, &path->as.string, 0, 0);
 
   ListNode *result = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
   result->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
@@ -913,7 +913,7 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
     };
     Str macros_bytecode = {0};
 
-    DA_APPEND(included_files, path->as.string);
+    DA_APPEND(included_files, &path->as.string);
 
     macros_bytecode.ptr = (char *) serialize_macros(&new_macros,
                                                     &macros_bytecode.len,
@@ -983,20 +983,16 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   FilePaths included_files = {0};
-  Ir ir = parse_ex(code->as.string, path->as.string,
+  Ir ir = parse_ex(code->as.string, &path->as.string,
                    &env->as.env->macros,
                    &included_files, &ir_arena, false);
 
-  expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false,
-                      &ir_arena, path->as.string, 0, 0);
-
-  Str prev_file_path = env->as.env->vm.current_file_path;
+  expand_macros_block(&ir, &env->as.env->macros, NULL, NULL,
+                      false, &ir_arena, &path->as.string, 0, 0);
 
   env->as.env->vm.current_file_path = path->as.string;
 
   Value *result = execute_block(&env->as.env->vm, &ir, true);
-
-  env->as.env->vm.current_file_path = prev_file_path;
 
   if (included_files.items)
     free(included_files.items);
