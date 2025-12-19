@@ -293,6 +293,7 @@ Macros deserialize_macros(u8 *data, u32 size, Arena *arena) {
   end += sizeof(u32);
 
   macros.items = arena_alloc(arena, macros.cap * sizeof(Macro));
+
   for (u32 i = 0; i < macros.len; ++i) {
     Macro *macro = macros.items + i;
 

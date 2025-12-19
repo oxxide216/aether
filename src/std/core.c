@@ -874,7 +874,7 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
 
   if (str_eq(magic, STR_LIT("ABC\0")) ||
       str_eq(magic, STR_LIT("ABM\0")))
-    return value_unit(vm->current_frame);
+    return code;
 
   u32 prev_macros_len = env->as.env->macros.len;
 
@@ -903,7 +903,8 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Dict dict = {0};
 
   Value *compiled = value_string(bytecode, vm->current_frame);
-  dict_push_value_str_key(vm->current_frame, &dict, STR_LIT("compiled"), compiled);
+  dict_push_value_str_key(vm->current_frame, &dict,
+                          STR_LIT("compiled"), compiled);
 
   if (compile_macros->as._bool && env->as.env->macros.len > prev_macros_len) {
     Macros new_macros = {
@@ -913,19 +914,21 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
     };
     Str macros_bytecode = {0};
 
-    DA_APPEND(included_files, &path->as.string);
-
     macros_bytecode.ptr = (char *) serialize_macros(&new_macros,
                                                     &macros_bytecode.len,
                                                     &included_files, dce->as._bool);
 
     Value *compiled_macros = value_string(macros_bytecode, vm->current_frame);
-    dict_push_value_str_key(vm->current_frame, &dict, STR_LIT("compiled-macros"), compiled_macros);
+    dict_push_value_str_key(vm->current_frame, &dict,
+                            STR_LIT("compiled-macros"),
+                            compiled_macros);
   }
 
   if (dict.len == 1) {
     Value *compiled_macros = value_unit(vm->current_frame);
-    dict_push_value_str_key(vm->current_frame, &dict, STR_LIT("compiled-macros"), compiled_macros);
+    dict_push_value_str_key(vm->current_frame, &dict,
+                            STR_LIT("compiled-macros"),
+                            compiled_macros);
   }
 
   free(included_files.items);

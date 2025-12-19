@@ -13,12 +13,9 @@
 #include "grammar.h"
 #include "shl/shl-log.h"
 
-#define STD_PREFIX_CT "ae-src/"
-#define STD_PREFIX_RT "/usr/include/aether/"
-
-#define INCLUDE_PATHS { NULL,           \
-                        STD_PREFIX_CT,  \
-                        STD_PREFIX_RT }
+#define INCLUDE_PATHS { "../",                   \
+                        "ae-src/",               \
+                        "/usr/include/aether/" }
 #define INCLUDE_PATHS_LEN 3
 
 #define MASK(id) (1 << (id))
@@ -558,22 +555,6 @@ static IrExprMatch parser_parse_match(Parser *parser) {
   return match;
 }
 
-static char *str_to_cstr(Str str) {
-  char *result = malloc((str.len + 1) * sizeof(char));
-  memcpy(result, str.ptr, str.len);
-  result[str.len] = 0;
-
-  return result;
-}
-
-static Str get_file_dir(Str path) {
-  for (u32 i = path.len; i > 0; --i)
-    if (path.ptr[i - 1] == '/')
-      return (Str) { path.ptr, i };
-
-  return (Str) {0};
-}
-
 static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
   IrExpr *expr = arena_alloc(parser->arena, sizeof(IrExpr));
   *expr = (IrExpr) {0};
@@ -737,10 +718,7 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
 
       parser_expect_token(parser, MASK(TT_CPAREN));
 
-      Str prefix = get_file_dir(*parser->file_path);
-      char *prefix_cstr = str_to_cstr(prefix);
       char *include_paths[INCLUDE_PATHS_LEN] = INCLUDE_PATHS;
-      include_paths[0] = prefix_cstr;
       StringBuilder path_sb = {0};
       Str code = { NULL, (u32) -1 };
       Str *path = NULL;
@@ -782,8 +760,6 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
         path_sb.len = 0;
       }
 
-      if (prefix_cstr)
-        free(prefix_cstr);
       if (path_sb.buffer)
         free(path_sb.buffer);
 
@@ -806,34 +782,42 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
 
       if (already_included) {
         arena_free(&arena);
-      } else {
-        Str magic = {
-          code.ptr,
-          sizeof(u32),
-        };
 
-        if (str_eq(magic, STR_LIT("ABM\0"))) {
-          Macros macros = deserialize_macros((u8 *) code.ptr, code.len, &arena);
+        break;
+      }
 
-          if (parser->macros->cap < parser->macros->len + macros.len) {
-             parser->macros->cap = parser->macros->len + macros.len;
+      Str magic = {
+        code.ptr,
+        sizeof(u32),
+      };
 
-            if (parser->macros->len == 0)
-              parser->macros->items = malloc(sizeof(Macro));
-            else
-              parser->macros->items = realloc(parser->macros->items,
-                                              parser->macros->cap * sizeof(Macro));
-          }
+      if (str_eq(magic, STR_LIT("ABM\0"))) {
+        DA_APPEND(*parser->included_files, path);
 
-          memcpy(parser->macros->items + parser->macros->len,
-                 macros.items, macros.len * sizeof(Macro));
+        Macros macros = deserialize_macros((u8 *) code.ptr,
+                                           code.len,
+                                           parser->arena);
 
-          parser->macros->len += macros.len;
-        } else {
-          expr->as.block = parse_ex(code, path, parser->macros,
-                                    parser->included_files, &arena,
-                                    parser->use_macros);
+        if (parser->macros->cap < parser->macros->len + macros.len) {
+           parser->macros->cap = parser->macros->len + macros.len;
+
+          if (parser->macros->len == 0)
+            parser->macros->items = malloc(parser->macros->cap * sizeof(Macro));
+          else
+            parser->macros->items = realloc(parser->macros->items,
+                                            parser->macros->cap * sizeof(Macro));
         }
+
+        memcpy(parser->macros->items + parser->macros->len,
+               macros.items, macros.len * sizeof(Macro));
+
+        parser->macros->len += macros.len;
+
+        arena_free(&arena);
+      } else {
+        expr->as.block = parse_ex(code, path, parser->macros,
+                                  parser->included_files, &arena,
+                                  parser->use_macros);
       }
     } break;
 

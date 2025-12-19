@@ -286,7 +286,7 @@ u8 *serialize_macros(Macros *macros, u32 *size,
   FilePathOffsets path_offsets = {0};
   save_included_files(&data, &data_size, size, included_files, &path_offsets);
 
-  reserve_space(sizeof(u32) + macros->len, &data, &data_size, size);
+  reserve_space(sizeof(u32), &data, &data_size, size);
   *(u32 *) (data + *size) = macros->len;
   *size += sizeof(u32);
 
@@ -305,8 +305,8 @@ u8 *serialize_macros(Macros *macros, u32 *size,
     if (dce)
       eliminate_dead_code(&macro->body);
 
-    save_block_data(&macro->body, &data, &data_size, size, &path_offsets,
-                    included_files->items[0]);
+    save_block_data(&macro->body, &data, &data_size, size,
+                    &path_offsets, included_files->items[0]);
 
     reserve_space(sizeof(u8), &data, &data_size, size);
     *(u8 *) (data + *size) = macro->has_unpack;
