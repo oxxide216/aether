@@ -1,0 +1,81 @@
+:root {
+  --bg: #181818;
+  --bg-alt: #282828;
+  --fg: #868aac;
+  --accent: #8253a1;
+  --accent-alt: #5ab977;
+  --accent-warn: #deb566;
+  --accent-error: #b54036;
+}
+
+.roboto-mono {
+  font-family: "Roboto Mono", monospace;
+  font-optical-sizing: auto;
+  font-style: normal;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.chat {
+  padding-top: 40px;
+  width: 40%;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.message {
+  border-radius: 15px;
+  margin-bottom: 8px;
+  width: 100%;
+  height: 36px;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  padding: 0px 0px 0px 8px;
+  font-family: monospace;
+}
+
+.prompt {
+  border: 2px solid var(--accent);
+}
+
+.result {
+  border: 2px solid var(--accent-alt);
+  height: fit-content;
+}
+
+.warn {
+  border: 2px solid var(--accent-warn);
+  height: fit-content;
+}
+
+.error {
+  border: 2px solid var(--accent-error);
+  height: fit-content;
+}
+
+.prompt-input {
+  border: none;
+  outline: none;
+  border-radius: 15px;
+  padding: 0px 0px 0px 5px;
+  background-color: var(--bg);
+  color: var(--fg);
+  width: 100%;
+  height: 100%;
+  font-size: 18px;
+}

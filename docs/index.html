@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Aether</title>
+
+    <link rel="icon" href="data:,">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+  <h1 class="roboto-mono">Welcome to Aether REPL</h1>
+  <h2 class="roboto-mono">Type Aether code below and press Enter</h1>
+  <div class="chat">
+    <div class="prompt message roboto-mono">
+      <span>&nbsp;&gt;&nbsp;</span>
+      <input class="prompt-input" placeholder="(+ 2 2)"></input>
+    </div>
+
+    <div class="result message roboto-mono" style="display: none"></div>
+    <div class="warn message roboto-mono" style="display: none"></div>
+    <div class="error message roboto-mono" style="display: none"></div>
+  </div>
+
+  <script src="aether-web.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
