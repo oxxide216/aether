@@ -13,7 +13,7 @@
 #include "grammar.h"
 #include "shl/shl-log.h"
 
-#define INCLUDE_PATHS { "./",                    \
+#define INCLUDE_PATHS { NULL,                    \
                         "ae-src/",               \
                         "/usr/include/aether/" }
 #define INCLUDE_PATHS_LEN 3
@@ -567,6 +567,21 @@ static IrExprMatch parser_parse_match(Parser *parser) {
   return match;
 }
 
+static Str get_file_dir(Str path) {
+  for (u32 i = path.len; i > 0; --i)
+    if (path.ptr[i - 1] == '/')
+      return (Str) { path.ptr, i };
+
+  return (Str) {0};
+}
+
+static char *str_to_cstr(Str str, Arena *arena) {
+  char *result = arena_alloc(arena, (str.len + 1) * sizeof(char));
+  memcpy(result, str.ptr, str.len * sizeof(char));
+  result[str.len] = 0;
+  return result;
+}
+
 static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
   IrExpr *expr = arena_alloc(parser->arena, sizeof(IrExpr));
   *expr = (IrExpr) {0};
@@ -730,7 +745,10 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
 
       parser_expect_token(parser, MASK(TT_CPAREN));
 
+      Str current_dir = get_file_dir(*parser->file_path);
+      char *current_dir_cstr = str_to_cstr(current_dir, parser->arena);
       char *include_paths[INCLUDE_PATHS_LEN] = INCLUDE_PATHS;
+      include_paths[0] = current_dir_cstr;
       StringBuilder path_sb = {0};
       Str code = { NULL, (u32) -1 };
       Str path = {0};
