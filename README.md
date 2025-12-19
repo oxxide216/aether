@@ -1,5 +1,7 @@
 # Aether
 
+### 🔥 [Try it online!](https://oxxide216.github.io/aether)
+
 Lisp-like interpreted functional programming language.
 
 Still in active development, only for Linux and WebAssembly for now.
