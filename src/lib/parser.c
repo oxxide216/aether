@@ -394,9 +394,9 @@ Ir parse_ex(Str code, Str *file_path, Macros *macros,
   FilePaths cached_included_files;
   cached_included_files.len = included_files->len;
   cached_included_files.cap = cached_included_files.len;
-  cached_included_files.items = arena_alloc(arena, cached_included_files.cap * sizeof(Str));
+  cached_included_files.items = arena_alloc(arena, cached_included_files.cap * sizeof(Str *));
   memcpy(cached_included_files.items, included_files->items,
-         cached_included_files.len * sizeof(Str));
+         cached_included_files.len * sizeof(Str *));
 
   CachedIr cached_ir = {
     file_path, parser.ir, cached_macros,
@@ -744,7 +744,6 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
       StringBuilder path_sb = {0};
       Str code = { NULL, (u32) -1 };
       Str *path = NULL;
-
       Arena arena = {0};
 
       for (u32 i = 0; i < ARRAY_LEN(include_paths); ++i) {
@@ -805,14 +804,16 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
         }
       }
 
-      if (!already_included) {
+      if (already_included) {
+        arena_free(&arena);
+      } else {
         Str magic = {
           code.ptr,
           sizeof(u32),
         };
 
         if (str_eq(magic, STR_LIT("ABM\0"))) {
-          Macros macros = deserialize_macros((u8 *) code.ptr, code.len, parser->arena);
+          Macros macros = deserialize_macros((u8 *) code.ptr, code.len, &arena);
 
           if (parser->macros->cap < parser->macros->len + macros.len) {
              parser->macros->cap = parser->macros->len + macros.len;
@@ -822,12 +823,12 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
             else
               parser->macros->items = realloc(parser->macros->items,
                                               parser->macros->cap * sizeof(Macro));
-
-            memcpy(parser->macros->items + parser->macros->len,
-                   macros.items, macros.len * sizeof(Macro));
-
-            parser->macros->len += macros.len;
           }
+
+          memcpy(parser->macros->items + parser->macros->len,
+                 macros.items, macros.len * sizeof(Macro));
+
+          parser->macros->len += macros.len;
         } else {
           expr->as.block = parse_ex(code, path, parser->macros,
                                     parser->included_files, &arena,
