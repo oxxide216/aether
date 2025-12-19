@@ -16,6 +16,7 @@ extern CachedIrs cached_irs;
 extern StringBuilder printf_sb;
 #endif
 
+static Arena ir_arena = {0};
 static Macros macros = {0};
 static FilePaths included_files = {0};
 static Vm vm = {0};
@@ -55,8 +56,6 @@ char *emscripten_eval_compiled(u8 *bytecode, u32 bytecode_len) {
 
   vm.current_file_path = prev_file_path;
 
-  arena_free(&ir_arena);
-
   return value_to_cstr(result);
 }
 
@@ -84,7 +83,6 @@ void emscripten_eval_macros(u8 *macro_bytecode, u32 macro_bytecode_len) {
 
 EMSCRIPTEN_KEEPALIVE
 char *emscripten_eval(char *code, char *file_path) {
-  Arena ir_arena = {0};
   Str file_path_str = { file_path, strlen(file_path) };
   Ir ir = parse_ex(STR(code, strlen(code)), &file_path_str,
                    &macros, &included_files, &ir_arena, false);
@@ -99,8 +97,6 @@ char *emscripten_eval(char *code, char *file_path) {
   Value *result = execute_block(&vm, &ir, true);
 
   vm.current_file_path = prev_file_path;
-
-  arena_free(&ir_arena);
 
   return value_to_cstr(result);
 }
@@ -117,6 +113,7 @@ void emscripten_destroy(void) {
 
   free(printf_sb.buffer);
 
+  arena_free(&ir_arena);
   free(macros.items);
   macros = (Macros) {0};
   free(included_files.items);
