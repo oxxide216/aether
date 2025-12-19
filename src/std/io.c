@@ -10,7 +10,7 @@
 #include "aether/misc.h"
 #include "aether/io.h"
 
-#ifndef __emscripten
+#ifndef EMSCRIPTEN
 Value *unblock_input_intrinsic(Vm *vm, Value **args) {
   (void) args;
 
@@ -177,7 +177,7 @@ Value *list_directory_intrinsic(Vm *vm, Value **args) {
 }
 
 Intrinsic io_intrinsics[] = {
-#ifndef __emscripten
+#ifndef EMSCRIPTEN
   { STR_LIT("unblock-input"), false, 0, {}, &unblock_input_intrinsic },
   { STR_LIT("block-input"), false, 0, {}, &block_input_intrinsic },
 #endif

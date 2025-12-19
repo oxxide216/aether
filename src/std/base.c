@@ -1,4 +1,7 @@
 #include <unistd.h>
+#ifdef EMSCRIPTEN
+#include <emscripten.h>
+#endif
 
 #include "aether/vm.h"
 #include "aether/misc.h"
@@ -19,8 +22,15 @@ Value *printf_intrinsic(Vm *vm, Value **args) {
     node = node->next;
   }
 
+#ifdef EMSCRIPTEN
+  sb_push_char(&printf_sb, '\0');
+  EM_ASM({
+    console.log(UTF8ToString($0));
+  }, printf_sb.buffer);
+#else
   str_print(STR(printf_sb.buffer, printf_sb.len));
   fflush(stdout);
+#endif
 
   return value_unit(vm->current_frame);
 }
