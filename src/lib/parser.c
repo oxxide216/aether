@@ -13,7 +13,7 @@
 #include "grammar.h"
 #include "shl/shl-log.h"
 
-#define INCLUDE_PATHS { "../",                   \
+#define INCLUDE_PATHS { "./",                    \
                         "ae-src/",               \
                         "/usr/include/aether/" }
 #define INCLUDE_PATHS_LEN 3
