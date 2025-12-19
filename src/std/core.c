@@ -918,6 +918,11 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
                                                     &macros_bytecode.len,
                                                     &included_files, dce->as._bool);
 
+    char *new_ptr = arena_alloc(&vm->current_frame->arena, macros_bytecode.len);
+    memcpy(new_ptr, macros_bytecode.ptr, macros_bytecode.len);
+    free(macros_bytecode.ptr);
+    macros_bytecode.ptr = new_ptr;
+
     Value *compiled_macros = value_string(macros_bytecode, vm->current_frame);
     dict_push_value_str_key(vm->current_frame, &dict,
                             STR_LIT("compiled-macros"),

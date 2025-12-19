@@ -80,16 +80,20 @@ void emscripten_eval_macros(u8 *macro_bytecode, u32 macro_bytecode_len) {
 
 EMSCRIPTEN_KEEPALIVE
 char *emscripten_eval(char *code, char *file_path) {
-  Str file_path_str = { file_path, strlen(file_path) };
-  Ir ir = parse_ex(STR(code, strlen(code)), &file_path_str,
+  Str *file_path_str = arena_alloc(&ir_arena, sizeof(Str));
+  file_path_str->len = strlen(file_path);
+  file_path_str->ptr = arena_alloc(&ir_arena, file_path_str->len);
+  memcpy(file_path_str->ptr, file_path, file_path_str->len);
+
+  Ir ir = parse_ex(STR(code, strlen(code)), file_path_str,
                    &macros, &included_files, &ir_arena, false);
 
   expand_macros_block(&ir, &macros, NULL, NULL, false,
-                      &ir_arena, &file_path_str, 0, 0);
+                      &ir_arena, file_path_str, 0, 0);
 
   Str prev_file_path = vm.current_file_path;
 
-  vm.current_file_path = file_path_str;
+  vm.current_file_path = *file_path_str;
 
   Value *result = execute_block(&vm, &ir, true);
 
