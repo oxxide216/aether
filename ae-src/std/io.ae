@@ -7,6 +7,7 @@
 ; TODO: file data
 (let get-file-info [path] -> import 'get-file-info')
 (let read-file [path] -> import 'read-file')
+(let read-binary-file [path] -> import 'read-binary-file')
 (let write-file [path content] -> import 'write-file')
 (let delete-file [path] -> import 'delete-file')
 (let delete-directory [path] -> import 'delete-directory')

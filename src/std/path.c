@@ -16,9 +16,9 @@ Value *get_current_path_intrinsic(Vm *vm, Value **args) {
 Value *set_current_path_intrinsic(Vm *vm, Value **args) {
   Value *path = args[0];
 
-  char *path_cstring = malloc(path->as.string.len + 1);
-  memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
-  path_cstring[path->as.string.len] = '\0';
+  char *path_cstring = malloc(path->as.string.str.len + 1);
+  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
+  path_cstring[path->as.string.str.len] = '\0';
 
   chdir(path_cstring);
 
@@ -30,9 +30,9 @@ Value *set_current_path_intrinsic(Vm *vm, Value **args) {
 Value *get_absolute_path_intrinsic(Vm *vm, Value **args) {
   Value *path = args[0];
 
-  char *path_cstring = malloc(path->as.string.len + 1);
-  memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
-  path_cstring[path->as.string.len] = '\0';
+  char *path_cstring = malloc(path->as.string.str.len + 1);
+  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
+  path_cstring[path->as.string.str.len] = '\0';
 
   char *absolute_path = arena_alloc(&vm->current_frame->arena, PATH_MAX_LENGTH);
   realpath(path_cstring, absolute_path);

@@ -8,7 +8,7 @@
   Value *set_func_name##_intrinsic(Vm *vm, Value **args) {                      \
     Value *name = args[0];                                                      \
     Value *callback = args[1];                                                  \
-    char *name_cstr = str_to_cstr(name->as.string);                             \
+    char *name_cstr = str_to_cstr(name->as.string.str);                         \
     EventData *event_data = arena_alloc(&vm->frames->arena, sizeof(EventData)); \
     event_data->vm = vm;                                                        \
     event_data->callback = callback->as.func;                                   \
@@ -33,7 +33,7 @@ static char *str_to_cstr(Str str) {
 Value *alert_intrinsic(Vm *vm, Value **args) {
   Value *text = args[0];
 
-  char *text_cstr = str_to_cstr(text->as.string);
+  char *text_cstr = str_to_cstr(text->as.string.str);
 
   EM_ASM({
     alert(UTF8ToString($0));
@@ -48,8 +48,8 @@ Value *update_html_intrinsic(Vm *vm, Value **args) {
   Value *name = args[0];
   Value *html = args[1];
 
-  char *name_cstr = str_to_cstr(name->as.string);
-  char *html_cstr = str_to_cstr(html->as.string);
+  char *name_cstr = str_to_cstr(name->as.string.str);
+  char *html_cstr = str_to_cstr(html->as.string.str);
 
   EM_ASM({
     const element = document.querySelector(UTF8ToString($0));
@@ -66,8 +66,8 @@ Value *update_text_intrinsic(Vm *vm, Value **args) {
   Value *name = args[0];
   Value *text = args[1];
 
-  char *name_cstr = str_to_cstr(name->as.string);
-  char *text_cstr = str_to_cstr(text->as.string);
+  char *name_cstr = str_to_cstr(name->as.string.str);
+  char *text_cstr = str_to_cstr(text->as.string.str);
 
   EM_ASM({
     const element = document.querySelector(UTF8ToString($0));
@@ -83,7 +83,7 @@ Value *update_text_intrinsic(Vm *vm, Value **args) {
 Value *get_html_intrinsic(Vm *vm, Value **args) {
   Value *name = args[0];
 
-  char *name_cstr = str_to_cstr(name->as.string);
+  char *name_cstr = str_to_cstr(name->as.string.str);
 
   char *html = EM_ASM_PTR({
     const element = document.querySelector(UTF8ToString($0));
@@ -103,7 +103,7 @@ Value *get_html_intrinsic(Vm *vm, Value **args) {
 Value *get_text_intrinsic(Vm *vm, Value **args) {
   Value *name = args[0];
 
-  char *name_cstr = str_to_cstr(name->as.string);
+  char *name_cstr = str_to_cstr(name->as.string.str);
 
   char *text = EM_ASM_PTR({
     const element = document.querySelector(UTF8ToString($0));
@@ -178,7 +178,7 @@ bool mouse_event_callback(i32 event_type, const EmscriptenMouseEvent *mouse_even
 Value *console_log_intrinsic(Vm *vm, Value **args) {
   Value *message = args[0];
 
-  char *message_cstr = str_to_cstr(message->as.string);
+  char *message_cstr = str_to_cstr(message->as.string.str);
   emscripten_console_log(message_cstr);
   free(message_cstr);
 
@@ -188,7 +188,7 @@ Value *console_log_intrinsic(Vm *vm, Value **args) {
 Value *console_warn_intrinsic(Vm *vm, Value **args) {
   Value *message = args[0];
 
-  char *message_cstr = str_to_cstr(message->as.string);
+  char *message_cstr = str_to_cstr(message->as.string.str);
   emscripten_console_warn(message_cstr);
   free(message_cstr);
 
@@ -198,7 +198,7 @@ Value *console_warn_intrinsic(Vm *vm, Value **args) {
 Value *console_error_intrinsic(Vm *vm, Value **args) {
   Value *message = args[0];
 
-  char *message_cstr = str_to_cstr(message->as.string);
+  char *message_cstr = str_to_cstr(message->as.string.str);
   emscripten_console_error(message_cstr);
   free(message_cstr);
 

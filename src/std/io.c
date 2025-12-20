@@ -39,7 +39,7 @@ static char *str_to_cstr(Str str) {
 Value *get_file_info_intrinsic(Vm *vm, Value **args) {
   Value *path = args[0];
 
-  char *path_cstring = str_to_cstr(path->as.string);
+  char *path_cstring = str_to_cstr(path->as.string.str);
 
   if (access(path_cstring, F_OK) != 0) {
     free(path_cstring);
@@ -81,7 +81,7 @@ Value *get_file_info_intrinsic(Vm *vm, Value **args) {
 Value *read_file_intrinsic(Vm *vm, Value **args) {
   Value *path = args[0];
 
-  char *path_cstring = str_to_cstr(path->as.string);
+  char *path_cstring = str_to_cstr(path->as.string.str);
 
   Str content = read_file_arena(path_cstring, &vm->current_frame->arena);
 
@@ -93,13 +93,19 @@ Value *read_file_intrinsic(Vm *vm, Value **args) {
   return value_string(content, vm->current_frame);
 }
 
+Value *read_binary_file_intrinsic(Vm *vm, Value **args) {
+  Value *content = read_file_intrinsic(vm, args);
+  content->as.string.is_utf8 = false;
+  return content;
+}
+
 Value *write_file_intrinsic(Vm *vm, Value **args) {
   Value *path = args[0];
   Value *content = args[1];
 
-  char *path_cstring = str_to_cstr(path->as.string);
+  char *path_cstring = str_to_cstr(path->as.string.str);
 
-  write_file(path_cstring, content->as.string);
+  write_file(path_cstring, content->as.string.str);
 
   free(path_cstring);
 
@@ -109,7 +115,7 @@ Value *write_file_intrinsic(Vm *vm, Value **args) {
 Value *delete_file_intrinsic(Vm *vm, Value **args) {
   Value *path = args[0];
 
-  char *path_cstring = str_to_cstr(path->as.string);
+  char *path_cstring = str_to_cstr(path->as.string.str);
 
   remove(path_cstring);
 
@@ -132,7 +138,7 @@ Value *delete_directory_intrinsic(Vm *vm, Value **args) {
 
   Value *path = args[0];
 
-  char *path_cstring = str_to_cstr(path->as.string);
+  char *path_cstring = str_to_cstr(path->as.string.str);
 
   nftw(path_cstring, unlink_dir_callback, 64, FTW_DEPTH | FTW_PHYS);
 
@@ -145,7 +151,7 @@ Value *list_directory_intrinsic(Vm *vm, Value **args) {
   ListNode *list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
   ListNode *list_end = list;
 
-  char *path_cstring = str_to_cstr(path->as.string);
+  char *path_cstring = str_to_cstr(path->as.string.str);
 
   DIR *dir = opendir(path_cstring);
   if (dir) {
@@ -159,9 +165,7 @@ Value *list_directory_intrinsic(Vm *vm, Value **args) {
 
       list_end->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
       list_end = list_end->next;
-      list_end->value = value_alloc(vm->current_frame);
-      list_end->value->kind = ValueKindString;
-      list_end->value->as.string = path;
+      list_end->value = value_string(path, vm->current_frame);
     }
 
     closedir(dir);
@@ -184,6 +188,7 @@ Intrinsic io_intrinsics[] = {
   // Files
   { STR_LIT("get-file-info"), true, 1, { ValueKindString }, &get_file_info_intrinsic },
   { STR_LIT("read-file"), true, 1, { ValueKindString }, &read_file_intrinsic },
+  { STR_LIT("read-binary-file"), true, 1, { ValueKindString }, &read_binary_file_intrinsic },
   { STR_LIT("write-file"), false, 2,
     { ValueKindString, ValueKindString },
     &write_file_intrinsic },

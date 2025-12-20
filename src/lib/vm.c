@@ -75,7 +75,7 @@ Value *value_list(ListNode *nodes, StackFrame *frame) {
 
 Value *value_string(Str string, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  *value = (Value) { ValueKindString, { .string = string },
+  *value = (Value) { ValueKindString, { .string = { string, true } },
                      frame, 0, false };
   return value;
 }
@@ -149,9 +149,9 @@ Value *value_clone(Value *value, StackFrame *frame) {
     copy->as.list = arena_alloc(&frame->arena, sizeof(ListNode));
     copy->as.list->next = list_clone(value->as.list->next, frame);
   } else if (value->kind == ValueKindString) {
-    copy->as.string.len = value->as.string.len;
-    copy->as.string.ptr = arena_alloc(&frame->arena, copy->as.string.len);
-    memcpy(copy->as.string.ptr, value->as.string.ptr, copy->as.string.len);
+    copy->as.string.str.len = value->as.string.str.len;
+    copy->as.string.str.ptr = arena_alloc(&frame->arena, copy->as.string.str.len);
+    memcpy(copy->as.string.str.ptr, value->as.string.str.ptr, copy->as.string.str.len);
   } else if (value->kind == ValueKindDict) {
     copy->as.dict = dict_clone(&value->as.dict, frame);
   } else if (value->kind == ValueKindFunc) {
@@ -236,7 +236,7 @@ bool value_eq(Value *a, Value *b) {
   }
 
   case ValueKindString: {
-    return str_eq(a->as.string, b->as.string);
+    return str_eq(a->as.string.str, b->as.string.str);
   }
 
   case ValueKindInt: {
@@ -772,8 +772,8 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       else
         result = value_unit(vm->current_frame);
     } else if (src->kind == ValueKindString) {
-      if ((u32) key->as._int < src->as.string.len) {
-        Str result_string = src->as.string;
+      if ((u32) key->as._int < src->as.string.str.len) {
+        Str result_string = src->as.string.str;
         result_string.ptr += key->as._int;
         result_string.len = 1;
 
@@ -1083,7 +1083,7 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
     new_arg->value = arena_alloc(&vm.current_frame->arena, sizeof(Value));
     *new_arg->value = (Value) {
       ValueKindString,
-      { .string = { buffer, len } },
+      { .string = { { buffer, len }, true } },
       vm.current_frame,
       1, false,
     };

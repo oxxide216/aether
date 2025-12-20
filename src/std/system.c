@@ -6,9 +6,9 @@
 Value *run_command_intrinsic(Vm *vm, Value **args) {
   Value *path = args[0];
 
-  char *path_cstring = malloc(path->as.string.len + 1);
-  memcpy(path_cstring, path->as.string.ptr, path->as.string.len);
-  path_cstring[path->as.string.len] = '\0';
+  char *path_cstring = malloc(path->as.string.str.len + 1);
+  memcpy(path_cstring, path->as.string.str.ptr, path->as.string.str.len);
+  path_cstring[path->as.string.str.len] = '\0';
 
   i64 exit_code = system(path_cstring);
 

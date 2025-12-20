@@ -56,9 +56,10 @@ Value *get_index_intrinsic(Vm *vm, Value **args) {
       ++i;
     }
   } else if (collection->kind == ValueKindString) {
-    if (item->as.string.len <= collection->as.string.len) {
-      for (u32 i = 0; i < collection->as.string.len - item->as.string.len; ++i)
-        if (str_eq(STR(collection->as.string.ptr + i, item->as.string.len), item->as.string))
+    if (item->as.string.str.len <= collection->as.string.str.len) {
+      for (u32 i = 0; i < collection->as.string.str.len - item->as.string.str.len; ++i)
+        if (str_eq(STR(collection->as.string.str.ptr + i, item->as.string.str.len),
+                   item->as.string.str))
           return value_int(i, vm->current_frame);
     }
   }
@@ -79,11 +80,14 @@ Value *len_intrinsic(Vm *vm, Value **args) {
 
     return value_int(len, vm->current_frame);
   } else if (value->kind == ValueKindString) {
+    if (!value->as.string.is_utf8)
+      return value_int(value->as.string.str.len, vm->current_frame);
+
     u32 len = 0;
     u32 index = 0;
     u32 wchar_len;
 
-    while (get_next_wchar(value->as.string, index, &wchar_len)) {
+    while (get_next_wchar(value->as.string.str, index, &wchar_len)) {
       ++len;
       index += wchar_len;
     }
@@ -132,7 +136,7 @@ Value *get_range_intrinsic(Vm *vm, Value **args) {
     return value_list(sub_list, vm->current_frame);
   } else {
     Str sub_string = {
-      value->as.string.ptr + begin->as._int,
+      value->as.string.str.ptr + begin->as._int,
       end->as._int - begin->as._int,
     };
 
@@ -305,15 +309,15 @@ bool value_bigger(Value *a, Value *b) {
 
   switch (a->kind) {
   case ValueKindString: {
-    Value *min_len_string = a->as.string.len < b->as.string.len ? a : b;
-    for (u32 i = 0; i < min_len_string->as.string.len; ++i) {
-      if (a->as.string.ptr[i] > b->as.string.ptr[i])
+    Value *min_len_string = a->as.string.str.len < b->as.string.str.len ? a : b;
+    for (u32 i = 0; i < min_len_string->as.string.str.len; ++i) {
+      if (a->as.string.str.ptr[i] > b->as.string.str.ptr[i])
         return true;
-      else if (a->as.string.ptr[i] < b->as.string.ptr[i])
+      else if (a->as.string.str.ptr[i] < b->as.string.str.ptr[i])
         return false;
     }
 
-    return a->as.string.len > b->as.string.len;
+    return a->as.string.str.len > b->as.string.str.len;
   }
 
   case ValueKindInt: {
@@ -411,8 +415,8 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
     }
   } else if (collection->kind == ValueKindString) {
     Value *_char = value_string(STR_LIT(" "), vm->current_frame);
-    for (u32 i = 0; i < collection->as.string.len; ++i) {
-      _char->as.string.ptr[0] = collection->as.string.ptr[i];
+    for (u32 i = 0; i < collection->as.string.str.len; ++i) {
+      _char->as.string.str.ptr[0] = collection->as.string.str.ptr[i];
 
       execute_func(vm, &_char, func->as.func, NULL, false);
       if (vm->state != ExecStateContinue)
@@ -492,7 +496,7 @@ Value *to_int_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
   if (value->kind == ValueKindString) {
-    return value_int(str_to_i64(value->as.string), vm->current_frame);
+    return value_int(str_to_i64(value->as.string.str), vm->current_frame);
   } else if (value->kind == ValueKindBool) {
     return value_int((i64) value->as._bool, vm->current_frame);
   } else if (value->kind == ValueKindFloat) {
@@ -508,7 +512,7 @@ Value *to_float_intrinsic(Vm *vm, Value **args) {
   if (value->kind == ValueKindInt)
     return value_float((f64) value->as._int, vm->current_frame);
   else if (value->kind == ValueKindString)
-    return value_float(str_to_f64(value->as.string), vm->current_frame);
+    return value_float(str_to_f64(value->as.string.str), vm->current_frame);
 
   return value_unit(vm->current_frame);
 }
@@ -532,8 +536,8 @@ Value *add_intrinsic(Vm *vm, Value **args) {
   } else if (a->kind == ValueKindString &&
              b->kind == ValueKindString) {
     StringBuilder sb = {0};
-    sb_push_str(&sb, a->as.string);
-    sb_push_str(&sb, b->as.string);
+    sb_push_str(&sb, a->as.string.str);
+    sb_push_str(&sb, b->as.string.str);
 
     Str new_string;
     new_string.len = sb.len;
@@ -623,7 +627,7 @@ Value *mul_intrinsic(Vm *vm, Value **args) {
   } else if (a->kind == ValueKindString) {
     StringBuilder sb = {0};
     for (u32 i = 0; i < (u32) b->as._int; ++i)
-      sb_push_str(&sb, a->as.string);
+      sb_push_str(&sb, a->as.string.str);
 
     Str result = {
       arena_alloc(&vm->current_frame->arena, sb.len),
@@ -862,7 +866,7 @@ Value *make_env_intrinsic(Vm *vm, Value **args) {
       PANIC(vm->current_frame,
             "make-env: every program argument should be of type string\n");
 
-    char *cstr_cmd_arg = str_to_cstr(node->value->as.string);
+    char *cstr_cmd_arg = str_to_cstr(node->value->as.string.str);
     DA_APPEND(cstr_cmd_args, cstr_cmd_arg);
 
     node = node->next;
@@ -886,7 +890,7 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Value *dce = args[4];
 
   Str magic = {
-    code->as.string.ptr,
+    code->as.string.str.ptr,
     sizeof(u32),
   };
 
@@ -898,12 +902,12 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   FilePaths included_files = {0};
-  Ir ir = parse_ex(code->as.string, &path->as.string,
+  Ir ir = parse_ex(code->as.string.str, &path->as.string.str,
                    &env->as.env->macros,
                    &included_files, &ir_arena, true);
 
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL,
-                      false, &ir_arena, &path->as.string, 0, 0);
+                      false, &ir_arena, &path->as.string.str, 0, 0);
 
   ListNode *result = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
   result->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
@@ -964,8 +968,8 @@ Value *eval_compiled_intrinsic(Vm *vm, Value **args) {
   Value *bytecode = args[1];
 
   Arena ir_arena = {0};
-  Ir ir = deserialize((u8 *) bytecode->as.string.ptr,
-                      bytecode->as.string.len, &ir_arena,
+  Ir ir = deserialize((u8 *) bytecode->as.string.str.ptr,
+                      bytecode->as.string.str.len, &ir_arena,
                       &env->as.env->vm.current_file_path);
 
   Value *result = execute_block(&env->as.env->vm, &ir, true);
@@ -984,8 +988,8 @@ Value *eval_macros_intrinsic(Vm *vm, Value **args) {
   Value *macro_bytecode = args[1];
 
   Arena ir_arena = {0};
-  Macros macros = deserialize_macros((u8 *) macro_bytecode->as.string.ptr,
-                                     macro_bytecode->as.string.len,
+  Macros macros = deserialize_macros((u8 *) macro_bytecode->as.string.str.ptr,
+                                     macro_bytecode->as.string.str.len,
                                      &env->as.env->included_files, &ir_arena);
 
   if (env->as.env->macros.cap < env->as.env->macros.len + macros.len) {
@@ -1010,14 +1014,14 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   FilePaths included_files = {0};
-  Ir ir = parse_ex(code->as.string, &path->as.string,
+  Ir ir = parse_ex(code->as.string.str, &path->as.string.str,
                    &env->as.env->macros,
                    &included_files, &ir_arena, false);
 
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL,
-                      false, &ir_arena, &path->as.string, 0, 0);
+                      false, &ir_arena, &path->as.string.str, 0, 0);
 
-  env->as.env->vm.current_file_path = path->as.string;
+  env->as.env->vm.current_file_path = path->as.string.str;
 
   Value *result = execute_block(&env->as.env->vm, &ir, true);
 

@@ -76,6 +76,11 @@ typedef Da(NamedValue)    NamedValues;
 typedef struct DictValue  DictValue;
 typedef Da(DictValue)     Dict;
 
+typedef struct {
+  Str  str;
+  bool is_utf8;
+} String;
+
 typedef struct Vm Vm;
 typedef struct Value Value;
 typedef Da(Value *) Values;
@@ -153,7 +158,7 @@ typedef struct {
 
 typedef union {
   ListNode *list;
-  Str       string;
+  String    string;
   i64       _int;
   f64       _float;
   bool      _bool;

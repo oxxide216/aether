@@ -6,7 +6,7 @@ bool value_to_bool(Value *value) {
   else if (value->kind == ValueKindList)
     return value->as.list->next != NULL;
   else if (value->kind == ValueKindString)
-    return value->as.string.len != 0;
+    return value->as.string.str.len != 0;
   else if (value->kind == ValueKindInt)
     return value->as._int != 0;
   else if (value->kind == ValueKindFloat)
@@ -36,7 +36,7 @@ void dict_push_value_str_key(StackFrame *frame, Dict *dict, Str string, Value *v
   Value *key = value_alloc(frame);
   *key = (Value) {
     ValueKindString,
-    { .string = string },
+    { .string = { string, true } },
     frame, 1, false,
   };
   DictValue dict_value = { key, value };
@@ -46,7 +46,7 @@ void dict_push_value_str_key(StackFrame *frame, Dict *dict, Str string, Value *v
 Value *dict_get_value_str_key(StackFrame *frame, Dict *dict, Str string) {
   for (u32 i = 0; i < dict->len; ++i)
     if (dict->items[i].key->kind == ValueKindString &&
-        str_eq(dict->items[i].key->as.string, string))
+        str_eq(dict->items[i].key->as.string.str, string))
       return dict->items[i].value;
 
   Value *result = value_alloc(frame);
@@ -85,7 +85,7 @@ void sb_push_value(StringBuilder *sb, Value *value,
     if (kind)
       sb_push(sb, "str");
     else
-      sb_push_str(sb, value->as.string);
+      sb_push_str(sb, value->as.string.str);
   } break;
 
   case ValueKindInt: {

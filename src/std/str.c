@@ -6,15 +6,15 @@ Value *str_insert_intrinsic(Vm *vm, Value **args) {
   Value *sub_string = args[2];
 
   Str new_string;
-  new_string.len = string->as.string.len + sub_string->as.string.len;
+  new_string.len = string->as.string.str.len + sub_string->as.string.str.len;
   new_string.ptr = arena_alloc(&vm->current_frame->arena, new_string.len);
-  memcpy(new_string.ptr, string->as.string.ptr, index->as._int);
+  memcpy(new_string.ptr, string->as.string.str.ptr, index->as._int);
   memcpy(new_string.ptr + index->as._int,
-         sub_string->as.string.ptr,
-         sub_string->as.string.len);
-  memcpy(new_string.ptr + index->as._int + sub_string->as.string.len,
-         string->as.string.ptr + index->as._int,
-         string->as.string.len - index->as._int);
+         sub_string->as.string.str.ptr,
+         sub_string->as.string.str.len);
+  memcpy(new_string.ptr + index->as._int + sub_string->as.string.str.len,
+         string->as.string.str.ptr + index->as._int,
+         string->as.string.str.len - index->as._int);
 
   return value_string(new_string, vm->current_frame);
 }
@@ -25,12 +25,12 @@ Value *str_remove_intrinsic(Vm *vm, Value **args) {
   Value *amount = args[2];
 
   Str new_string;
-  new_string.len = string->as.string.len - amount->as._int;
+  new_string.len = string->as.string.str.len - amount->as._int;
   new_string.ptr = arena_alloc(&vm->current_frame->arena, new_string.len);
-  memcpy(new_string.ptr, string->as.string.ptr, index->as._int);
+  memcpy(new_string.ptr, string->as.string.str.ptr, index->as._int);
   memcpy(new_string.ptr + index->as._int,
-         string->as.string.ptr + index->as._int + 1,
-         string->as.string.len - index->as._int - amount->as._int);
+         string->as.string.str.ptr + index->as._int + 1,
+         string->as.string.str.len - index->as._int - amount->as._int);
 
   return value_string(new_string, vm->current_frame);
 }
@@ -40,20 +40,20 @@ Value *str_replace_intrinsic(Vm *vm, Value **args) {
   Value *index = args[1];
   Value *sub_string = args[2];
 
-  u32 new_len = string->as.string.len;
-  if (new_len < index->as._int + sub_string->as.string.len)
-    new_len = index->as._int + sub_string->as.string.len;
+  u32 new_len = string->as.string.str.len;
+  if (new_len < index->as._int + sub_string->as.string.str.len)
+    new_len = index->as._int + sub_string->as.string.str.len;
 
   Str new_string;
   new_string.len = new_len;
   new_string.ptr = arena_alloc(&vm->current_frame->arena, new_string.len);
-  memcpy(new_string.ptr, string->as.string.ptr, index->as._int);
+  memcpy(new_string.ptr, string->as.string.str.ptr, index->as._int);
   memcpy(new_string.ptr + index->as._int,
-         sub_string->as.string.ptr,
-         sub_string->as.string.len);
-  memcpy(new_string.ptr + index->as._int + sub_string->as.string.len,
-         string->as.string.ptr + index->as._int + sub_string->as.string.len,
-         string->as.string.len - index->as._int - sub_string->as.string.len);
+         sub_string->as.string.str.ptr,
+         sub_string->as.string.str.len);
+  memcpy(new_string.ptr + index->as._int + sub_string->as.string.str.len,
+         string->as.string.str.ptr + index->as._int + sub_string->as.string.str.len,
+         string->as.string.str.len - index->as._int - sub_string->as.string.str.len);
 
   return value_string(new_string, vm->current_frame);
 }
@@ -66,12 +66,12 @@ Value *split_intrinsic(Vm *vm, Value **args) {
   ListNode *node = list;
   u32 index = 0, i = 0;
 
-  for (; i < string->as.string.len; ++i) {
+  for (; i < string->as.string.str.len; ++i) {
     u32 found = true;
 
-    for (u32 j = 0; j + i < string->as.string.len &&
-                        j < delimeter->as.string.len; ++j) {
-      if (string->as.string.ptr[j + i] != delimeter->as.string.ptr[j]) {
+    for (u32 j = 0; j + i < string->as.string.str.len &&
+                        j < delimeter->as.string.str.len; ++j) {
+      if (string->as.string.str.ptr[j + i] != delimeter->as.string.str.ptr[j]) {
         found = false;
         break;
       }
@@ -84,16 +84,11 @@ Value *split_intrinsic(Vm *vm, Value **args) {
       Str new_string;
       new_string.len = i - index;
       new_string.ptr = arena_alloc(&vm->current_frame->arena, new_string.len);
-      memcpy(new_string.ptr, string->as.string.ptr + index, new_string.len);
+      memcpy(new_string.ptr, string->as.string.str.ptr + index, new_string.len);
 
-      *node->next->value = (Value) {
-        ValueKindString,
-        { .string = new_string },
-        vm->current_frame,
-        1, false,
-      };
+      node->next->value = value_string(new_string, vm->current_frame);
 
-      index = i + delimeter->as.string.len;
+      index = i + delimeter->as.string.str.len;
       node = node->next;
     }
   }
@@ -105,14 +100,9 @@ Value *split_intrinsic(Vm *vm, Value **args) {
     Str new_string;
     new_string.len = i - index;
     new_string.ptr = arena_alloc(&vm->current_frame->arena, new_string.len);
-    memcpy(new_string.ptr, string->as.string.ptr + index, new_string.len);
+    memcpy(new_string.ptr, string->as.string.str.ptr + index, new_string.len);
 
-    *node->next->value = (Value) {
-      ValueKindString,
-      { .string = new_string },
-      vm->current_frame,
-      1, false,
-    };
+    node->next->value = value_string(new_string, vm->current_frame);
   }
 
   return value_list(list, vm->current_frame);
@@ -124,11 +114,11 @@ Value *sub_str_intrinsic(Vm *vm, Value **args) {
   Value *end = args[2];
 
   if (begin->as._int >= end->as._int ||
-      (u32) end->as._int > string->as.string.len)
+      (u32) end->as._int > string->as.string.str.len)
     return value_unit(vm->current_frame);
 
   Str sub_string = {
-    string->as.string.ptr + begin->as._int,
+    string->as.string.str.ptr + begin->as._int,
     end->as._int - begin->as._int,
   };
 
@@ -144,13 +134,13 @@ Value *join_intrinsic(Vm *vm, Value **args) {
   ListNode *node = parts->as.list->next;
   while (node) {
     if (node != parts->as.list->next)
-      sb_push_str(&sb, filler->as.string);
+      sb_push_str(&sb, filler->as.string.str);
 
     if (node->value->kind != ValueKindString)
       PANIC(vm->current_frame,
             "join: wrong part kinds\n");
 
-    sb_push_str(&sb, node->value->as.string);
+    sb_push_str(&sb, node->value->as.string.str);
 
     node = node->next;
   }
@@ -170,15 +160,15 @@ Value *eat_str_intrinsic(Vm *vm, Value **args) {
   Value *string = args[0];
   Value *pattern = args[1];
 
-  if (string->as.string.len < pattern->as.string.len)
+  if (string->as.string.str.len < pattern->as.string.str.len)
     return value_bool(false, vm->current_frame);
 
   Str string_begin = {
-    string->as.string.ptr,
-    pattern->as.string.len,
+    string->as.string.str.ptr,
+    pattern->as.string.str.len,
   };
 
-  bool matches = str_eq(string_begin, pattern->as.string);
+  bool matches = str_eq(string_begin, pattern->as.string.str);
 
   ListNode *new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
 
@@ -189,16 +179,10 @@ Value *eat_str_intrinsic(Vm *vm, Value **args) {
 
   new_list->next->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
   Str new_string = {
-    string->as.string.ptr + pattern->as.string.len,
-    string->as.string.len - pattern->as.string.len,
+    string->as.string.str.ptr + pattern->as.string.str.len,
+    string->as.string.str.len - pattern->as.string.str.len,
   };
-  new_list->next->next->value = value_alloc(vm->current_frame);
-  *new_list->next->next->value = (Value) {
-    ValueKindString,
-    { .string = new_string },
-    vm->current_frame,
-    1, false,
-  };
+  new_list->next->next->value = value_string(new_string, vm->current_frame);
 
   return value_list(new_list, vm->current_frame);
 }
@@ -206,15 +190,15 @@ Value *eat_str_intrinsic(Vm *vm, Value **args) {
 static Value *eat_byte(Vm *vm, Value **args, u32 size) {
   Value *string = args[0];
 
-  if (string->as.string.len < size)
+  if (string->as.string.str.len < size)
     return value_unit(vm->current_frame);
 
   i64 _int = 0;
   switch (size) {
-  case 8: _int = *(i64 *) string->as.string.ptr; break;
-  case 4: _int = *(i32 *) string->as.string.ptr; break;
-  case 2: _int = *(i16 *) string->as.string.ptr; break;
-  case 1: _int = *(i8 *) string->as.string.ptr; break;
+  case 8: _int = *(i64 *) string->as.string.str.ptr; break;
+  case 4: _int = *(i32 *) string->as.string.str.ptr; break;
+  case 2: _int = *(i16 *) string->as.string.str.ptr; break;
+  case 1: _int = *(i8 *) string->as.string.str.ptr; break;
   }
 
   ListNode *new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
@@ -226,16 +210,10 @@ static Value *eat_byte(Vm *vm, Value **args, u32 size) {
 
   new_list->next->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
   Str new_string = {
-    string->as.string.ptr + size,
-    string->as.string.len - size,
+    string->as.string.str.ptr + size,
+    string->as.string.str.len - size,
   };
-  new_list->next->next->value = value_alloc(vm->current_frame);
-  *new_list->next->next->value = (Value) {
-    ValueKindString,
-    { .string = new_string },
-    vm->current_frame,
-    1, false,
-  };
+  new_list->next->next->value = value_string(new_string, vm->current_frame);
 
   return value_list(new_list, vm->current_frame);
 }

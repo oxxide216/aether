@@ -50,11 +50,11 @@ Value *create_client_intrinsic(Vm *vm, Value **args) {
   Value *server_ip_address = args[0];
   Value *port = args[1];
 
-  char *server_ip_address_cstr = malloc(server_ip_address->as.string.len + 1);
+  char *server_ip_address_cstr = malloc(server_ip_address->as.string.str.len + 1);
   memcpy(server_ip_address_cstr,
-         server_ip_address->as.string.ptr,
-         server_ip_address->as.string.len);
-  server_ip_address_cstr[server_ip_address->as.string.len] = '\0';
+         server_ip_address->as.string.str.ptr,
+         server_ip_address->as.string.str.len);
+  server_ip_address_cstr[server_ip_address->as.string.str.len] = '\0';
 
   StringBuilder sb = {0};
   sb_push_i64(&sb, port->as._int);
@@ -133,8 +133,8 @@ Value *send_intrinsic(Vm *vm, Value **args) {
   Value *receiver = args[0];
   Value *message = args[1];
 
-  send(receiver->as._int, message->as.string.ptr,
-       message->as.string.len, 0);
+  send(receiver->as._int, message->as.string.str.ptr,
+       message->as.string.str.len, 0);
 
   return value_unit(vm->current_frame);
 }
