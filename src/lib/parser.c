@@ -752,7 +752,6 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
       StringBuilder path_sb = {0};
       Str code = { NULL, (u32) -1 };
       Str path = {0};
-      Arena arena = {0};
 
       for (u32 i = 0; i < ARRAY_LEN(include_paths); ++i) {
         sb_push(&path_sb, include_paths[i]);
@@ -761,12 +760,12 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
         if (parser->use_macros) {
           sb_push_str(&path_sb, STR_LIT(".abm\0"));
 
-          code = read_file_arena(path_sb.buffer, &arena);
+          code = read_file_arena(path_sb.buffer, parser->arena);
         }
 
         if (code.len != (u32) -1) {
           --path_sb.len; // exclude NULL-terminator
-          path = copy_str(sb_to_str(path_sb), &arena);
+          path = copy_str(sb_to_str(path_sb), parser->arena);
 
           break;
         } else {
@@ -775,11 +774,11 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
 
           sb_push_str(&path_sb, STR_LIT(".ae\0"));
 
-          code = read_file_arena(path_sb.buffer, &arena);
+          code = read_file_arena(path_sb.buffer, parser->arena);
 
           if (code.len != (u32) -1) {
             --path_sb.len; // exclude NULL-terminator
-            path = copy_str(sb_to_str(path_sb), &arena);
+            path = copy_str(sb_to_str(path_sb), parser->arena);
 
             break;
           }
@@ -808,18 +807,15 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
         }
       }
 
-      if (already_included) {
-        arena_free(&arena);
-
+      if (already_included)
         break;
-      }
 
       Str magic = {
         code.ptr,
         sizeof(u32),
       };
 
-      Str *path_ptr = arena_alloc(&arena, sizeof(Str));
+      Str *path_ptr = arena_alloc(parser->arena, sizeof(Str));
       *path_ptr = path;
 
       if (str_eq(magic, STR_LIT("ABM\0"))) {
@@ -844,6 +840,7 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
 
         parser->macros->len += macros.len;
       } else {
+        Arena arena = {0};
         expr->as.block = parse_ex(code, path_ptr, parser->macros,
                                   parser->included_files, &arena,
                                   parser->use_macros);
