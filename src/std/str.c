@@ -68,6 +68,7 @@ Value *split_intrinsic(Vm *vm, Value **args) {
 
   for (; i < string->as.string.len; ++i) {
     u32 found = true;
+
     for (u32 j = 0; j + i < string->as.string.len &&
                         j < delimeter->as.string.len; ++j) {
       if (string->as.string.ptr[j + i] != delimeter->as.string.ptr[j]) {
@@ -92,7 +93,7 @@ Value *split_intrinsic(Vm *vm, Value **args) {
         1, false,
       };
 
-      index = i + 1;
+      index = i + delimeter->as.string.len;
       node = node->next;
     }
   }
