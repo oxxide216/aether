@@ -1,5 +1,6 @@
 #include "aether/deserializer.h"
 #include "aether/serializer.h"
+#include "aether/common.h"
 #include "shl/shl-log.h"
 
 static void load_block_data(IrBlock *block, u8 *data, u32 *end,
@@ -263,7 +264,9 @@ Ir deserialize(u8 *data, u32 size, Arena *arena, Str *file_path) {
   return ir;
 }
 
-Macros deserialize_macros(u8 *data, u32 size, Arena *arena) {
+Macros deserialize_macros(u8 *data, u32 size,
+                          FilePaths *included_files,
+                          Arena *arena) {
   Macros macros = {0};
 
   if (size < sizeof(u32)) {
@@ -287,6 +290,27 @@ Macros deserialize_macros(u8 *data, u32 size, Arena *arena) {
 
   FilePathOffsets path_offsets = {0};
   load_path_offsets_data(&path_offsets, data, &end, arena);
+
+  if (included_files) {
+    if (included_files->cap < included_files->len + path_offsets.len) {
+      included_files->cap = included_files->len + path_offsets.len;
+      if (included_files->len == 0)
+        included_files->items = malloc(included_files->cap * sizeof(Str));
+      else
+        included_files->items = realloc(included_files->items,
+                                        included_files->cap * sizeof(Str));
+    }
+
+    for (u32 i = 0; i < path_offsets.len; ++i) {
+      Str *new_file_path;
+      new_file_path = arena_alloc(arena, sizeof(Str));
+      new_file_path->len = path_offsets.items[i].path.len;
+      new_file_path->ptr = arena_alloc(arena, new_file_path->len);
+      memcpy(new_file_path->ptr, path_offsets.items[i].path.ptr, new_file_path->len);
+
+      included_files->items[included_files->len++] = new_file_path;
+    }
+  }
 
   macros.len = *(u32 *) (data + end);
   macros.cap = macros.len;

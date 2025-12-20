@@ -5,8 +5,6 @@
 #include "arena.h"
 #include "macros.h"
 
-typedef Da(Str *) FilePaths;
-
 typedef struct {
   Str       *file_path;
   Ir         ir;

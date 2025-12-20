@@ -61,7 +61,9 @@ char *emscripten_eval_compiled(u8 *bytecode, u32 bytecode_len) {
 
 EMSCRIPTEN_KEEPALIVE
 void emscripten_eval_macros(u8 *macro_bytecode, u32 macro_bytecode_len) {
-  Macros temp_macros = deserialize_macros(macro_bytecode, macro_bytecode_len, &ir_arena);
+  Macros temp_macros = deserialize_macros(macro_bytecode,
+                                          macro_bytecode_len,
+                                          NULL, &ir_arena);
 
   if (macros.cap < macros.len + temp_macros.len) {
     macros.cap = macros.len + temp_macros.len;

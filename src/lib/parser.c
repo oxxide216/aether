@@ -825,8 +825,8 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
       if (str_eq(magic, STR_LIT("ABM\0"))) {
         include_file(parser->included_files, path_ptr);
 
-        Macros macros = deserialize_macros((u8 *) code.ptr,
-                                           code.len,
+        Macros macros = deserialize_macros((u8 *) code.ptr, code.len,
+                                           parser->included_files,
                                            parser->arena);
 
         if (parser->macros->cap < parser->macros->len + macros.len) {
@@ -843,8 +843,6 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
                macros.items, macros.len * sizeof(Macro));
 
         parser->macros->len += macros.len;
-
-        arena_free(&arena);
       } else {
         expr->as.block = parse_ex(code, path_ptr, parser->macros,
                                   parser->included_files, &arena,

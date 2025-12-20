@@ -4,6 +4,7 @@
 #include "aether/ir.h"
 #include "arena.h"
 
+typedef Da(Str *) FilePaths;
 typedef Da(Str) InternStrings;
 
 typedef Da(Str) Args;

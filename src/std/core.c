@@ -967,7 +967,8 @@ Value *eval_macros_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   Macros macros = deserialize_macros((u8 *) macro_bytecode->as.string.ptr,
-                                     macro_bytecode->as.string.len, &ir_arena);
+                                     macro_bytecode->as.string.len,
+                                     &env->as.env->included_files, &ir_arena);
 
   if (env->as.env->macros.cap < env->as.env->macros.len + macros.len) {
     env->as.env->macros.cap = env->as.env->macros.len + macros.len;
