@@ -361,6 +361,30 @@ static void catch_vars(Vm *vm, Strs *local_names,
   } break;
 
   case IrExprKindSetAt: {
+    for (u32 i = 0; i < local_names->len; ++i)
+      if (str_eq(expr->as.set_at.dest, local_names->items[i]))
+        return;
+
+    Var *var = get_var(vm, expr->as.set_at.dest);
+    if (var && var->kind != VarKindGlobal) {
+      NamedValue value = {
+        var->name,
+        value_clone(var->value, frame),
+      };
+
+      if (catched_values->cap == catched_values->len) {
+        if (catched_values->cap == 0)
+          catched_values->cap = 1;
+        else
+          catched_values->cap *= 2;
+        NamedValue *new_items = arena_alloc(&frame->arena, catched_values->cap * sizeof(NamedValue));
+        memcpy(new_items, catched_values->items, catched_values->len * sizeof(NamedValue));
+        catched_values->items = new_items;
+      }
+
+      catched_values->items[catched_values->len++] = value;
+    }
+
     CATCH_VARS(vm, local_names, catched_values, frame, expr->as.set_at.key);
     CATCH_VARS(vm, local_names, catched_values, frame, expr->as.set_at.value);
   } break;
@@ -863,20 +887,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
           key = value_clone(key, dest_var->value->frame);
 
         DictValue dict_value = { key, value };
-
-        if (dest_var->value->as.dict.cap == dest_var->value->as.dict.len) {
-          if (dest_var->value->as.dict.cap == 0)
-            dest_var->value->as.dict.cap = 1;
-          else
-            dest_var->value->as.dict.cap *= 2;
-          DictValue *new_items =
-            arena_alloc(&vm->current_frame->arena, dest_var->value->as.dict.cap * sizeof(DictValue));
-          memcpy(new_items, dest_var->value->as.dict.items,
-                 dest_var->value->as.dict.len * sizeof(DictValue));
-          dest_var->value->as.dict.items = new_items;
-
-          dest_var->value->as.dict.items[dest_var->value->as.dict.len++] = dict_value;
-        }
+        DA_APPEND(dest_var->value->as.dict, dict_value);
       }
     } else {
       StringBuilder sb = {0};
