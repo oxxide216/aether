@@ -112,6 +112,7 @@ typedef struct {
   NamedValues  catched_values_names;
   StackFrame  *catched_frame;
   Str          intrinsic_name;
+  u32          refs_count;
 } Func;
 
 typedef enum {
@@ -142,8 +143,7 @@ struct Vm {
   ListNode   *args;
   ExecState   state;
   i64         exit_code;
-  bool        is_inside_of_func;
-  Func        current_func;
+  Func       *current_func;
   Str         current_file_path;
 };
 
@@ -161,7 +161,7 @@ typedef union {
   f64       _float;
   bool      _bool;
   Dict      dict;
-  Func      func;
+  Func     *func;
   Env      *env;
 } ValueAs;
 

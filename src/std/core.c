@@ -176,7 +176,7 @@ Value *map_intrinsic(Vm *vm, Value **args) {
   while (node) {
     Value *func_args[] = { node->value };
     // TODO: put real metadata here
-    Value *replacement = execute_func(vm, func_args, &func->as.func, NULL, true);
+    Value *replacement = execute_func(vm, func_args, func->as.func, NULL, true);
     if (vm->state != ExecStateContinue)
       break;
 
@@ -213,7 +213,7 @@ Value *filter_intrinsic(Vm *vm, Value **args) {
   while (node) {
     Value *func_args[] = { node->value };
     // TODO: put real metadata here
-    Value *is_ok = execute_func(vm, func_args, &func->as.func, NULL, true);
+    Value *is_ok = execute_func(vm, func_args, func->as.func, NULL, true);
     if (vm->state != ExecStateContinue)
       break;
 
@@ -251,7 +251,7 @@ Value *fold_intrinsic(Vm *vm, Value **args) {
   while (node) {
     Value *func_args[] = { accumulator, node->value };
     // TODO: put real metadata here
-    Value *new_accumulator = execute_func(vm, func_args, &func->as.func, NULL, true);
+    Value *new_accumulator = execute_func(vm, func_args, func->as.func, NULL, true);
     if (vm->state != ExecStateContinue)
       break;
 
@@ -403,7 +403,7 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
   if (collection->kind == ValueKindList) {
     ListNode *node = collection->as.list->next;
     while (node) {
-      execute_func(vm, &node->value, &func->as.func, NULL, false);
+      execute_func(vm, &node->value, func->as.func, NULL, false);
       if (vm->state != ExecStateContinue)
         break;
 
@@ -414,7 +414,7 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
     for (u32 i = 0; i < collection->as.string.len; ++i) {
       _char->as.string.ptr[0] = collection->as.string.ptr[i];
 
-      execute_func(vm, &_char, &func->as.func, NULL, false);
+      execute_func(vm, &_char, func->as.func, NULL, false);
       if (vm->state != ExecStateContinue)
         break;
     }
@@ -432,7 +432,7 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
       pair->as.dict.items[0].value = collection->as.dict.items[i].key;
       pair->as.dict.items[1].value = collection->as.dict.items[i].value;
 
-      execute_func(vm, &pair, &func->as.func, NULL, false);
+      execute_func(vm, &pair, func->as.func, NULL, false);
       if (vm->state != ExecStateContinue)
         break;
     }

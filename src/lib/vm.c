@@ -110,7 +110,10 @@ Value *value_dict(Dict dict, StackFrame *frame) {
 
 Value *value_func(Func func, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  *value = (Value) { ValueKindFunc, { .func = func },
+  Func *_func = malloc(sizeof(Func));
+  func.refs_count = 1;
+  *_func = func;
+  *value = (Value) { ValueKindFunc, { .func = _func },
                      frame, 0, false };
   return value;
 }
@@ -151,6 +154,8 @@ Value *value_clone(Value *value, StackFrame *frame) {
     memcpy(copy->as.string.ptr, value->as.string.ptr, copy->as.string.len);
   } else if (value->kind == ValueKindDict) {
     copy->as.dict = dict_clone(&value->as.dict, frame);
+  } else if (value->kind == ValueKindFunc) {
+    ++copy->as.func->refs_count;
   } else if (value->kind == ValueKindEnv) {
     ++copy->as.env->refs_count;
   }
@@ -173,18 +178,20 @@ void value_free(Value *value) {
       value_free(value->as.dict.items[i].value);
     }
   } else if (value->kind == ValueKindFunc) {
-    if (value->as.func.catched_frame->is_used) {
-      value->as.func.catched_frame->is_used = false;
+    if (--value->as.func->refs_count == 0) {
+      if (value->as.func->catched_frame->is_used) {
+        value->as.func->catched_frame->is_used = false;
 
-      for (u32 i = 0; i < value->as.func.catched_values_names.len; ++i)
-        value_free(value->as.func.catched_values_names.items[i].value);
-      value->as.func.catched_values_names.len = 0;
+        value->as.func->catched_values_names.len = 0;
 
-      for (u32 i = 0; i < value->as.func.catched_frame->values.len; ++i)
-        value_free(value->as.func.catched_frame->values.items[i]);
-      value->as.func.catched_frame->values.len = 0;
+        for (u32 i = 0; i < value->as.func->catched_frame->values.len; ++i)
+          value_free(value->as.func->catched_frame->values.items[i]);
+        value->as.func->catched_frame->values.len = 0;
 
-      arena_reset(&value->as.func.catched_frame->arena);
+        arena_reset(&value->as.func->catched_frame->arena);
+      }
+
+      free(value->as.func);
     }
   } else if (value->kind == ValueKindEnv) {
     if (--value->as.env->refs_count == 0) {
@@ -251,8 +258,8 @@ bool value_eq(Value *a, Value *b) {
   }
 
   case ValueKindFunc: {
-    if (a->as.func.intrinsic_name.len > 0)
-      return str_eq(a->as.func.intrinsic_name, b->as.func.intrinsic_name);
+    if (a->as.func->intrinsic_name.len > 0)
+      return str_eq(a->as.func->intrinsic_name, b->as.func->intrinsic_name);
 
     return false;
   }
@@ -314,6 +321,7 @@ static void catch_vars(Vm *vm, Strs *local_names,
       memcpy(new_items, local_names->items, local_names->len * sizeof(Str));
       local_names->items = new_items;
     }
+
     local_names->items[local_names->len++] = expr->as.var_def.name;
   } break;
 
@@ -496,14 +504,15 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool val
 
   StackFrame *frame = vm->current_frame;
 
-  frame->vars.len = func->args.len + func->catched_values_names.len;
-  if (frame->vars.cap < frame->vars.len) {
-    frame->vars.cap = frame->vars.len;
-    if (frame->vars.items)
-      frame->vars.items = realloc(frame->vars.items, frame->vars.cap * sizeof(Var));
-    else
+  if (frame->vars.cap < func->args.len + func->catched_values_names.len) {
+    frame->vars.cap = func->args.len + func->catched_values_names.len;
+    if (frame->vars.len == 0)
       frame->vars.items = malloc(frame->vars.cap * sizeof(Var));
+    else
+      frame->vars.items = realloc(frame->vars.items, frame->vars.cap * sizeof(Var));
   }
+
+  frame->vars.len = func->args.len + func->catched_values_names.len;
 
   for (u32 i = 0; i < func->args.len; ++i) {
     Var var = {
@@ -557,10 +566,8 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Value *func_value;
     EXECUTE_EXPR_SET(vm, func_value, expr->as.func_call.func, true);
 
-    bool prev_is_inside_of_func = vm->is_inside_of_func;
-    Func prev_func = vm->current_func;
+    Func *prev_func = vm->current_func;
 
-    vm->is_inside_of_func = true;
     vm->current_func = func_value->as.func;
 
     if (func_value->kind != ValueKindFunc) {
@@ -576,10 +583,10 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       return value_unit(vm->current_frame);
     }
 
-    if (expr->as.func_call.args.len != func_value->as.func.args.len) {
+    if (expr->as.func_call.args.len != func_value->as.func->args.len) {
       PERROR(META_FMT, "Wrong arguments count: %u, expected %u\n",
             META_ARG(expr->meta), expr->as.func_call.args.len,
-            func_value->as.func.args.len);
+            func_value->as.func->args.len);
       vm->state = ExecStateExit;
       vm->exit_code = 1;
 
@@ -595,7 +602,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         return value_unit(vm->current_frame);
     }
 
-    result = execute_func(vm, func_args, &func_value->as.func, &expr->meta, value_expected);
+    result = execute_func(vm, func_args, func_value->as.func, &expr->meta, value_expected);
 
     if (vm->state != ExecStateContinue && vm->exit_code != 0) {
       Str name = STR_LIT("<lambda>");
@@ -609,7 +616,6 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       return value_unit(vm->current_frame);
     }
 
-    vm->is_inside_of_func = prev_is_inside_of_func;
     vm->current_func = prev_func;
   } break;
 
@@ -625,7 +631,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Var var = {0};
     var.name = expr->as.var_def.name;
     var.value = value;
-    var.kind = vm->is_inside_of_func ? VarKindLocal : VarKindGlobal;
+    var.kind = (bool) vm->current_func ? VarKindLocal : VarKindGlobal;
 
     if (var.kind == VarKindGlobal)
       DA_APPEND(vm->global_vars, var);
@@ -971,7 +977,8 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     local_names.len = expr->as.lambda.args.len;
     local_names.cap = local_names.len;
     local_names.items = arena_alloc(&frame->arena, local_names.len * sizeof(Str));
-    memcpy(local_names.items, expr->as.lambda.args.items, local_names.len * sizeof(Str));
+    memcpy(local_names.items, expr->as.lambda.args.items,
+           expr->as.lambda.args.len * sizeof(Str));
 
     catch_vars_block(vm, &local_names, &catched_values_names,
                      frame, &expr->as.lambda.body);
@@ -982,6 +989,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       catched_values_names,
       frame,
       expr->as.lambda.intrinsic_name,
+      1,
     };
 
     result = value_func(func, vm->current_frame);
@@ -1024,7 +1032,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
   case IrExprKindSelf: {
     if (value_expected)
-      result = value_func(vm->current_func, vm->current_frame);
+      result = value_func(*vm->current_func, vm->current_frame);
   } break;
   }
 

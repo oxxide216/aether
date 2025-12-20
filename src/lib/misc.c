@@ -116,10 +116,10 @@ void sb_push_value(StringBuilder *sb, Value *value,
   case ValueKindFunc: {
     sb_push_char(sb, '[');
 
-    for (u32 i = 0; i < value->as.func.args.len; ++i) {
+    for (u32 i = 0; i < value->as.func->args.len; ++i) {
       if (i > 0)
         sb_push_char(sb, ' ');
-      sb_push_str(sb, value->as.func.args.items[i]);
+      sb_push_str(sb, value->as.func->args.items[i]);
     }
 
     sb_push(sb, "] -> ...");

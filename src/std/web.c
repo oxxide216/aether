@@ -19,7 +19,7 @@
 
 typedef struct {
   Vm   *vm;
-  Func  callback;
+  Func *callback;
 } EventData;
 
 static char *str_to_cstr(Str str) {
@@ -149,7 +149,7 @@ bool key_event_callback(i32 event_type, const EmscriptenKeyboardEvent *key_event
   Value *event_data_value = value_dict(event_data_dict, event_data->vm->current_frame);
 
   Value *args[] = { event_data_value };
-  execute_func(event_data->vm, args, &event_data->callback, NULL, false);
+  execute_func(event_data->vm, args, event_data->callback, NULL, false);
 
   return true;
 }
@@ -170,7 +170,7 @@ bool mouse_event_callback(i32 event_type, const EmscriptenMouseEvent *mouse_even
   Value *event_data_value = value_dict(event_data_dict, event_data->vm->current_frame);
 
   Value *args[] = { event_data_value };
-  execute_func(event_data->vm, args, &event_data->callback, NULL, false);
+  execute_func(event_data->vm, args, event_data->callback, NULL, false);
 
   return true;
 }
