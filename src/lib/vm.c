@@ -189,6 +189,8 @@ void value_free(Value *value) {
         value->as.func->catched_frame->values.len = 0;
 
         arena_reset(&value->as.func->catched_frame->arena);
+
+        value->as.func->catched_frame->vars.len = 0;
       }
 
       free(value->as.func);
@@ -197,8 +199,10 @@ void value_free(Value *value) {
     if (--value->as.env->refs_count == 0) {
       if (value->as.env->macros.items)
         free(value->as.env->macros.items);
+
       if (value->as.env->included_files.items)
         free(value->as.env->included_files.items);
+
       vm_destroy(&value->as.env->vm);
       free(value->as.env);
     }
@@ -539,8 +543,6 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool val
   if (vm->state == ExecStateReturn)
     vm->state = ExecStateContinue;
 
-  frame = vm->current_frame;
-
   Value *result_stable = NULL;
   if (vm->state == ExecStateContinue) {
     if (value_expected)
@@ -569,6 +571,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Func *prev_func = vm->current_func;
 
     vm->current_func = func_value->as.func;
+    ++vm->current_func->refs_count;
 
     if (func_value->kind != ValueKindFunc) {
       StringBuilder sb = {0};
@@ -616,6 +619,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       return value_unit(vm->current_frame);
     }
 
+    ++vm->current_func->refs_count;
     vm->current_func = prev_func;
   } break;
 
@@ -723,6 +727,15 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     EXECUTE_EXPR_SET(vm, key, expr->as.get_at.key, true);
 
     if (src->kind == ValueKindList) {
+      if (key->kind != ValueKindInt) {
+        PERROR(META_FMT, "get: lists can only be indexed with integers\n",
+               META_ARG(expr->meta));
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+
+        return value_unit(vm->current_frame);
+      }
+
       ListNode *node = src->as.list->next;
       u32 i = 0;
       while (node && i < (u32) key->as._int) {
