@@ -159,6 +159,16 @@ Value *value_clone(Value *value, StackFrame *frame) {
     if (frame != value->frame) {
       copy->as.func = arena_alloc(&frame->arena, sizeof(Func));
       *copy->as.func = *value->as.func;
+
+      copy->as.func->catched_values_names.items =
+        arena_alloc(&frame->arena, copy->as.func->catched_values_names.len * sizeof(NamedValue));
+
+      for (u32 i = 0; i < copy->as.func->catched_values_names.len; ++i) {
+        copy->as.func->catched_values_names.items[i].name =
+          value->as.func->catched_values_names.items[i].name;
+        copy->as.func->catched_values_names.items[i].value =
+          value_clone(value->as.func->catched_values_names.items[i].value, frame);
+      }
     }
   } else if (value->kind == ValueKindEnv) {
     ++copy->as.env->refs_count;
@@ -186,21 +196,8 @@ void value_free(Value *value) {
       value_free(value->as.dict.items[i].value);
     }
   } else if (value->kind == ValueKindFunc) {
-    if (--value->as.func->refs_count == 0) {
-      if (value->as.func->catched_frame->is_used) {
-        value->as.func->catched_frame->is_used = false;
-
-        value->as.func->catched_values_names.len = 0;
-
-        for (u32 i = 0; i < value->as.func->catched_frame->values.len; ++i)
-          value_free(value->as.func->catched_frame->values.items[i]);
-        value->as.func->catched_frame->values.len = 0;
-
-        arena_reset(&value->as.func->catched_frame->arena);
-
-        value->as.func->catched_frame->vars.len = 0;
-      }
-    }
+    if (--value->as.func->refs_count == 0)
+      value->as.func->catched_values_names.len = 0;
   } else if (value->kind == ValueKindEnv) {
     if (--value->as.env->refs_count == 0) {
       if (value->as.env->macros.items)
@@ -369,7 +366,7 @@ static void catch_vars(Vm *vm, Strs *local_names,
     if (var && var->kind != VarKindGlobal) {
       NamedValue value = {
         var->name,
-        value_clone(var->value, frame),
+        var->value,
       };
 
       if (catched_values->cap == catched_values->len) {
@@ -407,7 +404,7 @@ static void catch_vars(Vm *vm, Strs *local_names,
     if (var && var->kind != VarKindGlobal) {
       NamedValue value = {
         var->name,
-        value_clone(var->value, frame),
+        var->value,
       };
 
       if (catched_values->cap == catched_values->len) {
@@ -902,9 +899,6 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
       return value_unit(vm->current_frame);
     }
-
-  if (value_expected)
-    result = value_unit(vm->current_frame);
   } break;
 
   case IrExprKindRet: {
@@ -980,23 +974,21 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       break;
 
     NamedValues catched_values_names = {0};
-    StackFrame *frame = alloc_clojure_frame(vm->clojure_frames);
 
     Strs local_names;
     local_names.len = expr->as.lambda.args.len;
     local_names.cap = local_names.len;
-    local_names.items = arena_alloc(&frame->arena, local_names.len * sizeof(Str));
+    local_names.items = arena_alloc(&vm->current_frame->arena, local_names.len * sizeof(Str));
     memcpy(local_names.items, expr->as.lambda.args.items,
            expr->as.lambda.args.len * sizeof(Str));
 
     catch_vars_block(vm, &local_names, &catched_values_names,
-                     frame, &expr->as.lambda.body);
+                     vm->current_frame, &expr->as.lambda.body);
 
     Func func = {
       expr->as.lambda.args,
       expr->as.lambda.body,
       catched_values_names,
-      frame,
       expr->as.lambda.intrinsic_name,
       1,
     };
@@ -1079,9 +1071,6 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
   vm.frames_end = vm.frames;
 
   vm.current_frame = vm.frames;
-
-  vm.clojure_frames = malloc(sizeof(StackFrame));
-  *vm.clojure_frames = (StackFrame) {0};
 
   ListNode *args = arena_alloc(&vm.current_frame->arena, sizeof(ListNode));
   ListNode *args_end = args;
@@ -1183,13 +1172,6 @@ void vm_destroy(Vm *vm) {
     frame_free(frame);
     frame = next;
   }
-
-  frame = vm->clojure_frames;
-  while (frame) {
-    StackFrame *next = frame->next;
-    frame_free(frame);
-    frame = next;
-  }
 }
 
 void begin_frame(Vm *vm) {
@@ -1215,28 +1197,4 @@ void end_frame(Vm *vm) {
 
   if (vm->current_frame->prev)
     vm->current_frame = vm->current_frame->prev;
-}
-
-StackFrame *alloc_clojure_frame(StackFrame *prev) {
-  StackFrame *frame = prev;
-
-  while (frame && frame->next && frame->is_used)
-    frame = frame->next;
-
-  if (frame->is_used) {
-    StackFrame *next = frame->next;
-
-    frame->next = malloc(sizeof(StackFrame));
-    *frame->next = (StackFrame) {0};
-    frame = frame->next;
-
-    if (next) {
-      frame->next = next;
-      next->prev = frame;
-    }
-  }
-
-  frame->is_used = true;
-
-  return frame;
 }

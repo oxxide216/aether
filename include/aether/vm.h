@@ -101,7 +101,6 @@ struct StackFrame {
   Arena       arena;
   Vars        vars;
   bool        can_lookup_through;
-  bool        is_used;
   StackFrame *next;
   StackFrame *prev;
 };
@@ -110,7 +109,6 @@ typedef struct {
   IrArgs       args;
   IrBlock      body;
   NamedValues  catched_values_names;
-  StackFrame  *catched_frame;
   Str          intrinsic_name;
   u32          refs_count;
 } Func;
@@ -139,7 +137,6 @@ struct Vm {
   StackFrame *frames;
   StackFrame *frames_end;
   StackFrame *current_frame;
-  StackFrame *clojure_frames;
   ListNode   *args;
   ExecState   state;
   i64         exit_code;
@@ -219,8 +216,7 @@ void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics);
 void vm_stop(Vm *Vm);
 void vm_destroy(Vm *vm);
 
-void        begin_frame(Vm *vm);
-void        end_frame(Vm *vm);
-StackFrame *alloc_clojure_frame(StackFrame *prev);
+void begin_frame(Vm *vm);
+void end_frame(Vm *vm);
 
 #endif // AETHER_VM
