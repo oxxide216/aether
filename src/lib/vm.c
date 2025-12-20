@@ -110,9 +110,9 @@ Value *value_dict(Dict dict, StackFrame *frame) {
 
 Value *value_func(Func func, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  Func *_func = malloc(sizeof(Func));
-  func.refs_count = 1;
+  Func *_func = arena_alloc(&frame->arena, sizeof(Func));
   *_func = func;
+  _func->refs_count = 1;
   *value = (Value) { ValueKindFunc, { .func = _func },
                      frame, 0, false };
   return value;
@@ -120,7 +120,7 @@ Value *value_func(Func func, StackFrame *frame) {
 
 Value *value_env(Vm vm, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  Env *env = malloc(sizeof(Env));
+  Env *env = arena_alloc(&frame->arena, sizeof(Env));
   *env = (Env) {0};
   env->vm = vm;
   env->refs_count = 1;
@@ -156,8 +156,16 @@ Value *value_clone(Value *value, StackFrame *frame) {
     copy->as.dict = dict_clone(&value->as.dict, frame);
   } else if (value->kind == ValueKindFunc) {
     ++copy->as.func->refs_count;
+    if (frame != value->frame) {
+      copy->as.func = arena_alloc(&frame->arena, sizeof(Func));
+      *copy->as.func = *value->as.func;
+    }
   } else if (value->kind == ValueKindEnv) {
     ++copy->as.env->refs_count;
+    if (frame != value->frame) {
+      copy->as.env = arena_alloc(&frame->arena, sizeof(Env));
+      *copy->as.env = *value->as.env;
+    }
   }
 
   return copy;
@@ -192,8 +200,6 @@ void value_free(Value *value) {
 
         value->as.func->catched_frame->vars.len = 0;
       }
-
-      free(value->as.func);
     }
   } else if (value->kind == ValueKindEnv) {
     if (--value->as.env->refs_count == 0) {
@@ -204,7 +210,6 @@ void value_free(Value *value) {
         free(value->as.env->included_files.items);
 
       vm_destroy(&value->as.env->vm);
-      free(value->as.env);
     }
   }
 }
@@ -568,11 +573,6 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Value *func_value;
     EXECUTE_EXPR_SET(vm, func_value, expr->as.func_call.func, true);
 
-    Func *prev_func = vm->current_func;
-
-    vm->current_func = func_value->as.func;
-    ++vm->current_func->refs_count;
-
     if (func_value->kind != ValueKindFunc) {
       StringBuilder sb = {0};
       sb_push_value(&sb, func_value, 0, true, vm);
@@ -605,9 +605,15 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         return value_unit(vm->current_frame);
     }
 
+    Func *prev_func = vm->current_func;
+
+    vm->current_func = func_value->as.func;
+
     result = execute_func(vm, func_args, func_value->as.func, &expr->meta, value_expected);
 
-    if (vm->state != ExecStateContinue && vm->exit_code != 0) {
+    vm->current_func = prev_func;
+
+    if (vm->state == ExecStateExit && vm->exit_code != 0) {
       Str name = STR_LIT("<lambda>");
       if (expr->as.func_call.func->kind == IrExprKindIdent)
         name = expr->as.func_call.func->as.ident;
@@ -618,9 +624,6 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
       return value_unit(vm->current_frame);
     }
-
-    ++vm->current_func->refs_count;
-    vm->current_func = prev_func;
   } break;
 
   case IrExprKindVarDef: {
@@ -966,25 +969,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       break;
 
     NamedValues catched_values_names = {0};
-    StackFrame *frame = vm->clojure_frames;
-
-    while (frame && frame->next && frame->is_used)
-      frame = frame->next;
-
-    if (frame->is_used) {
-      StackFrame *next = frame->next;
-
-      frame->next = malloc(sizeof(StackFrame));
-      *frame->next = (StackFrame) {0};
-      frame = frame->next;
-
-      if (next) {
-        frame->next = next;
-        next->prev = frame;
-      }
-    }
-
-    frame->is_used = true;
+    StackFrame *frame = alloc_clojure_frame(vm->clojure_frames);
 
     Strs local_names;
     local_names.len = expr->as.lambda.args.len;
@@ -1219,4 +1204,28 @@ void end_frame(Vm *vm) {
 
   if (vm->current_frame->prev)
     vm->current_frame = vm->current_frame->prev;
+}
+
+StackFrame *alloc_clojure_frame(StackFrame *prev) {
+  StackFrame *frame = prev;
+
+  while (frame && frame->next && frame->is_used)
+    frame = frame->next;
+
+  if (frame->is_used) {
+    StackFrame *next = frame->next;
+
+    frame->next = malloc(sizeof(StackFrame));
+    *frame->next = (StackFrame) {0};
+    frame = frame->next;
+
+    if (next) {
+      frame->next = next;
+      next->prev = frame;
+    }
+  }
+
+  frame->is_used = true;
+
+  return frame;
 }

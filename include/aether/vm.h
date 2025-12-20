@@ -219,7 +219,8 @@ void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics);
 void vm_stop(Vm *Vm);
 void vm_destroy(Vm *vm);
 
-void begin_frame(Vm *vm);
-void end_frame(Vm *vm);
+void        begin_frame(Vm *vm);
+void        end_frame(Vm *vm);
+StackFrame *alloc_clojure_frame(StackFrame *prev);
 
 #endif // AETHER_VM
