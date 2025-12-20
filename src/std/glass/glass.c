@@ -198,30 +198,30 @@ static u64 fnv_hash(u8 *data, u32 size) {
 }
 
 Value *run_intrinsic(Vm *vm, Value **args) {
-  Func init = args[3]->as.func;
-  Func event_handler = args[4]->as.func;
-  Func update = args[5]->as.func;
-  Func render = args[6]->as.func;
+  Func *init = args[3]->as.func;
+  Func *event_handler = args[4]->as.func;
+  Func *update = args[5]->as.func;
+  Func *render = args[6]->as.func;
 
-  if (init.args.len != 0) {
+  if (init->args.len != 0) {
     ERROR("glass/run: init should have zero arguments\n");
     vm->state = ExecStateExit;
     return NULL;
   }
 
-  if (event_handler.args.len != 2) {
+  if (event_handler->args.len != 2) {
     ERROR("glass/run: event handler should have two arguments\n");
     vm->state = ExecStateExit;
     return NULL;
   }
 
-  if (update.args.len != 1) {
+  if (update->args.len != 1) {
     ERROR("glass/run: update body should have one argument\n");
     vm->state = ExecStateExit;
     return NULL;
   }
 
-  if (render.args.len != 1) {
+  if (render->args.len != 1) {
     ERROR("glass/run: render body should have one argument\n");
     vm->state = ExecStateExit;
     return NULL;
@@ -264,7 +264,7 @@ Value *run_intrinsic(Vm *vm, Value **args) {
   begin_frame(vm);
   vm->current_frame->can_lookup_through = true;
 
-  Value *state = execute_func(vm, &state, &init, NULL, true);
+  Value *state = execute_func(vm, &state, init, NULL, true);
   if (vm->state != ExecStateContinue) {
     winx_destroy_window(&glass.window);
     winx_cleanup(&glass.winx);
@@ -292,7 +292,7 @@ Value *run_intrinsic(Vm *vm, Value **args) {
       } else {
         Value *event_value = winx_event_to_value(&event, vm);
         Value *args[2] = { state, event_value };
-        execute_func(vm, args, &event_handler, NULL, false);
+        execute_func(vm, args, event_handler, NULL, false);
         if (vm->state != ExecStateContinue)
           break;
 
@@ -312,11 +312,11 @@ Value *run_intrinsic(Vm *vm, Value **args) {
                          vec2((f32) width, (f32) height));
     }
 
-    execute_func(vm, &state, &update, NULL, false);
+    execute_func(vm, &state, update, NULL, false);
     if (vm->state != ExecStateContinue)
       break;
 
-    execute_func(vm, &state, &render, NULL, false);
+    execute_func(vm, &state, render, NULL, false);
     if (vm->state != ExecStateContinue)
       break;
 

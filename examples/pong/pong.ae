@@ -1,5 +1,5 @@
-(use 'std/glass.ae')
-(use 'std/str.ae')
+(use 'std/glass')
+(use 'std/str')
 
 (let quad-offset 60.0)
 (let quad-width 25.0)

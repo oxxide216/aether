@@ -842,8 +842,19 @@ Value *is_env_intrinsic(Vm *vm, Value **args) {
   return value_bool(args[0]->kind == ValueKindEnv, vm->current_frame);
 }
 
+static char *str_to_cstr(Str str) {
+  StringBuilder sb = {0};
+
+  sb_push_str(&sb, str);
+  sb_push_char(&sb, '\0');
+
+  return sb.buffer;
+}
+
 Value *make_env_intrinsic(Vm *vm, Value **args) {
   Value *cmd_args = args[0];
+
+  Da(char *) cstr_cmd_args = {0};
 
   ListNode *node = cmd_args->as.list->next;
   while (node) {
@@ -851,11 +862,18 @@ Value *make_env_intrinsic(Vm *vm, Value **args) {
       PANIC(vm->current_frame,
             "make-env: every program argument should be of type string\n");
 
+    char *cstr_cmd_arg = str_to_cstr(node->value->as.string);
+    DA_APPEND(cstr_cmd_args, cstr_cmd_arg);
+
     node = node->next;
   }
 
   Intrinsics intrinsics = {0};
-  Vm new_vm = vm_create(0, NULL, &intrinsics);
+  Vm new_vm = vm_create(cstr_cmd_args.len, cstr_cmd_args.items, &intrinsics);
+
+  for (u32 i = 0; i < cstr_cmd_args.len; ++i)
+    free(cstr_cmd_args.items[i]);
+  free(cstr_cmd_args.items);
 
   return value_env(new_vm, vm->current_frame);
 }

@@ -1,7 +1,7 @@
-(use 'std/term.ae')
-(use 'std/io.ae')
-(use 'std/str.ae')
-(use 'std/path.ae')
+(use 'std/term')
+(use 'std/io')
+(use 'std/str')
+(use 'std/path')
 
 (let fg-color term/fg-magenta)
 (let bg-color term/bg-magenta)

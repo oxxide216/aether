@@ -1,6 +1,6 @@
+#include "aether/io.h"
 #include "text.h"
 #include "glass.h"
-#include "io.h"
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 

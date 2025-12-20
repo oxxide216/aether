@@ -1,12 +1,11 @@
-(use 'std/io.ae')
+(use 'std/io')
 
 (let DEPTH-LIMIT 4)
 (let TAB-WIDTH   2)
 (let FILLER      ' ')
 
-(if (< (len (get-args)) 2)
-  (println 'Target directory was not provided')
-  (exit 1))
+(let base-directory (if (>= (len (get-args)) 3) (get-args)::1
+                     else                       '.'))
 
 (let begins-with [str begin] ->
   (== (get-range str 0 (len begin)) begin))
@@ -33,5 +32,4 @@
 
     (print-directory item (+ path (+ '/' item)) (+ offset 1))))
 
-(let base-directory (get-args)::1)
 (print-directory base-directory base-directory 0)
