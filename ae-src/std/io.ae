@@ -9,6 +9,7 @@
 (let read-file [path] -> import 'read-file')
 (let read-binary-file [path] -> import 'read-binary-file')
 (let write-file [path content] -> import 'write-file')
+(let write-binary-file [path content] -> import 'write-binary-file')
 (let delete-file [path] -> import 'delete-file')
 (let delete-directory [path] -> import 'delete-directory')
 (let list-directory [path] -> import 'list-directory')

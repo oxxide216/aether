@@ -13,6 +13,8 @@ bool value_to_bool(Value *value) {
     return value->as._float != 0.0;
   else if (value->kind == ValueKindBool)
     return value->as._bool;
+  else if (value->kind == ValueKindBytes)
+    return value->as.bytes.len != 0;
   else
     return true;
 }
@@ -36,7 +38,7 @@ void dict_push_value_str_key(StackFrame *frame, Dict *dict, Str string, Value *v
   Value *key = value_alloc(frame);
   *key = (Value) {
     ValueKindString,
-    { .string = { string, true } },
+    { .string = { string } },
     frame, 1, false,
   };
   DictValue dict_value = { key, value };
@@ -146,6 +148,19 @@ void sb_push_value(StringBuilder *sb, Value *value,
 
   case ValueKindEnv: {
     sb_push(sb, "environment");
+  } break;
+
+  case ValueKindBytes: {
+    if (kind) {
+      sb_push(sb, "bytes");
+    } else {
+      Str bytes_string = {
+        (char *) value->as.bytes.ptr,
+        value->as.bytes.len,
+      };
+
+      sb_push_str(sb, bytes_string);
+    }
   } break;
 
   default: {

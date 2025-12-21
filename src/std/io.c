@@ -94,18 +94,36 @@ Value *read_file_intrinsic(Vm *vm, Value **args) {
 }
 
 Value *read_binary_file_intrinsic(Vm *vm, Value **args) {
-  Value *content = read_file_intrinsic(vm, args);
-  content->as.string.is_utf8 = false;
-  return content;
+  Value *string = read_file_intrinsic(vm, args);
+  Bytes bytes = {
+    (u8 *) string->as.string.str.ptr,
+    string->as.string.str.len,
+  };
+
+  return value_bytes(bytes, vm->current_frame);
 }
 
 Value *write_file_intrinsic(Vm *vm, Value **args) {
   Value *path = args[0];
   Value *content = args[1];
 
+  Str data = {0};
+
+  if (content->kind == ValueKindString) {
+    data = (Str) {
+      content->as.string.str.ptr,
+      content->as.string.str.len,
+    };
+  } else if (content->kind == ValueKindBytes) {
+    data = (Str) {
+      (char *) content->as.bytes.ptr,
+      content->as.bytes.len,
+    };
+  }
+
   char *path_cstring = str_to_cstr(path->as.string.str);
 
-  write_file(path_cstring, content->as.string.str);
+  write_file(path_cstring, data);
 
   free(path_cstring);
 
@@ -191,6 +209,9 @@ Intrinsic io_intrinsics[] = {
   { STR_LIT("read-binary-file"), true, 1, { ValueKindString }, &read_binary_file_intrinsic },
   { STR_LIT("write-file"), false, 2,
     { ValueKindString, ValueKindString },
+    &write_file_intrinsic },
+  { STR_LIT("write-binary-file"), false, 2,
+    { ValueKindString, ValueKindBytes },
     &write_file_intrinsic },
   { STR_LIT("delete-file"), false, 1, { ValueKindString }, &delete_file_intrinsic },
   { STR_LIT("delete-directory"), false, 1, { ValueKindString }, &delete_directory_intrinsic },

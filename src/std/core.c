@@ -62,6 +62,18 @@ Value *get_index_intrinsic(Vm *vm, Value **args) {
                    item->as.string.str))
           return value_int(i, vm->current_frame);
     }
+  } else if (collection->kind == ValueKindBytes) {
+    Str item_string = {
+      (char *) item->as.bytes.ptr,
+      item->as.bytes.len,
+    };
+
+    if (item->as.bytes.len <= collection->as.bytes.len) {
+      for (u32 i = 0; i < collection->as.bytes.len - item->as.bytes.len; ++i)
+        if (str_eq(STR((char *) collection->as.bytes.ptr + i, item->as.bytes.len),
+                   item_string))
+          return value_int(i, vm->current_frame);
+    }
   }
 
   return value_unit(vm->current_frame);
@@ -80,9 +92,6 @@ Value *len_intrinsic(Vm *vm, Value **args) {
 
     return value_int(len, vm->current_frame);
   } else if (value->kind == ValueKindString) {
-    if (!value->as.string.is_utf8)
-      return value_int(value->as.string.str.len, vm->current_frame);
-
     u32 len = 0;
     u32 index = 0;
     u32 wchar_len;
@@ -93,15 +102,11 @@ Value *len_intrinsic(Vm *vm, Value **args) {
     }
 
     return value_int(len, vm->current_frame);
+  } else if (value->kind == ValueKindBytes) {
+    return value_int(value->as.bytes.len, vm->current_frame);
   }
 
   return value_unit(vm->current_frame);
-}
-
-Value *len_bytes_intrinsic(Vm *vm, Value **args) {
-  Value *string = args[0];
-
-  return value_int(string->as.string.str.len, vm->current_frame);
 }
 
 Value *get_range_intrinsic(Vm *vm, Value **args) {
@@ -140,13 +145,34 @@ Value *get_range_intrinsic(Vm *vm, Value **args) {
     }
 
     return value_list(sub_list, vm->current_frame);
-  } else {
+  } else if (value->kind == ValueKindString) {
+    u32 begin_byte = 0;
+    u32 index = 0;
+    u32 bytes_len = 0;
+    u32 wchar_len;
+
+    while (get_next_wchar(value->as.string.str, index, &wchar_len) != '\0' &&
+           index < end->as._int) {
+      if (index == begin->as._int)
+        begin_byte = bytes_len;
+
+      ++index;
+      bytes_len += wchar_len;
+    }
+
     Str sub_string = {
-      value->as.string.str.ptr + begin->as._int,
-      end->as._int - begin->as._int,
+      value->as.string.str.ptr + begin_byte,
+      index - begin_byte,
     };
 
     return value_string(sub_string, vm->current_frame);
+  } else if (value->kind == ValueKindBytes) {
+    Bytes sub_bytes = {
+      value->as.bytes.ptr + begin->as._int,
+      end->as._int - begin->as._int,
+    };
+
+    return value_bytes(sub_bytes, vm->current_frame);
   }
 
   return value_unit(vm->current_frame);
@@ -342,7 +368,8 @@ bool value_bigger(Value *a, Value *b) {
   case ValueKindList:
   case ValueKindDict:
   case ValueKindFunc:
-  case ValueKindEnv: {
+  case ValueKindEnv:
+  case ValueKindBytes: {
     return false;
   }
   }
@@ -428,6 +455,15 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
       if (vm->state != ExecStateContinue)
         break;
     }
+  } else if (collection->kind == ValueKindBytes) {
+    Value *_int = value_int(0, vm->current_frame);
+    for (u32 i = 0; i < collection->as.bytes.len; ++i) {
+      _int->as._int = collection->as.bytes.ptr[i];
+
+      execute_func(vm, &_int, func->as.func, NULL, false);
+      if (vm->state != ExecStateContinue)
+        break;
+    }
   } else if (collection->kind == ValueKindDict) {
     Dict _pair = {0};
 
@@ -451,6 +487,58 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
   return value_unit(vm->current_frame);
 }
 
+Value *add_byte_64_intrinsic(Vm *vm, Value **args) {
+  Value *bytes = args[0];
+  Value *byte = args[1];
+
+  Bytes new_bytes;
+  new_bytes.len = bytes->as.bytes.len;
+  new_bytes.ptr = arena_alloc(&vm->current_frame->arena, new_bytes.len += sizeof(i64));
+  memcpy(new_bytes.ptr, bytes->as.bytes.ptr, new_bytes.len);
+  ((i64 *) new_bytes.ptr)[new_bytes.len] = byte->as._int;
+
+  return value_bytes(new_bytes, vm->current_frame);
+}
+
+Value *add_byte_32_intrinsic(Vm *vm, Value **args) {
+  Value *bytes = args[0];
+  Value *byte = args[1];
+
+  Bytes new_bytes;
+  new_bytes.len = bytes->as.bytes.len;
+  new_bytes.ptr = arena_alloc(&vm->current_frame->arena, new_bytes.len += sizeof(i32));
+  memcpy(new_bytes.ptr, bytes->as.bytes.ptr, new_bytes.len);
+  ((i32 *) new_bytes.ptr)[new_bytes.len] = byte->as._int;
+
+  return value_bytes(new_bytes, vm->current_frame);
+}
+
+Value *add_byte_16_intrinsic(Vm *vm, Value **args) {
+  Value *bytes = args[0];
+  Value *byte = args[1];
+
+  Bytes new_bytes;
+  new_bytes.len = bytes->as.bytes.len;
+  new_bytes.ptr = arena_alloc(&vm->current_frame->arena, new_bytes.len += sizeof(i16));
+  memcpy(new_bytes.ptr, bytes->as.bytes.ptr, new_bytes.len);
+  ((i16 *) new_bytes.ptr)[new_bytes.len] = byte->as._int;
+
+  return value_bytes(new_bytes, vm->current_frame);
+}
+
+Value *add_byte_8_intrinsic(Vm *vm, Value **args) {
+  Value *bytes = args[0];
+  Value *byte = args[1];
+
+  Bytes new_bytes;
+  new_bytes.len = bytes->as.bytes.len;
+  new_bytes.ptr = arena_alloc(&vm->current_frame->arena, new_bytes.len += sizeof(i8));
+  memcpy(new_bytes.ptr, bytes->as.bytes.ptr, new_bytes.len);
+  ((i8 *) new_bytes.ptr)[new_bytes.len] = byte->as._int;
+
+  return value_bytes(new_bytes, vm->current_frame);
+}
+
 Value *to_str_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
@@ -459,7 +547,7 @@ Value *to_str_intrinsic(Vm *vm, Value **args) {
 
   Str string;
   string.len = sb.len;
-  string.ptr = arena_alloc(&vm->current_frame->arena, sb.len);
+  string.ptr = arena_alloc(&vm->current_frame->arena, string.len);
   memcpy(string.ptr, sb.buffer, string.len);
 
   free(sb.buffer);
@@ -467,35 +555,15 @@ Value *to_str_intrinsic(Vm *vm, Value **args) {
   return value_string(string, vm->current_frame);
 }
 
-static Value *byte_to_str(Vm *vm, Value *value, u32 size) {
-  Str new_string;
-  new_string.len = size;
-  new_string.ptr = arena_alloc(&vm->current_frame->arena, new_string.len);
+Value *to_bytes_intrinsic(Vm *vm, Value **args) {
+  Value *value = args[0];
 
-  switch (size) {
-  case 8: *(i64 *) new_string.ptr = value->as._int; break;
-  case 4: *(i32 *) new_string.ptr = value->as._int; break;
-  case 2: *(i16 *) new_string.ptr = value->as._int; break;
-  case 1: *(i8 *) new_string.ptr = value->as._int; break;
-  }
+  Bytes bytes;
+  bytes.len = value->as.string.str.len;
+  bytes.ptr = arena_alloc(&vm->current_frame->arena, bytes.len);
+  memcpy(bytes.ptr, value->as.string.str.ptr, bytes.len);
 
-  return value_string(new_string, vm->current_frame);
-}
-
-Value *byte_64_to_str_intrinsic(Vm *vm, Value **args) {
-  return byte_to_str(vm, args[0], 8);
-}
-
-Value *byte_32_to_str_intrinsic(Vm *vm, Value **args) {
-  return byte_to_str(vm, args[0], 4);
-}
-
-Value *byte_16_to_str_intrinsic(Vm *vm, Value **args) {
-  return byte_to_str(vm, args[0], 2);
-}
-
-Value *byte_8_to_str_intrinsic(Vm *vm, Value **args) {
-  return byte_to_str(vm, args[0], 1);
+  return value_bytes(bytes, vm->current_frame);
 }
 
 Value *to_int_intrinsic(Vm *vm, Value **args) {
@@ -810,8 +878,12 @@ Value *type_intrinsic(Vm *vm, Value **args) {
     return value_string(STR_LIT("env"), vm->current_frame);
   } break;
 
+  case ValueKindBytes: {
+    return value_string(STR_LIT("bytes"), vm->current_frame);
+  } break;
+
   default: {
-    PANIC(vm->current_frame, "Unknown type: %u\n", args[0]->kind);
+    PANIC(vm->current_frame, "Unknown value king: %u\n", args[0]->kind);
   }
   }
 }
@@ -850,6 +922,10 @@ Value *is_dict_intrinsic(Vm *vm, Value **args) {
 
 Value *is_env_intrinsic(Vm *vm, Value **args) {
   return value_bool(args[0]->kind == ValueKindEnv, vm->current_frame);
+}
+
+Value *is_bytes_intrinsic(Vm *vm, Value **args) {
+  return value_bool(args[0]->kind == ValueKindBytes, vm->current_frame);
 }
 
 static char *str_to_cstr(Str str) {
@@ -1068,14 +1144,18 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("last"), true, 1, { ValueKindList }, &last_intrinsic },
   { STR_LIT("get-index"), true, 2, { ValueKindList, ValueKindUnit }, &get_index_intrinsic },
   { STR_LIT("get-index"), true, 2, { ValueKindString, ValueKindString }, &get_index_intrinsic },
+  { STR_LIT("get-index"), true, 2, { ValueKindBytes, ValueKindBytes }, &get_index_intrinsic },
   { STR_LIT("len"), true, 1, { ValueKindList }, &len_intrinsic },
   { STR_LIT("len"), true, 1, { ValueKindString }, &len_intrinsic },
-  { STR_LIT("len-bytes"), true, 1, { ValueKindString }, &len_bytes_intrinsic },
+  { STR_LIT("len"), true, 1, { ValueKindBytes }, &len_intrinsic },
   { STR_LIT("get-range"), true, 3,
     { ValueKindList, ValueKindInt, ValueKindInt },
     &get_range_intrinsic },
   { STR_LIT("get-range"), true, 3,
     { ValueKindString, ValueKindInt, ValueKindInt },
+    &get_range_intrinsic },
+  { STR_LIT("get-range"), true, 3,
+    { ValueKindBytes, ValueKindInt, ValueKindInt },
     &get_range_intrinsic },
   { STR_LIT("gen-range"), true, 2, { ValueKindInt, ValueKindInt }, &gen_range_intrinsic },
   { STR_LIT("map"), true, 2, { ValueKindFunc, ValueKindList }, &map_intrinsic },
@@ -1087,13 +1167,16 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("sort"), true, 1, { ValueKindList }, &sort_intrinsic },
   { STR_LIT("for-each"), false, 2, { ValueKindList, ValueKindFunc }, &for_each_intrinsic },
   { STR_LIT("for-each"), false, 2, { ValueKindString, ValueKindFunc }, &for_each_intrinsic },
+  { STR_LIT("for-each"), false, 2, { ValueKindBytes, ValueKindFunc }, &for_each_intrinsic },
   { STR_LIT("for-each"), false, 2, { ValueKindDict, ValueKindFunc }, &for_each_intrinsic },
+  // Bytes
+  { STR_LIT("add-byte-64"), false, 2, { ValueKindBytes, ValueKindInt }, &add_byte_64_intrinsic },
+  { STR_LIT("add-byte-32"), false, 2, { ValueKindBytes, ValueKindInt }, &add_byte_32_intrinsic },
+  { STR_LIT("add-byte-16"), false, 2, { ValueKindBytes, ValueKindInt }, &add_byte_16_intrinsic },
+  { STR_LIT("add-byte-8"), false, 2, { ValueKindBytes, ValueKindInt }, &add_byte_8_intrinsic },
   // Conversions
   { STR_LIT("to-str"), true, 1, { ValueKindUnit }, &to_str_intrinsic },
-  { STR_LIT("byte-64-to-str"), true, 1, { ValueKindInt }, &byte_64_to_str_intrinsic },
-  { STR_LIT("byte-32-to-str"), true, 1, { ValueKindInt }, &byte_32_to_str_intrinsic },
-  { STR_LIT("byte-16-to-str"), true, 1, { ValueKindInt }, &byte_16_to_str_intrinsic },
-  { STR_LIT("byte-8-to-str"), true, 1, { ValueKindInt }, &byte_8_to_str_intrinsic },
+  { STR_LIT("to-bytes"), true, 1, { ValueKindString }, &to_bytes_intrinsic },
   { STR_LIT("to-int"), true, 1, { ValueKindString }, &to_int_intrinsic },
   { STR_LIT("to-int"), true, 1, { ValueKindBool }, &to_int_intrinsic },
   { STR_LIT("to-int"), true, 1, { ValueKindFloat }, &to_int_intrinsic },
@@ -1146,6 +1229,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("is-func"), true, 1, { ValueKindUnit }, &is_func_intrinsic },
   { STR_LIT("is-dict"), true, 1, { ValueKindUnit }, &is_dict_intrinsic },
   { STR_LIT("is-env"), true, 1, { ValueKindUnit }, &is_env_intrinsic },
+  { STR_LIT("is-bytes"), true, 1, { ValueKindUnit }, &is_bytes_intrinsic },
   // Env
   { STR_LIT("make-env"), true, 1, { ValueKindList }, &make_env_intrinsic },
   { STR_LIT("compile"), true, 5,

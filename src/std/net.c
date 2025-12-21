@@ -133,8 +133,12 @@ Value *send_intrinsic(Vm *vm, Value **args) {
   Value *receiver = args[0];
   Value *message = args[1];
 
-  send(receiver->as._int, message->as.string.str.ptr,
-       message->as.string.str.len, 0);
+  if (message->kind == ValueKindString)
+    send(receiver->as._int, message->as.string.str.ptr,
+         message->as.string.str.len, 0);
+  else if (message->kind == ValueKindBytes)
+    send(receiver->as._int, message->as.bytes.ptr,
+         message->as.bytes.len, 0);
 
   return value_unit(vm->current_frame);
 }
@@ -143,7 +147,7 @@ Value *receive_size_intrinsic(Vm *vm, Value **args) {
   Value *receiver = args[0];
   Value *size = args[1];
 
-  Str buffer = { arena_alloc(&vm->current_frame->arena, size->as._int), 0 };
+  Bytes buffer = { arena_alloc(&vm->current_frame->arena, size->as._int), 0 };
 
   struct pollfd pfd;
   pfd.fd = receiver->as._int;
@@ -156,14 +160,14 @@ Value *receive_size_intrinsic(Vm *vm, Value **args) {
   if (buffer.len == 0)
     return value_unit(vm->current_frame);
 
-  return value_string(buffer, vm->current_frame);
+  return value_bytes(buffer, vm->current_frame);
 }
 
 Value *receive_intrinsic(Vm *vm, Value **args) {
   Value *receiver = args[0];
 
   u32 cap = DEFAULT_RECEIVE_BUFFER_SIZE;
-  Str buffer = { arena_alloc(&vm->current_frame->arena, cap), 0 };
+  Bytes buffer = { arena_alloc(&vm->current_frame->arena, cap), 0 };
 
   struct pollfd pfd;
   pfd.fd = receiver->as._int;
@@ -188,7 +192,7 @@ Value *receive_intrinsic(Vm *vm, Value **args) {
     buffer.len += (u32) len;
 
     if (buffer.len >= cap) {
-      char *prev_ptr = buffer.ptr;
+      u8 *prev_ptr = buffer.ptr;
 
       cap += DEFAULT_RECEIVE_BUFFER_SIZE;
       buffer.ptr = arena_alloc(&vm->current_frame->arena, cap);
@@ -199,7 +203,7 @@ Value *receive_intrinsic(Vm *vm, Value **args) {
   if (buffer.len == 0)
     return value_unit(vm->current_frame);
 
-  return value_string(buffer, vm->current_frame);
+  return value_bytes(buffer, vm->current_frame);
 }
 
 Intrinsic net_intrinsics[] = {
@@ -212,6 +216,7 @@ Intrinsic net_intrinsics[] = {
     &accept_connection_intrinsic },
   { STR_LIT("close-connection"), false, 1, { ValueKindInt }, &close_connection_intrinsic },
   { STR_LIT("send"), false, 2, { ValueKindInt, ValueKindString }, &send_intrinsic },
+  { STR_LIT("send"), false, 2, { ValueKindInt, ValueKindBytes }, &send_intrinsic },
   { STR_LIT("receive-size"), true, 2,
     { ValueKindInt, ValueKindInt },
     &receive_size_intrinsic },

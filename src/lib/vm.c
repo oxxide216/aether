@@ -75,7 +75,14 @@ Value *value_list(ListNode *nodes, StackFrame *frame) {
 
 Value *value_string(Str string, StackFrame *frame) {
   Value *value = value_alloc(frame);
-  *value = (Value) { ValueKindString, { .string = { string, true } },
+  *value = (Value) { ValueKindString, { .string = { string } },
+                     frame, 0, false };
+  return value;
+}
+
+Value *value_bytes(Bytes bytes, StackFrame *frame) {
+  Value *value = value_alloc(frame);
+  *value = (Value) { ValueKindBytes, { .bytes = bytes },
                      frame, 0, false };
   return value;
 }
@@ -152,6 +159,10 @@ Value *value_clone(Value *value, StackFrame *frame) {
     copy->as.string.str.len = value->as.string.str.len;
     copy->as.string.str.ptr = arena_alloc(&frame->arena, copy->as.string.str.len);
     memcpy(copy->as.string.str.ptr, value->as.string.str.ptr, copy->as.string.str.len);
+  } else if (value->kind == ValueKindBytes) {
+    copy->as.bytes.len = value->as.bytes.len;
+    copy->as.bytes.ptr = arena_alloc(&frame->arena, copy->as.bytes.len);
+    memcpy(copy->as.bytes.ptr, value->as.bytes.ptr, copy->as.bytes.len);
   } else if (value->kind == ValueKindDict) {
     copy->as.dict = dict_clone(&value->as.dict, frame);
   } else if (value->kind == ValueKindFunc) {
@@ -1083,7 +1094,7 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
     new_arg->value = arena_alloc(&vm.current_frame->arena, sizeof(Value));
     *new_arg->value = (Value) {
       ValueKindString,
-      { .string = { { buffer, len }, true } },
+      { .string = { { buffer, len } } },
       vm.current_frame,
       1, false,
     };

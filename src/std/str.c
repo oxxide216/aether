@@ -1,4 +1,5 @@
 #include "aether/vm.h"
+#include "aether/misc.h"
 
 Value *str_insert_intrinsic(Vm *vm, Value **args) {
   Value *string = args[0];
@@ -113,45 +114,40 @@ Value *split_intrinsic(Vm *vm, Value **args) {
   return value_list(list, vm->current_frame);
 }
 
-Value *sub_str_intrinsic(Vm *vm, Value **args) {
-  Value *string = args[0];
-  Value *begin = args[1];
-  Value *end = args[2];
-
-  if (begin->as._int >= end->as._int ||
-      (u32) end->as._int > string->as.string.str.len)
-    return value_unit(vm->current_frame);
-
-  Str sub_string = {
-    string->as.string.str.ptr + begin->as._int,
-    end->as._int - begin->as._int,
-  };
-
-  return value_string(sub_string, vm->current_frame);
-}
-
 Value *join_intrinsic(Vm *vm, Value **args) {
   Value *parts = args[0];
   Value *filler = args[1];
 
   StringBuilder sb = {0};
-  bool is_utf8 = true;
+  bool is_binary = false;
 
   ListNode *node = parts->as.list->next;
   while (node) {
     if (node != parts->as.list->next)
-      sb_push_str(&sb, filler->as.string.str);
+      SB_PUSH_VALUE(&sb, filler, 0, false, vm);
 
-    if (node->value->kind != ValueKindString)
+    if (node->value->kind == ValueKindBytes)
+      is_binary = true;
+    else if (node->value->kind != ValueKindString)
       PANIC(vm->current_frame,
             "join: wrong part kinds\n");
 
-    sb_push_str(&sb, node->value->as.string.str);
 
-    if (!node->value->as.string.is_utf8)
-      is_utf8 = false;
+    SB_PUSH_VALUE(&sb, node->value, 0, false, vm);
 
     node = node->next;
+  }
+
+  if (is_binary) {
+    Bytes joined = {
+      arena_alloc(&vm->current_frame->arena, sb.len),
+      sb.len,
+    };
+
+    memcpy(joined.ptr, sb.buffer, sb.len);
+    free(sb.buffer);
+
+    return value_bytes(joined, vm->current_frame);
   }
 
   Str joined = {
@@ -162,88 +158,7 @@ Value *join_intrinsic(Vm *vm, Value **args) {
   memcpy(joined.ptr, sb.buffer, sb.len);
   free(sb.buffer);
 
-  Value *result = value_string(joined, vm->current_frame);
-  result->as.string.is_utf8 = is_utf8;
-
-  return result;
-}
-
-Value *eat_str_intrinsic(Vm *vm, Value **args) {
-  Value *string = args[0];
-  Value *pattern = args[1];
-
-  if (string->as.string.str.len < pattern->as.string.str.len)
-    return value_bool(false, vm->current_frame);
-
-  Str string_begin = {
-    string->as.string.str.ptr,
-    pattern->as.string.str.len,
-  };
-
-  bool matches = str_eq(string_begin, pattern->as.string.str);
-
-  ListNode *new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-
-  new_list->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-  new_list->next->value = value_alloc(vm->current_frame);
-  *new_list->next->value = (Value) { ValueKindBool, { ._bool = matches },
-                                     vm->current_frame, 1, false };
-
-  new_list->next->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-  Str new_string = {
-    string->as.string.str.ptr + pattern->as.string.str.len,
-    string->as.string.str.len - pattern->as.string.str.len,
-  };
-  new_list->next->next->value = value_string(new_string, vm->current_frame);
-
-  return value_list(new_list, vm->current_frame);
-}
-
-static Value *eat_byte(Vm *vm, Value **args, u32 size) {
-  Value *string = args[0];
-
-  if (string->as.string.str.len < size)
-    return value_unit(vm->current_frame);
-
-  i64 _int = 0;
-  switch (size) {
-  case 8: _int = *(i64 *) string->as.string.str.ptr; break;
-  case 4: _int = *(i32 *) string->as.string.str.ptr; break;
-  case 2: _int = *(i16 *) string->as.string.str.ptr; break;
-  case 1: _int = *(i8 *) string->as.string.str.ptr; break;
-  }
-
-  ListNode *new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-
-  new_list->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-  new_list->next->value = value_alloc(vm->current_frame);
-  *new_list->next->value = (Value) { ValueKindInt, { ._int = _int },
-                                     vm->current_frame, 1, false };
-
-  new_list->next->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-  Str new_string = {
-    string->as.string.str.ptr + size,
-    string->as.string.str.len - size,
-  };
-  new_list->next->next->value = value_string(new_string, vm->current_frame);
-
-  return value_list(new_list, vm->current_frame);
-}
-
-Value *eat_byte_64_intrinsic(Vm *vm, Value **args) {
-  return eat_byte(vm, args, 8);
-}
-
-Value *eat_byte_32_intrinsic(Vm *vm, Value **args) {
-  return eat_byte(vm, args, 4);
-}
-
-Value *eat_byte_16_intrinsic(Vm *vm, Value **args) {
-  return eat_byte(vm, args, 2);
-}
-
-Value *eat_byte_8_intrinsic(Vm *vm, Value **args) {
-  return eat_byte(vm, args, 1);
+  return value_string(joined, vm->current_frame);
 }
 
 Intrinsic str_intrinsics[] = {
@@ -257,15 +172,8 @@ Intrinsic str_intrinsics[] = {
     { ValueKindString, ValueKindInt, ValueKindString },
     &str_replace_intrinsic },
   { STR_LIT("split"), true, 2, { ValueKindString, ValueKindString }, &split_intrinsic },
-  { STR_LIT("sub-str"), true, 3,
-    { ValueKindString, ValueKindInt, ValueKindInt },
-    &sub_str_intrinsic },
   { STR_LIT("join"), true, 2, { ValueKindList, ValueKindString }, &join_intrinsic },
-  { STR_LIT("eat-str"), true, 2, { ValueKindString, ValueKindString }, &eat_str_intrinsic },
-  { STR_LIT("eat-byte-64"), true, 1, { ValueKindString }, &eat_byte_64_intrinsic },
-  { STR_LIT("eat-byte-32"), true, 1, { ValueKindString }, &eat_byte_32_intrinsic },
-  { STR_LIT("eat-byte-16"), true, 1, { ValueKindString }, &eat_byte_16_intrinsic },
-  { STR_LIT("eat-byte-8"), true, 1, { ValueKindString }, &eat_byte_8_intrinsic },
+  { STR_LIT("join"), true, 2, { ValueKindList, ValueKindInt }, &join_intrinsic },
 };
 
 u32 str_intrinsics_len = ARRAY_LEN(str_intrinsics);
