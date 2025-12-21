@@ -529,7 +529,7 @@ static IrExprLambda parser_parse_lambda(Parser *parser) {
   } else {
     lambda.body = parser_parse_block(parser, MASK(TT_CPAREN) |
                                              MASK(TT_CBRACKET) |
-                                             MASK(TT_CURLY) |
+                                             MASK(TT_CCURLY) |
                                              MASK(TT_RHOMBUS));
 
     if (!parser_peek_token(parser).eof &&
