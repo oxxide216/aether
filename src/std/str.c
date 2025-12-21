@@ -130,6 +130,7 @@ Value *join_intrinsic(Vm *vm, Value **args) {
   Value *filler = args[1];
 
   StringBuilder sb = {0};
+  bool is_utf8 = true;
 
   ListNode *node = parts->as.list->next;
   while (node) {
@@ -142,6 +143,9 @@ Value *join_intrinsic(Vm *vm, Value **args) {
 
     sb_push_str(&sb, node->value->as.string.str);
 
+    if (!node->value->as.string.is_utf8)
+      is_utf8 = false;
+
     node = node->next;
   }
 
@@ -153,7 +157,10 @@ Value *join_intrinsic(Vm *vm, Value **args) {
   memcpy(joined.ptr, sb.buffer, sb.len);
   free(sb.buffer);
 
-  return value_string(joined, vm->current_frame);
+  Value *result = value_string(joined, vm->current_frame);
+  result->as.string.is_utf8 = is_utf8;
+
+  return result;
 }
 
 Value *eat_str_intrinsic(Vm *vm, Value **args) {
