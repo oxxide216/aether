@@ -98,6 +98,12 @@ Value *len_intrinsic(Vm *vm, Value **args) {
   return value_unit(vm->current_frame);
 }
 
+Value *len_bytes_intrinsic(Vm *vm, Value **args) {
+  Value *string = args[0];
+
+  return value_int(string->as.string.str.len, vm->current_frame);
+}
+
 Value *get_range_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
   Value *begin = args[1];
@@ -1064,6 +1070,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("get-index"), true, 2, { ValueKindString, ValueKindString }, &get_index_intrinsic },
   { STR_LIT("len"), true, 1, { ValueKindList }, &len_intrinsic },
   { STR_LIT("len"), true, 1, { ValueKindString }, &len_intrinsic },
+  { STR_LIT("len-bytes"), true, 1, { ValueKindString }, &len_bytes_intrinsic },
   { STR_LIT("get-range"), true, 3,
     { ValueKindList, ValueKindInt, ValueKindInt },
     &get_range_intrinsic },
