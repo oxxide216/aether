@@ -69,13 +69,18 @@ Value *split_intrinsic(Vm *vm, Value **args) {
   for (; i < string->as.string.str.len; ++i) {
     u32 found = true;
 
-    for (u32 j = 0; j + i < string->as.string.str.len &&
-                        j < delimeter->as.string.str.len; ++j) {
+    u32 j = 0;
+
+    for (; j + i < string->as.string.str.len &&
+               j < delimeter->as.string.str.len; ++j) {
       if (string->as.string.str.ptr[j + i] != delimeter->as.string.str.ptr[j]) {
         found = false;
         break;
       }
     }
+
+    if (j != delimeter->as.string.str.len)
+      found = false;
 
     if (found) {
       node->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
