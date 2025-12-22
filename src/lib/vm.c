@@ -959,7 +959,25 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
           key = value_clone(key, dest_var->value->frame);
 
         DictValue dict_value = { key, value };
-        DA_APPEND(dest_var->value->as.dict, dict_value);
+
+        Dict *dict = &dest_var->value->as.dict;
+
+        if (dict->cap == dict->len) {
+          if (dict->cap == 0)
+            dict->cap = 1;
+          else
+            dict->cap *= 2;
+
+          DictValue *new_items =
+            arena_alloc(&dest_var->value->frame->arena,
+                        dict->cap * sizeof(DictValue));
+
+          memcpy(new_items, dict->items, dict->len * sizeof(DictValue));
+
+          dict->items = new_items;
+        }
+
+        dict->items[dict->len++] = dict_value;
       }
     } else {
       StringBuilder sb = {0};
