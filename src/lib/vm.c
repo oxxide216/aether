@@ -1,6 +1,7 @@
 #include "aether/vm.h"
 #include "aether/misc.h"
 #include "intrinsics.h"
+#include "lexgen/runtime.h"
 #include "shl/shl-str.h"
 #include "shl/shl-log.h"
 
@@ -783,16 +784,50 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       else
         result = value_unit(vm->current_frame);
     } else if (src->kind == ValueKindString) {
-      if ((u32) key->as._int < src->as.string.str.len) {
-        Str result_string = src->as.string.str;
-        result_string.ptr += key->as._int;
-        result_string.len = 1;
+      if ((u32) key->as._int >= src->as.string.str.len) {
+        PERROR(META_FMT, "get: index out of bounds\n",
+               META_ARG(expr->meta));
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
 
-        result = value_string(result_string, vm->current_frame);
-      } else {
-        result = value_unit(vm->current_frame);
+        return value_unit(vm->current_frame);
       }
-    } else if (src->kind == ValueKindDict) {
+
+      u32 index = 0;
+      u32 byte_index = 0;
+      u32 wchar_len;
+
+      while (get_next_wchar(src->as.string.str, index, &wchar_len) != '\0') {
+        if (index == key->as._int) {
+          Str sub_string = {
+            src->as.string.str.ptr + byte_index,
+            wchar_len,
+          };
+          return value_string(sub_string, vm->current_frame);
+        }
+
+        ++index;
+        byte_index += wchar_len;
+      }
+
+      PERROR(META_FMT, "get: index out of bounds\n",
+             META_ARG(expr->meta));
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+
+      return value_unit(vm->current_frame);
+    } else if (src->kind == ValueKindBytes) {
+      if (key->as._int >= src->as.bytes.len) {
+        PERROR(META_FMT, "get: index out of bounds\n",
+               META_ARG(expr->meta));
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+
+        return value_unit(vm->current_frame);
+      }
+
+      result = value_int(src->as.bytes.ptr[key->as._int], vm->current_frame);
+    }  else if (src->kind == ValueKindDict) {
       bool found = false;
 
       for (u32 i = 0; i < src->as.dict.len; ++i) {
@@ -847,7 +882,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     if (dest_var->value->kind == ValueKindList) {
       if (key->kind != ValueKindInt) {
-        PERROR(META_FMT, "set: only integer can be used as an array index\n",
+        PERROR(META_FMT, "set: only integer can be used as a list index\n",
                META_ARG(expr->meta));
         vm->state = ExecStateExit;
         vm->exit_code = 1;
@@ -874,6 +909,35 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       --node->value->refs_count;
 
       node->value = value;
+    } else if (dest_var->value->kind == ValueKindBytes) {
+      if (key->kind != ValueKindInt) {
+        PERROR(META_FMT, "set: only integer can be used as a bytes index\n",
+               META_ARG(expr->meta));
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+
+        return value_unit(vm->current_frame);
+      }
+
+      if (value->kind != ValueKindInt) {
+        PERROR(META_FMT, "set: only integer value can be assigned to a bytes array\n",
+               META_ARG(expr->meta));
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+
+        return value_unit(vm->current_frame);
+      }
+
+      if (key->as._int >= dest_var->value->as.bytes.len) {
+        PERROR(META_FMT, "set: index out of bounds\n",
+               META_ARG(expr->meta));
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+
+        return value_unit(vm->current_frame);
+      }
+
+      dest_var->value->as.bytes.ptr[key->as._int] = value->as._int;
     } else if (dest_var->value->kind == ValueKindDict) {
       bool found = false;
 
