@@ -68,6 +68,7 @@ typedef enum {
   ValueKindDict,
   ValueKindFunc,
   ValueKindEnv,
+  ValueKindBytes,
 } ValueKind;
 
 typedef struct ListNode   ListNode;
@@ -78,7 +79,6 @@ typedef Da(DictValue)     Dict;
 
 typedef struct {
   Str  str;
-  bool is_utf8;
 } String;
 
 typedef struct Vm Vm;
@@ -156,6 +156,11 @@ typedef struct {
   u32       refs_count;
 } Env;
 
+typedef struct {
+  u8 *ptr;
+  u32 len;
+} Bytes;
+
 typedef union {
   ListNode *list;
   String    string;
@@ -165,6 +170,7 @@ typedef union {
   Dict      dict;
   Func     *func;
   Env      *env;
+  Bytes     bytes;
 } ValueAs;
 
 struct Value {
@@ -203,6 +209,7 @@ Value *value_bool(bool _bool, StackFrame *frame);
 Value *value_dict(Dict dict, StackFrame *frame);
 Value *value_func(Func func, StackFrame *frame);
 Value *value_env(Vm vm, StackFrame *frame);
+Value *value_bytes(Bytes bytes, StackFrame *frame);
 
 Value *value_alloc(StackFrame *frame);
 Value *value_clone(Value *value, StackFrame *frame);
