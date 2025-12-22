@@ -128,10 +128,12 @@ Value *join_intrinsic(Vm *vm, Value **args) {
 
     if (node->value->kind == ValueKindBytes)
       is_binary = true;
-    else if (node->value->kind != ValueKindString)
+    else if (node->value->kind != ValueKindString) {
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
       PANIC(vm->current_frame,
             "join: wrong part kinds\n");
-
+    }
 
     SB_PUSH_VALUE(&sb, node->value, 0, false, vm);
 

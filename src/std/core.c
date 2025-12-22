@@ -109,6 +109,17 @@ Value *len_intrinsic(Vm *vm, Value **args) {
   return value_unit(vm->current_frame);
 }
 
+Value *len_bytes_intrinsic(Vm *vm, Value **args) {
+  Value *value = args[0];
+
+  if (value->kind == ValueKindString)
+    return value_int(value->as.string.str.len, vm->current_frame);
+  else if (value->kind == ValueKindBytes)
+    return value_int(value->as.bytes.len, vm->current_frame);
+
+  return value_unit(vm->current_frame);
+}
+
 Value *get_range_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
   Value *begin = args[1];
@@ -162,7 +173,7 @@ Value *get_range_intrinsic(Vm *vm, Value **args) {
 
     Str sub_string = {
       value->as.string.str.ptr + begin_byte,
-      index - begin_byte,
+      bytes_len - begin_byte,
     };
 
     return value_string(sub_string, vm->current_frame);
@@ -1148,6 +1159,8 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("len"), true, 1, { ValueKindList }, &len_intrinsic },
   { STR_LIT("len"), true, 1, { ValueKindString }, &len_intrinsic },
   { STR_LIT("len"), true, 1, { ValueKindBytes }, &len_intrinsic },
+  { STR_LIT("len-bytes"), true, 1, { ValueKindString }, &len_bytes_intrinsic },
+  { STR_LIT("len-bytes"), true, 1, { ValueKindBytes }, &len_bytes_intrinsic },
   { STR_LIT("get-range"), true, 3,
     { ValueKindList, ValueKindInt, ValueKindInt },
     &get_range_intrinsic },

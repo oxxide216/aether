@@ -4,6 +4,7 @@
 (let last [list] -> import 'last')
 (let get-index [collection item] -> import 'get-index')
 (let len [collection] -> import 'len')
+(let len-bytes [str] -> import 'len-bytes')
 (let get-range [list begin end] -> import 'get-range')
 (let gen-range [begin end] -> import 'gen-range')
 (let map [func list] -> import 'map')
