@@ -132,7 +132,7 @@
    elif (== key term/backspace)
     (if (> prompt-pos 0)
       (set prompt-pos (- prompt-pos 1))
-      (set prompt-buffer (str-remove prompt-buffer 1 prompt-pos)))
+      (set prompt-buffer (str-remove prompt-buffer prompt-pos 1)))
       (try-go-to-search-target)
    elif (!= key '\0')
     (set prompt-buffer (str-insert prompt-buffer prompt-pos key))

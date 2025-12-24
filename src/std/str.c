@@ -25,12 +25,20 @@ Value *str_remove_intrinsic(Vm *vm, Value **args) {
   Value *index = args[1];
   Value *amount = args[2];
 
+  if (index->as._int + amount->as._int > string->as.string.str.len) {
+    vm->state = ExecStateExit;
+    vm->exit_code = 1;
+    PANIC(vm->current_frame, "str-remove: out of bounds\n");
+
+    return value_unit(vm->current_frame);
+  }
+
   Str new_string;
   new_string.len = string->as.string.str.len - amount->as._int;
   new_string.ptr = arena_alloc(&vm->current_frame->arena, new_string.len);
   memcpy(new_string.ptr, string->as.string.str.ptr, index->as._int);
   memcpy(new_string.ptr + index->as._int,
-         string->as.string.str.ptr + index->as._int + 1,
+         string->as.string.str.ptr + index->as._int,
          string->as.string.str.len - index->as._int - amount->as._int);
 
   return value_string(new_string, vm->current_frame);
@@ -133,6 +141,8 @@ Value *join_intrinsic(Vm *vm, Value **args) {
       vm->exit_code = 1;
       PANIC(vm->current_frame,
             "join: wrong part kinds\n");
+
+      return value_unit(vm->current_frame);
     }
 
     SB_PUSH_VALUE(&sb, node->value, 0, false, vm);

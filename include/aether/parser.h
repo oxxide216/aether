@@ -6,7 +6,7 @@
 #include "macros.h"
 
 typedef struct {
-  Str       *file_path;
+  u64        code_hash;
   Ir         ir;
   Macros     macros;
   FilePaths  included_files;

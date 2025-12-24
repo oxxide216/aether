@@ -364,10 +364,12 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask);
 Ir parse_ex(Str code, Str *file_path, Macros *macros,
             FilePaths *included_files, Arena *arena,
             bool use_macros) {
+  u64 code_hash = str_hash(code);
+
   for (u32 i = 0; i < cached_irs.len; ++i) {
     CachedIr *cached_ir = cached_irs.items + i;
 
-    if (str_eq(*cached_ir->file_path, *file_path)) {
+    if (cached_ir->code_hash == code_hash) {
       DA_EXTEND(*macros, cached_ir->macros);
       DA_EXTEND(*included_files, cached_ir->included_files);
       *arena = cached_ir->arena;
@@ -376,19 +378,14 @@ Ir parse_ex(Str code, Str *file_path, Macros *macros,
     }
   }
 
-  Str *_file_path = arena_alloc(arena, sizeof(Str));
-  _file_path->len = file_path->len;
-  _file_path->ptr = arena_alloc(arena, _file_path->len);
-  memcpy(_file_path->ptr, file_path->ptr, file_path->len);
-
-  include_file(included_files, _file_path);
+  include_file(included_files, file_path);
 
   Parser parser = {0};
 
   parser.lexer.code = code;
   parser.lexer.table = get_transition_table();
   parser.macros = macros;
-  parser.file_path = _file_path;
+  parser.file_path = file_path;
   parser.included_files = included_files;
   parser.arena = arena;
   parser.use_macros = use_macros;
@@ -408,7 +405,7 @@ Ir parse_ex(Str code, Str *file_path, Macros *macros,
          cached_included_files.len * sizeof(Str *));
 
   CachedIr cached_ir = {
-    _file_path, parser.ir, cached_macros,
+    code_hash, parser.ir, cached_macros,
     cached_included_files, *arena,
   };
   DA_APPEND(cached_irs, cached_ir);
@@ -798,18 +795,9 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
         exit(1);
       }
 
-      bool already_included = false;
-
-      for (u32 i = 0; i < parser->included_files->len; ++i) {
-        if (str_eq(*parser->included_files->items[i], path)) {
-          already_included = true;
-
+      for (u32 i = 0; i < parser->included_files->len; ++i)
+        if (str_eq(*parser->included_files->items[i], path))
           break;
-        }
-      }
-
-      if (already_included)
-        break;
 
       Str magic = {
         code.ptr,

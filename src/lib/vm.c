@@ -301,9 +301,10 @@ static Var *get_var(Vm *vm, Str name) {
     frame = frame->prev;
   }
 
-  for (u32 i = vm->global_vars.len; i > 0; --i)
+  for (u32 i = vm->global_vars.len; i > 0; --i) {
     if (str_eq(vm->global_vars.items[i - 1].name, name))
       return vm->global_vars.items + i - 1;
+  }
 
   return NULL;
 }
