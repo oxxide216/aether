@@ -105,7 +105,7 @@ static Value *try_get_dict_field_of_kind_str_key(Dict *dict, Str key,
 
   for (u32 i = 0; i < dict->len; ++i)
     if (dict->items[i].key->kind == ValueKindString &&
-        str_eq(dict->items[i].key->as.string, key))
+        str_eq(dict->items[i].key->as.string.str, key))
       result = dict->items[i].value;
 
   if (!result) {
@@ -122,7 +122,7 @@ static Value *try_get_dict_field_of_kind_str_key(Dict *dict, Str key,
 }
 
 Value *load_texture_intrinsic(Vm *vm, Value **args) {
-  Str file_name = args[0]->as.string;
+  Str file_name = args[0]->as.string.str;
   char *file_name_cstr = malloc(file_name.len + 1);
   memcpy(file_name_cstr, file_name.ptr, file_name.len);
   file_name_cstr[file_name.len] = '\0';
@@ -166,7 +166,7 @@ Value *load_texture_intrinsic(Vm *vm, Value **args) {
 Value *load_font_intrinsic(Vm *vm, Value **args) {
   u32 index = glass.fonts.len;
 
-  Str file_name = args[0]->as.string;
+  Str file_name = args[0]->as.string.str;
   char *file_name_cstr = malloc(file_name.len + 1);
   memcpy(file_name_cstr, file_name.ptr, file_name.len);
   file_name_cstr[file_name.len] = '\0';
@@ -231,7 +231,7 @@ Value *run_intrinsic(Vm *vm, Value **args) {
     initialized = true;
 
     glass.winx = winx_init();
-    glass.window = winx_init_window(&glass.winx, args[0]->as.string,
+    glass.window = winx_init_window(&glass.winx, args[0]->as.string.str,
                                     args[1]->as._int,
                                     args[2]->as._int,
                                     WinxGraphicsModeOpenGL,
@@ -409,7 +409,9 @@ Value *text_width_intrinsic(Vm *vm, Value **args) {
     Font *font = glass.fonts.items + id->as._int;
 
     f32 result = 0.0;
-    render_text(0.0, 0.0, args[0]->as._int, args[2]->as.string, font, &result, true);
+    render_text(0.0, 0.0, args[0]->as._int,
+                args[2]->as.string.str,
+                font, &result, true);
 
     return value_float(result, vm->current_frame);
   }
@@ -580,7 +582,7 @@ Value *text_intrinsic(Vm *vm, Value **args) {
     Font *font = glass.fonts.items + id->as._int;
 
     render_text(args[0]->as._float, args[1]->as._float, args[2]->as._int,
-                args[4]->as.string, font, NULL, false);
+                args[4]->as.string.str, font, NULL, false);
   }
 
   return value_unit(vm->current_frame);
