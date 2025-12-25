@@ -46,10 +46,7 @@
 (if (== mode mode-default)
   (match (get-range input-file-content 0 4)
     (to-bytes 'ABC\0') -> (set mode mode-eval-bytecode)
-    (to-bytes 'ABM\0') -> (set mode mode-eval-macros)
-    ... -> (do
-      (error 'Unknown file format: ' (get-range input-file-content 0 4))
-      (exit 1))))
+    (to-bytes 'ABM\0') -> (set mode mode-eval-macros)))
 
 (let env (make-env parsed-args))
 
@@ -57,7 +54,7 @@
 (load-module env 'base' base-paths)
 
 (match mode
-  mode-default -> (eval env input-file-content input-path)
+  mode-default -> (eval env (to-str input-file-content) input-path)
   mode-eval-bytecode -> (eval-compiled env input-file-content)
   mode-eval-macros -> (eval-macros env input-file-content)
   mode-compile-only ->
