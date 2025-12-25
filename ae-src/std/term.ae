@@ -62,7 +62,7 @@
 (let term/raw-mode-off [] -> import 'term/raw-mode-off')
 
 (let is-alpha [char] ->
-  (if (not char)
+  (if (== char '')
     (ret false))
 
   (let int (to-int (to-bytes char)))
@@ -78,8 +78,9 @@
     (set key (+ key char))
     (if (== char '[')
       (let char (input-size 1))
-      (while (not (is-alpha char))
+      (while (and (!= char '')
+                  (not (is-alpha char)))
         (set key (+ key char))
-        (set char (input-size 1))
-      (set key (+ key char)))))
+        (set char (input-size 1)))
+      (set key (+ key char))))
   key)
