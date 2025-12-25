@@ -61,6 +61,16 @@
 (let term/raw-mode-on  [] -> import 'term/raw-mode-on')
 (let term/raw-mode-off [] -> import 'term/raw-mode-off')
 
+(let is-alpha [char] ->
+  (if (not char)
+    (ret false))
+
+  (let int (to-int (to-bytes char)))
+  (or (and (>= int (to-int (to-bytes 'A')))
+           (<= int (to-int (to-bytes 'Z'))))
+      (and (>= int (to-int (to-bytes 'a')))
+           (<= int (to-int (to-bytes 'z'))))))
+
 (let term/get-key [] ->
   (let key (input-size 1))
   (if (== key '\e')
@@ -68,5 +78,8 @@
     (set key (+ key char))
     (if (== char '[')
       (let char (input-size 1))
-      (set key (+ key char))))
+      (while (not (is-alpha char))
+        (set key (+ key char))
+        (set char (input-size 1))
+      (set key (+ key char)))))
   key)
