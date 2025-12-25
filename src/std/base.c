@@ -9,6 +9,7 @@
 #define DEFAULT_INPUT_BUFFER_SIZE   64
 
 StringBuilder printf_sb = {0};
+char special_key_code = 0;
 
 Value *printf_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
@@ -43,7 +44,12 @@ Value *input_size_intrinsic(Vm *vm, Value **args) {
   buffer.len = size->as._int;
   buffer.ptr = arena_alloc(&vm->current_frame->arena, buffer.len);
 
-  read(0, buffer.ptr, buffer.len);
+  if (special_key_code) {
+    buffer.ptr[0] = special_key_code;
+    special_key_code = '\0';
+  } else if (read(0, buffer.ptr, buffer.len) < 0) {
+    buffer.len = 0;
+  }
 
   return value_string(buffer, vm->current_frame);
 }
@@ -56,6 +62,12 @@ Value *input_intrinsic(Vm *vm, Value **args) {
 
   u32 buffer_size = DEFAULT_INPUT_BUFFER_SIZE;
   buffer = arena_alloc(&vm->current_frame->arena, buffer_size);
+
+  if (special_key_code) {
+    ++len;
+    buffer[0] = special_key_code;
+    special_key_code = '\0';
+  }
 
   char ch;
   while ((ch = getc(stdin)) != (char) EOF && ch != '\n') {
@@ -72,13 +84,13 @@ Value *input_intrinsic(Vm *vm, Value **args) {
 
   return value_string(STR(buffer, len), vm->current_frame);
 }
-#endif
 
 Value *get_args_intrinsic(Vm *vm, Value **args) {
   (void) args;
 
-    return value_list(vm->args, vm->current_frame);
+  return value_list(vm->args, vm->current_frame);
 }
+#endif
 
 Intrinsic base_intrinsics[] = {
   { STR_LIT("printf"), false, 1, { ValueKindList }, &printf_intrinsic },

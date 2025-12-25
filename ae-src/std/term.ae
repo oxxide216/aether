@@ -1,5 +1,7 @@
 (use 'std/base')
 
+(let eof            (to-str (to-bytes -1)))
+
 (let term/up        '\e[A')
 (let term/down      '\e[B')
 (let term/right     '\e[C')

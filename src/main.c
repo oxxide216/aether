@@ -16,10 +16,15 @@ typedef struct {
   bool  is_precompiled;
 } Path;
 
+// From common.c
 extern InternStrings intern_strings;
+// From parser.c
 extern CachedIrs cached_irs;
 #ifndef NOSYSTEM
+// From base.c
 extern StringBuilder printf_sb;
+extern char special_key_code;
+// From term.c
 extern bool catch_kill;
 #endif
 
@@ -49,7 +54,9 @@ void cleanup(void) {
 void sigint_handler(i32 signal) {
   (void) signal;
 
-  if (!catch_kill)
+  if (catch_kill)
+    special_key_code = -1;
+  else
     vm_stop(&vm);
 }
 

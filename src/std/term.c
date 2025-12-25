@@ -5,10 +5,25 @@
 #include "aether/vm.h"
 #include "aether/misc.h"
 
+// From base.c
+extern char special_key_code;
+
 bool catch_kill = false;
 
 static struct termios default_term_state = {0};
 static bool is_term_state_initialized = false;
+
+void sigquit_handler(i32 signal) {
+  (void) signal;
+
+  special_key_code = -1;
+}
+
+void sigtstp_handler(i32 signal) {
+  (void) signal;
+
+  special_key_code = -1;
+}
 
 Value *get_size_intrinsic(Vm *vm, Value **args) {
   (void) args;
@@ -45,6 +60,8 @@ Value *raw_mode_on_intrinsic(Vm *vm, Value **args) {
   tcsetattr(0, TCSANOW, &term_state);
 
   catch_kill = true;
+  signal(SIGQUIT, sigquit_handler);
+  signal(SIGTSTP, sigtstp_handler);
 
   return value_unit(vm->current_frame);
 }
@@ -57,6 +74,8 @@ Value *raw_mode_off_intrinsic(Vm *vm, Value **args) {
     tcsetattr(0, TCSANOW, &default_term_state);
 
   catch_kill = false;
+  signal(SIGQUIT, NULL);
+  signal(SIGTSTP, NULL);
 
   return value_unit(vm->current_frame);
 }

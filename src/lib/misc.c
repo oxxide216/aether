@@ -14,8 +14,8 @@ bool value_to_bool(Value *value) {
   else if (value->kind == ValueKindBool)
     return value->as._bool;
   else if (value->kind == ValueKindBytes)
-    return value->as.bytes.len >= sizeof(value->as._bool) &&
-           *(bool *) value->as.bytes.ptr;
+    return value->as.bytes.len != 0 &&
+           ((u8 *) value->as.bytes.ptr)[0];
   else
     return true;
 }

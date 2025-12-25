@@ -605,8 +605,17 @@ Value *to_int_intrinsic(Vm *vm, Value **args) {
   } else if (value->kind == ValueKindFloat) {
     return value_int((i64) value->as._float, vm->current_frame);
   } else if (value->kind == ValueKindBytes) {
-    if (value->as.bytes.len >= sizeof(value->as._int))
+    if (value->as.bytes.len >= sizeof(i64))
       return value_int(*(i64 *) value->as.bytes.ptr, vm->current_frame);
+
+    if (value->as.bytes.len >= sizeof(i32))
+      return value_int(*(i32 *) value->as.bytes.ptr, vm->current_frame);
+
+    if (value->as.bytes.len >= sizeof(i16))
+      return value_int(*(i16 *) value->as.bytes.ptr, vm->current_frame);
+
+    if (value->as.bytes.len >= sizeof(i8))
+      return value_int(*(i8 *) value->as.bytes.ptr, vm->current_frame);
   }
 
   return value_unit(vm->current_frame);
