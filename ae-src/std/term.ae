@@ -6,7 +6,7 @@
 (let term/down      '\e[B')
 (let term/right     '\e[C')
 (let term/left      '\e[D')
-(let term/enter     '\n')
+(let term/enter     '\r')
 (let term/escape    '\e')
 (let term/backspace '\x7f')
 (let term/delete    '\e[P')
@@ -70,6 +70,19 @@
            (<= int (to-int (to-bytes 'Z'))))
       (and (>= int (to-int (to-bytes 'a')))
            (<= int (to-int (to-bytes 'z'))))))
+
+(let is-num [char] ->
+  (if (== char '')
+    (ret false))
+
+  (let int (to-int (to-bytes char)))
+  (and (>= int (to-int (to-bytes '0')))
+       (<= int (to-int (to-bytes '9')))))
+
+(let is-alnum [char] ->
+  (match (is-alpha char)
+    true -> true
+    false -> (is-num char)))
 
 (let term/get-key [] ->
   (let key (input-size 1))
