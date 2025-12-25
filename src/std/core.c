@@ -569,10 +569,28 @@ Value *to_str_intrinsic(Vm *vm, Value **args) {
 Value *to_bytes_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
-  Bytes bytes;
-  bytes.len = value->as.string.str.len;
-  bytes.ptr = arena_alloc(&vm->current_frame->arena, bytes.len);
-  memcpy(bytes.ptr, value->as.string.str.ptr, bytes.len);
+  Bytes bytes = {0};
+
+  if (value->kind == ValueKindString) {
+    bytes.len = value->as.string.str.len;
+    bytes.ptr = arena_alloc(&vm->current_frame->arena, bytes.len);
+    memcpy(bytes.ptr, value->as.string.str.ptr, bytes.len);
+  } else if (value->kind == ValueKindInt) {
+    bytes.len = sizeof(value->as._int);
+    bytes.ptr = arena_alloc(&vm->current_frame->arena, sizeof(value->as._int));
+    *bytes.ptr = value->as._int;
+  } else if (value->kind == ValueKindFloat) {
+    bytes.len = sizeof(value->as._float);
+    bytes.ptr = arena_alloc(&vm->current_frame->arena, sizeof(value->as._float));
+    *bytes.ptr = value->as._float;
+  } else if (value->kind == ValueKindBool) {
+    bytes.len = sizeof(value->as._bool);
+    bytes.ptr = arena_alloc(&vm->current_frame->arena, sizeof(value->as._bool));
+    *bytes.ptr = value->as._bool;
+  }
+
+  if (bytes.len == 0)
+    return value_unit(vm->current_frame);
 
   return value_bytes(bytes, vm->current_frame);
 }
@@ -586,6 +604,9 @@ Value *to_int_intrinsic(Vm *vm, Value **args) {
     return value_int((i64) value->as._bool, vm->current_frame);
   } else if (value->kind == ValueKindFloat) {
     return value_int((i64) value->as._float, vm->current_frame);
+  } else if (value->kind == ValueKindBytes) {
+    if (value->as.bytes.len >= sizeof(value->as._int))
+      return value_int(*(i64 *) value->as.bytes.ptr, vm->current_frame);
   }
 
   return value_unit(vm->current_frame);
@@ -594,10 +615,14 @@ Value *to_int_intrinsic(Vm *vm, Value **args) {
 Value *to_float_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
-  if (value->kind == ValueKindInt)
+  if (value->kind == ValueKindInt) {
     return value_float((f64) value->as._int, vm->current_frame);
-  else if (value->kind == ValueKindString)
+  } else if (value->kind == ValueKindString) {
     return value_float(str_to_f64(value->as.string.str), vm->current_frame);
+  } else if (value->kind == ValueKindBytes) {
+    if (value->as.bytes.len >= sizeof(value->as._float))
+      return value_float(*(f64 *) value->as.bytes.ptr, vm->current_frame);
+  }
 
   return value_unit(vm->current_frame);
 }
@@ -684,6 +709,15 @@ Value *add_intrinsic(Vm *vm, Value **args) {
     new_list->next->next = list_clone(b->as.list->next, vm->current_frame);
 
     return value_list(new_list, vm->current_frame);
+  } else if (a->kind == ValueKindBytes &&
+             b->kind == ValueKindBytes) {
+    Bytes bytes;
+    bytes.len = a->as.bytes.len + b->as.bytes.len;
+    bytes.ptr = arena_alloc(&vm->current_frame->arena, bytes.len);
+    memcpy(bytes.ptr, a->as.bytes.ptr, a->as.bytes.len);
+    memcpy(bytes.ptr + a->as.bytes.len, b->as.bytes.ptr, b->as.bytes.len);
+
+    return value_bytes(bytes, vm->current_frame);
   }
 
   return value_unit(vm->current_frame);
@@ -1190,11 +1224,16 @@ Intrinsic core_intrinsics[] = {
   // Conversions
   { STR_LIT("to-str"), true, 1, { ValueKindUnit }, &to_str_intrinsic },
   { STR_LIT("to-bytes"), true, 1, { ValueKindString }, &to_bytes_intrinsic },
+  { STR_LIT("to-bytes"), true, 1, { ValueKindInt }, &to_bytes_intrinsic },
+  { STR_LIT("to-bytes"), true, 1, { ValueKindFloat }, &to_bytes_intrinsic },
+  { STR_LIT("to-bytes"), true, 1, { ValueKindBool }, &to_bytes_intrinsic },
   { STR_LIT("to-int"), true, 1, { ValueKindString }, &to_int_intrinsic },
   { STR_LIT("to-int"), true, 1, { ValueKindBool }, &to_int_intrinsic },
   { STR_LIT("to-int"), true, 1, { ValueKindFloat }, &to_int_intrinsic },
+  { STR_LIT("to-int"), true, 1, { ValueKindBytes }, &to_int_intrinsic },
   { STR_LIT("to-float"), true, 1, { ValueKindInt }, &to_float_intrinsic },
   { STR_LIT("to-float"), true, 1, { ValueKindString }, &to_float_intrinsic },
+  { STR_LIT("to-float"), true, 1, { ValueKindBytes }, &to_float_intrinsic },
   { STR_LIT("to-bool"), true, 1, { ValueKindUnit }, &to_bool_intrinsic },
   // Math
   { STR_LIT("add"), true, 2, { ValueKindInt, ValueKindInt }, &add_intrinsic },
@@ -1203,6 +1242,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("add"), true, 2, { ValueKindList, ValueKindList }, &add_intrinsic },
   { STR_LIT("add"), true, 2, { ValueKindList, ValueKindUnit }, &add_intrinsic },
   { STR_LIT("add"), true, 2, { ValueKindUnit, ValueKindList }, &add_intrinsic },
+  { STR_LIT("add"), true, 2, { ValueKindBytes, ValueKindBytes }, &add_intrinsic },
   { STR_LIT("sub"), true, 2, { ValueKindInt, ValueKindInt }, &sub_intrinsic },
   { STR_LIT("sub"), true, 2, { ValueKindFloat, ValueKindFloat }, &sub_intrinsic },
   { STR_LIT("mul"), true, 2, { ValueKindInt, ValueKindInt }, &mul_intrinsic },
