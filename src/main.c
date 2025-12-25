@@ -23,7 +23,6 @@ extern CachedIrs cached_irs;
 #ifndef NOSYSTEM
 // From base.c
 extern StringBuilder printf_sb;
-extern char special_key_code;
 // From term.c
 extern bool catch_kill;
 #endif
@@ -54,9 +53,7 @@ void cleanup(void) {
 void sigint_handler(i32 signal) {
   (void) signal;
 
-  if (catch_kill)
-    special_key_code = -1;
-  else
+  if (!catch_kill)
     vm_stop(&vm);
 }
 
