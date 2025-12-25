@@ -108,6 +108,9 @@ void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
       eliminate_dead_code_expr(expr->as.match.cases.items[i].pattern, defs);
       eliminate_dead_code_expr(expr->as.match.cases.items[i].expr, defs);
     }
+
+    if (expr->as.match.any)
+      eliminate_dead_code_expr(expr->as.match.any, defs);
   } break;
 
   case IrExprKindSelf: break;

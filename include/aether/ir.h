@@ -147,6 +147,7 @@ typedef struct {
 typedef struct {
   IrExpr  *src;
   IrCases  cases;
+  IrExpr  *any;
 } IrExprMatch;
 
 #pragma pack(push, 1)

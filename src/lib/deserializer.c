@@ -183,6 +183,15 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
       load_expr_data(expr->as.match.cases.items[i].expr, data,
                      end, path_offsets, arena);
     }
+
+    bool has_any = *(u8 *) (data + *end);
+    *end += sizeof(u8);
+
+    if (has_any) {
+      expr->as.match.any = arena_alloc(arena, sizeof(IrExpr));
+
+      load_expr_data(expr->as.match.any, data, end, path_offsets, arena);
+    }
   } break;
 
   case IrExprKindSelf: break;

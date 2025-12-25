@@ -189,6 +189,14 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size,
       save_expr_data(expr->as.match.cases.items[i].expr, data, data_size,
                      end, path_offsets, file_path);
     }
+
+    reserve_space(sizeof(u8), data, data_size, end);
+    *(u8 *) (*data + *end) = expr->as.match.any != NULL;
+    *end += sizeof(u8);
+
+    if (expr->as.match.any)
+      save_expr_data(expr->as.match.any, data, data_size,
+                     end, path_offsets, file_path);
   } break;
 
   case IrExprKindSelf: break;

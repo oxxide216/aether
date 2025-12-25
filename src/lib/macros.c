@@ -160,6 +160,9 @@ static void clone_expr(IrExpr **expr, IrArgs *arg_names, Arena *arena) {
       clone_expr(&new_expr->as.match.cases.items[i].pattern, arg_names, arena);
       clone_expr(&new_expr->as.match.cases.items[i].expr, arg_names, arena);
     }
+
+    if (new_expr->as.match.any)
+      clone_expr(&new_expr->as.match.any, arg_names, arena);
   } break;
 
   case IrExprKindSelf: break;
@@ -600,6 +603,9 @@ void expand_macros(IrExpr *expr, Macros *macros,
       INLINE_THEN_EXPAND(expr->as.match.cases.items[i].pattern);
       INLINE_THEN_EXPAND(expr->as.match.cases.items[i].expr);
     }
+
+    if (expr->as.match.any)
+      INLINE_THEN_EXPAND(expr->as.match.any);
   } break;
 
   case IrExprKindSelf: break;

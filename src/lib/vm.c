@@ -467,6 +467,9 @@ static void catch_vars(Vm *vm, Strs *local_names,
       CATCH_VARS(vm, local_names, catched_values, frame, expr->as.match.cases.items[i].pattern);
       CATCH_VARS(vm, local_names, catched_values, frame, expr->as.match.cases.items[i].expr);
     }
+
+    if (expr->as.match.any)
+      CATCH_VARS(vm, local_names, catched_values, frame, expr->as.match.any);
   } break;
 
   case IrExprKindSelf: break;
@@ -1114,15 +1117,23 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Value *src;
     EXECUTE_EXPR_SET(vm, src, expr->as.match.src, true);
 
+    bool found = false;
+
     for (u32 i = 0; i < expr->as.match.cases.len; ++i) {
       Value *pattern;
       EXECUTE_EXPR_SET(vm, pattern, expr->as.match.cases.items[i].pattern, true);
 
       if (value_eq(pattern, src)) {
         EXECUTE_EXPR_SET(vm, result, expr->as.match.cases.items[i].expr, value_expected);
+
+        found = true;
+
         break;
       }
     }
+
+    if (!found && expr->as.match.any)
+      EXECUTE_EXPR_SET(vm, result, expr->as.match.any, true);
   } break;
 
   case IrExprKindSelf: {
