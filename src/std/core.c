@@ -654,15 +654,12 @@ Value *add_intrinsic(Vm *vm, Value **args) {
     return value_float(a->as._float + b->as._float, vm->current_frame);
   } else if (a->kind == ValueKindString &&
              b->kind == ValueKindString) {
-    StringBuilder sb = {0};
-    sb_push_str(&sb, a->as.string.str);
-    sb_push_str(&sb, b->as.string.str);
-
     Str new_string;
-    new_string.len = sb.len;
+    new_string.len = a->as.string.str.len + b->as.string.str.len;
     new_string.ptr = arena_alloc(&vm->current_frame->arena, new_string.len);
-    memcpy(new_string.ptr, sb.buffer, new_string.len);
-    free(sb.buffer);
+    memcpy(new_string.ptr, a->as.string.str.ptr, a->as.string.str.len);
+    memcpy(new_string.ptr + a->as.string.str.len,
+           b->as.string.str.ptr, b->as.string.str.len);
 
     return value_string(new_string, vm->current_frame);
   } else if (a->kind == ValueKindList &&
