@@ -20,6 +20,7 @@ extern InternStrings intern_strings;
 extern CachedIrs cached_irs;
 #ifndef NOSYSTEM
 extern StringBuilder printf_sb;
+extern bool catch_kill;
 #endif
 
 static Path loader_paths[] = {
@@ -48,7 +49,8 @@ void cleanup(void) {
 void sigint_handler(i32 signal) {
   (void) signal;
 
-  vm_stop(&vm);
+  if (!catch_kill)
+    vm_stop(&vm);
 }
 
 i32 main(i32 argc, char **argv) {
