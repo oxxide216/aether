@@ -28,16 +28,28 @@
   (error 'No input file was provided')
   (exit 1))
 
-(let input-file-content (read-file input-path))
+(let input-file-content (read-binary-file input-path))
 (if (unit? input-file-content)
   (error 'Could not open file ' input-path)
   (exit 1))
 
+(if (== (get-range input-file-content 0 2) (to-bytes '#!'))
+  (let shebang-end (get-index input-file-content (to-bytes '\n')))
+  (if shebang-end
+    (set input-file-content (get-range input-file-content
+                                       (+ shebang-end 1)
+                                       (len input-file-content))))
+
+  (if (unit? input-file-content)
+    (exit 0)))
+
 (if (== mode mode-default)
-  (if (== (get-range input-file-content 0 4) 'ABC\0')
-    (set mode mode-eval-bytecode)
-   elif (== (get-range input-file-content 0 4) 'ABM\0')
-    (set mode mode-eval-macros)))
+  (match (get-range input-file-content 0 4)
+    (to-bytes 'ABC\0') -> (set mode mode-eval-bytecode)
+    (to-bytes 'ABM\0') -> (set mode mode-eval-macros)
+    ... -> (do
+      (error 'Unknown file format: ' (get-range input-file-content 0 4))
+      (exit 1))))
 
 (let env (make-env parsed-args))
 
@@ -46,11 +58,12 @@
 
 (match mode
   mode-default -> (eval env input-file-content input-path)
-  mode-eval-bytecode -> (eval-compiled env input-file-content input-path)
+  mode-eval-bytecode -> (eval-compiled env input-file-content)
   mode-eval-macros -> (eval-macros env input-file-content)
   mode-compile-only ->
     (do
-      (let compiled (compile env input-file-content input-path false dce))
+      (let compiled (compile env (to-str input-file-content)
+                             input-path false dce))
 
       (write-file output-path compiled::'compiled'))
   mode-compile-macros-only ->

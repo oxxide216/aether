@@ -125,7 +125,11 @@ Value *get_range_intrinsic(Vm *vm, Value **args) {
   Value *begin = args[1];
   Value *end = args[2];
 
-  Value *len = len_intrinsic(vm, &value);
+  Value *len;
+  if (value->kind == ValueKindBytes)
+    len = len_bytes_intrinsic(vm, &value);
+  else
+    len = len_intrinsic(vm, &value);
 
   if (begin->as._int < 0)
     begin->as._int = 0;
@@ -346,7 +350,7 @@ Value *zip_intrinsic(Vm *vm,Value **args) {
   return value_list(new_list, vm->current_frame);
 }
 
-bool value_bigger(Value *a, Value *b) {
+static bool value_bigger(Value *a, Value *b) {
   if (a->kind != b->kind)
     return false;
 
@@ -1101,8 +1105,8 @@ Value *eval_compiled_intrinsic(Vm *vm, Value **args) {
   Value *bytecode = args[1];
 
   Arena ir_arena = {0};
-  Ir ir = deserialize((u8 *) bytecode->as.string.str.ptr,
-                      bytecode->as.string.str.len, &ir_arena,
+  Ir ir = deserialize(bytecode->as.bytes.ptr,
+                      bytecode->as.bytes.len, &ir_arena,
                       &env->as.env->vm.current_file_path);
 
   Value *result = execute_block(&env->as.env->vm, &ir, true);
@@ -1121,8 +1125,8 @@ Value *eval_macros_intrinsic(Vm *vm, Value **args) {
   Value *macro_bytecode = args[1];
 
   Arena ir_arena = {0};
-  Macros macros = deserialize_macros((u8 *) macro_bytecode->as.string.str.ptr,
-                                     macro_bytecode->as.string.str.len,
+  Macros macros = deserialize_macros(macro_bytecode->as.bytes.ptr,
+                                     macro_bytecode->as.bytes.len,
                                      &env->as.env->included_files, &ir_arena);
 
   if (env->as.env->macros.cap < env->as.env->macros.len + macros.len) {
@@ -1294,11 +1298,11 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("compile"), true, 5,
     { ValueKindEnv, ValueKindString, ValueKindString, ValueKindBool, ValueKindBool },
     &compile_intrinsic },
-  { STR_LIT("eval-compiled"), true, 2,
-    { ValueKindEnv, ValueKindBool },
+  { STR_LIT("eval-compiled"), false, 2,
+    { ValueKindEnv, ValueKindBytes },
     &eval_compiled_intrinsic },
   { STR_LIT("eval-macros"), false, 2,
-    { ValueKindEnv, ValueKindString },
+    { ValueKindEnv, ValueKindBytes },
     &eval_macros_intrinsic },
   { STR_LIT("eval"), true, 3,
     { ValueKindEnv, ValueKindString, ValueKindString },

@@ -282,6 +282,17 @@ bool value_eq(Value *a, Value *b) {
     return false;
   }
 
+  case ValueKindBytes: {
+    if (a->as.bytes.len != b->as.bytes.len)
+      return false;
+
+    for (u32 i = 0; i < a->as.bytes.len; ++i)
+      if (a->as.bytes.ptr[i] != b->as.bytes.ptr[i])
+        return false;
+
+    return true;
+  } break;
+
   default: {
     return false;
   }
