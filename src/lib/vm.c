@@ -551,9 +551,6 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool val
 
     Value *result = (*intrinsic->func)(vm, args);
 
-    if (vm->state == ExecStateReturn)
-      vm->state = ExecStateContinue;
-
     return result;
   }
 
@@ -593,11 +590,8 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool val
 
   Value *result = execute_block(vm, &func->body, value_expected);
 
-  if (vm->state == ExecStateReturn)
-    vm->state = ExecStateContinue;
-
   Value *result_stable = NULL;
-  if (vm->state == ExecStateContinue) {
+  if (vm->state != ExecStateExit) {
     if (value_expected)
       result_stable = value_clone(result, frame->prev);
     else
@@ -658,6 +652,9 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     vm->current_func = func_value->as.func;
 
     result = execute_func(vm, func_args, func_value->as.func, &expr->meta, value_expected);
+
+    if (vm->state == ExecStateReturn)
+      vm->state = ExecStateContinue;
 
     vm->current_func = prev_func;
 

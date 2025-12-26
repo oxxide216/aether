@@ -13,6 +13,8 @@
 #define EXECUTE_FUNC(vm, args, func, meta, value_expected)              \
   do {                                                                  \
     Value *result = execute_func(vm, args, func, meta, value_expected); \
+    if (vm->state == ExecStateReturn)                                   \
+      vm->state = ExecStateContinue;                                    \
     if (vm->state != ExecStateContinue)                                 \
       return result;                                                    \
   } while (0)
