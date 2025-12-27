@@ -12,10 +12,6 @@
 
 (let args (get-args))
 
-(if (< (len args) 2)
-  (repl)
-  (exit 0))
-
 (let parsed (parse-args (tail args)))
 (let parsed-args parsed::'args')
 (let input-path (head parsed-args))
@@ -25,8 +21,8 @@
 (let dce parsed::'dce')
 
 (if (unit? input-path)
-  (error 'No input file was provided')
-  (exit 1))
+  (repl)
+  (exit 0))
 
 (let input-file-content (read-binary-file input-path))
 (if (unit? input-file-content)
