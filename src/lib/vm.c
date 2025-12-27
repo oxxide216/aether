@@ -610,9 +610,6 @@ Value *execute_func(Vm *vm, Value **args, Func *func,
 
   Value *result_stable = NULL;
   if (vm->state != ExecStateExit) {
-    if (vm->state == ExecStateReturn)
-      vm->state = ExecStateContinue;
-
     if (value_expected)
       result_stable = value_clone(result, frame->prev);
     else
@@ -670,6 +667,9 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     result = execute_func(vm, func_args, func_value->as.func,
                           &expr->meta, value_expected);
+
+    if (vm->state == ExecStateReturn)
+      vm->state = ExecStateContinue;
 
     if (vm->state == ExecStateExit && vm->exit_code != 0) {
       Str name = STR_LIT("<lambda>");
@@ -809,6 +809,15 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       else
         result = value_unit(vm->current_frame);
     } else if (src->kind == ValueKindString) {
+      if (key->kind != ValueKindInt) {
+        PERROR(META_FMT, "get: strings can only be indexed with integers\n",
+               META_ARG(expr->meta));
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+
+        return value_unit(vm->current_frame);
+      }
+
       if ((u32) key->as._int >= src->as.string.str.len) {
         PERROR(META_FMT, "get: index out of bounds\n",
                META_ARG(expr->meta));
