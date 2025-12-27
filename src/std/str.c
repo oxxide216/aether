@@ -132,7 +132,7 @@ Value *join_intrinsic(Vm *vm, Value **args) {
   ListNode *node = parts->as.list->next;
   while (node) {
     if (node != parts->as.list->next)
-      SB_PUSH_VALUE(&sb, filler, 0, false, vm);
+      SB_PUSH_VALUE(&sb, filler, 0, false, false, vm);
 
     if (node->value->kind == ValueKindBytes)
       is_binary = true;
@@ -145,7 +145,7 @@ Value *join_intrinsic(Vm *vm, Value **args) {
       return value_unit(vm->current_frame);
     }
 
-    SB_PUSH_VALUE(&sb, node->value, 0, false, vm);
+    SB_PUSH_VALUE(&sb, node->value, 0, false, false, vm);
 
     node = node->next;
   }

@@ -121,6 +121,7 @@ Value *value_func(Func func, StackFrame *frame) {
   Func *_func = arena_alloc(&frame->arena, sizeof(Func));
   *_func = func;
   _func->refs_count = 1;
+
   *value = (Value) { ValueKindFunc, { .func = _func },
                      frame, 0, false };
   return value;
@@ -173,7 +174,8 @@ Value *value_clone(Value *value, StackFrame *frame) {
       *copy->as.func = *value->as.func;
 
       copy->as.func->catched_values_names.items =
-        arena_alloc(&frame->arena, copy->as.func->catched_values_names.len * sizeof(NamedValue));
+        arena_alloc(&frame->arena, copy->as.func->catched_values_names.len *
+                                   sizeof(NamedValue));
 
       for (u32 i = 0; i < copy->as.func->catched_values_names.len; ++i) {
         copy->as.func->catched_values_names.items[i].name =
@@ -277,7 +279,8 @@ bool value_eq(Value *a, Value *b) {
 
   case ValueKindFunc: {
     if (a->as.func->intrinsic_name.len > 0)
-      return str_eq(a->as.func->intrinsic_name, b->as.func->intrinsic_name);
+      return str_eq(a->as.func->intrinsic_name,
+                    b->as.func->intrinsic_name);
 
     return false;
   }
@@ -299,8 +302,7 @@ bool value_eq(Value *a, Value *b) {
   }
 }
 
-static Var *get_var(Vm *vm, Str name) {
-  StackFrame *frame = vm->current_frame;
+static Var *get_var_in_frame(StackFrame *frame, Vars *global_vars, Str name) {
   while (frame) {
     for (u32 i = frame->vars.len; i > 0; --i)
       if (str_eq(frame->vars.items[i - 1].name, name))
@@ -312,12 +314,15 @@ static Var *get_var(Vm *vm, Str name) {
     frame = frame->prev;
   }
 
-  for (u32 i = vm->global_vars.len; i > 0; --i) {
-    if (str_eq(vm->global_vars.items[i - 1].name, name))
-      return vm->global_vars.items + i - 1;
-  }
+  for (u32 i = global_vars->len; i > 0; --i)
+    if (str_eq(global_vars->items[i - 1].name, name))
+      return global_vars->items + i - 1;
 
   return NULL;
+}
+
+static Var *get_var(Vm *vm, Str name) {
+  return get_var_in_frame(vm->current_frame, &vm->global_vars, name);
 }
 
 static void catch_vars_block(Vm *vm, Strs *local_names,
@@ -517,7 +522,8 @@ static Intrinsic *get_intrinsic(Vm *vm, Str name, u32 args_count, Value **args) 
   return NULL;
 }
 
-Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool value_expected) {
+Value *execute_func(Vm *vm, Value **args, Func *func,
+                    IrExprMeta *meta, bool value_expected) {
   if (func->intrinsic_name.len > 0) {
     Intrinsic *intrinsic = get_intrinsic(vm, func->intrinsic_name, func->args.len, args);
 
@@ -525,10 +531,10 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool val
       StringBuilder sb = {0};
       sb_push_str(&sb, func->intrinsic_name);
       sb_push(&sb, " [");
-      for (u32 i = 0; i < func->args.len; ++i) {
+      for (u32 i = 0; i <func->args.len; ++i) {
         if (i > 0)
           sb_push_char(&sb, ' ');
-        SB_PUSH_VALUE(&sb, args[i], 0, true, vm);
+        SB_PUSH_VALUE(&sb, args[i], 0, true, true, vm);
       }
       sb_push_char(&sb, ']');
 
@@ -558,8 +564,8 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool val
 
   StackFrame *frame = vm->current_frame;
 
-  if (frame->vars.cap < func->args.len + func->catched_values_names.len) {
-    frame->vars.cap = func->args.len + func->catched_values_names.len;
+  if (frame->vars.cap < func->args.len + func-> catched_values_names.len) {
+    frame->vars.cap =func->catched_values_names.len + func->args.len;
     if (frame->vars.len == 0)
       frame->vars.items = malloc(frame->vars.cap * sizeof(Var));
     else
@@ -570,7 +576,7 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool val
 
   for (u32 i = 0; i < func->args.len; ++i) {
     Var var = {
-      func->args.items[i],
+     func->args.items[i],
       args[i],
       VarKindLocal,
     };
@@ -578,17 +584,29 @@ Value *execute_func(Vm *vm, Value **args, Func *func, IrExprMeta *meta, bool val
     frame->vars.items[i] = var;
   }
 
-  for (u32 i = 0; i < func->catched_values_names.len; ++i) {
-    Var var = {
-      func->catched_values_names.items[i].name,
-      func->catched_values_names.items[i].value,
-      VarKindCatched,
-    };
+  if (vm->current_func == func->parent_func) {
+    frame->can_lookup_through = true;
+  } else {
+    for (u32 i = 0; i < func->catched_values_names.len; ++i) {
+      Var var = {
+       func->catched_values_names.items[i].name,
+       func->catched_values_names.items[i].value,
+        VarKindCatched,
+      };
 
-    frame->vars.items[i + func->args.len] = var;
+      frame->vars.items[i + func->args.len] = var;
+    }
   }
 
+  Func *prev_func = vm->current_func;
+
+  vm->current_func = func;
+
   Value *result = execute_block(vm, &func->body, value_expected);
+
+  vm->current_func = prev_func;
+
+  frame->can_lookup_through = false;
 
   Value *result_stable = NULL;
   if (vm->state != ExecStateExit) {
@@ -617,7 +635,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     if (func_value->kind != ValueKindFunc) {
       StringBuilder sb = {0};
-      sb_push_value(&sb, func_value, 0, true, vm);
+      sb_push_value(&sb, func_value, 0, true, true, vm);
 
       PERROR(META_FMT, "Value of kind "STR_FMT" is not callable\n",
              META_ARG(expr->meta), STR_ARG(sb_to_str(sb)));
@@ -647,16 +665,11 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         return value_unit(vm->current_frame);
     }
 
-    Func *prev_func = vm->current_func;
-
-    vm->current_func = func_value->as.func;
-
-    result = execute_func(vm, func_args, func_value->as.func, &expr->meta, value_expected);
+    result = execute_func(vm, func_args, func_value->as.func,
+                          &expr->meta, value_expected);
 
     if (vm->state == ExecStateReturn)
       vm->state = ExecStateContinue;
-
-    vm->current_func = prev_func;
 
     if (vm->state == ExecStateExit && vm->exit_code != 0) {
       Str name = STR_LIT("<lambda>");
@@ -855,7 +868,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
         result = value_unit(vm->current_frame);
     } else {
       StringBuilder sb = {0};
-      sb_push_value(&sb, src, 0, true, vm);
+      sb_push_value(&sb, src, 0, true, true, vm);
 
       PERROR(META_FMT, "get: source should be list, string or dictionary, but got "STR_FMT"\n",
              META_ARG(expr->meta), STR_ARG(sb_to_str(sb)));
@@ -993,7 +1006,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       }
     } else {
       StringBuilder sb = {0};
-      sb_push_value(&sb, dest_var->value, 0, true, vm);
+      sb_push_value(&sb, dest_var->value, 0, true, true, vm);
 
       PERROR(META_FMT, "set: destination should be list or dictionary, but got "STR_FMT"\n",
              META_ARG(expr->meta), STR_ARG(sb_to_str(sb)));
@@ -1094,6 +1107,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       expr->as.lambda.args,
       expr->as.lambda.body,
       catched_values_names,
+      vm->current_func,
       expr->as.lambda.intrinsic_name,
       1,
     };

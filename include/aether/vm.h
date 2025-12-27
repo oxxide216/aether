@@ -10,13 +10,13 @@
 
 #define MAX_INTRINSIC_ARGS_COUNT 10
 
-#define EXECUTE_FUNC(vm, args, func, meta, value_expected)              \
-  do {                                                                  \
-    Value *result = execute_func(vm, args, func, meta, value_expected); \
-    if (vm->state == ExecStateReturn)                                   \
-      vm->state = ExecStateContinue;                                    \
-    if (vm->state != ExecStateContinue)                                 \
-      return result;                                                    \
+#define EXECUTE_FUNC(vm, args, func, meta, is_moved, value_expected)             \
+  do {                                                                           \
+    Value *result = execute_func(vm, args, func, is_moved meta, value_expected); \
+    if (vm->state == ExecStateReturn)                                            \
+      vm->state = ExecStateContinue;                                             \
+    if (vm->state != ExecStateContinue)                                          \
+      return result;                                                             \
   } while (0)
 
 #define EXECUTE_EXPR(vm, expr, value_expected)              \
@@ -33,11 +33,11 @@
       return result;                                          \
   } while (0)
 
-#define EXECUTE_FUNC_SET(vm, dest, args, func, meta, value_expected) \
-  do {                                                               \
-    dest = execute_func(vm, args, func, meta, value_expected);       \
-    if (vm->state != ExecStateContinue)                              \
-      return dest;                                                   \
+#define EXECUTE_FUNC_SET(vm, dest, args, func, is_moved, meta, value_expected) \
+  do {                                                                         \
+    dest = execute_func(vm, args, func, is_moved, meta, value_expected);       \
+    if (vm->state != ExecStateContinue)                                        \
+      return dest;                                                             \
   } while (0)
 
 #define EXECUTE_EXPR_SET(vm, dest, expr, value_expected) \
@@ -100,6 +100,7 @@ typedef struct {
 } Var;
 
 typedef Da(Var) Vars;
+typedef Da(Var *) VarRefs;
 
 typedef struct StackFrame StackFrame;
 
@@ -112,13 +113,16 @@ struct StackFrame {
   StackFrame *prev;
 };
 
-typedef struct {
+typedef struct Func Func;
+
+struct Func {
   IrArgs       args;
   IrBlock      body;
   NamedValues  catched_values_names;
+  Func        *parent_func;
   Str          intrinsic_name;
   u32          refs_count;
-} Func;
+};
 
 typedef enum {
   ExecStateContinue = 0,
@@ -166,7 +170,7 @@ typedef struct {
 typedef union {
   ListNode *list;
   String    string;
-  i64       _int;
+  i64      _int;
   f64       _float;
   bool      _bool;
   Dict      dict;

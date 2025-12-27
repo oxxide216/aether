@@ -94,10 +94,13 @@ Value *read_file_intrinsic(Vm *vm, Value **args) {
 }
 
 Value *read_binary_file_intrinsic(Vm *vm, Value **args) {
-  Value *string = read_file_intrinsic(vm, args);
+  Value *result = read_file_intrinsic(vm, args);
+  if (result->kind == ValueKindUnit)
+    return result;
+
   Bytes bytes = {
-    (u8 *) string->as.string.str.ptr,
-    string->as.string.str.len,
+    (u8 *) result->as.string.str.ptr,
+    result->as.string.str.len,
   };
 
   return value_bytes(bytes, vm->current_frame);

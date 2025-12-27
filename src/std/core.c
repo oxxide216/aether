@@ -227,13 +227,14 @@ Value *map_intrinsic(Vm *vm, Value **args) {
   while (node) {
     Value *func_args[] = { node->value };
     // TODO: put real metadata here
-    Value *replacement = execute_func(vm, func_args, func->as.func, NULL, true);
+    Value *replacement =
+      execute_func(vm, func_args, func->as.func, NULL, true);
     if (vm->state != ExecStateContinue) {
       if (vm->state == ExecStateReturn)
-        vm->state = ExecStateContinue;
+        return replacement;
 
       break;
-      }
+    }
 
     if (list->is_atom) {
       --node->value->refs_count;
@@ -271,7 +272,7 @@ Value *filter_intrinsic(Vm *vm, Value **args) {
     Value *is_ok = execute_func(vm, func_args, func->as.func, NULL, true);
     if (vm->state != ExecStateContinue) {
       if (vm->state == ExecStateReturn)
-        vm->state = ExecStateContinue;
+        return is_ok;
 
       break;
     }
@@ -310,10 +311,11 @@ Value *fold_intrinsic(Vm *vm, Value **args) {
   while (node) {
     Value *func_args[] = { accumulator, node->value };
     // TODO: put real metadata here
-    Value *new_accumulator = execute_func(vm, func_args, func->as.func, NULL, true);
+    Value *new_accumulator =
+      execute_func(vm, func_args, func->as.func, NULL, true);
     if (vm->state != ExecStateContinue) {
       if (vm->state == ExecStateReturn)
-        vm->state = ExecStateContinue;
+        return new_accumulator;
 
       break;
     }
@@ -467,10 +469,10 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
   if (collection->kind == ValueKindList) {
     ListNode *node = collection->as.list->next;
     while (node) {
-      execute_func(vm, &node->value, func->as.func, NULL, false);
+      Value *result = execute_func(vm, &node->value, func->as.func, NULL, true);
       if (vm->state != ExecStateContinue) {
         if (vm->state == ExecStateReturn)
-          vm->state = ExecStateContinue;
+          return result;
 
         break;
       }
@@ -482,10 +484,10 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
     for (u32 i = 0; i < collection->as.string.str.len; ++i) {
       _char->as.string.str.ptr[0] = collection->as.string.str.ptr[i];
 
-      execute_func(vm, &_char, func->as.func, NULL, false);
+      Value *result = execute_func(vm, &_char, func->as.func, NULL, true);
       if (vm->state != ExecStateContinue) {
         if (vm->state == ExecStateReturn)
-          vm->state = ExecStateContinue;
+          return result;
 
         break;
       }
@@ -495,10 +497,10 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
     for (u32 i = 0; i < collection->as.bytes.len; ++i) {
       _int->as._int = collection->as.bytes.ptr[i];
 
-      execute_func(vm, &_int, func->as.func, NULL, false);
+      Value *result = execute_func(vm, &_int, func->as.func, NULL, true);
       if (vm->state != ExecStateContinue) {
         if (vm->state == ExecStateReturn)
-          vm->state = ExecStateContinue;
+          return result;
 
         break;
       }
@@ -517,10 +519,10 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
       pair->as.dict.items[0].value = collection->as.dict.items[i].key;
       pair->as.dict.items[1].value = collection->as.dict.items[i].value;
 
-      execute_func(vm, &pair, func->as.func, NULL, false);
+      Value *result = execute_func(vm, &pair, func->as.func, NULL, true);
       if (vm->state != ExecStateContinue) {
         if (vm->state == ExecStateReturn)
-          vm->state = ExecStateContinue;
+          return result;
 
         break;
       }
@@ -586,7 +588,7 @@ Value *to_str_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
   StringBuilder sb = {0};
-  SB_PUSH_VALUE(&sb, value, 0, false, vm);
+  SB_PUSH_VALUE(&sb, value, 0, false, true, vm);
 
   Str string;
   string.len = sb.len;

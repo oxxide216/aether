@@ -58,7 +58,8 @@ Value *dict_get_value_str_key(StackFrame *frame, Dict *dict, Str string) {
 }
 
 void sb_push_value(StringBuilder *sb, Value *value,
-                   u32 level, bool kind, Vm *vm) {
+                   u32 level, bool kind,
+                   bool quote_string, Vm *vm) {
   switch (value->kind) {
   case ValueKindUnit: {
     sb_push(sb, "unit");
@@ -72,11 +73,7 @@ void sb_push_value(StringBuilder *sb, Value *value,
       if (node != value->as.list->next)
         sb_push_char(sb, ' ');
 
-      if (node->value->kind == ValueKindString)
-        sb_push_char(sb, '\'');
-      sb_push_value(sb, node->value, level, kind, vm);
-      if (node->value->kind == ValueKindString)
-        sb_push_char(sb, '\'');
+      sb_push_value(sb, node->value, level, kind, true, vm);
 
       node = node->next;
     }
@@ -85,10 +82,15 @@ void sb_push_value(StringBuilder *sb, Value *value,
   } break;
 
   case ValueKindString: {
-    if (kind)
+    if (kind) {
       sb_push(sb, "str");
-    else
+    } else {
+      if (quote_string)
+        sb_push_char(sb, '\'');
       sb_push_str(sb, value->as.string.str);
+      if (quote_string)
+        sb_push_char(sb, '\'');
+    }
   } break;
 
   case ValueKindInt: {
@@ -135,9 +137,11 @@ void sb_push_value(StringBuilder *sb, Value *value,
       for (u32 j = 0; j < level + 1; ++j)
         sb_push(sb, "  ");
 
-      sb_push_value(sb, value->as.dict.items[i].key, level + 1, kind, vm);
+      sb_push_value(sb, value->as.dict.items[i].key,
+                    level + 1, kind, true, vm);
       sb_push(sb, ": ");
-      sb_push_value(sb, value->as.dict.items[i].value, level + 1, kind, vm);
+      sb_push_value(sb, value->as.dict.items[i].value,
+                    level + 1, kind, true, vm);
 
       sb_push_char(sb, '\n');
     }

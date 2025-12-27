@@ -17,7 +17,7 @@ Value *printf_intrinsic(Vm *vm, Value **args) {
 
   ListNode *node = value->as.list->next;
   while (node) {
-    SB_PUSH_VALUE(&printf_sb, node->value, 0, false, vm);
+    SB_PUSH_VALUE(&printf_sb, node->value, 0, false, false, vm);
 
     node = node->next;
   }
