@@ -64,6 +64,7 @@ Value *get_file_info_intrinsic(Vm *vm, Value **args) {
 
   if (stat(path_cstring, &st) < 0) {
     free(path_cstring);
+
     return value_unit(vm->current_frame);
   }
 

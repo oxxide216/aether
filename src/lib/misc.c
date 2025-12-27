@@ -87,7 +87,16 @@ void sb_push_value(StringBuilder *sb, Value *value,
     } else {
       if (quote_string)
         sb_push_char(sb, '\'');
-      sb_push_str(sb, value->as.string.str);
+
+      for (u32 i = 0; i < value->as.string.str.len; ++i) {
+        char _char = value->as.string.str.ptr[i];
+
+        if (_char == '\n' && quote_string)
+          sb_push(sb, "\\n");
+        else
+          sb_push_char(sb, _char);
+      }
+
       if (quote_string)
         sb_push_char(sb, '\'');
     }

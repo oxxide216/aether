@@ -610,6 +610,9 @@ Value *execute_func(Vm *vm, Value **args, Func *func,
 
   Value *result_stable = NULL;
   if (vm->state != ExecStateExit) {
+    if (vm->state == ExecStateReturn)
+      vm->state = ExecStateContinue;
+
     if (value_expected)
       result_stable = value_clone(result, frame->prev);
     else
@@ -667,9 +670,6 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
     result = execute_func(vm, func_args, func_value->as.func,
                           &expr->meta, value_expected);
-
-    if (vm->state == ExecStateReturn)
-      vm->state = ExecStateContinue;
 
     if (vm->state == ExecStateExit && vm->exit_code != 0) {
       Str name = STR_LIT("<lambda>");
@@ -1022,6 +1022,8 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   case IrExprKindRet: {
     if (expr->as.ret.has_expr)
       EXECUTE_EXPR_SET(vm, result, expr->as.ret.expr, true);
+    else
+      result = value_unit(vm->current_frame);
 
     vm->state = ExecStateReturn;
   } break;
