@@ -230,8 +230,10 @@ Value *map_intrinsic(Vm *vm, Value **args) {
     Value *replacement =
       execute_func(vm, func_args, func->as.func, NULL, true);
     if (vm->state != ExecStateContinue) {
-      if (vm->state == ExecStateReturn)
+      if (vm->state == ExecStateBreak) {
+        vm->state = ExecStateContinue;
         return replacement;
+      }
 
       break;
     }
@@ -271,8 +273,10 @@ Value *filter_intrinsic(Vm *vm, Value **args) {
     // TODO: put real metadata here
     Value *is_ok = execute_func(vm, func_args, func->as.func, NULL, true);
     if (vm->state != ExecStateContinue) {
-      if (vm->state == ExecStateReturn)
+      if (vm->state == ExecStateBreak) {
+        vm->state = ExecStateContinue;
         return is_ok;
+      }
 
       break;
     }
@@ -314,8 +318,10 @@ Value *fold_intrinsic(Vm *vm, Value **args) {
     Value *new_accumulator =
       execute_func(vm, func_args, func->as.func, NULL, true);
     if (vm->state != ExecStateContinue) {
-      if (vm->state == ExecStateReturn)
+      if (vm->state == ExecStateBreak) {
+        vm->state = ExecStateContinue;
         return new_accumulator;
+      }
 
       break;
     }
@@ -499,8 +505,10 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
 
       Value *result = execute_func(vm, &_int, func->as.func, NULL, true);
       if (vm->state != ExecStateContinue) {
-        if (vm->state == ExecStateReturn)
+        if (vm->state == ExecStateBreak) {
+          vm->state = ExecStateContinue;
           return result;
+        }
 
         break;
       }

@@ -731,12 +731,19 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     u32 i = 0;
 
     while (true) {
-      Value *cond;
-      EXECUTE_EXPR_SET(vm, cond, expr->as._while.cond, true);
+      Value *cond = execute_expr(vm, expr->as._while.cond, true);
+
       if (!value_to_bool(cond))
         break;
 
-      EXECUTE_BLOCK(vm, &expr->as._while.body, false);
+      Value *body_result;
+      EXECUTE_BLOCK_SET(vm, body_result, &expr->as._while.body, false);
+
+      if (vm->state == ExecStateBreak) {
+        vm->state = ExecStateContinue;
+
+        return body_result;
+      }
 
       if (i++ == WHILE_FRAME_LENGTH) {
         end_frame(vm);
@@ -1173,6 +1180,15 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     if (value_expected)
       result = value_func(*vm->current_func, vm->current_frame);
   } break;
+
+  case IrExprKindBreak: {
+    if (expr->as._break.expr)
+      EXECUTE_EXPR_SET(vm, result, expr->as._break.expr, true);
+    else
+      result = value_unit(vm->current_frame);
+
+    vm->state = ExecStateBreak;
+  } break;
   }
 
   if (value_expected && !result)
@@ -1181,10 +1197,17 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 }
 
 Value *execute_block(Vm *vm, IrBlock *block, bool value_expected) {
-  for (u32 i = 0; i + 1 < block->len; ++i)
-    EXECUTE_EXPR(vm, block->items[i], false);
-
   Value *result = NULL;
+
+  for (u32 i = 0; i + 1 < block->len; ++i) {
+    EXECUTE_EXPR_SET(vm, result, block->items[i], false);
+
+    if (vm->state == ExecStateBreak) {
+      vm->state = ExecStateContinue;
+
+      return result;
+    }
+  }
 
   if (block->len > 0)
     EXECUTE_EXPR_SET(vm, result, block->items[block->len - 1], value_expected);

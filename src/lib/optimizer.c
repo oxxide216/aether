@@ -114,6 +114,11 @@ void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
   } break;
 
   case IrExprKindSelf: break;
+
+  case IrExprKindBreak: {
+    if (expr->as._break.expr)
+      eliminate_dead_code_expr(expr->as._break.expr, defs);
+  } break;
   }
 }
 

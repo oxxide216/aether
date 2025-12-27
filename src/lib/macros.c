@@ -47,6 +47,10 @@ static bool needs_cloning(IrExpr *expr, IrArgs *arg_names) {
       return false;
     }
 
+    case IrExprKindBreak: {
+      return expr->as._break.expr != NULL;
+    }
+
     default: {
       return true;
     }
@@ -166,6 +170,11 @@ static void clone_expr(IrExpr **expr, IrArgs *arg_names, Arena *arena) {
   } break;
 
   case IrExprKindSelf: break;
+
+  case IrExprKindBreak: {
+    if (new_expr->as._break.expr)
+      clone_expr(&new_expr->as._break.expr, arg_names, arena);
+  } break;
   }
 }
 
@@ -311,6 +320,11 @@ static void rename_args_expr(IrExpr *expr, IrArgs *prev_arg_names,
   } break;
 
   case IrExprKindSelf: break;
+
+  case IrExprKindBreak: {
+    if (expr->as._break.expr)
+      rename_args_expr(expr->as._break.expr, prev_arg_names, new_arg_names, arena);
+  } break;
   }
 }
 
@@ -609,6 +623,11 @@ void expand_macros(IrExpr *expr, Macros *macros,
   } break;
 
   case IrExprKindSelf: break;
+
+  case IrExprKindBreak: {
+    if (expr->as._break.expr)
+      INLINE_THEN_EXPAND(expr->as._break.expr);
+  } break;
   }
 
   expr->meta.row = (i16) expr->meta.row + row;

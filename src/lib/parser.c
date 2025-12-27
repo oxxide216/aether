@@ -18,7 +18,7 @@
                         "/usr/include/aether/" }
 #define INCLUDE_PATHS_LEN 3
 
-#define MASK(id) (1 << (id))
+#define MASK(id) (1lu << (id))
 
 typedef enum {
   TokenStatusOk = 0,
@@ -890,6 +890,18 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
 
       expr->kind = IrExprKindBlock;
       expr->as.block = parser_parse_block(parser, MASK(TT_CPAREN));
+
+      parser_expect_token(parser, MASK(TT_CPAREN));
+    } break;
+
+    case TT_BREAK: {
+      parser_next_token(parser);
+
+      expr->kind = IrExprKindBreak;
+
+      token = parser_peek_token(parser);
+      if (!token.eof && token.id != TT_CPAREN)
+        expr->as._break.expr = parser_parse_expr(parser, false);
 
       parser_expect_token(parser, MASK(TT_CPAREN));
     } break;

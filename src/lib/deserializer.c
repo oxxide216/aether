@@ -196,6 +196,17 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
 
   case IrExprKindSelf: break;
 
+  case IrExprKindBreak: {
+    bool has_expr = *(u8 *) (data + *end);
+    *end += sizeof(u8);
+
+    if (has_expr) {
+      expr->as._break.expr = arena_alloc(arena, sizeof(IrExpr));
+
+      load_expr_data(expr->as._break.expr, data, end, path_offsets, arena);
+    }
+  } break;
+
   default: {
     ERROR("Corrupted bytecode: unknown expression kind\n");
     exit(1);

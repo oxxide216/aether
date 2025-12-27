@@ -128,6 +128,7 @@ typedef enum {
   ExecStateContinue = 0,
   ExecStateReturn,
   ExecStateExit,
+  ExecStateBreak,
 } ExecState;
 
 typedef Value *(*IntrinsicFunc)(Vm *vm, Value **args);

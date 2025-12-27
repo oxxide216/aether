@@ -31,6 +31,7 @@ typedef enum {
   IrExprKindRet,
   IrExprKindMatch,
   IrExprKindSelf,
+  IrExprKindBreak,
 } IrExprKind;
 
 typedef struct {
@@ -150,6 +151,10 @@ typedef struct {
   IrExpr  *any;
 } IrExprMatch;
 
+typedef struct {
+  IrExpr *expr;
+} IrExprBreak;
+
 #pragma pack(push, 1)
 typedef union {
   IrBlock        block;
@@ -170,6 +175,7 @@ typedef union {
   IrExprDict     dict;
   IrExprRet      ret;
   IrExprMatch    match;
+  IrExprBreak    _break;
 } IrExprAs;
 #pragma pack(pop)
 
