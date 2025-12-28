@@ -533,7 +533,7 @@ Value *execute_func(Vm *vm, Value **args, Func *func,
       StringBuilder sb = {0};
       sb_push_str(&sb, func->intrinsic_name);
       sb_push(&sb, " [");
-      for (u32 i = 0; i <func->args.len; ++i) {
+      for (u32 i = 0; i < func->args.len; ++i) {
         if (i > 0)
           sb_push_char(&sb, ' ');
         SB_PUSH_VALUE(&sb, args[i], 0, true, true, vm);
@@ -570,11 +570,11 @@ Value *execute_func(Vm *vm, Value **args, Func *func,
   StackFrame *frame = vm->current_frame;
 
   if (frame->vars.cap < func->args.len + func-> catched_values_names.len) {
-    frame->vars.cap =func->catched_values_names.len + func->args.len;
-    if (frame->vars.len == 0)
-      frame->vars.items = malloc(frame->vars.cap * sizeof(Var));
-    else
+    frame->vars.cap = func->catched_values_names.len + func->args.len;
+    if (frame->vars.items)
       frame->vars.items = realloc(frame->vars.items, frame->vars.cap * sizeof(Var));
+    else
+      frame->vars.items = malloc(frame->vars.cap * sizeof(Var));
   }
 
   frame->vars.len = func->args.len + func->catched_values_names.len;
