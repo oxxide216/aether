@@ -571,10 +571,13 @@ Value *execute_func(Vm *vm, Value **args, Func *func,
 
   if (frame->vars.cap < func->args.len + func-> catched_values_names.len) {
     frame->vars.cap = func->catched_values_names.len + func->args.len;
-    if (frame->vars.items)
-      frame->vars.items = realloc(frame->vars.items, frame->vars.cap * sizeof(Var));
-    else
+    if (frame->vars.len == 0) {
+      if (frame->vars.items)
+        free(frame->vars.items);
       frame->vars.items = malloc(frame->vars.cap * sizeof(Var));
+    } else {
+      frame->vars.items = realloc(frame->vars.items, frame->vars.cap * sizeof(Var));
+    }
   }
 
   frame->vars.len = func->args.len + func->catched_values_names.len;
