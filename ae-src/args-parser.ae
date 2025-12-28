@@ -39,13 +39,7 @@
       (error 'Unknown flag: ' (head args))
       (exit 1)
      else
-      (ret {
-        'args': args
-        'mode': mode
-        'output-path': output-path
-        'output-macros-path': output-macros-path
-        'dce': dce
-      }))
+      (break))
     (set args (tail args)))
 
   {

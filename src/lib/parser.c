@@ -869,8 +869,9 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
     case TT_RET: {
       parser_next_token(parser);
 
+      token = parser_peek_token(parser);
       expr->kind = IrExprKindRet;
-      expr->as.ret.has_expr = parser_peek_token(parser).id != TT_CPAREN;
+      expr->as.ret.has_expr = !token.eof && token.id != TT_CPAREN;
 
       if (expr->as.ret.has_expr)
         expr->as.ret.expr = parser_parse_expr(parser, false);

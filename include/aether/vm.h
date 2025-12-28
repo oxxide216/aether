@@ -10,13 +10,11 @@
 
 #define MAX_INTRINSIC_ARGS_COUNT 10
 
-#define EXECUTE_FUNC(vm, args, func, meta, is_moved, value_expected)             \
-  do {                                                                           \
-    Value *result = execute_func(vm, args, func, is_moved meta, value_expected); \
-    if (vm->state == ExecStateReturn)                                            \
-      vm->state = ExecStateContinue;                                             \
-    if (vm->state != ExecStateContinue)                                          \
-      return result;                                                             \
+#define EXECUTE_FUNC(vm, args, func, meta, value_expected)              \
+  do {                                                                  \
+    Value *result = execute_func(vm, args, func, meta, value_expected); \
+    if (vm->state != ExecStateContinue)                                 \
+      return result;                                                    \
   } while (0)
 
 #define EXECUTE_EXPR(vm, expr, value_expected)              \
@@ -29,15 +27,15 @@
 #define EXECUTE_BLOCK(vm, block, value_expected)              \
   do {                                                        \
     Value *result = execute_block(vm, block, value_expected); \
-    if (vm->state != ExecStateContinue)                       \
+    if (vm->state != ExecStatContinue)                       \
       return result;                                          \
   } while (0)
 
-#define EXECUTE_FUNC_SET(vm, dest, args, func, is_moved, meta, value_expected) \
-  do {                                                                         \
-    dest = execute_func(vm, args, func, is_moved, meta, value_expected);       \
-    if (vm->state != ExecStateContinue)                                        \
-      return dest;                                                             \
+#define EXECUTE_FUNC_SET(vm, dest, args, func, meta, value_expected) \
+  do {                                                               \
+    dest = execute_func(vm, args, func, meta, value_expected);       \
+    if (vm->state != ExecStateContinue)                              \
+      return dest;                                                   \
   } while (0)
 
 #define EXECUTE_EXPR_SET(vm, dest, expr, value_expected) \

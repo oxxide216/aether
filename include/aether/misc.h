@@ -6,7 +6,8 @@
 #define SB_PUSH_VALUE(sb, value, level, kind, quote_string, vm) \
   do {                                                          \
     sb_push_value(sb, value, level, kind, quote_string, vm);    \
-    if (vm->state != ExecStateContinue)                         \
+    if (vm->state != ExecStateContinue &&                       \
+        vm->state != ExecStateReturn)                           \
       return NULL;                                              \
   } while (0)
 

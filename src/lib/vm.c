@@ -13,14 +13,16 @@
 #define CATCH_VARS(vm, local_names, catched_values, frame, expr) \
   do {                                                           \
     catch_vars(vm, local_names, catched_values, frame, expr);    \
-    if (vm->state != ExecStateContinue)                          \
+    if (vm->state == ExecStateExit ||                            \
+        vm->state == ExecStateReturn)                            \
       return;                                                    \
   } while (0)
 
 #define CATCH_VARS_BLOCK(vm, local_names, catched_values, frame, block) \
   do {                                                                  \
     catch_vars_block(vm, local_names, catched_values, frame, block);    \
-    if (vm->state != ExecStateContinue)                                 \
+    if (vm->state == ExecStateExit ||                                   \
+        vm->state == ExecStateReturn)                                   \
       return;                                                           \
   } while (0)
 
@@ -557,6 +559,9 @@ Value *execute_func(Vm *vm, Value **args, Func *func,
 
     Value *result = (*intrinsic->func)(vm, args);
 
+    if (vm->state == ExecStateReturn)
+      vm->state = ExecStateContinue;
+
     return result;
   }
 
@@ -607,6 +612,9 @@ Value *execute_func(Vm *vm, Value **args, Func *func,
   vm->current_func = prev_func;
 
   frame->can_lookup_through = false;
+
+  if (vm->state == ExecStateReturn)
+    vm->state = ExecStateContinue;
 
   Value *result_stable = NULL;
   if (vm->state != ExecStateExit) {
@@ -668,9 +676,6 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     result = execute_func(vm, func_args, func_value->as.func,
                           &expr->meta, value_expected);
 
-    if (vm->state == ExecStateReturn)
-      vm->state = ExecStateContinue;
-
     if (vm->state == ExecStateExit && vm->exit_code != 0) {
       Str name = STR_LIT("<lambda>");
       if (expr->as.func_call.func->kind == IrExprKindIdent)
@@ -696,7 +701,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Var var = {0};
     var.name = expr->as.var_def.name;
     var.value = value;
-    var.kind = (bool) vm->current_func ? VarKindLocal : VarKindGlobal;
+    var.kind = vm->current_func != NULL ? VarKindLocal : VarKindGlobal;
 
     if (var.kind == VarKindGlobal)
       DA_APPEND(vm->global_vars, var);
@@ -733,16 +738,26 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     while (true) {
       Value *cond = execute_expr(vm, expr->as._while.cond, true);
 
+      if (vm->state != ExecStateContinue) {
+        if (vm->state == ExecStateBreak)
+          vm->state = ExecStateContinue;
+
+        break;
+      }
+
       if (!value_to_bool(cond))
         break;
 
-      Value *body_result;
-      EXECUTE_BLOCK_SET(vm, body_result, &expr->as._while.body, false);
+      Value *body_result = execute_block(vm, &expr->as._while.body, value_expected);
 
-      if (vm->state == ExecStateBreak) {
-        vm->state = ExecStateContinue;
+      if (vm->state != ExecStateContinue) {
+        if (vm->state == ExecStateBreak)
+          vm->state = ExecStateContinue;
 
-        return body_result;
+        if (value_expected)
+          result = value_clone(body_result, vm->current_frame->prev);
+
+        break;
       }
 
       if (i++ == WHILE_FRAME_LENGTH) {
@@ -1199,15 +1214,8 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 Value *execute_block(Vm *vm, IrBlock *block, bool value_expected) {
   Value *result = NULL;
 
-  for (u32 i = 0; i + 1 < block->len; ++i) {
-    EXECUTE_EXPR_SET(vm, result, block->items[i], false);
-
-    if (vm->state == ExecStateBreak) {
-      vm->state = ExecStateContinue;
-
-      return result;
-    }
-  }
+  for (u32 i = 0; i + 1 < block->len; ++i)
+    EXECUTE_EXPR_SET(vm, result, block->items[i], value_expected);
 
   if (block->len > 0)
     EXECUTE_EXPR_SET(vm, result, block->items[block->len - 1], value_expected);
