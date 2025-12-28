@@ -3,7 +3,7 @@
 (let str-replace [str at sub-str] -> import 'str-replace')
 (let split [str delimiter] -> import 'split')
 (let sub-str [str begin end] -> import 'sub-str')
-(let join [str filler] -> import 'join')
+(let join [parts filler] -> import 'join')
 
 (let begins-with [str begin] ->
   (if (< (len str) (len begin))
@@ -16,3 +16,13 @@
     false
    else
     (== (get-range str (- (len str) (len end)) (len str)) end)))
+
+(let join-any [parts filler] ->
+  (let strs
+    (map [part] ->
+           (if (str? part)
+             part
+            else
+             (to-str part)) <>
+         parts))
+  (join strs filler))
