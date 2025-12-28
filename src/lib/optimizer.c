@@ -7,7 +7,35 @@ typedef struct {
 
 typedef Da(Def) Defs;
 
+void eliminate_dead_code_expr(IrExpr *expr, Defs *defs);
 void eliminate_dead_code_block(IrBlock *block, Defs *defs);
+
+static void eliminate_dead_code_even_in_lambda_expr(IrExpr *expr, Defs *defs) {
+  if (expr->kind == IrExprKindLambda)
+    eliminate_dead_code_block(&expr->as.lambda.body, defs);
+  else
+    eliminate_dead_code_expr(expr, defs);
+}
+
+static void eliminate_dead_code_even_in_lambda_block(IrBlock *block, Defs *defs) {
+  for (u32 i = 0; i < block->len; ++i)
+    eliminate_dead_code_even_in_lambda_expr(block->items[i], defs);
+}
+
+static void use_ident(Str ident, Defs *defs) {
+  for (u32 i = defs->len; i > 0; --i) {
+    Def *def = defs->items + i - 1;
+
+    if (str_eq(def->name, ident)) {
+      if (def->expr->is_dead) {
+        def->expr->is_dead = false;
+        eliminate_dead_code_even_in_lambda_expr(def->expr->as.var_def.expr, defs);
+
+        break;
+      }
+    }
+  }
+}
 
 void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
   expr->is_dead = expr->kind == IrExprKindVarDef;
@@ -19,7 +47,7 @@ void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
 
   case IrExprKindFuncCall: {
     eliminate_dead_code_expr(expr->as.func_call.func, defs);
-    eliminate_dead_code_block(&expr->as.func_call.args, defs);
+    eliminate_dead_code_even_in_lambda_block(&expr->as.func_call.args, defs);
   } break;
 
   case IrExprKindVarDef: {
@@ -45,6 +73,8 @@ void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
   } break;
 
   case IrExprKindSet: {
+    use_ident(expr->as.set.dest, defs);
+
     eliminate_dead_code_expr(expr->as.set.src, defs);
   } break;
 
@@ -54,6 +84,8 @@ void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
   } break;
 
   case IrExprKindSetAt: {
+    use_ident(expr->as.set_at.dest, defs);
+
     eliminate_dead_code_expr(expr->as.set_at.key, defs);
     eliminate_dead_code_expr(expr->as.set_at.value, defs);
   } break;
@@ -63,21 +95,7 @@ void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
   } break;
 
   case IrExprKindIdent: {
-    for (u32 i = defs->len; i > 0; --i) {
-      Def *def = defs->items + i - 1;
-
-      if (str_eq(def->name, expr->as.ident)) {
-        if (def->expr->is_dead) {
-          def->expr->is_dead = false;
-          if (def->expr->as.var_def.expr->kind == IrExprKindLambda)
-            eliminate_dead_code_block(&def->expr->as.var_def.expr->as.lambda.body, defs);
-          else
-            eliminate_dead_code_expr(def->expr->as.var_def.expr, defs);
-        }
-
-        break;
-      }
-    }
+    use_ident(expr->as.ident, defs);
   } break;
 
   case IrExprKindString: break;
@@ -85,9 +103,7 @@ void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
   case IrExprKindFloat: break;
   case IrExprKindBool: break;
 
-  case IrExprKindLambda: {
-    eliminate_dead_code_block(&expr->as.lambda.body, defs);
-  } break;
+  case IrExprKindLambda: break;
 
   case IrExprKindDict: {
     for (u32 i = 0; i < expr->as.dict.len; ++i) {
@@ -98,7 +114,7 @@ void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
 
   case IrExprKindRet: {
     if (expr->as.ret.has_expr)
-      eliminate_dead_code_expr(expr->as.ret.expr, defs);
+      eliminate_dead_code_even_in_lambda_expr(expr->as.ret.expr, defs);
   } break;
 
   case IrExprKindMatch: {
