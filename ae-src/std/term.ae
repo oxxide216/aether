@@ -38,6 +38,8 @@
 
 (let term/clear      '\e[2J')
 (let term/clear-line '\e[2K')
+(let term/save       '\e[?47h')
+(let term/load       '\e[?47l')
 
 (let term/save-pos   '\e[s')
 (let term/load-pos   '\e[u')

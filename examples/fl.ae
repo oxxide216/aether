@@ -159,6 +159,7 @@
 (let prompt-history-pos 0)
 
 (term/raw-mode-on)
+(print term/save term/save-pos)
 
 (let is-running true)
 (while is-running
@@ -171,5 +172,5 @@
    else
     (update-view)))
 
-(print term/show term/clear (term/go-to 1 1))
+(print term/show term/load-pos term/load)
 (term/raw-mode-off)
