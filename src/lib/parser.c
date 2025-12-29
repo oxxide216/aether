@@ -66,6 +66,7 @@ static char *token_names[] = {
   "import",
   "match",
   "do",
+  "break",
   "`(`",
   "`)`",
   "`[`",
