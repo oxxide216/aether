@@ -227,7 +227,7 @@ Value *is_alpha_number_intrinsic(Vm *vm, Value **args) {
   u32 index = 0;
 
   while((_wchar = get_next_wchar(str->as.string.str, index, &wchar_len)) != '\0') {
-    if (!iswdigit(_wchar)) {
+    if (!iswalnum(_wchar)) {
       is_alpha_number = false;
 
       break;
