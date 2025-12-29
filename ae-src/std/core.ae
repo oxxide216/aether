@@ -79,6 +79,13 @@
         (break true))))
   (not-unit? result))
 
+(let contains-any-key [dict keys] ->
+  (let result
+    (for key in keys
+      (if (not-unit? dict::key)
+        (break true))))
+  (not-unit? result))
+
 (let count [collection item] ->
   (let i 0)
   (for -item in collection
