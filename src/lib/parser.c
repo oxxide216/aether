@@ -960,7 +960,8 @@ Ir parse(Str code, Str *file_path) {
   FilePaths included_files = {0};
   Arena arena = {0};
   Ir ir = parse_ex(code, file_path, &macros, &included_files, &arena, false);
-  expand_macros_block(&ir, &macros, NULL, NULL, false, &arena, file_path, 0, 0);
+  expand_macros_block(&ir, &macros, NULL, NULL, false,
+                      &arena, file_path, 0, 0, false);
 
   if (macros.items)
     free(macros.items);

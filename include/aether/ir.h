@@ -188,6 +188,7 @@ typedef struct {
 struct IrExpr {
   u8         kind;
   u8         is_dead;
+  u8         is_macro;
   IrExprAs   as;
   IrExprMeta meta;
 };

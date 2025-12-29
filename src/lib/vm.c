@@ -679,7 +679,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     result = execute_func(vm, func_args, func_value->as.func,
                           &expr->meta, value_expected);
 
-    if (vm->state == ExecStateExit && vm->exit_code != 0) {
+    if (vm->state == ExecStateExit && vm->exit_code != 0 && !expr->is_macro) {
       Str name = STR_LIT("<lambda>");
       if (expr->as.func_call.func->kind == IrExprKindIdent)
         name = expr->as.func_call.func->as.ident;

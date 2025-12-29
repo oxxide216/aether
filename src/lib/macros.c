@@ -8,14 +8,14 @@
       col = 0;                                                                          \
     }                                                                                   \
     expand_macros(expr, macros, arg_names, args, unpack,                                \
-                  arena, file_path, row, col, is_inlined & inlined);                    \
+                  arena, file_path, row, col, is_inlined | inlined);                    \
   } while (0)
 
 #define INLINE_THEN_EXPAND_BLOCK(block)                 \
   do {                                                  \
     expand_macros_block(&block, macros, arg_names,      \
                         args, unpack, arena, file_path, \
-                        row, col);                      \
+                        row, col, is_inlined);          \
   } while (0)
 
 static u32 get_macro_arg_index(Str name, IrArgs *arg_names) {
@@ -417,7 +417,7 @@ static bool try_inline_macro_arg(IrExpr **expr, IrArgs *arg_names,
 void expand_macros_block(IrBlock *block, Macros *macros,
                          IrArgs *arg_names, IrBlock *args,
                          bool unpack, Arena *arena, Str *file_path,
-                         i16 row, i16 col) {
+                         i16 row, i16 col, bool is_inlined) {
   Block new_block = {0};
   Da(bool) inlined_exprs = {0};
 
@@ -443,7 +443,7 @@ void expand_macros_block(IrBlock *block, Macros *macros,
 
     expand_macros(new_block.items[i], macros, arg_names,
                   args, unpack, arena, file_path,
-                  temp_row, temp_col, inlined);
+                  temp_row, temp_col, is_inlined | inlined);
   }
 
   block->items = new_block.items;
@@ -457,9 +457,6 @@ void expand_macros(IrExpr *expr, Macros *macros,
                    IrArgs *arg_names, IrBlock *args,
                    bool unpack, Arena *arena, Str *file_path,
                    i16 row, i16 col, bool is_inlined) {
-  if (arg_names && args && !is_inlined)
-    expr->meta.file_path = file_path;
-
   switch (expr->kind) {
   case IrExprKindBlock: {
     INLINE_THEN_EXPAND_BLOCK(expr->as.block);
@@ -539,8 +536,10 @@ void expand_macros(IrExpr *expr, Macros *macros,
         expand_macros_block(&expr->as.block, macros,
                             &ir_new_arg_names, &ir_new_args,
                             macro->has_unpack, arena,
-                            file_path, expr->meta.row - macro->row,
-                            expr->meta.col - macro->col);
+                            expr->meta.file_path,
+                            (i16) expr->meta.row - (i16) macro->row,
+                            (i16) expr->meta.col - (i16) macro->col,
+                            false);
 
         if (new_arg_names.items)
           free(new_arg_names.items);
@@ -630,6 +629,10 @@ void expand_macros(IrExpr *expr, Macros *macros,
   } break;
   }
 
-  expr->meta.row = (i16) expr->meta.row + row;
-  expr->meta.col = (i16) expr->meta.col + col;
+  if (arg_names && args && !is_inlined) {
+    expr->is_macro = true;
+    expr->meta.file_path = file_path;
+    expr->meta.row = (i16) expr->meta.row + row;
+    expr->meta.col = (i16) expr->meta.col + col;
+  }
 }
