@@ -469,9 +469,14 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
       node = node->next;
     }
   } else if (collection->kind == ValueKindString) {
-    Value *_char = value_string(STR_LIT(" "), vm->current_frame);
-    for (u32 i = 0; i < collection->as.string.str.len; ++i) {
-      _char->as.string.str.ptr[0] = collection->as.string.str.ptr[i];
+    char *filler = arena_alloc(&vm->current_frame->arena, sizeof(wchar));
+    Value *_char = value_string(STR(filler, sizeof(wchar)), vm->current_frame);
+    u32 wchar_len;
+    u32 index = 0;
+    wchar _wchar;
+
+    while ((_wchar = get_next_wchar(collection->as.string.str, index, &wchar_len)) != '\0') {
+      *(wchar *) _char->as.string.str.ptr = _wchar;
 
       Value *result = execute_func(vm, &_char, func->as.func, NULL, true);
 
@@ -481,6 +486,8 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
 
         return result;
       }
+
+      index += wchar_len;
     }
   } else if (collection->kind == ValueKindBytes) {
     Value *_int = value_int(0, vm->current_frame);
