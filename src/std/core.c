@@ -1246,6 +1246,10 @@ Value *atom_intrinsic(Vm *vm, Value **args) {
   return value;
 }
 
+Value *copy_intrinsic(Vm *vm, Value **args) {
+  return value_clone(args[0], vm->current_frame);
+}
+
 Value *exit_intrinsic(Vm *vm, Value **args) {
   Value *exit_code = args[0];
 
@@ -1375,6 +1379,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("atom"), true, 1, { ValueKindString }, &atom_intrinsic },
   { STR_LIT("atom"), true, 1, { ValueKindDict }, &atom_intrinsic },
   { STR_LIT("atom"), true, 1, { ValueKindBytes }, &atom_intrinsic },
+  { STR_LIT("copy"), true, 1, { ValueKindUnit }, &copy_intrinsic },
   { STR_LIT("exit"), false, 1, { ValueKindInt }, &exit_intrinsic },
 };
 

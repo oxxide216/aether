@@ -70,6 +70,7 @@
 
 ; Other
 (let atom [value] -> import 'atom')
+(let copy [value] -> import 'copy')
 (let exit [exit-code] -> import 'exit')
 
 (let contains? [collection item] ->
