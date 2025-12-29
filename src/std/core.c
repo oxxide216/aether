@@ -519,6 +519,8 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
         return result;
       }
     }
+
+    pair->as.dict.len = 0;
   }
 
   return value_unit(vm->current_frame);
