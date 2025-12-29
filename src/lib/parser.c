@@ -803,9 +803,18 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
         exit(1);
       }
 
-      for (u32 i = 0; i < parser->included_files->len; ++i)
-        if (str_eq(*parser->included_files->items[i], path))
+      bool was_already_included = false;
+
+      for (u32 i = 0; i < parser->included_files->len; ++i) {
+        if (str_eq(*parser->included_files->items[i], path)) {
+          was_already_included = true;
+
           break;
+        }
+      }
+
+      if (was_already_included)
+        return expr;
 
       Str magic = {
         code.ptr,
