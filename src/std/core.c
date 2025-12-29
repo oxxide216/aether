@@ -696,6 +696,10 @@ Value *add_intrinsic(Vm *vm, Value **args) {
     memcpy(new_string.ptr + a->as.string.str.len,
            b->as.string.str.ptr, b->as.string.str.len);
 
+    if (a->is_atom) {
+      a->as.string.str = new_string;
+      return a;
+    }
     return value_string(new_string, vm->current_frame);
   } else if (a->kind == ValueKindList &&
              b->kind == ValueKindList) {
@@ -758,29 +762,33 @@ Value *add_intrinsic(Vm *vm, Value **args) {
     memcpy(bytes.ptr, a->as.bytes.ptr, a->as.bytes.len);
     memcpy(bytes.ptr + a->as.bytes.len, b->as.bytes.ptr, b->as.bytes.len);
 
+    if (a->is_atom) {
+      a->as.bytes = bytes;
+      return a;
+    }
     return value_bytes(bytes, vm->current_frame);
   } else if (a->kind == ValueKindDict) {
-    Dict result = a->as.dict;
+    Dict dict = a->as.dict;
 
-    if (!a->is_atom || result.cap < result.len + b->as.dict.len) {
-      result.cap = result.len + b->as.dict.len;
+    if (!a->is_atom || dict.cap < dict.len + b->as.dict.len) {
+      dict.cap = dict.len + b->as.dict.len;
       DictValue *new_items = arena_alloc(&vm->current_frame->arena,
-                                         result.cap * sizeof(DictValue));
-      memcpy(new_items, result.items, result.len * sizeof(DictValue));
-      result.items = new_items;
+                                         dict.cap * sizeof(DictValue));
+      memcpy(new_items, dict.items, dict.len * sizeof(DictValue));
+      dict.items = new_items;
     }
 
-    memcpy(result.items + result.len,
+    memcpy(dict.items + dict.len,
            b->as.dict.items,
            b->as.dict.len * sizeof(DictValue));
 
-    result.len += b->as.dict.len;
+    dict.len += b->as.dict.len;
 
     if (a->is_atom) {
-      a->as.dict = result;
+      a->as.dict = dict;
       return a;
     }
-    return value_dict(result, vm->current_frame);
+    return value_dict(dict, vm->current_frame);
   }
 
   return value_unit(vm->current_frame);
@@ -1362,7 +1370,10 @@ Intrinsic core_intrinsics[] = {
     { ValueKindEnv, ValueKindString, ValueKindString },
     &eval_intrinsic },
   // Other
-  { STR_LIT("atom"), true, 1, { ValueKindUnit }, &atom_intrinsic },
+  { STR_LIT("atom"), true, 1, { ValueKindList }, &atom_intrinsic },
+  { STR_LIT("atom"), true, 1, { ValueKindString }, &atom_intrinsic },
+  { STR_LIT("atom"), true, 1, { ValueKindDict }, &atom_intrinsic },
+  { STR_LIT("atom"), true, 1, { ValueKindBytes }, &atom_intrinsic },
   { STR_LIT("exit"), false, 1, { ValueKindInt }, &exit_intrinsic },
 };
 
