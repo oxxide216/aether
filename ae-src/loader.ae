@@ -41,8 +41,8 @@
 
 (if (== mode mode-default)
   (match (get-range input-file-content 0 4)
-    (to-bytes 'ABC\0') -> (set mode mode-eval-bytecode)
-    (to-bytes 'ABM\0') -> (set mode mode-eval-macros)))
+    (to-bytes 'ABC\0') => (set mode mode-eval-bytecode)
+    (to-bytes 'ABM\0') => (set mode mode-eval-macros)))
 
 (let env (make-env parsed-args))
 
@@ -50,16 +50,16 @@
 (load-module env 'base' base-paths)
 
 (match mode
-  mode-default -> (eval env (to-str input-file-content) input-path)
-  mode-eval-bytecode -> (eval-compiled env input-file-content)
-  mode-eval-macros -> (eval-macros env input-file-content)
-  mode-compile-only ->
+  mode-default => (eval env (to-str input-file-content) input-path)
+  mode-eval-bytecode => (eval-compiled env input-file-content)
+  mode-eval-macros => (eval-macros env input-file-content)
+  mode-compile-only =>
     (do
       (let compiled (compile env (to-str input-file-content)
                              input-path false dce))
 
       (write-file output-path compiled::'compiled'))
-  mode-compile-macros-only ->
+  mode-compile-macros-only =>
     (do
       (let compiled (compile env input-file-content input-path true dce))
 

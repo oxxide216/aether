@@ -83,8 +83,8 @@
 
 (let is-alnum [char] ->
   (match (is-alpha char)
-    true -> true
-    false -> (is-num char)))
+    true => true
+    false => (is-num char)))
 
 (let term/get-key [] ->
   (let key (input-size 1))

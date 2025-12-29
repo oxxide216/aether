@@ -81,6 +81,7 @@ static char *token_names[] = {
   "`::`",
   "`<>`",
   "`<->`",
+  "`=>`",
   "int",
   "float",
   "bool",
@@ -549,14 +550,14 @@ static IrExprMatch parser_parse_match(Parser *parser) {
   while (!(token = parser_peek_token(parser)).eof && token.id != TT_CPAREN) {
     if (token.id == TT_UNPACK) {
       parser_next_token(parser);
-      parser_expect_token(parser, MASK(TT_RIGHT_ARROW));
+      parser_expect_token(parser, MASK(TT_EQ_ARROW));
       match.any = parser_parse_expr(parser, false);
 
       break;
     }
 
     IrExpr *pattern = parser_parse_expr(parser, false);
-    parser_expect_token(parser, MASK(TT_RIGHT_ARROW));
+    parser_expect_token(parser, MASK(TT_EQ_ARROW));
     IrExpr *expr = parser_parse_expr(parser, false);
 
     IrCase _case = { pattern, expr };
