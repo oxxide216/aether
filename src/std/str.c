@@ -1,5 +1,8 @@
+#include <wctype.h>
+
 #include "aether/vm.h"
 #include "aether/misc.h"
+#include "lexgen/runtime.h"
 
 Value *str_insert_intrinsic(Vm *vm, Value **args) {
   Value *string = args[0];
@@ -173,6 +176,69 @@ Value *join_intrinsic(Vm *vm, Value **args) {
   return value_string(joined, vm->current_frame);
 }
 
+Value *is_alpha_intrinsic(Vm *vm, Value **args) {
+  Value *str = args[0];
+
+  bool is_alpha = true;
+  u32 wchar_len;
+  wchar _wchar;
+  u32 index = 0;
+
+  while((_wchar = get_next_wchar(str->as.string.str, index, &wchar_len)) != '\0') {
+    if (!iswalpha(_wchar)) {
+      is_alpha = false;
+
+      break;
+    }
+
+    index += wchar_len;
+  }
+
+  return value_bool(is_alpha, vm->current_frame);
+}
+
+Value *is_number_intrinsic(Vm *vm, Value **args) {
+  Value *str = args[0];
+
+  bool is_number = true;
+  u32 wchar_len;
+  wchar _wchar;
+  u32 index = 0;
+
+  while((_wchar = get_next_wchar(str->as.string.str, index, &wchar_len)) != '\0') {
+    if (!iswdigit(_wchar)) {
+      is_number = false;
+
+      break;
+    }
+
+    index += wchar_len;
+  }
+
+  return value_bool(is_number, vm->current_frame);
+}
+
+Value *is_alpha_number_intrinsic(Vm *vm, Value **args) {
+  Value *str = args[0];
+
+  bool is_alpha_number = true;
+  u32 wchar_len;
+  wchar _wchar;
+  u32 index = 0;
+
+  while((_wchar = get_next_wchar(str->as.string.str, index, &wchar_len)) != '\0') {
+    if (!iswdigit(_wchar)) {
+      is_alpha_number = false;
+
+      break;
+    }
+
+    index += wchar_len;
+  }
+
+  return value_bool(is_alpha_number, vm->current_frame);
+}
+
 Intrinsic str_intrinsics[] = {
   { STR_LIT("str-insert"), true, 3,
     { ValueKindString, ValueKindInt, ValueKindString },
@@ -185,7 +251,9 @@ Intrinsic str_intrinsics[] = {
     &str_replace_intrinsic },
   { STR_LIT("split"), true, 2, { ValueKindString, ValueKindString }, &split_intrinsic },
   { STR_LIT("join"), true, 2, { ValueKindList, ValueKindString }, &join_intrinsic },
-  { STR_LIT("join"), true, 2, { ValueKindList, ValueKindInt }, &join_intrinsic },
+  { STR_LIT("is-alpha"), true, 1, { ValueKindString }, &is_alpha_intrinsic },
+  { STR_LIT("is-number"), true, 1, { ValueKindString }, &is_number_intrinsic },
+  { STR_LIT("is-alpha-number"), true, 1, { ValueKindString }, &is_alpha_number_intrinsic },
 };
 
 u32 str_intrinsics_len = ARRAY_LEN(str_intrinsics);

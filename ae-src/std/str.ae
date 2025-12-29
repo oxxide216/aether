@@ -4,6 +4,9 @@
 (let split [str delimiter] -> import 'split')
 (let sub-str [str begin end] -> import 'sub-str')
 (let join [parts filler] -> import 'join')
+(let is-alpha [str] -> import 'is-alpha')
+(let is-number [str] -> import 'is-number')
+(let is-alpha-number [str] -> import 'is-alpha-number')
 
 (let begins-with [str begin] ->
   (if (< (len str) (len begin))
