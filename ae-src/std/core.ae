@@ -72,5 +72,25 @@
 (let atom [value] -> import 'atom')
 (let exit [exit-code] -> import 'exit')
 
-(macro for [element in collection ...body] ->
-  (for-each collection [element] -> body))
+(let contains [collection item] ->
+  (let result
+    (for -item in collection
+      (if (== -item item)
+        (break true))))
+  (not-unit? result))
+
+(let count [collection item] ->
+  (let i 0)
+  (for -item in collection
+    (if (== -item item)
+      (set i (+ i 1))))
+  i)
+
+(let dict-add-except [dest src except] ->
+  (for item in src
+    (if (not (contains except item::'key'))
+      (set dest::(do item::'key') item::'value')))
+  dest)
+
+(macro for [item in collection ...body] ->
+  (for-each collection [item] -> body))
