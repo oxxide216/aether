@@ -750,6 +750,26 @@ Value *add_intrinsic(Vm *vm, Value **args) {
     memcpy(bytes.ptr + a->as.bytes.len, b->as.bytes.ptr, b->as.bytes.len);
 
     return value_bytes(bytes, vm->current_frame);
+  } else if (a->kind == ValueKindDict) {
+    Dict result = a->as.dict;
+
+    if (result.cap < result.len + b->as.dict.len) {
+      result.cap = result.len + b->as.dict.len;
+      DictValue *new_items = arena_alloc(&vm->current_frame->arena,
+                                         result.cap * sizeof(DictValue));
+      memcpy(new_items, result.items, result.len * sizeof(DictValue));
+      result.items = new_items;
+    }
+
+    memcpy(result.items + result.len,
+           b->as.dict.items,
+           b->as.dict.len * sizeof(DictValue));
+
+    if (a->is_atom) {
+      a->as.dict = result;
+      return a;
+    }
+    return value_dict(result, vm->current_frame);
   }
 
   return value_unit(vm->current_frame);
@@ -1275,6 +1295,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("add"), true, 2, { ValueKindList, ValueKindUnit }, &add_intrinsic },
   { STR_LIT("add"), true, 2, { ValueKindUnit, ValueKindList }, &add_intrinsic },
   { STR_LIT("add"), true, 2, { ValueKindBytes, ValueKindBytes }, &add_intrinsic },
+  { STR_LIT("add"), true, 2, { ValueKindDict, ValueKindDict }, &add_intrinsic },
   { STR_LIT("sub"), true, 2, { ValueKindInt, ValueKindInt }, &sub_intrinsic },
   { STR_LIT("sub"), true, 2, { ValueKindFloat, ValueKindFloat }, &sub_intrinsic },
   { STR_LIT("mul"), true, 2, { ValueKindInt, ValueKindInt }, &mul_intrinsic },
