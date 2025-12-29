@@ -28,8 +28,6 @@
 
 typedef Da(Str) Strs;
 
-static Value unit = { ValueKindUnit, {}, NULL, 0, false };
-
 ListNode *list_clone(ListNode *nodes, StackFrame *frame) {
   if (!nodes)
     return NULL;
@@ -64,9 +62,10 @@ Dict dict_clone(Dict *dict, StackFrame *frame) {
 }
 
 Value *value_unit(StackFrame *frame) {
-  (void) frame;
-
-  return &unit;
+  Value *value = value_alloc(frame);
+  *value = (Value) { ValueKindUnit, {},
+                     frame, 0, false };
+  return value;
 }
 
 Value *value_list(ListNode *nodes, StackFrame *frame) {
@@ -148,9 +147,6 @@ Value *value_alloc(StackFrame *frame) {
 }
 
 Value *value_clone(Value *value, StackFrame *frame) {
-  if (value->kind == ValueKindUnit || !frame)
-    return value;
-
   Value *copy = value_alloc(frame);
   *copy = *value;
   copy->frame = frame;
@@ -569,8 +565,12 @@ Value *execute_func(Vm *vm, Value **args, Func *func,
 
   StackFrame *frame = vm->current_frame;
 
-  if (frame->vars.cap < func->args.len + func-> catched_values_names.len) {
-    frame->vars.cap = func->catched_values_names.len + func->args.len;
+  u32 new_cap = func->args.len;
+  if (vm->current_func != func->parent_func)
+    new_cap += func->catched_values_names.len;
+
+  if (frame->vars.cap < new_cap) {
+    frame->vars.cap = new_cap;
     if (frame->vars.len == 0) {
       if (frame->vars.items)
         free(frame->vars.items);
@@ -580,7 +580,7 @@ Value *execute_func(Vm *vm, Value **args, Func *func,
     }
   }
 
-  frame->vars.len = func->args.len + func->catched_values_names.len;
+  frame->vars.len = new_cap;
 
   for (u32 i = 0; i < func->args.len; ++i) {
     Var var = {
@@ -597,8 +597,8 @@ Value *execute_func(Vm *vm, Value **args, Func *func,
   } else {
     for (u32 i = 0; i < func->catched_values_names.len; ++i) {
       Var var = {
-       func->catched_values_names.items[i].name,
-       func->catched_values_names.items[i].value,
+        func->catched_values_names.items[i].name,
+        func->catched_values_names.items[i].value,
         VarKindCatched,
       };
 
