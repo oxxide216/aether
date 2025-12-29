@@ -1100,9 +1100,10 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   FilePaths included_files = {0};
+  CachedIrs cached_irs = {0};
   Ir ir = parse_ex(code->as.string.str, &path->as.string.str,
-                   &env->as.env->macros,
-                   &included_files, &ir_arena, true);
+                   &env->as.env->macros, &included_files,
+                   &cached_irs, &ir_arena, true);
 
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false,
                       &ir_arena, &path->as.string.str, 0, 0, false);
@@ -1213,8 +1214,8 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
   Arena ir_arena = {0};
   FilePaths included_files = {0};
   Ir ir = parse_ex(code->as.string.str, &path->as.string.str,
-                   &env->as.env->macros,
-                   &included_files, &ir_arena, false);
+                   &env->as.env->macros, &included_files,
+                   &env->as.env->cached_irs, &ir_arena, false);
 
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false,
                       &ir_arena, &path->as.string.str, 0, 0, false);

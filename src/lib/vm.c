@@ -218,6 +218,11 @@ void value_free(Value *value) {
       if (value->as.env->included_files.items)
         free(value->as.env->included_files.items);
 
+      for (u32 i = 0; i < value->as.env->cached_irs.len; ++i)
+        arena_free(&value->as.env->cached_irs.items[i].arena);
+      if (value->as.env->cached_irs.items)
+        free(value->as.env->cached_irs.items);
+
       vm_destroy(&value->as.env->vm);
     }
   }

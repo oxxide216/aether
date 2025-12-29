@@ -18,8 +18,6 @@ typedef struct {
 
 // From common.c
 extern InternStrings intern_strings;
-// From parser.c
-extern CachedIrs cached_irs;
 #ifndef NOSYSTEM
 // From base.c
 extern StringBuilder printf_sb;
@@ -32,6 +30,7 @@ static Path loader_paths[] = {
   { "/usr/include/aether/loader.abc", true },
 };
 
+static CachedIrs cached_irs = {0};
 static Arena arena = {0};
 static Vm vm = {0};
 
@@ -39,12 +38,13 @@ void cleanup(void) {
   if (intern_strings.items)
     free(intern_strings.items);
 
-  for (u32 i = 0; i < cached_irs.len; ++i)
-    arena_free(&cached_irs.items[i].arena);
-  free(cached_irs.items);
-
   if (printf_sb.buffer)
     free(printf_sb.buffer);
+
+  for (u32 i = 0; i < cached_irs.len; ++i)
+    arena_free(&cached_irs.items[i].arena);
+  if (cached_irs.items)
+    free(cached_irs.items);
 
   arena_free(&arena);
   vm_destroy(&vm);
@@ -87,7 +87,7 @@ i32 main(i32 argc, char **argv) {
     ir = deserialize((u8 *) code.ptr, code.len, &arena, &vm.current_file_path);
   } else {
     vm.current_file_path = (Str) { path->cstr, strlen(path->cstr) };
-    ir = parse(code, &vm.current_file_path);
+    ir = parse(code, &vm.current_file_path, &cached_irs);
   }
 
   free(code.ptr);

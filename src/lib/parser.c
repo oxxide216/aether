@@ -45,6 +45,7 @@ typedef struct {
   Macros    *macros;
   Str       *file_path;
   FilePaths *included_files;
+  CachedIrs *irs;
   Arena     *arena;
   bool       use_macros;
   Ir         ir;
@@ -85,8 +86,6 @@ static char *token_names[] = {
   "bool",
   "identifier",
 };
-
-CachedIrs cached_irs = {0};
 
 static char escape_char(Str *str, u32 *col) {
   char _char = str->ptr[0];
@@ -363,12 +362,12 @@ static void include_file(FilePaths *included_files, Str *new_file) {
 static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask);
 
 Ir parse_ex(Str code, Str *file_path, Macros *macros,
-            FilePaths *included_files, Arena *arena,
-            bool use_macros) {
+            FilePaths *included_files, CachedIrs *cached_irs,
+            Arena *arena, bool use_macros) {
   u64 code_hash = str_hash(code);
 
-  for (u32 i = 0; i < cached_irs.len; ++i) {
-    CachedIr *cached_ir = cached_irs.items + i;
+  for (u32 i = 0; i < cached_irs->len; ++i) {
+    CachedIr *cached_ir = cached_irs->items + i;
 
     if (cached_ir->code_hash == code_hash) {
       DA_EXTEND(*macros, cached_ir->macros);
@@ -388,6 +387,7 @@ Ir parse_ex(Str code, Str *file_path, Macros *macros,
   parser.macros = macros;
   parser.file_path = file_path;
   parser.included_files = included_files;
+  parser.irs = cached_irs;
   parser.arena = arena;
   parser.use_macros = use_macros;
   parser.ir = parser_parse_block(&parser, 0);
@@ -409,7 +409,7 @@ Ir parse_ex(Str code, Str *file_path, Macros *macros,
     code_hash, parser.ir, cached_macros,
     cached_included_files, *arena,
   };
-  DA_APPEND(cached_irs, cached_ir);
+  DA_APPEND(*cached_irs, cached_ir);
 
   free(parser.lexer.temp_sb.buffer);
 
@@ -840,8 +840,8 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
       } else {
         Arena arena = {0};
         expr->as.block = parse_ex(code, path_ptr, parser->macros,
-                                  parser->included_files, &arena,
-                                  parser->use_macros);
+                                  parser->included_files, parser->irs,
+                                  &arena, parser->use_macros);
       }
     } break;
 
@@ -956,16 +956,19 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
   };
 }
 
-Ir parse(Str code, Str *file_path) {
+Ir parse(Str code, Str *file_path, CachedIrs *cached_irs) {
   Macros macros = {0};
   FilePaths included_files = {0};
   Arena arena = {0};
-  Ir ir = parse_ex(code, file_path, &macros, &included_files, &arena, false);
+  Ir ir = parse_ex(code, file_path, &macros,
+                   &included_files, cached_irs,
+                   &arena, false);
   expand_macros_block(&ir, &macros, NULL, NULL, false,
                       &arena, file_path, 0, 0, false);
 
   if (macros.items)
     free(macros.items);
+
   if (included_files.items)
     free(included_files.items);
 
