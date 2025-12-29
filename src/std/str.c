@@ -239,6 +239,27 @@ Value *is_alpha_number_intrinsic(Vm *vm, Value **args) {
   return value_bool(is_alpha_number, vm->current_frame);
 }
 
+Value *is_whitespace_intrinsic(Vm *vm, Value **args) {
+  Value *str = args[0];
+
+  bool is_whitespace = true;
+  u32 wchar_len;
+  wchar _wchar;
+  u32 index = 0;
+
+  while((_wchar = get_next_wchar(str->as.string.str, index, &wchar_len)) != '\0') {
+    if (!iswspace(_wchar)) {
+      is_whitespace = false;
+
+      break;
+    }
+
+    index += wchar_len;
+  }
+
+  return value_bool(is_whitespace, vm->current_frame);
+}
+
 Intrinsic str_intrinsics[] = {
   { STR_LIT("str-insert"), true, 3,
     { ValueKindString, ValueKindInt, ValueKindString },
@@ -254,6 +275,7 @@ Intrinsic str_intrinsics[] = {
   { STR_LIT("is-alpha"), true, 1, { ValueKindString }, &is_alpha_intrinsic },
   { STR_LIT("is-number"), true, 1, { ValueKindString }, &is_number_intrinsic },
   { STR_LIT("is-alpha-number"), true, 1, { ValueKindString }, &is_alpha_number_intrinsic },
+  { STR_LIT("is-whitespace"), true, 1, { ValueKindString }, &is_whitespace_intrinsic },
 };
 
 u32 str_intrinsics_len = ARRAY_LEN(str_intrinsics);

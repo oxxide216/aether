@@ -7,6 +7,7 @@
 (let is-alpha [str] -> import 'is-alpha')
 (let is-number [str] -> import 'is-number')
 (let is-alpha-number [str] -> import 'is-alpha-number')
+(let is-whitespace [str] -> import 'is-whitespace')
 
 (let begins-with [str begin] ->
   (if (< (len str) (len begin))
