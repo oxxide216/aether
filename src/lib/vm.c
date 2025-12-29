@@ -323,6 +323,35 @@ static Var *get_var(Vm *vm, Str name) {
   return get_var_in_frame(vm->current_frame, &vm->global_vars, name);
 }
 
+static void try_catch_var(Str name, Vm *vm,
+                          Strs *local_names,
+                          NamedValues *catched_values,
+                          StackFrame *frame) {
+  for (u32 i = 0; i < local_names->len; ++i)
+    if (str_eq(name, local_names->items[i]))
+      return;
+
+  Var *var = get_var(vm, name);
+  if (var && var->kind != VarKindGlobal) {
+    NamedValue value = {
+      var->name,
+      var->value,
+    };
+
+    if (catched_values->cap == catched_values->len) {
+      if (catched_values->cap == 0)
+        catched_values->cap = 1;
+      else
+        catched_values->cap *= 2;
+      NamedValue *new_items = arena_alloc(&frame->arena, catched_values->cap * sizeof(NamedValue));
+      memcpy(new_items, catched_values->items, catched_values->len * sizeof(NamedValue));
+      catched_values->items = new_items;
+    }
+
+    catched_values->items[catched_values->len++] = value;
+  }
+}
+
 static void catch_vars_block(Vm *vm, Strs *local_names,
                              NamedValues *catched_values,
                              StackFrame *frame,
@@ -376,6 +405,8 @@ static void catch_vars(Vm *vm, Strs *local_names,
   } break;
 
   case IrExprKindSet: {
+    try_catch_var(expr->as.set.dest, vm, local_names, catched_values, frame);
+
     CATCH_VARS(vm, local_names, catched_values, frame, expr->as.set.src);
   } break;
 
@@ -385,29 +416,7 @@ static void catch_vars(Vm *vm, Strs *local_names,
   } break;
 
   case IrExprKindSetAt: {
-    for (u32 i = 0; i < local_names->len; ++i)
-      if (str_eq(expr->as.set_at.dest, local_names->items[i]))
-        return;
-
-    Var *var = get_var(vm, expr->as.set_at.dest);
-    if (var && var->kind != VarKindGlobal) {
-      NamedValue value = {
-        var->name,
-        var->value,
-      };
-
-      if (catched_values->cap == catched_values->len) {
-        if (catched_values->cap == 0)
-          catched_values->cap = 1;
-        else
-          catched_values->cap *= 2;
-        NamedValue *new_items = arena_alloc(&frame->arena, catched_values->cap * sizeof(NamedValue));
-        memcpy(new_items, catched_values->items, catched_values->len * sizeof(NamedValue));
-        catched_values->items = new_items;
-      }
-
-      catched_values->items[catched_values->len++] = value;
-    }
+    try_catch_var(expr->as.set_at.dest, vm, local_names, catched_values, frame);
 
     CATCH_VARS(vm, local_names, catched_values, frame, expr->as.set_at.key);
     CATCH_VARS(vm, local_names, catched_values, frame, expr->as.set_at.value);
@@ -423,29 +432,7 @@ static void catch_vars(Vm *vm, Strs *local_names,
   } break;
 
   case IrExprKindIdent: {
-    for (u32 i = 0; i < local_names->len; ++i)
-      if (str_eq(expr->as.ident, local_names->items[i]))
-        return;
-
-    Var *var = get_var(vm, expr->as.ident);
-    if (var && var->kind != VarKindGlobal) {
-      NamedValue value = {
-        var->name,
-        var->value,
-      };
-
-      if (catched_values->cap == catched_values->len) {
-        if (catched_values->cap == 0)
-          catched_values->cap = 1;
-        else
-          catched_values->cap *= 2;
-        NamedValue *new_items = arena_alloc(&frame->arena, catched_values->cap * sizeof(NamedValue));
-        memcpy(new_items, catched_values->items, catched_values->len * sizeof(NamedValue));
-        catched_values->items = new_items;
-      }
-
-      catched_values->items[catched_values->len++] = value;
-    }
+    try_catch_var(expr->as.ident, vm, local_names, catched_values, frame);
   } break;
 
   case IrExprKindString: break;
