@@ -316,7 +316,7 @@ static void print_id_mask(u64 id_mask) {
       ++ids_count;
 
   for (u64 i = 0, j = 0; i < 64 && j < ids_count; ++i) {
-    if ((1 << i) & id_mask) {
+    if ((1lu << i) & id_mask) {
       if (j > 0) {
         if (j + 1 == ids_count)
           fputs(" or ", stderr);
