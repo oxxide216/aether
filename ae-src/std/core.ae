@@ -72,17 +72,17 @@
 (let atom [value] -> import 'atom')
 (let exit [exit-code] -> import 'exit')
 
-(let contains [collection item] ->
+(let contains? [collection item] ->
   (let result
     (for -item in collection
       (if (== -item item)
         (break true))))
   (not-unit? result))
 
-(let contains-any-key [dict keys] ->
+(let lists-collide? [a b] ->
   (let result
-    (for key in keys
-      (if (not-unit? dict::key)
+    (for item in a
+      (if (contains? b item)
         (break true))))
   (not-unit? result))
 
