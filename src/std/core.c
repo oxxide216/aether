@@ -755,7 +755,7 @@ Value *add_intrinsic(Vm *vm, Value **args) {
   } else if (a->kind == ValueKindDict) {
     Dict result = a->as.dict;
 
-    if (result.cap < result.len + b->as.dict.len) {
+    if (!a->is_atom || result.cap < result.len + b->as.dict.len) {
       result.cap = result.len + b->as.dict.len;
       DictValue *new_items = arena_alloc(&vm->current_frame->arena,
                                          result.cap * sizeof(DictValue));
@@ -766,6 +766,8 @@ Value *add_intrinsic(Vm *vm, Value **args) {
     memcpy(result.items + result.len,
            b->as.dict.items,
            b->as.dict.len * sizeof(DictValue));
+
+    result.len += b->as.dict.len;
 
     if (a->is_atom) {
       a->as.dict = result;
