@@ -492,7 +492,12 @@ void expand_macros(IrExpr *expr, Macros *macros,
           variadic_args->kind = IrExprKindList;
           variadic_args->as.list.items = variadic_block.items;
           variadic_args->as.list.len = variadic_block.len;
-          DA_APPEND(new_args, variadic_args);
+
+          IrExpr **new_items = arena_alloc(arena, (new_args.len + 1) * sizeof(IrExpr *));
+          memcpy(new_items, new_args.items, new_args.len * sizeof(IrExpr *));
+          new_args.items = new_items;
+
+          new_args.items[new_args.len++] = variadic_args;
         }
 
         Args new_arg_names = {0};
@@ -543,6 +548,8 @@ void expand_macros(IrExpr *expr, Macros *macros,
 
         if (new_arg_names.items)
           free(new_arg_names.items);
+
+        break;
       }
     }
   } break;
