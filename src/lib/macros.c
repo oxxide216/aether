@@ -63,8 +63,8 @@ static Macro *get_macro(Macros *macros, Str name, u32 args_len) {
 
     if (str_eq(macro->name, name) &&
         (macro->arg_names.len == args_len ||
-         (macro->arg_names.len < args_len &&
-          macro->has_unpack)))
+         (macro->has_unpack &&
+          macro->arg_names.len <= args_len + 1)))
       return macro;
   }
 
