@@ -13,11 +13,6 @@
 #include "grammar.h"
 #include "shl/shl-log.h"
 
-#define INCLUDE_PATHS { NULL,                    \
-                        "ae-src/",               \
-                        "/usr/include/aether/" }
-#define INCLUDE_PATHS_LEN 3
-
 #define MASK(id) (1lu << (id))
 
 typedef enum {
@@ -41,14 +36,15 @@ typedef struct {
 } Lexer;
 
 typedef struct {
-  Lexer      lexer;
-  Macros    *macros;
-  Str       *file_path;
-  FilePaths *included_files;
-  CachedIrs *irs;
-  Arena     *arena;
-  bool       use_macros;
-  Ir         ir;
+  Lexer         lexer;
+  Macros       *macros;
+  Str          *file_path;
+  FilePaths    *included_files;
+  IncludePaths *include_paths;
+  CachedIrs    *irs;
+  Arena        *arena;
+  bool          use_macros;
+  Ir            ir;
 } Parser;
 
 static char *token_names[] = {
@@ -363,8 +359,8 @@ static void include_file(FilePaths *included_files, Str *new_file) {
 static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask);
 
 Ir parse_ex(Str code, Str *file_path, Macros *macros,
-            FilePaths *included_files, CachedIrs *cached_irs,
-            Arena *arena, bool use_macros) {
+            FilePaths *included_files, IncludePaths *include_paths,
+            CachedIrs *cached_irs, Arena *arena, bool use_macros) {
   u64 code_hash = str_hash(code);
 
   for (u32 i = 0; i < cached_irs->len; ++i) {
@@ -389,6 +385,7 @@ Ir parse_ex(Str code, Str *file_path, Macros *macros,
   parser.file_path = file_path;
   parser.included_files = included_files;
   parser.irs = cached_irs;
+  parser.include_paths = include_paths;
   parser.arena = arena;
   parser.use_macros = use_macros;
   parser.ir = parser_parse_block(&parser, 0);
@@ -575,21 +572,6 @@ static IrExprMatch parser_parse_match(Parser *parser) {
   return match;
 }
 
-static Str get_file_dir(Str path) {
-  for (u32 i = path.len; i > 0; --i)
-    if (path.ptr[i - 1] == '/')
-      return (Str) { path.ptr, i };
-
-  return (Str) {0};
-}
-
-static char *str_to_cstr(Str str, Arena *arena) {
-  char *result = arena_alloc(arena, (str.len + 1) * sizeof(char));
-  memcpy(result, str.ptr, str.len * sizeof(char));
-  result[str.len] = 0;
-  return result;
-}
-
 static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
   IrExpr *expr = arena_alloc(parser->arena, sizeof(IrExpr));
   *expr = (IrExpr) {0};
@@ -753,16 +735,12 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
 
       parser_expect_token(parser, MASK(TT_CPAREN));
 
-      Str current_dir = get_file_dir(*parser->file_path);
-      char *current_dir_cstr = str_to_cstr(current_dir, parser->arena);
-      char *include_paths[INCLUDE_PATHS_LEN] = INCLUDE_PATHS;
-      include_paths[0] = current_dir_cstr;
       StringBuilder path_sb = {0};
       Str code = { NULL, (u32) -1 };
       Str path = {0};
 
-      for (u32 i = 0; i < ARRAY_LEN(include_paths); ++i) {
-        sb_push(&path_sb, include_paths[i]);
+      for (u32 i = 0; i < parser->include_paths->len; ++i) {
+        sb_push_str(&path_sb, parser->include_paths->items[i]);
         sb_push_str(&path_sb, module_path);
 
         if (parser->use_macros) {
@@ -809,6 +787,9 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
         if (str_eq(*parser->included_files->items[i], path))
           return expr;
 
+      Str dir = get_file_dir(path);
+      DA_APPEND(*parser->include_paths, dir);
+
       Str magic = {
         code.ptr,
         sizeof(u32),
@@ -841,8 +822,8 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
       } else {
         Arena arena = {0};
         expr->as.block = parse_ex(code, path_ptr, parser->macros,
-                                  parser->included_files, parser->irs,
-                                  &arena, parser->use_macros);
+                                  parser->included_files, parser->include_paths,
+                                  parser->irs, &arena, parser->use_macros);
       }
     } break;
 
@@ -960,10 +941,18 @@ static IrBlock parser_parse_block(Parser *parser, u64 end_id_mask) {
 Ir parse(Str code, Str *file_path, CachedIrs *cached_irs) {
   Macros macros = {0};
   FilePaths included_files = {0};
+  IncludePaths include_paths = {0};
   Arena arena = {0};
+
+  Str file_dir = get_file_dir(*file_path);
+
+  DA_APPEND(include_paths, file_dir);
+  DA_APPEND(include_paths, STR_LIT("ae-src/"));
+  DA_APPEND(include_paths, STR_LIT("/usr/include/aether/"));
+
   Ir ir = parse_ex(code, file_path, &macros,
-                   &included_files, cached_irs,
-                   &arena, false);
+                   &included_files, &include_paths,
+                   cached_irs, &arena, false);
   expand_macros_block(&ir, &macros, NULL, NULL, false,
                       &arena, file_path, 0, 0, false);
 

@@ -14,7 +14,7 @@
     (error 'Could not load ' name ' module')
     (exit 1))
 
-  (eval env content right-paths::0))
+  (eval env content right-paths::0 std-include-paths))
 
 (let load-compiled-module [env name path] ->
   (let right-paths (filter [path] ->

@@ -8,6 +8,7 @@
   (let mode mode-default)
   (let output-path unit)
   (let output-macros-path unit)
+  (let include-paths [])
   (let dce true)
 
   (while (head args)
@@ -33,6 +34,17 @@
         (exit 1))
       (set output-macros-path (head args))
       (set mode mode-compile-macros-only)
+     elif (== (head args) '-i')
+      (set args (tail args))
+      (if (unit? (head args))
+        (error '-i flag requires an argument')
+        (exit 1))
+      (let include-path (head args))
+      (set include-paths (+ include-paths
+                            (if (ends-with include-path '/')
+                              include-path
+                             else
+                              (+ include-path '/'))))
      elif (== (head args) '--no-dce')
         (set dce false)
      elif (begins-with (head args) '-')
@@ -47,5 +59,6 @@
     'mode': mode
     'output-path': output-path
     'output-macros-path': output-macros-path
+    'include-paths': include-paths
     'dce': dce
   })

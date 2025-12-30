@@ -1080,12 +1080,28 @@ Value *make_env_intrinsic(Vm *vm, Value **args) {
   return value_env(new_vm, vm->current_frame);
 }
 
+static Value *process_include_paths(IncludePaths *dest, Value *value,
+                                  char *func_name, StackFrame *frame) {
+  ListNode *include_path = value->as.list->next;
+  while (include_path) {
+    if (include_path->value->kind != ValueKindString)
+      PANIC(frame, "%s: every include path should be of type string\n", func_name);
+
+    DA_APPEND(*dest, include_path->value->as.string.str);
+
+    include_path = include_path->next;
+  }
+
+  return NULL;
+}
+
 Value *compile_intrinsic(Vm *vm, Value **args) {
   Value *env = args[0];
   Value *code = args[1];
   Value *path = args[2];
-  Value *compile_macros = args[3];
-  Value *dce = args[4];
+  Value *include_paths = args[3];
+  Value *compile_macros = args[4];
+  Value *dce = args[5];
 
   Str magic = {
     code->as.string.str.ptr,
@@ -1101,16 +1117,26 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Arena ir_arena = {0};
   FilePaths included_files = {0};
   CachedIrs cached_irs = {0};
+  IncludePaths _include_paths = {0};
+
+  Str file_dir = get_file_dir(path->as.string.str);
+  DA_APPEND(_include_paths, file_dir);
+
+  Value *include_result = process_include_paths(&_include_paths, include_paths,
+                                                "compile", vm->current_frame);
+  if (include_result)
+    return include_result;
+
   Ir ir = parse_ex(code->as.string.str, &path->as.string.str,
-                   &env->as.env->macros, &included_files,
+                   &env->as.env->macros, &included_files, &_include_paths,
                    &cached_irs, &ir_arena, true);
 
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false,
                       &ir_arena, &path->as.string.str, 0, 0, false);
 
-  ListNode *result = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-  result->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-  result->next->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+  //ListNode *result = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+  //result->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+  //result->next->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
 
   Str bytecode = {0};
   bytecode.ptr = (char *) serialize(&ir, &bytecode.len,
@@ -1126,6 +1152,8 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Value *compiled = value_string(bytecode, vm->current_frame);
   dict_push_value_str_key(vm->current_frame, &dict,
                           STR_LIT("compiled"), compiled);
+
+  Value *compiled_macros;
 
   if (compile_macros->as._bool && env->as.env->macros.len > prev_macros_len) {
     Macros new_macros = {
@@ -1144,18 +1172,14 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
     free(macros_bytecode.ptr);
     macros_bytecode.ptr = new_ptr;
 
-    Value *compiled_macros = value_string(macros_bytecode, vm->current_frame);
-    dict_push_value_str_key(vm->current_frame, &dict,
-                            STR_LIT("compiled-macros"),
-                            compiled_macros);
+    compiled_macros = value_string(macros_bytecode, vm->current_frame);
+  } else {
+    compiled_macros = value_unit(vm->current_frame);
   }
 
-  if (dict.len == 1) {
-    Value *compiled_macros = value_unit(vm->current_frame);
-    dict_push_value_str_key(vm->current_frame, &dict,
-                            STR_LIT("compiled-macros"),
-                            compiled_macros);
-  }
+  dict_push_value_str_key(vm->current_frame, &dict,
+                          STR_LIT("compiled-macros"),
+                          compiled_macros);
 
   free(included_files.items);
 
@@ -1210,11 +1234,22 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
   Value *env = args[0];
   Value *code = args[1];
   Value *path = args[2];
+  Value *include_paths = args[3];
 
   Arena ir_arena = {0};
   FilePaths included_files = {0};
+  IncludePaths _include_paths = {0};
+
+  Str file_dir = get_file_dir(path->as.string.str);
+  DA_APPEND(_include_paths, file_dir);
+
+  Value *include_result = process_include_paths(&_include_paths, include_paths,
+                                                "eval", vm->current_frame);
+  if (include_result)
+    return include_result;
+
   Ir ir = parse_ex(code->as.string.str, &path->as.string.str,
-                   &env->as.env->macros, &included_files,
+                   &env->as.env->macros, &included_files, &_include_paths,
                    &env->as.env->cached_irs, &ir_arena, false);
 
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false,
@@ -1362,8 +1397,9 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("is-bytes"), true, 1, { ValueKindUnit }, &is_bytes_intrinsic },
   // Env
   { STR_LIT("make-env"), true, 1, { ValueKindList }, &make_env_intrinsic },
-  { STR_LIT("compile"), true, 5,
-    { ValueKindEnv, ValueKindString, ValueKindString, ValueKindBool, ValueKindBool },
+  { STR_LIT("compile"), true, 6,
+    { ValueKindEnv, ValueKindString, ValueKindString,
+      ValueKindList, ValueKindBool, ValueKindBool },
     &compile_intrinsic },
   { STR_LIT("eval-compiled"), false, 2,
     { ValueKindEnv, ValueKindBytes },
@@ -1371,8 +1407,9 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("eval-macros"), false, 2,
     { ValueKindEnv, ValueKindBytes },
     &eval_macros_intrinsic },
-  { STR_LIT("eval"), true, 3,
-    { ValueKindEnv, ValueKindString, ValueKindString },
+  { STR_LIT("eval"), true, 4,
+    { ValueKindEnv, ValueKindString,
+      ValueKindString, ValueKindList },
     &eval_intrinsic },
   // Other
   { STR_LIT("atom"), true, 1, { ValueKindList }, &atom_intrinsic },

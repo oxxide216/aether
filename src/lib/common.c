@@ -32,3 +32,11 @@ Str copy_str(Str str, Arena *arena) {
 
   return copy;
 }
+
+Str get_file_dir(Str path) {
+  for (u32 i = path.len; i > 0; --i)
+    if (path.ptr[i - 1] == '/')
+      return (Str) { path.ptr, i };
+
+  return (Str) {0};
+}

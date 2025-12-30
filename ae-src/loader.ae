@@ -18,6 +18,7 @@
 (let mode parsed::'mode')
 (let output-path parsed::'output-path')
 (let output-macros-path parsed::'output-macros-path')
+(let include-paths (+ std-include-paths parsed::'include-paths'))
 (let dce parsed::'dce')
 
 (if (unit? input-path)
@@ -50,13 +51,14 @@
 (load-module env 'base' base-paths)
 
 (match mode
-  mode-default => (eval env (to-str input-file-content) input-path)
+  mode-default => (eval env (to-str input-file-content)
+                        input-path include-paths)
   mode-eval-bytecode => (eval-compiled env input-file-content)
   mode-eval-macros => (eval-macros env input-file-content)
   mode-compile-only =>
     (do
       (let compiled (compile env (to-str input-file-content)
-                             input-path false dce))
+                             input-path include-paths false dce))
 
       (write-file output-path compiled::'compiled'))
   mode-compile-macros-only =>

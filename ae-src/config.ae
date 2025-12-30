@@ -1,3 +1,6 @@
+(let std-include-paths ['ae-src/'
+                        '/usr/include/aether/'])
+
 (let core-paths ['ae-src/std/core.ae'
                  '/usr/include/aether/std/core.ae'])
 (let base-paths ['ae-src/std/base.ae'
