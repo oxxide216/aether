@@ -1116,8 +1116,8 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
 
   Arena ir_arena = {0};
   FilePaths included_files = {0};
-  CachedIrs cached_irs = {0};
   IncludePaths _include_paths = {0};
+  CachedIrs cached_irs = {0};
 
   Str file_dir = get_file_dir(path->as.string.str);
   DA_APPEND(_include_paths, file_dir);
@@ -1133,10 +1133,6 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
 
   expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false,
                       &ir_arena, &path->as.string.str, 0, 0, false);
-
-  //ListNode *result = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-  //result->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-  //result->next->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
 
   Str bytecode = {0};
   bytecode.ptr = (char *) serialize(&ir, &bytecode.len,
@@ -1181,7 +1177,16 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
                           STR_LIT("compiled-macros"),
                           compiled_macros);
 
-  free(included_files.items);
+  if (included_files.items)
+    free(included_files.items);
+
+  if (_include_paths.items)
+    free(_include_paths.items);
+
+  for (u32 i = 0; i < cached_irs.len; ++i)
+    arena_free(&cached_irs.items[i].arena);
+  if (cached_irs.items)
+    free(cached_irs.items);
 
   return value_dict(dict, vm->current_frame);
 }
@@ -1261,6 +1266,9 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
 
   if (included_files.items)
     free(included_files.items);
+
+  if (_include_paths.items)
+    free(_include_paths.items);
 
   if (env->as.env->vm.state != ExecStateContinue)
     env->as.env->vm.state = ExecStateContinue;

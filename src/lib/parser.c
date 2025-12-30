@@ -962,5 +962,8 @@ Ir parse(Str code, Str *file_path, CachedIrs *cached_irs) {
   if (included_files.items)
     free(included_files.items);
 
+  if (include_paths.items)
+    free(include_paths.items);
+
   return ir;
 }

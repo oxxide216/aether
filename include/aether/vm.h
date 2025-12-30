@@ -157,8 +157,8 @@ struct Vm {
 typedef struct {
   Macros       macros;
   FilePaths    included_files;
-  CachedIrs    cached_irs;
   IncludePaths include_paths;
+  CachedIrs    cached_irs;
   Vm           vm;
   u32          refs_count;
 } Env;

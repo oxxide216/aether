@@ -218,6 +218,9 @@ void value_free(Value *value) {
       if (value->as.env->included_files.items)
         free(value->as.env->included_files.items);
 
+      if (value->as.env->include_paths.items)
+        free(value->as.env->include_paths.items);
+
       for (u32 i = 0; i < value->as.env->cached_irs.len; ++i)
         arena_free(&value->as.env->cached_irs.items[i].arena);
       if (value->as.env->cached_irs.items)
