@@ -536,6 +536,7 @@ void expand_macros(IrExpr *expr, Macros *macros,
           new_args.len,
         };
 
+        clone_block(&expr->as.block, &ir_new_arg_names, arena);
         rename_args_block(&expr->as.block, &macro->arg_names,
                           &ir_new_arg_names, arena);
         expand_macros_block(&expr->as.block, macros,
