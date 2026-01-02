@@ -50,15 +50,13 @@ Dict dict_clone(Dict *dict, StackFrame *frame) {
   Dict copy = {0};
 
   for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
-    DictValue **new_entry = copy.items + i;
     DictValue *entry = dict->items[i];
     while (entry) {
-      *new_entry = arena_alloc(&frame->arena, sizeof(DictValue));
+      Value *key = value_clone(entry->key, frame);
+      Value *value = value_clone(entry->value, frame);
 
-      (*new_entry)->key = value_clone(entry->key, frame);
-      (*new_entry)->value = value_clone(entry->value, frame);
+      dict_set_value(frame, &copy, key, value);
 
-      new_entry = &(*new_entry)->next;
       entry = entry->next;
     }
   }
@@ -1002,7 +1000,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
       dest_var->value->as.bytes.ptr[key->as._int] = value->as._int;
     } else if (dest_var->value->kind == ValueKindDict) {
-      dict_set_value(vm->current_frame, &dest_var->value->as.dict, key, value);
+      dict_set_value(dest_var->value->frame, &dest_var->value->as.dict, key, value);
     } else {
       StringBuilder sb = {0};
       sb_push_value(&sb, dest_var->value, 0, true, true, vm);
