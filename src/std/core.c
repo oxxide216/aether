@@ -778,6 +778,16 @@ Value *add_intrinsic(Vm *vm, Value **args) {
     if (!a->is_atom)
       dict_value = value_clone(dict_value, vm->current_frame);
 
+    for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
+      DictValue *entry = b->as.dict.items[i];
+      while (entry) {
+        dict_set_value(vm->current_frame, &dict_value->as.dict,
+                       entry->key, entry->value);
+
+        entry = entry->next;
+      }
+    }
+
     return dict_value;
   }
 
