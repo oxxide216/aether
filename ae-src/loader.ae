@@ -14,7 +14,6 @@
 
 (let parsed (parse-args (tail args)))
 (let parsed-args parsed::'args')
-(println parsed-args)
 (let input-path (head parsed-args))
 (let mode parsed::'mode')
 (let output-path parsed::'output-path')

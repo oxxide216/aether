@@ -54,15 +54,6 @@
       (break))
     (set args (tail args)))
 
-  (println {
-    'args': args
-    'mode': mode
-    'output-path': output-path
-    'output-macros-path': output-macros-path
-    'include-paths': include-paths
-    'dce': dce
-  })
-
   {
     'args': args
     'mode': mode
