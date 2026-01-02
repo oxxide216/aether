@@ -9,6 +9,7 @@
 #include "shl/shl-log.h"
 
 #define MAX_INTRINSIC_ARGS_COUNT 10
+#define DICT_HASH_TABLE_CAP      10
 
 #define EXECUTE_FUNC(vm, args, func, meta, value_expected)              \
   do {                                                                  \
@@ -74,8 +75,12 @@ typedef enum {
 typedef struct ListNode   ListNode;
 typedef struct NamedValue NamedValue;
 typedef Da(NamedValue)    NamedValues;
+
 typedef struct DictValue  DictValue;
-typedef Da(DictValue)     Dict;
+
+typedef struct {
+  DictValue *items[DICT_HASH_TABLE_CAP];
+} Dict;
 
 typedef struct {
   Str  str;
@@ -195,8 +200,9 @@ struct ListNode {
 };
 
 struct DictValue {
-  Value *key;
-  Value *value;
+  Value     *key;
+  Value     *value;
+  DictValue *next;
 };
 
 struct NamedValue {

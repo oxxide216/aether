@@ -20,41 +20,141 @@ bool value_to_bool(Value *value) {
     return true;
 }
 
-void dict_push_value(Dict *dict, Value *key, Value *value) {
-  DictValue dict_value = { key, value };
-  DA_APPEND(*dict, dict_value);
-}
+static u64 value_hash(Value *value) {
+  u64 result = 0;
 
-void dict_push_value_str_key(StackFrame *frame, Dict *dict, Str string, Value *value) {
-  if (dict->len == dict->cap) {
-    if (dict->cap == 0)
-      dict->cap = 1;
-    else
-      dict->cap *= 2;
-    DictValue *new_items = arena_alloc(&frame->arena, dict->cap * sizeof(DictValue));
-    memcpy(new_items, dict->items, dict->len * sizeof(DictValue));
-    dict->items = new_items;
+  switch (value->kind) {
+  case ValueKindUnit: break;
+
+  case ValueKindList: {
+    ListNode *node = value->as.list->next;
+    while (node) {
+      result += value_hash(node->value);
+    }
+  } break;
+
+  case ValueKindString: {
+    result = str_hash(value->as.string.str);
+  } break;
+
+  case ValueKindInt: {
+    result = value->as._int;
+  } break;
+
+  case ValueKindFloat: {
+    result = *(i64 *) &value->as._float;
+  } break;
+
+  case ValueKindBool: {
+    result = value->as._bool;
+  } break;
+
+  case ValueKindDict: {
+    for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
+      DictValue *entry = value->as.dict.items[i];
+      while (entry) {
+        result += value_hash(entry->key);
+        result += value_hash(entry->value);
+
+        entry = entry->next;
+      }
+    }
+  } break;
+
+  case ValueKindFunc: break;
+  case ValueKindEnv: break;
+
+  case ValueKindBytes: {
+    Str str = {
+      (char *) value->as.bytes.ptr,
+      value->as.bytes.len,
+    };
+
+    result = str_hash(str);
+  } break;
   }
 
-  Value *key = value_alloc(frame);
-  *key = (Value) {
-    ValueKindString,
-    { .string = { string } },
-    frame, 1, false,
-  };
-  DictValue dict_value = { key, value };
-  dict->items[dict->len++] = dict_value;
+  return result;
 }
 
-Value *dict_get_value_str_key(StackFrame *frame, Dict *dict, Str string) {
-  for (u32 i = 0; i < dict->len; ++i)
-    if (dict->items[i].key->kind == ValueKindString &&
-        str_eq(dict->items[i].key->as.string.str, string))
-      return dict->items[i].value;
+Value *dict_get_value(Dict *dict, Value *key) {
+  u64 index = value_hash(key) % DICT_HASH_TABLE_CAP;
 
-  Value *result = value_alloc(frame);
-  result->kind = ValueKindUnit;
-  return result;
+  DictValue *entry = dict->items[index];
+  while (entry && entry->next && !value_eq(entry->key, key))
+    entry = entry->next;
+
+  if (entry && value_eq(entry->key, key))
+    return entry->value;
+  else
+    return NULL;
+}
+
+void dict_set_value(StackFrame *frame, Dict *dict,
+                    Value *key, Value *value) {
+  u64 index = value_hash(key) % DICT_HASH_TABLE_CAP;
+
+  DictValue *entry = dict->items[index];
+  while (entry && entry->next && !value_eq(entry->key, key))
+    entry = entry->next;
+
+  if (entry) {
+    if (value_eq(entry->key, key)) {
+      --entry->value->refs_count;
+    } else {
+      entry->next = arena_alloc(&frame->arena, sizeof(DictValue));
+      entry = entry->next;
+      entry->key = key;
+    }
+  } else {
+    entry = arena_alloc(&frame->arena, sizeof(DictValue));
+    entry->key = key;
+    dict->items[index] = entry;
+  }
+
+  entry->value = value;
+}
+
+Value *dict_get_value_str_key(Dict *dict, Str string) {
+  u64 index = str_hash(string) % DICT_HASH_TABLE_CAP;
+
+  DictValue *entry = dict->items[index];
+  while (entry && entry->next &&
+         (entry->key->kind != ValueKindString ||
+          !str_eq(entry->key->as.string.str, string)))
+    entry = entry->next;
+
+  if (entry)
+    return entry->value;
+  else
+    return NULL;
+}
+
+void dict_set_value_str_key(StackFrame *frame, Dict *dict,
+                            Str string, Value *value) {
+  Value *key = value_string(string, frame);
+
+  u64 index = str_hash(string) % DICT_HASH_TABLE_CAP;
+
+  DictValue *entry = dict->items[index];
+  while (entry && entry->next && !value_eq(entry->key, key))
+    entry = entry->next;
+
+  if (entry) {
+    if (value_eq(entry->key, key)) {
+      --entry->value->refs_count;
+    } else {
+      entry->next = arena_alloc(&frame->arena, sizeof(DictValue));
+      entry = entry->next;
+      entry->key = key;
+    }
+  } else {
+    entry = arena_alloc(&frame->arena, sizeof(DictValue));
+    entry->key = key;
+    dict->items[index] = entry;
+  }
+
+  entry->value = value;
 }
 
 void sb_push_value(StringBuilder *sb, Value *value,
@@ -142,17 +242,20 @@ void sb_push_value(StringBuilder *sb, Value *value,
   case ValueKindDict: {
     sb_push(sb, "{\n");
 
-    for (u32 i = 0; i < value->as.dict.len; ++i) {
-      for (u32 j = 0; j < level + 1; ++j)
-        sb_push(sb, "  ");
+    for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
+      DictValue *entry = value->as.dict.items[i];
+      while (entry) {
+        for (u32 j = 0; j < level + 1; ++j)
+          sb_push(sb, "  ");
 
-      sb_push_value(sb, value->as.dict.items[i].key,
-                    level + 1, kind, true, vm);
-      sb_push(sb, ": ");
-      sb_push_value(sb, value->as.dict.items[i].value,
-                    level + 1, kind, true, vm);
+        sb_push_value(sb, entry->key, level + 1, kind, true, vm);
+        sb_push(sb, ": ");
+        sb_push_value(sb, entry->value, level + 1, kind, true, vm);
 
-      sb_push_char(sb, '\n');
+        sb_push_char(sb, '\n');
+
+        entry = entry->next;
+      }
     }
 
     for (u32 j = 0; j < level; ++j)

@@ -47,15 +47,20 @@ ListNode *list_clone(ListNode *nodes, StackFrame *frame) {
 }
 
 Dict dict_clone(Dict *dict, StackFrame *frame) {
-  Dict copy = {
-    arena_alloc(&frame->arena, dict->len * sizeof(DictValue)),
-    dict->len,
-    dict->len,
-  };
+  Dict copy = {0};
 
-  for (u32 i = 0; i < copy.len; ++i) {
-    copy.items[i].key = value_clone(dict->items[i].key, frame);
-    copy.items[i].value = value_clone(dict->items[i].value, frame);
+  for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
+    DictValue **new_entry = copy.items + i;
+    DictValue *entry = dict->items[i];
+    while (entry) {
+      *new_entry = arena_alloc(&frame->arena, sizeof(DictValue));
+
+      (*new_entry)->key = value_clone(entry->key, frame);
+      (*new_entry)->value = value_clone(entry->value, frame);
+
+      new_entry = &(*new_entry)->next;
+      entry = entry->next;
+    }
   }
 
   return copy;
@@ -203,9 +208,14 @@ void value_free(Value *value) {
       node = next_node;
     }
   } else if (value->kind == ValueKindDict) {
-    for (u32 i = 0; i < value->as.dict.len; ++i) {
-      value_free(value->as.dict.items[i].key);
-      value_free(value->as.dict.items[i].value);
+    for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
+      DictValue *entry = value->as.dict.items[i];
+      while (entry) {
+        value_free(entry->key);
+        value_free(entry->value);
+
+        entry = entry->next;
+      }
     }
   } else if (value->kind == ValueKindFunc) {
     if (--value->as.func->refs_count == 0)
@@ -272,13 +282,19 @@ bool value_eq(Value *a, Value *b) {
   }
 
   case ValueKindDict: {
-    if (a->as.dict.len != b->as.dict.len)
-      return false;
+    for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
+      DictValue *entry_a = a->as.dict.items[i];
+      DictValue *entry_b = b->as.dict.items[i];
 
-    for (u32 i = 0; i < a->as.dict.len; ++i)
-      if (!value_eq(a->as.dict.items[i].key, b->as.dict.items[i].key) ||
-          !value_eq(a->as.dict.items[i].value, b->as.dict.items[i].value))
+      while (entry_a && entry_b) {
+        if (!value_eq(entry_a->key, entry_b->key) ||
+            !value_eq(entry_a->value, entry_b->value))
+          return false;
+      }
+
+      if (entry_a != entry_b)
         return false;
+    }
 
     return true;
   }
@@ -882,18 +898,8 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
       result = value_int(src->as.bytes.ptr[key->as._int], vm->current_frame);
     }  else if (src->kind == ValueKindDict) {
-      bool found = false;
-
-      for (u32 i = 0; i < src->as.dict.len; ++i) {
-        if (value_eq(src->as.dict.items[i].key, key)) {
-          result = src->as.dict.items[i].value;
-          found = true;
-
-          break;
-        }
-      }
-
-      if (!found)
+      result = dict_get_value(&src->as.dict, key);
+      if (!result)
         result = value_unit(vm->current_frame);
     } else {
       StringBuilder sb = {0};
@@ -993,46 +999,7 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
 
       dest_var->value->as.bytes.ptr[key->as._int] = value->as._int;
     } else if (dest_var->value->kind == ValueKindDict) {
-      bool found = false;
-
-      for (u32 i = 0; i < dest_var->value->as.dict.len; ++i) {
-        if (value_eq(dest_var->value->as.dict.items[i].key, key)) {
-          --dest_var->value->as.dict.items[i].value->refs_count;
-
-          dest_var->value->as.dict.items[i].value = value;
-          found = true;
-
-          break;
-        }
-      }
-
-      if (!found) {
-        if (key->frame == dest_var->value->frame)
-          ++key->refs_count;
-        else
-          key = value_clone(key, dest_var->value->frame);
-
-        DictValue dict_value = { key, value };
-
-        Dict *dict = &dest_var->value->as.dict;
-
-        if (dict->cap == dict->len) {
-          if (dict->cap == 0)
-            dict->cap = 1;
-          else
-            dict->cap *= 2;
-
-          DictValue *new_items =
-            arena_alloc(&dest_var->value->frame->arena,
-                        dict->cap * sizeof(DictValue));
-
-          memcpy(new_items, dict->items, dict->len * sizeof(DictValue));
-
-          dict->items = new_items;
-        }
-
-        dict->items[dict->len++] = dict_value;
-      }
+      dict_set_value(vm->current_frame, &dest_var->value->as.dict, key, value);
     } else {
       StringBuilder sb = {0};
       sb_push_value(&sb, dest_var->value, 0, true, true, vm);
@@ -1151,16 +1118,15 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
       break;
 
     Dict dict = {0};
-    dict.len = expr->as.dict.len;
-    dict.cap = dict.len;
-    dict.items = arena_alloc(&vm->current_frame->arena, dict.cap * sizeof(DictValue));
 
-    for (u32 i = 0; i < dict.len; ++i) {
-      DictValue field = {0};
-      EXECUTE_EXPR_SET(vm, field.key, expr->as.dict.items[i].key, true);
-      EXECUTE_EXPR_SET(vm, field.value, expr->as.dict.items[i].expr, true);
+    for (u32 i = 0; i < expr->as.dict.len; ++i) {
+      Value *key;
+      Value *value;
 
-      dict.items[i] = field;
+      EXECUTE_EXPR_SET(vm, key, expr->as.dict.items[i].key, true);
+      EXECUTE_EXPR_SET(vm, value, expr->as.dict.items[i].expr, true);
+
+      dict_set_value(vm->current_frame, &dict, key, value);
     }
 
     result = value_dict(dict, vm->current_frame);

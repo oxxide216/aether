@@ -506,28 +506,33 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
   } else if (collection->kind == ValueKindDict) {
     Dict _pair = {0};
 
-    dict_push_value_str_key(vm->current_frame,
-                            &_pair, STR_LIT("key"), NULL);
-    dict_push_value_str_key(vm->current_frame,
-                            &_pair, STR_LIT("value"), NULL);
+    dict_set_value_str_key(vm->current_frame,
+                           &_pair, STR_LIT("key"), NULL);
+    dict_set_value_str_key(vm->current_frame,
+                           &_pair, STR_LIT("value"), NULL);
 
     Value *pair = value_dict(_pair, vm->current_frame);
 
-    for (u32 i = 0; i < collection->as.dict.len; ++i) {
-      pair->as.dict.items[0].value = collection->as.dict.items[i].key;
-      pair->as.dict.items[1].value = collection->as.dict.items[i].value;
+    for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
+      DictValue *entry = collection->as.dict.items[i];
+      while (entry) {
+        pair->as.dict.items[0]->key = entry->key;
+        pair->as.dict.items[1]->value = entry->value;
 
-      Value *result = execute_func(vm, &pair, func->as.func, NULL, true);
+        Value *result = execute_func(vm, &pair, func->as.func, NULL, true);
 
-      if (vm->state != ExecStateContinue) {
-        if (vm->state == ExecStateBreak)
-          vm->state = ExecStateContinue;
+        if (vm->state != ExecStateContinue) {
+          if (vm->state == ExecStateBreak)
+            vm->state = ExecStateContinue;
 
-        return result;
+          return result;
+        }
+
+        entry = entry->next;
       }
     }
 
-    pair->as.dict.len = 0;
+    pair->as.dict = (Dict) {0};
   }
 
   return value_unit(vm->current_frame);
@@ -768,27 +773,12 @@ Value *add_intrinsic(Vm *vm, Value **args) {
     }
     return value_bytes(bytes, vm->current_frame);
   } else if (a->kind == ValueKindDict) {
-    Dict dict = a->as.dict;
+    Value *dict_value = a;
 
-    if (!a->is_atom || dict.cap < dict.len + b->as.dict.len) {
-      dict.cap = dict.len + b->as.dict.len;
-      DictValue *new_items = arena_alloc(&vm->current_frame->arena,
-                                         dict.cap * sizeof(DictValue));
-      memcpy(new_items, dict.items, dict.len * sizeof(DictValue));
-      dict.items = new_items;
-    }
+    if (!a->is_atom)
+      dict_value = value_clone(dict_value, vm->current_frame);
 
-    memcpy(dict.items + dict.len,
-           b->as.dict.items,
-           b->as.dict.len * sizeof(DictValue));
-
-    dict.len += b->as.dict.len;
-
-    if (a->is_atom) {
-      a->as.dict = dict;
-      return a;
-    }
-    return value_dict(dict, vm->current_frame);
+    return dict_value;
   }
 
   return value_unit(vm->current_frame);
@@ -1081,7 +1071,7 @@ Value *make_env_intrinsic(Vm *vm, Value **args) {
 }
 
 static Value *process_include_paths(IncludePaths *dest, Value *value,
-                                  char *func_name, StackFrame *frame) {
+                                    char *func_name, StackFrame *frame) {
   ListNode *include_path = value->as.list->next;
   while (include_path) {
     if (include_path->value->kind != ValueKindString)
@@ -1146,8 +1136,8 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Dict dict = {0};
 
   Value *compiled = value_string(bytecode, vm->current_frame);
-  dict_push_value_str_key(vm->current_frame, &dict,
-                          STR_LIT("compiled"), compiled);
+  dict_set_value_str_key(vm->current_frame, &dict,
+                         STR_LIT("compiled"), compiled);
 
   Value *compiled_macros;
 
@@ -1173,9 +1163,9 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
     compiled_macros = value_unit(vm->current_frame);
   }
 
-  dict_push_value_str_key(vm->current_frame, &dict,
-                          STR_LIT("compiled-macros"),
-                          compiled_macros);
+  dict_set_value_str_key(vm->current_frame, &dict,
+                         STR_LIT("compiled-macros"),
+                         compiled_macros);
 
   if (included_files.items)
     free(included_files.items);

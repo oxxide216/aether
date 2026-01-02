@@ -101,12 +101,7 @@ static Value *try_get_dict_field_of_kind_str_key(Dict *dict, Str key,
                                                  ValueKind expected_kind,
                                                  char *intrinsic_name,
                                                  char *arg_name) {
-  Value *result = NULL;
-
-  for (u32 i = 0; i < dict->len; ++i)
-    if (dict->items[i].key->kind == ValueKindString &&
-        str_eq(dict->items[i].key->as.string.str, key))
-      result = dict->items[i].value;
+  Value *result = dict_get_value_str_key(dict, key);
 
   if (!result) {
     ERROR("%s: %s should have a "STR_FMT" field\n",
@@ -153,12 +148,12 @@ Value *load_texture_intrinsic(Vm *vm, Value **args) {
 
   Dict result = {0};
 
-  dict_push_value_str_key(vm->current_frame, &result, STR_LIT("id"),
-                          value_int(texture.id, vm->current_frame));
-  dict_push_value_str_key(vm->current_frame, &result, STR_LIT("width"),
-                          value_float((f64) width, vm->current_frame));
-  dict_push_value_str_key(vm->current_frame, &result, STR_LIT("height"),
-                          value_float((f64) height, vm->current_frame));
+  dict_set_value_str_key(vm->current_frame, &result, STR_LIT("id"),
+                         value_int(texture.id, vm->current_frame));
+  dict_set_value_str_key(vm->current_frame, &result, STR_LIT("width"),
+                         value_float((f64) width, vm->current_frame));
+  dict_set_value_str_key(vm->current_frame, &result, STR_LIT("height"),
+                         value_float((f64) height, vm->current_frame));
 
   return value_dict(result, vm->current_frame);
 }
@@ -180,8 +175,8 @@ Value *load_font_intrinsic(Vm *vm, Value **args) {
 
   Dict result = {0};
 
-  dict_push_value_str_key(vm->current_frame, &result, STR_LIT("id"),
-                          value_int(index, vm->current_frame));
+  dict_set_value_str_key(vm->current_frame, &result, STR_LIT("id"),
+                         value_int(index, vm->current_frame));
 
   return value_dict(result, vm->current_frame);
 }
@@ -386,12 +381,12 @@ Value *window_size_intrinsic(Vm *vm, Value **args) {
   Value *width = value_alloc(vm->current_frame);
   width->kind = ValueKindFloat;
   width->as._float = (f32) glass.window.width;
-  dict_push_value_str_key(vm->current_frame, &size, STR_LIT("width"), width);
+  dict_set_value_str_key(vm->current_frame, &size, STR_LIT("width"), width);
 
   Value *height = value_alloc(vm->current_frame);
   height->kind = ValueKindFloat;
   height->as._float = (f32) glass.window.height;
-  dict_push_value_str_key(vm->current_frame, &size, STR_LIT("height"), height);
+  dict_set_value_str_key(vm->current_frame, &size, STR_LIT("height"), height);
 
   return value_dict(size, vm->current_frame);
 }

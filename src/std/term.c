@@ -21,12 +21,12 @@ Value *get_size_intrinsic(Vm *vm, Value **args) {
   Value *rows = value_alloc(vm->current_frame);
   *rows = (Value) { ValueKindInt, { ._int = _size.ws_row },
                     vm->current_frame, 1, false };
-  dict_push_value_str_key(vm->current_frame, &size, STR_LIT("rows"), rows);
+  dict_set_value_str_key(vm->current_frame, &size, STR_LIT("rows"), rows);
 
   Value *cols = value_alloc(vm->current_frame);
   *cols = (Value) { ValueKindInt, { ._int = _size.ws_col },
                     vm->current_frame, 1, false };
-  dict_push_value_str_key(vm->current_frame, &size, STR_LIT("cols"), cols);
+  dict_set_value_str_key(vm->current_frame, &size, STR_LIT("cols"), cols);
 
   return value_dict(size, vm->current_frame);
 }
