@@ -8,8 +8,9 @@
 #include "shl/shl-str.h"
 #include "shl/shl-log.h"
 
-#define MAX_INTRINSIC_ARGS_COUNT 10
-#define DICT_HASH_TABLE_CAP      10
+#define MAX_INTRINSIC_ARGS_COUNT  10
+#define DICT_HASH_TABLE_CAP       10
+#define INTRINSICS_HASH_TABLE_CAP 60
 
 #define EXECUTE_FUNC(vm, args, func, meta, value_expected)              \
   do {                                                                  \
@@ -136,15 +137,20 @@ typedef enum {
 
 typedef Value *(*IntrinsicFunc)(Vm *vm, Value **args);
 
-typedef struct {
-  Str           name;
-  bool          has_return_value;
-  u32           args_count;
-  ValueKind     arg_kinds[MAX_INTRINSIC_ARGS_COUNT];
-  IntrinsicFunc func;
-} Intrinsic;
+typedef struct Intrinsic Intrinsic;
 
-typedef Da(Intrinsic) Intrinsics;
+struct Intrinsic {
+  Str            name;
+  bool           has_return_value;
+  u32            args_count;
+  ValueKind      arg_kinds[MAX_INTRINSIC_ARGS_COUNT];
+  IntrinsicFunc  func;
+  Intrinsic     *next;
+};
+
+typedef struct {
+  Intrinsic *items[INTRINSICS_HASH_TABLE_CAP];
+} Intrinsics;
 
 struct Vm {
   Vars        global_vars;
@@ -235,6 +241,8 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected);
 Value *execute_block(Vm *vm, IrBlock *block, bool value_expected);
 u32    execute(Ir *ir, i32 argc, char **argv, Arena *arena,
                Intrinsics *intrinsics, Value **result_value);
+
+void intrinsics_append(Intrinsics *a, Intrinsic *b, u32 b_len, Arena *arena);
 
 Vm   vm_create(i32 argc, char **argv, Intrinsics *intrinsics);
 void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics);

@@ -518,14 +518,17 @@ bool value_list_matches_kinds(u32 len, Value **values, ValueKind *kinds) {
 }
 
 static Intrinsic *get_intrinsic(Vm *vm, Str name, u32 args_count, Value **args) {
-  for (u32 i = 0; i < vm->intrinsics.len; ++i) {
-    Intrinsic *intrinsic = vm->intrinsics.items + i;
+  u64 index = str_hash(name) % INTRINSICS_HASH_TABLE_CAP;
 
-    if (str_eq(intrinsic->name, name) &&
-        intrinsic->args_count == args_count &&
-        value_list_matches_kinds(args_count, args, intrinsic->arg_kinds)) {
-      return intrinsic;
+  Intrinsic *entry = vm->intrinsics.items[index];
+  while (entry) {
+    if (str_eq(entry->name, name) &&
+        entry->args_count == args_count &&
+        value_list_matches_kinds(args_count, args, entry->arg_kinds)) {
+      return entry;
     }
+
+    entry = entry->next;
   }
 
   return NULL;
@@ -1189,11 +1192,22 @@ Value *execute_block(Vm *vm, IrBlock *block, bool value_expected) {
   return result;
 }
 
-static void intrinsics_append(Intrinsics *a, Intrinsic *b, u32 b_len) {
-  a->cap += b_len;
-  a->items = realloc(a->items, a->cap * sizeof(Intrinsic));
-  memcpy(a->items + a->len, b, b_len * sizeof(Intrinsic));
-  a->len += b_len;
+void intrinsics_append(Intrinsics *a, Intrinsic *b, u32 b_len, Arena *arena) {
+  for (u32 i = 0; i < b_len; ++i) {
+    u64 index = str_hash(b[i].name) % INTRINSICS_HASH_TABLE_CAP;
+
+    Intrinsic *entry = a->items[index];
+    while (entry && entry->next)
+      entry = entry->next;
+
+    Intrinsic *intrinsic = arena_alloc(arena, sizeof(Intrinsic));
+    *intrinsic = b[i];
+
+    if (entry)
+      entry->next = intrinsic;
+    else
+      a->items[index] = intrinsic;
+  }
 }
 
 Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
@@ -1232,22 +1246,22 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
 }
 
 void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics) {
-  intrinsics_append(intrinsics, core_intrinsics, core_intrinsics_len);
-  intrinsics_append(intrinsics, math_intrinsics, math_intrinsics_len);
-  intrinsics_append(intrinsics, str_intrinsics, str_intrinsics_len);
+  intrinsics_append(intrinsics, core_intrinsics, core_intrinsics_len, &vm->frames->arena);
+  intrinsics_append(intrinsics, math_intrinsics, math_intrinsics_len, &vm->frames->arena);
+  intrinsics_append(intrinsics, str_intrinsics, str_intrinsics_len, &vm->frames->arena);
 #ifndef NOSYSTEM
-  intrinsics_append(intrinsics, base_intrinsics, base_intrinsics_len);
-  intrinsics_append(intrinsics, io_intrinsics, io_intrinsics_len);
-  intrinsics_append(intrinsics, path_intrinsics, path_intrinsics_len);
-  intrinsics_append(intrinsics, net_intrinsics, net_intrinsics_len);
-  intrinsics_append(intrinsics, term_intrinsics, term_intrinsics_len);
-  intrinsics_append(intrinsics, system_intrinsics, system_intrinsics_len);
+  intrinsics_append(intrinsics, base_intrinsics, base_intrinsics_len, &vm->frames->arena);
+  intrinsics_append(intrinsics, io_intrinsics, io_intrinsics_len, &vm->frames->arena);
+  intrinsics_append(intrinsics, path_intrinsics, path_intrinsics_len, &vm->frames->arena);
+  intrinsics_append(intrinsics, net_intrinsics, net_intrinsics_len, &vm->frames->arena);
+  intrinsics_append(intrinsics, term_intrinsics, term_intrinsics_len, &vm->frames->arena);
+  intrinsics_append(intrinsics, system_intrinsics, system_intrinsics_len, &vm->frames->arena);
 #endif
 #ifdef GLASS
-  intrinsics_append(intrinsics, glass_intrinsics, glass_intrinsics_len);
+  intrinsics_append(intrinsics, glass_intrinsics, glass_intrinsics_len, &vm->frames->arena);
 #endif
 #ifdef EMSCRIPTEN
-  intrinsics_append(intrinsics, web_intrinsics, web_intrinsics_len);
+  intrinsics_append(intrinsics, web_intrinsics, web_intrinsics_len, &vm->frames->arena);
 #endif
 
   vm->intrinsics = *intrinsics;
@@ -1296,8 +1310,6 @@ static void frame_free(StackFrame *frame) {
 void vm_destroy(Vm *vm) {
   if (vm->global_vars.items)
     free(vm->global_vars.items);
-  if (vm->intrinsics.items)
-    free(vm->intrinsics.items);
 
   StackFrame *frame = vm->frames;
   while (frame) {

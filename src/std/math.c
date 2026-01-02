@@ -82,16 +82,16 @@ Value *round_intrinsic(Vm *vm, Value **args) {
 }
 
 Intrinsic math_intrinsics[] = {
-  { STR_LIT("abs"), true, 1, { ValueKindInt }, &abs_intrinsic },
-  { STR_LIT("abs"), true, 1, { ValueKindFloat }, &abs_intrinsic },
-  { STR_LIT("min"), true, 1, { ValueKindInt, ValueKindInt }, &min_intrinsic },
-  { STR_LIT("min"), true, 1, { ValueKindFloat, ValueKindFloat }, &min_intrinsic },
-  { STR_LIT("max"), true, 1, { ValueKindInt, ValueKindInt }, &max_intrinsic },
-  { STR_LIT("max"), true, 1, { ValueKindFloat, ValueKindFloat }, &max_intrinsic },
-  { STR_LIT("pow"), true, 1, { ValueKindInt, ValueKindInt }, &pow_intrinsic },
-  { STR_LIT("pow"), true, 1, { ValueKindFloat, ValueKindInt }, &pow_intrinsic },
-  { STR_LIT("sqrt"), true, 1, { ValueKindFloat }, &sqrt_intrinsic },
-  { STR_LIT("round"), true, 1, { ValueKindFloat }, &round_intrinsic },
+  { STR_LIT("abs"), true, 1, { ValueKindInt }, &abs_intrinsic, NULL },
+  { STR_LIT("abs"), true, 1, { ValueKindFloat }, &abs_intrinsic, NULL },
+  { STR_LIT("min"), true, 1, { ValueKindInt, ValueKindInt }, &min_intrinsic, NULL },
+  { STR_LIT("min"), true, 1, { ValueKindFloat, ValueKindFloat }, &min_intrinsic, NULL },
+  { STR_LIT("max"), true, 1, { ValueKindInt, ValueKindInt }, &max_intrinsic, NULL },
+  { STR_LIT("max"), true, 1, { ValueKindFloat, ValueKindFloat }, &max_intrinsic, NULL },
+  { STR_LIT("pow"), true, 1, { ValueKindInt, ValueKindInt }, &pow_intrinsic, NULL },
+  { STR_LIT("pow"), true, 1, { ValueKindFloat, ValueKindInt }, &pow_intrinsic, NULL },
+  { STR_LIT("sqrt"), true, 1, { ValueKindFloat }, &sqrt_intrinsic, NULL },
+  { STR_LIT("round"), true, 1, { ValueKindFloat }, &round_intrinsic, NULL },
 };
 
 u32 math_intrinsics_len = ARRAY_LEN(math_intrinsics);

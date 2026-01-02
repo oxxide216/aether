@@ -44,9 +44,9 @@ Value *get_absolute_path_intrinsic(Vm *vm, Value **args) {
 }
 
 Intrinsic path_intrinsics[] = {
-  { STR_LIT("get-current-path"), true, 0, {}, &get_current_path_intrinsic },
-  { STR_LIT("set-current-path"), false, 1, { ValueKindString }, &set_current_path_intrinsic },
-  { STR_LIT("get-absolute-path"), true, 1, { ValueKindString }, &get_absolute_path_intrinsic },
+  { STR_LIT("get-current-path"), true, 0, {}, &get_current_path_intrinsic, NULL },
+  { STR_LIT("set-current-path"), false, 1, { ValueKindString }, &set_current_path_intrinsic, NULL },
+  { STR_LIT("get-absolute-path"), true, 1, { ValueKindString }, &get_absolute_path_intrinsic, NULL },
 };
 
 u32 path_intrinsics_len = ARRAY_LEN(path_intrinsics);

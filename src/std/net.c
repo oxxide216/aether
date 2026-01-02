@@ -207,20 +207,20 @@ Value *receive_intrinsic(Vm *vm, Value **args) {
 }
 
 Intrinsic net_intrinsics[] = {
-  { STR_LIT("create-server"), true, 1, { ValueKindInt }, &create_server_intrinsic },
+  { STR_LIT("create-server"), true, 1, { ValueKindInt }, &create_server_intrinsic, NULL },
   { STR_LIT("create-client"), true, 2,
     { ValueKindString, ValueKindInt },
-    &create_client_intrinsic },
+    &create_client_intrinsic, NULL },
   { STR_LIT("accept-connection"), true, 2,
     { ValueKindInt, ValueKindInt },
-    &accept_connection_intrinsic },
-  { STR_LIT("close-connection"), false, 1, { ValueKindInt }, &close_connection_intrinsic },
-  { STR_LIT("send"), false, 2, { ValueKindInt, ValueKindString }, &send_intrinsic },
-  { STR_LIT("send"), false, 2, { ValueKindInt, ValueKindBytes }, &send_intrinsic },
+    &accept_connection_intrinsic, NULL },
+  { STR_LIT("close-connection"), false, 1, { ValueKindInt }, &close_connection_intrinsic, NULL },
+  { STR_LIT("send"), false, 2, { ValueKindInt, ValueKindString }, &send_intrinsic, NULL },
+  { STR_LIT("send"), false, 2, { ValueKindInt, ValueKindBytes }, &send_intrinsic, NULL },
   { STR_LIT("receive-size"), true, 2,
     { ValueKindInt, ValueKindInt },
-    &receive_size_intrinsic },
-  { STR_LIT("receive"), true, 1, { ValueKindInt }, &receive_intrinsic },
+    &receive_size_intrinsic, NULL },
+  { STR_LIT("receive"), true, 1, { ValueKindInt }, &receive_intrinsic, NULL },
 };
 
 u32 net_intrinsics_len = ARRAY_LEN(net_intrinsics);

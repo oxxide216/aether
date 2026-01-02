@@ -62,9 +62,9 @@ Value *raw_mode_off_intrinsic(Vm *vm, Value **args) {
 }
 
 Intrinsic term_intrinsics[] = {
-  { STR_LIT("term/get-size"), true, 0, {}, &get_size_intrinsic },
-  { STR_LIT("term/raw-mode-on"), false, 0, {}, &raw_mode_on_intrinsic },
-  { STR_LIT("term/raw-mode-off"), false, 0, {}, &raw_mode_off_intrinsic },
+  { STR_LIT("term/get-size"), true, 0, {}, &get_size_intrinsic, NULL },
+  { STR_LIT("term/raw-mode-on"), false, 0, {}, &raw_mode_on_intrinsic, NULL },
+  { STR_LIT("term/raw-mode-off"), false, 0, {}, &raw_mode_off_intrinsic, NULL },
 };
 
 u32 term_intrinsics_len = ARRAY_LEN(term_intrinsics);

@@ -204,22 +204,22 @@ Value *list_directory_intrinsic(Vm *vm, Value **args) {
 
 Intrinsic io_intrinsics[] = {
 #ifndef EMSCRIPTEN
-  { STR_LIT("unblock-input"), false, 0, {}, &unblock_input_intrinsic },
-  { STR_LIT("block-input"), false, 0, {}, &block_input_intrinsic },
+  { STR_LIT("unblock-input"), false, 0, {}, &unblock_input_intrinsic, NULL },
+  { STR_LIT("block-input"), false, 0, {}, &block_input_intrinsic, NULL },
 #endif
   // Files
-  { STR_LIT("get-file-info"), true, 1, { ValueKindString }, &get_file_info_intrinsic },
-  { STR_LIT("read-file"), true, 1, { ValueKindString }, &read_file_intrinsic },
-  { STR_LIT("read-binary-file"), true, 1, { ValueKindString }, &read_binary_file_intrinsic },
+  { STR_LIT("get-file-info"), true, 1, { ValueKindString }, &get_file_info_intrinsic, NULL },
+  { STR_LIT("read-file"), true, 1, { ValueKindString }, &read_file_intrinsic, NULL },
+  { STR_LIT("read-binary-file"), true, 1, { ValueKindString }, &read_binary_file_intrinsic, NULL },
   { STR_LIT("write-file"), false, 2,
     { ValueKindString, ValueKindString },
-    &write_file_intrinsic },
+    &write_file_intrinsic, NULL },
   { STR_LIT("write-binary-file"), false, 2,
     { ValueKindString, ValueKindBytes },
-    &write_file_intrinsic },
-  { STR_LIT("delete-file"), false, 1, { ValueKindString }, &delete_file_intrinsic },
-  { STR_LIT("delete-directory"), false, 1, { ValueKindString }, &delete_directory_intrinsic },
-  { STR_LIT("list-directory"), true, 1, { ValueKindString }, &list_directory_intrinsic },
+    &write_file_intrinsic, NULL },
+  { STR_LIT("delete-file"), false, 1, { ValueKindString }, &delete_file_intrinsic, NULL },
+  { STR_LIT("delete-directory"), false, 1, { ValueKindString }, &delete_directory_intrinsic, NULL },
+  { STR_LIT("list-directory"), true, 1, { ValueKindString }, &list_directory_intrinsic, NULL },
 };
 
 u32 io_intrinsics_len = ARRAY_LEN(io_intrinsics);

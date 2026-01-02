@@ -263,19 +263,19 @@ Value *is_whitespace_intrinsic(Vm *vm, Value **args) {
 Intrinsic str_intrinsics[] = {
   { STR_LIT("str-insert"), true, 3,
     { ValueKindString, ValueKindInt, ValueKindString },
-    &str_insert_intrinsic },
+    &str_insert_intrinsic, NULL },
   { STR_LIT("str-remove"), true, 3,
     { ValueKindString, ValueKindInt, ValueKindInt },
-    &str_remove_intrinsic },
+    &str_remove_intrinsic, NULL },
   { STR_LIT("str-replace"), true, 3,
     { ValueKindString, ValueKindInt, ValueKindString },
-    &str_replace_intrinsic },
-  { STR_LIT("split"), true, 2, { ValueKindString, ValueKindString }, &split_intrinsic },
-  { STR_LIT("join"), true, 2, { ValueKindList, ValueKindString }, &join_intrinsic },
-  { STR_LIT("is-alpha"), true, 1, { ValueKindString }, &is_alpha_intrinsic },
-  { STR_LIT("is-number"), true, 1, { ValueKindString }, &is_number_intrinsic },
-  { STR_LIT("is-alpha-number"), true, 1, { ValueKindString }, &is_alpha_number_intrinsic },
-  { STR_LIT("is-whitespace"), true, 1, { ValueKindString }, &is_whitespace_intrinsic },
+    &str_replace_intrinsic, NULL },
+  { STR_LIT("split"), true, 2, { ValueKindString, ValueKindString }, &split_intrinsic, NULL },
+  { STR_LIT("join"), true, 2, { ValueKindList, ValueKindString }, &join_intrinsic, NULL },
+  { STR_LIT("is-alpha"), true, 1, { ValueKindString }, &is_alpha_intrinsic, NULL },
+  { STR_LIT("is-number"), true, 1, { ValueKindString }, &is_number_intrinsic, NULL },
+  { STR_LIT("is-alpha-number"), true, 1, { ValueKindString }, &is_alpha_number_intrinsic, NULL },
+  { STR_LIT("is-whitespace"), true, 1, { ValueKindString }, &is_whitespace_intrinsic, NULL },
 };
 
 u32 str_intrinsics_len = ARRAY_LEN(str_intrinsics);
