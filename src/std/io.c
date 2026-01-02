@@ -54,8 +54,8 @@ Value *get_file_info_intrinsic(Vm *vm, Value **args) {
   Value *is_directory = value_alloc(vm->current_frame);
   is_directory->kind = ValueKindBool;
   is_directory->as._bool = directory != NULL || errno != ENOTDIR;
-  dict_set_value_str_key(vm->current_frame, &info,
-                         STR_LIT("is-directory"), is_directory);
+  Value *is_directory_key = value_string(STR_LIT("is-directory"), vm->current_frame);
+  dict_set_value(vm->current_frame, &info, is_directory_key, is_directory);
 
   if (directory)
     closedir(directory);
@@ -71,8 +71,8 @@ Value *get_file_info_intrinsic(Vm *vm, Value **args) {
   Value *size = value_alloc(vm->current_frame);
   size->kind = ValueKindInt;
   size->as._int = st.st_size;
-  dict_set_value_str_key(vm->current_frame, &info,
-                         STR_LIT("size"), size);
+  Value *size_key = value_string(STR_LIT("size"), vm->current_frame);
+  dict_set_value(vm->current_frame, &info, size_key, size);
 
   free(path_cstring);
 

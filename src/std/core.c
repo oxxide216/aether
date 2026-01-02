@@ -506,10 +506,11 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
   } else if (collection->kind == ValueKindDict) {
     Dict _pair = {0};
 
-    dict_set_value_str_key(vm->current_frame,
-                           &_pair, STR_LIT("key"), NULL);
-    dict_set_value_str_key(vm->current_frame,
-                           &_pair, STR_LIT("value"), NULL);
+    Value *key = value_string(STR_LIT("key"), vm->current_frame);
+    dict_set_value(vm->current_frame, &_pair, key, NULL);
+
+    Value *value = value_string(STR_LIT("value"), vm->current_frame);
+    dict_set_value(vm->current_frame, &_pair, value, NULL);
 
     Value *pair = value_dict(_pair, vm->current_frame);
 
@@ -1146,8 +1147,8 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Dict dict = {0};
 
   Value *compiled = value_string(bytecode, vm->current_frame);
-  dict_set_value_str_key(vm->current_frame, &dict,
-                         STR_LIT("compiled"), compiled);
+  Value *compiled_key = value_string(STR_LIT("compiled"), vm->current_frame);
+  dict_set_value(vm->current_frame, &dict, compiled_key, compiled);
 
   Value *compiled_macros;
 
@@ -1173,9 +1174,8 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
     compiled_macros = value_unit(vm->current_frame);
   }
 
-  dict_set_value_str_key(vm->current_frame, &dict,
-                         STR_LIT("compiled-macros"),
-                         compiled_macros);
+  Value *compiled_macros_key = value_string(STR_LIT("compiled-macros"), vm->current_frame);
+  dict_set_value(vm->current_frame, &dict, compiled_macros_key, compiled_macros);
 
   if (included_files.items)
     free(included_files.items);

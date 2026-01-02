@@ -97,18 +97,18 @@ static bool initialized = false;
 
 static Color clear_color = {0};
 
-static Value *try_get_dict_field_of_kind_str_key(Dict *dict, Str key,
-                                                 ValueKind expected_kind,
-                                                 char *intrinsic_name,
-                                                 char *arg_name) {
-  Value *result = dict_get_value_str_key(dict, key);
+static Value *try_get_dict_field_of_kind(Dict *dict, Value *key,
+                                         ValueKind expected_kind,
+                                         char *intrinsic_name,
+                                         char *arg_name) {
+  Value *result = dict_get_value(dict, key);
 
   if (!result) {
     ERROR("%s: %s should have a "STR_FMT" field\n",
-          intrinsic_name, arg_name, STR_ARG(key));
+          intrinsic_name, arg_name, STR_ARG(key->as.string.str));
   } else if (result->kind != expected_kind) {
     ERROR(""STR_FMT" field of %s has unexpected type\n",
-          STR_ARG(key), arg_name);
+          STR_ARG(key->as.string.str), arg_name);
 
     return NULL;
   }
@@ -148,11 +148,16 @@ Value *load_texture_intrinsic(Vm *vm, Value **args) {
 
   Dict result = {0};
 
-  dict_set_value_str_key(vm->current_frame, &result, STR_LIT("id"),
+  Value *id_key = value_string(STR_LIT("id"), vm->current_frame);
+  dict_set_value(vm->current_frame, &result, id_key,
                          value_int(texture.id, vm->current_frame));
-  dict_set_value_str_key(vm->current_frame, &result, STR_LIT("width"),
+
+  Value *width_key = value_string(STR_LIT("width"), vm->current_frame);
+  dict_set_value(vm->current_frame, &result, width_key,
                          value_float((f64) width, vm->current_frame));
-  dict_set_value_str_key(vm->current_frame, &result, STR_LIT("height"),
+
+  Value *height_key = value_string(STR_LIT("height"), vm->current_frame);
+  dict_set_value(vm->current_frame, &result, height_key,
                          value_float((f64) height, vm->current_frame));
 
   return value_dict(result, vm->current_frame);
@@ -175,8 +180,9 @@ Value *load_font_intrinsic(Vm *vm, Value **args) {
 
   Dict result = {0};
 
-  dict_set_value_str_key(vm->current_frame, &result, STR_LIT("id"),
-                         value_int(index, vm->current_frame));
+  Value *id_key = value_string(STR_LIT("id"), vm->current_frame);
+  dict_set_value(vm->current_frame, &result, id_key,
+                 value_int(index, vm->current_frame));
 
   return value_dict(result, vm->current_frame);
 }
@@ -381,12 +387,14 @@ Value *window_size_intrinsic(Vm *vm, Value **args) {
   Value *width = value_alloc(vm->current_frame);
   width->kind = ValueKindFloat;
   width->as._float = (f32) glass.window.width;
-  dict_set_value_str_key(vm->current_frame, &size, STR_LIT("width"), width);
+  Value *width_key = value_string(STR_LIT("width"), vm->current_frame);
+  dict_set_value(vm->current_frame, &size, width_key, width);
 
   Value *height = value_alloc(vm->current_frame);
   height->kind = ValueKindFloat;
   height->as._float = (f32) glass.window.height;
-  dict_set_value_str_key(vm->current_frame, &size, STR_LIT("height"), height);
+  Value *height_key = value_string(STR_LIT("height"), vm->current_frame);
+  dict_set_value(vm->current_frame, &size, height_key, height);
 
   return value_dict(size, vm->current_frame);
 }
@@ -395,8 +403,9 @@ Value *text_width_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
     return value_unit(vm->current_frame);
 
-  Value *id = try_get_dict_field_of_kind_str_key(&args[1]->as.dict, STR_LIT("id"),
-                                                 ValueKindInt, "font", "font");
+  Value *id_key = value_string(STR_LIT("id"), vm->current_frame);
+  Value *id = try_get_dict_field_of_kind(&args[1]->as.dict, id_key,
+                                         ValueKindInt, "font", "font");
   if (!id)
     vm->state = ExecStateExit;
 
@@ -505,18 +514,21 @@ Value *texture_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
     return value_unit(vm->current_frame);
 
-  Value *id = try_get_dict_field_of_kind_str_key(&args[2]->as.dict, STR_LIT("id"),
-                                                 ValueKindInt, "texture", "texture");
+  Value *id_key = value_string(STR_LIT("id"), vm->current_frame);
+  Value *id = try_get_dict_field_of_kind(&args[2]->as.dict, id_key,
+                                         ValueKindInt, "texture", "texture");
   if (!id)
     vm->state = ExecStateExit;
 
-  Value *width = try_get_dict_field_of_kind_str_key(&args[2]->as.dict, STR_LIT("width"),
-                                                    ValueKindFloat, "texture", "texture");
+  Value *width_key = value_string(STR_LIT("width"), vm->current_frame);
+  Value *width = try_get_dict_field_of_kind(&args[2]->as.dict, width_key,
+                                            ValueKindFloat, "texture", "texture");
   if (!width)
     vm->state = ExecStateExit;
 
-  Value *height = try_get_dict_field_of_kind_str_key(&args[2]->as.dict, STR_LIT("height"),
-                                                     ValueKindFloat, "texture", "texture");
+  Value *height_key = value_string(STR_LIT("height"), vm->current_frame);
+  Value *height = try_get_dict_field_of_kind(&args[2]->as.dict, height_key,
+                                             ValueKindFloat, "texture", "texture");
   if (!height)
     vm->state = ExecStateExit;
 
@@ -532,8 +544,9 @@ Value *textured_quad_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
     return value_unit(vm->current_frame);
 
-  Value *id = try_get_dict_field_of_kind_str_key(&args[4]->as.dict, STR_LIT("id"),
-                                                 ValueKindInt, "texture", "texture");
+  Value *id_key = value_string(STR_LIT("id"), vm->current_frame);
+  Value *id = try_get_dict_field_of_kind(&args[4]->as.dict, id_key,
+                                         ValueKindInt, "texture", "texture");
   if (!id)
     vm->state = ExecStateExit;
 
@@ -549,8 +562,9 @@ Value *tile_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
     return value_unit(vm->current_frame);
 
-  Value *id = try_get_dict_field_of_kind_str_key(&args[8]->as.dict, STR_LIT("id"),
-                                                 ValueKindInt, "texture", "texture");
+  Value *id_key = value_string(STR_LIT("id"), vm->current_frame);
+  Value *id = try_get_dict_field_of_kind(&args[8]->as.dict, id_key,
+                                         ValueKindInt, "texture", "texture");
   if (!id)
     vm->state = ExecStateExit;
 
@@ -568,8 +582,9 @@ Value *text_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
     return value_unit(vm->current_frame);
 
-  Value *id = try_get_dict_field_of_kind_str_key(&args[3]->as.dict, STR_LIT("id"),
-                                                 ValueKindInt, "font", "font");
+  Value *id_key = value_string(STR_LIT("id"), vm->current_frame);
+  Value *id = try_get_dict_field_of_kind(&args[3]->as.dict, id_key,
+                                         ValueKindInt, "font", "font");
   if (!id)
     vm->state = ExecStateExit;
 

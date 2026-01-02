@@ -15,9 +15,6 @@ bool   value_to_bool(Value *value);
 Value *dict_get_value(Dict *dict, Value *key);
 void   dict_set_value(StackFrame *frame, Dict *dict,
                       Value *key, Value *value);
-Value *dict_get_value_str_key(Dict *dict, Str string);
-void   dict_set_value_str_key(StackFrame *frame, Dict *dict,
-                              Str string, Value *value);
 void   sb_push_value(StringBuilder *sb, Value *value,
                      u32 level, bool kind,
                      bool quote_string, Vm *vm);

@@ -115,48 +115,6 @@ void dict_set_value(StackFrame *frame, Dict *dict,
   entry->value = value;
 }
 
-Value *dict_get_value_str_key(Dict *dict, Str string) {
-  u64 index = str_hash(string) % DICT_HASH_TABLE_CAP;
-
-  DictValue *entry = dict->items[index];
-  while (entry && entry->next &&
-         (entry->key->kind != ValueKindString ||
-          !str_eq(entry->key->as.string.str, string)))
-    entry = entry->next;
-
-  if (entry)
-    return entry->value;
-  else
-    return NULL;
-}
-
-void dict_set_value_str_key(StackFrame *frame, Dict *dict,
-                            Str string, Value *value) {
-  Value *key = value_string(string, frame);
-
-  u64 index = str_hash(string) % DICT_HASH_TABLE_CAP;
-
-  DictValue *entry = dict->items[index];
-  while (entry && entry->next && !value_eq(entry->key, key))
-    entry = entry->next;
-
-  if (entry) {
-    if (value_eq(entry->key, key)) {
-      --entry->value->refs_count;
-    } else {
-      entry->next = arena_alloc(&frame->arena, sizeof(DictValue));
-      entry = entry->next;
-      entry->key = key;
-    }
-  } else {
-    entry = arena_alloc(&frame->arena, sizeof(DictValue));
-    entry->key = key;
-    dict->items[index] = entry;
-  }
-
-  entry->value = value;
-}
-
 void sb_push_value(StringBuilder *sb, Value *value,
                    u32 level, bool kind,
                    bool quote_string, Vm *vm) {

@@ -141,65 +141,75 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
     type = STR_LIT("key-press");
 
     WinxKeyCode key_code = event->as.key.key_code;
-    dict_set_value_str_key(vm->current_frame, &result, STR_LIT("key-code"),
-                           value_string(key_code_names[key_code], vm->current_frame));
+    Value *key_code_key = value_string(STR_LIT("key-code"), vm->current_frame);
+    dict_set_value(vm->current_frame, &result, key_code_key,
+                   value_string(key_code_names[key_code], vm->current_frame));
 
     Str _char = { arena_alloc(&vm->current_frame->arena, 1), 1 };
     *_char.ptr = (char) event->as.key._char;
-    dict_set_value_str_key(vm->current_frame, &result, STR_LIT("char"),
-                           value_string(_char, vm->current_frame));
+    Value *char_key = value_string(STR_LIT("char"), vm->current_frame);
+    dict_set_value(vm->current_frame, &result, char_key,
+                   value_string(_char, vm->current_frame));
   } break;
 
   case WinxEventKindKeyRelease: {
     type = STR_LIT("key-release");
 
     WinxKeyCode key_code = event->as.key.key_code;
-    dict_set_value_str_key(vm->current_frame, &result, STR_LIT("key-code"),
-                           value_string(key_code_names[key_code], vm->current_frame));
+    Value *key_code_key = value_string(STR_LIT("key-code"), vm->current_frame);
+    dict_set_value(vm->current_frame, &result, key_code_key,
+                   value_string(key_code_names[key_code], vm->current_frame));
 
     Str _char = { arena_alloc(&vm->current_frame->arena, 1), 1 };
     *_char.ptr = (char) event->as.key._char;
-    dict_set_value_str_key(vm->current_frame, &result, STR_LIT("char"),
-                           value_string(_char, vm->current_frame));
+    Value *char_key = value_string(STR_LIT("char"), vm->current_frame);
+    dict_set_value(vm->current_frame, &result, char_key,
+                   value_string(_char, vm->current_frame));
   } break;
 
   case WinxEventKindKeyHold: {
     type = STR_LIT("key-hold");
 
     WinxKeyCode key_code = event->as.key.key_code;
-    dict_set_value_str_key(vm->current_frame, &result, STR_LIT("key-code"),
-                           value_string(key_code_names[key_code], vm->current_frame));
+    Value *key_code_key = value_string(STR_LIT("key-code"), vm->current_frame);
+    dict_set_value(vm->current_frame, &result, key_code_key,
+                   value_string(key_code_names[key_code], vm->current_frame));
 
     Str _char = { arena_alloc(&vm->current_frame->arena, 1), 1 };
     *_char.ptr = (char) event->as.key._char;
-    dict_set_value_str_key(vm->current_frame, &result, STR_LIT("char"),
-                           value_string(_char, vm->current_frame));
+    Value *char_key = value_string(STR_LIT("char"), vm->current_frame);
+    dict_set_value(vm->current_frame, &result, char_key,
+                   value_string(_char, vm->current_frame));
   } break;
 
   case WinxEventKindButtonPress: {
     type = STR_LIT("button-press");
 
     WinxMouseButton button = event->as.button.button;
-    dict_set_value_str_key(vm->current_frame, &result, STR_LIT("button"),
-                           value_string(mouse_button_names[button], vm->current_frame));
+    Value *button_key = value_string(STR_LIT("button"), vm->current_frame);
+    dict_set_value(vm->current_frame, &result, button_key,
+                   value_string(mouse_button_names[button], vm->current_frame));
   } break;
 
   case WinxEventKindButtonRelease: {
     type = STR_LIT("button-release");
 
     WinxMouseButton button = event->as.button.button;
-    dict_set_value_str_key(vm->current_frame, &result, STR_LIT("button"),
-                           value_string(mouse_button_names[button], vm->current_frame));
+    Value *button_key = value_string(STR_LIT("button"), vm->current_frame);
+    dict_set_value(vm->current_frame, &result, button_key,
+                   value_string(mouse_button_names[button], vm->current_frame));
   } break;
 
   case WinxEventKindMouseMove: {
     type = STR_LIT("mouse-move");
 
-    dict_set_value_str_key(vm->current_frame, &result, STR_LIT("x"),
-                           value_int(event->as.mouse_move.x, vm->current_frame));
+    Value *x_key = value_string(STR_LIT("x"), vm->current_frame);
+    dict_set_value(vm->current_frame, &result, x_key,
+                   value_int(event->as.mouse_move.x, vm->current_frame));
 
-    dict_set_value_str_key(vm->current_frame, &result, STR_LIT("y"),
-                           value_int(event->as.mouse_move.y, vm->current_frame));
+    Value *y_key = value_string(STR_LIT("y"), vm->current_frame);
+    dict_set_value(vm->current_frame, &result, y_key,
+                   value_int(event->as.mouse_move.y, vm->current_frame));
   } break;
 
   case WinxEventKindFocus: {
@@ -213,11 +223,13 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
   case WinxEventKindResize: {
     type = STR_LIT("resize");
 
-    dict_set_value_str_key(vm->current_frame, &result, STR_LIT("width"),
-                           value_float((f32) event->as.resize.width, vm->current_frame));
+    Value *width_key = value_string(STR_LIT("width"), vm->current_frame);
+    dict_set_value(vm->current_frame, &result, width_key,
+                   value_float((f32) event->as.resize.width, vm->current_frame));
 
-    dict_set_value_str_key(vm->current_frame, &result, STR_LIT("height"),
-                           value_float((f32) event->as.resize.height, vm->current_frame));
+    Value *height_key = value_string(STR_LIT("height"), vm->current_frame);
+    dict_set_value(vm->current_frame, &result, height_key,
+                   value_float((f32) event->as.resize.height, vm->current_frame));
   } break;
 
   case WinxEventKindQuit: {
@@ -225,8 +237,9 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
   } break;
   }
 
-  dict_set_value_str_key(vm->current_frame, &result, STR_LIT("type"),
-                         value_string(type, vm->current_frame));
+  Value *type_key = value_string(STR_LIT("type"), vm->current_frame);
+  dict_set_value(vm->current_frame, &result, type_key,
+                 value_string(type, vm->current_frame));
 
   return value_dict(result, vm->current_frame);
 }
