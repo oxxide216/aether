@@ -102,8 +102,8 @@ static void save_expr_data(IrExpr *expr, u8 **data, u32 *data_size,
 
   case IrExprKindSetAt: {
     save_str_data(expr->as.set_at.dest, data, data_size, end);
-    save_expr_data(expr->as.set_at.key, data, data_size,
-                   end, path_offsets, file_path);
+    save_block_data(&expr->as.set_at.keys, data, data_size,
+                    end, path_offsets, file_path);
     save_expr_data(expr->as.set_at.value, data, data_size,
                    end, path_offsets, file_path);
   } break;

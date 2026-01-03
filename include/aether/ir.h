@@ -83,9 +83,9 @@ typedef struct {
 } IrExprGetAt;
 
 typedef struct {
-  Str     dest;
-  IrExpr *key;
-  IrExpr *value;
+  Str      dest;
+  IrBlock  keys;
+  IrExpr  *value;
 } IrExprSetAt;
 
 typedef struct {

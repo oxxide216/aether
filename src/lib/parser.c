@@ -833,12 +833,20 @@ static IrExpr *parser_parse_expr(Parser *parser, bool is_short) {
       Str dest = parser_expect_token(parser, MASK(TT_IDENT)).lexeme;
 
       token = parser_peek_token(parser);
+      if (token.eof)
+        break;
+
       if (token.id == TT_QOLON) {
-        parser_next_token(parser);
+        Block keys = {0};
+
+        while (!(token = parser_peek_token(parser)).eof && token.id == TT_QOLON) {
+          parser_next_token(parser);
+          block_append(&keys, parser_parse_expr(parser, true), parser->arena);
+        }
 
         expr->kind = IrExprKindSetAt;
-        expr->as.set_at.dest = copy_str(dest, parser->arena);
-        expr->as.set_at.key = parser_parse_expr(parser, false);
+        expr->as.set_at.dest = dest;
+        expr->as.set_at.keys = (IrBlock) { keys.items, keys.len };
         expr->as.set_at.value = parser_parse_expr(parser, false);
       } else {
         expr->kind = IrExprKindSet;

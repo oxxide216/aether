@@ -11,12 +11,13 @@
       return NULL;                                              \
   } while (0)
 
-bool   value_to_bool(Value *value);
-Value *dict_get_value(Dict *dict, Value *key);
-void   dict_set_value(StackFrame *frame, Dict *dict,
-                      Value *key, Value *value);
-void   sb_push_value(StringBuilder *sb, Value *value,
-                     u32 level, bool kind,
-                     bool quote_string, Vm *vm);
+bool    value_to_bool(Value *value);
+Value **dict_get_value_root(Dict *dict, Value *key);
+Value  *dict_get_value(Dict *dict, Value *key);
+void    dict_set_value(StackFrame *frame, Dict *dict,
+                       Value *key, Value *value);
+void    sb_push_value(StringBuilder *sb, Value *value,
+                      u32 level, bool kind,
+                      bool quote_string, Vm *vm);
 
 #endif // MISC_H

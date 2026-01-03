@@ -438,9 +438,7 @@ static void catch_vars(Vm *vm, Strs *local_names,
   } break;
 
   case IrExprKindSetAt: {
-    try_catch_var(expr->as.set_at.dest, vm, local_names, catched_values, frame);
-
-    CATCH_VARS(vm, local_names, catched_values, frame, expr->as.set_at.key);
+    CATCH_VARS_BLOCK(vm, local_names, catched_values, frame, &expr->as.set_at.keys);
     CATCH_VARS(vm, local_names, catched_values, frame, expr->as.set_at.value);
   } break;
 
@@ -644,6 +642,245 @@ Value *execute_func(Vm *vm, Value **args, Func *func,
   return result_stable;
 }
 
+Value *execute_get_at_expr(Vm *vm, IrExprMeta *meta, Value *src, Value *key, Value ***root) {
+  if (src->kind == ValueKindList) {
+    if (key->kind != ValueKindInt) {
+      PERROR(META_FMT, "get: lists can only be indexed with integers\n",
+             META_ARG(*meta));
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+
+      return value_unit(vm->current_frame);
+    }
+
+    ListNode *node = src->as.list->next;
+    u32 i = 0;
+    while (node && i < (u32) key->as._int) {
+      node = node->next;
+      ++i;
+    }
+
+    if (node) {
+      if (root)
+        *root = &node->value;
+
+      return node->value;
+    } else {
+      return value_unit(vm->current_frame);
+    }
+  } else if (src->kind == ValueKindString) {
+    if (key->kind != ValueKindInt) {
+      PERROR(META_FMT, "get: strings can only be indexed with integers\n",
+             META_ARG(*meta));
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+
+      return value_unit(vm->current_frame);
+    }
+
+    if ((u32) key->as._int >= src->as.string.str.len) {
+      PERROR(META_FMT, "get: index out of bounds\n",
+             META_ARG(*meta));
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+
+      return value_unit(vm->current_frame);
+    }
+
+    u32 index = 0;
+    u32 byte_index = 0;
+    u32 wchar_len;
+
+    while (get_next_wchar(src->as.string.str, index, &wchar_len) != '\0') {
+      if (index == key->as._int) {
+        Str sub_string = {
+          src->as.string.str.ptr + byte_index,
+          wchar_len,
+        };
+
+        *root = NULL;
+        return value_string(sub_string, vm->current_frame);
+      }
+
+      ++index;
+      byte_index += wchar_len;
+    }
+
+    PERROR(META_FMT, "get: index out of bounds\n",
+           META_ARG(*meta));
+    vm->state = ExecStateExit;
+    vm->exit_code = 1;
+
+    return value_unit(vm->current_frame);
+  } else if (src->kind == ValueKindBytes) {
+    if (key->as._int >= src->as.bytes.len) {
+      PERROR(META_FMT, "get: index out of bounds\n",
+             META_ARG(*meta));
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+
+      return value_unit(vm->current_frame);
+    }
+
+    return value_int(src->as.bytes.ptr[key->as._int], vm->current_frame);
+  }  else if (src->kind == ValueKindDict) {
+    Value **result = dict_get_value_root(&src->as.dict, key);
+
+    if (!result)
+      return value_unit(vm->current_frame);
+
+    if (root)
+      *root = result;
+
+    return *result;
+  } else {
+    StringBuilder sb = {0};
+    sb_push_value(&sb, src, 0, true, true, vm);
+
+    PERROR(META_FMT, "get: source should be list, string or dictionary, but got "STR_FMT"\n",
+           META_ARG(*meta), STR_ARG(sb_to_str(sb)));
+    vm->state = ExecStateExit;
+    vm->exit_code = 1;
+
+    free(sb.buffer);
+
+    return value_unit(vm->current_frame);
+  }
+}
+
+void execute_set_at_expr(Vm *vm, IrExprMeta *meta, Str dest, IrBlock *keys, Value *value) {
+  Var *dest_var = get_var(vm, dest);
+  if (!dest_var) {
+    PERROR(META_FMT, "Symbol "STR_FMT" was not defined before usage\n",
+           META_ARG(*meta), STR_ARG(dest));
+    vm->state = ExecStateExit;
+    vm->exit_code = 1;
+
+    return;
+  }
+
+  Value **dest_value_root = NULL;
+  Value *dest_value = dest_var->value;
+
+  for (u32 i = 0; i + 1 < keys->len; ++i) {
+    dest_value_root = NULL;
+
+    Value *key = execute_expr(vm, keys->items[i], true);
+    if (vm->state != ExecStateContinue)
+      return;
+
+    dest_value = execute_get_at_expr(vm, &keys->items[i]->meta,
+                                     dest_value, key, &dest_value_root);
+    if (vm->state != ExecStateContinue)
+      return;
+
+    if (!dest_value_root) {
+      StringBuilder sb = {0};
+      sb_push_value(&sb, dest_value, 0, true, true, vm);
+
+      PERROR(META_FMT, "set: destination should be list, dictionary or bytes, but got "STR_FMT"\n",
+             META_ARG(*meta), STR_ARG(sb_to_str(sb)));
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+
+      free(sb.buffer);
+
+      return;
+    }
+  }
+
+  if (dest_value->refs_count > 1 && !dest_value->is_atom) {
+    *dest_value_root = value_clone(dest_value, dest_value->frame);
+    dest_value = *dest_value_root;
+  }
+
+  u32 last_key_index = keys->len - 1;
+
+  Value *key = execute_expr(vm, keys->items[last_key_index], true);
+
+  if (value->frame == dest_value->frame)
+    ++value->refs_count;
+  else
+    value = value_clone(value, dest_value->frame);
+
+  if (dest_value->kind == ValueKindList) {
+    if (key->kind != ValueKindInt) {
+      PERROR(META_FMT, "set: only integer can be used as a list index\n",
+             META_ARG(*meta));
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+
+      return;
+    }
+
+    ListNode *node = dest_value->as.list->next;
+    u32 i = 0;
+    while (node && i < (u32) key->as._int) {
+      node = node->next;
+      ++i;
+    }
+
+    if (!node) {
+      PERROR(META_FMT, "set: index out of bounds\n",
+             META_ARG(*meta));
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+
+      return;
+    }
+
+    --node->value->refs_count;
+
+    node->value = value;
+  } else if (dest_value->kind == ValueKindBytes) {
+    if (key->kind != ValueKindInt) {
+      PERROR(META_FMT, "set: only integer can be used as a bytes index\n",
+             META_ARG(*meta));
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+
+      return;
+    }
+
+    if (value->kind != ValueKindInt) {
+      PERROR(META_FMT, "set: only integer value can be assigned to a bytes array\n",
+             META_ARG(*meta));
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+
+      return;
+    }
+
+    if (key->as._int >= dest_value->as.bytes.len) {
+      PERROR(META_FMT, "set: index out of bounds\n",
+             META_ARG(*meta));
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+
+      return;
+    }
+
+    dest_value->as.bytes.ptr[key->as._int] = value->as._int;
+  } else if (dest_value->kind == ValueKindDict) {
+    if (key->frame == dest_value->frame)
+      ++key->refs_count;
+    else
+      key = value_clone(key, dest_value->frame);
+
+    dict_set_value(dest_value->frame, &dest_value->as.dict, key, value);
+  } else {
+    StringBuilder sb = {0};
+    sb_push_value(&sb, dest_var->value, 0, true, true, vm);
+
+    PERROR(META_FMT, "set: destination should be list, dictionary or bytes, but got "STR_FMT"\n",
+           META_ARG(*meta), STR_ARG(sb_to_str(sb)));
+    vm->state = ExecStateExit;
+    vm->exit_code = 1;
+
+    free(sb.buffer);
+  }
+}
+
 Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
   Value *result = NULL;
 
@@ -824,196 +1061,18 @@ Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected) {
     Value *key;
     EXECUTE_EXPR_SET(vm, key, expr->as.get_at.key, true);
 
-    if (src->kind == ValueKindList) {
-      if (key->kind != ValueKindInt) {
-        PERROR(META_FMT, "get: lists can only be indexed with integers\n",
-               META_ARG(expr->meta));
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
-
-        return value_unit(vm->current_frame);
-      }
-
-      ListNode *node = src->as.list->next;
-      u32 i = 0;
-      while (node && i < (u32) key->as._int) {
-        node = node->next;
-        ++i;
-      }
-
-      if (node)
-        result = node->value;
-      else
-        result = value_unit(vm->current_frame);
-    } else if (src->kind == ValueKindString) {
-      if (key->kind != ValueKindInt) {
-        PERROR(META_FMT, "get: strings can only be indexed with integers\n",
-               META_ARG(expr->meta));
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
-
-        return value_unit(vm->current_frame);
-      }
-
-      if ((u32) key->as._int >= src->as.string.str.len) {
-        PERROR(META_FMT, "get: index out of bounds\n",
-               META_ARG(expr->meta));
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
-
-        return value_unit(vm->current_frame);
-      }
-
-      u32 index = 0;
-      u32 byte_index = 0;
-      u32 wchar_len;
-
-      while (get_next_wchar(src->as.string.str, index, &wchar_len) != '\0') {
-        if (index == key->as._int) {
-          Str sub_string = {
-            src->as.string.str.ptr + byte_index,
-            wchar_len,
-          };
-          return value_string(sub_string, vm->current_frame);
-        }
-
-        ++index;
-        byte_index += wchar_len;
-      }
-
-      PERROR(META_FMT, "get: index out of bounds\n",
-             META_ARG(expr->meta));
-      vm->state = ExecStateExit;
-      vm->exit_code = 1;
-
-      return value_unit(vm->current_frame);
-    } else if (src->kind == ValueKindBytes) {
-      if (key->as._int >= src->as.bytes.len) {
-        PERROR(META_FMT, "get: index out of bounds\n",
-               META_ARG(expr->meta));
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
-
-        return value_unit(vm->current_frame);
-      }
-
-      result = value_int(src->as.bytes.ptr[key->as._int], vm->current_frame);
-    }  else if (src->kind == ValueKindDict) {
-      result = dict_get_value(&src->as.dict, key);
-      if (!result)
-        result = value_unit(vm->current_frame);
-    } else {
-      StringBuilder sb = {0};
-      sb_push_value(&sb, src, 0, true, true, vm);
-
-      PERROR(META_FMT, "get: source should be list, string or dictionary, but got "STR_FMT"\n",
-             META_ARG(expr->meta), STR_ARG(sb_to_str(sb)));
-      vm->state = ExecStateExit;
-      vm->exit_code = 1;
-
-      free(sb.buffer);
-
-      return value_unit(vm->current_frame);
-    }
+    result = execute_get_at_expr(vm, &expr->meta, src, key, NULL);
+    if (vm->state != ExecStateContinue)
+      return result;
   } break;
 
   case IrExprKindSetAt: {
-    Var *dest_var = get_var(vm, expr->as.set_at.dest);
-    if (!dest_var) {
-      PERROR(META_FMT, "Symbol "STR_FMT" was not defined before usage\n",
-            META_ARG(expr->meta), STR_ARG(expr->as.set_at.dest));
-      vm->state = ExecStateExit;
-      vm->exit_code = 1;
-
-      return value_unit(vm->current_frame);
-    }
-
-    if (dest_var->value->refs_count > 1 && !dest_var->value->is_atom)
-      dest_var->value = value_clone(dest_var->value, dest_var->value->frame);
-
-    Value *key;
-    EXECUTE_EXPR_SET(vm, key, expr->as.set_at.key, true);
     Value *value;
     EXECUTE_EXPR_SET(vm, value, expr->as.set_at.value, true);
 
-    if (value->frame == dest_var->value->frame)
-      ++value->refs_count;
-    else
-      value = value_clone(value, dest_var->value->frame);
-
-    if (dest_var->value->kind == ValueKindList) {
-      if (key->kind != ValueKindInt) {
-        PERROR(META_FMT, "set: only integer can be used as a list index\n",
-               META_ARG(expr->meta));
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
-
-        return value_unit(vm->current_frame);
-      }
-
-      ListNode *node = dest_var->value->as.list->next;
-      u32 i = 0;
-      while (node && i < (u32) key->as._int) {
-        node = node->next;
-        ++i;
-      }
-
-      if (!node) {
-        PERROR(META_FMT, "set: index out of bounds\n",
-               META_ARG(expr->meta));
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
-
-        return value_unit(vm->current_frame);
-      }
-
-      --node->value->refs_count;
-
-      node->value = value;
-    } else if (dest_var->value->kind == ValueKindBytes) {
-      if (key->kind != ValueKindInt) {
-        PERROR(META_FMT, "set: only integer can be used as a bytes index\n",
-               META_ARG(expr->meta));
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
-
-        return value_unit(vm->current_frame);
-      }
-
-      if (value->kind != ValueKindInt) {
-        PERROR(META_FMT, "set: only integer value can be assigned to a bytes array\n",
-               META_ARG(expr->meta));
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
-
-        return value_unit(vm->current_frame);
-      }
-
-      if (key->as._int >= dest_var->value->as.bytes.len) {
-        PERROR(META_FMT, "set: index out of bounds\n",
-               META_ARG(expr->meta));
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
-
-        return value_unit(vm->current_frame);
-      }
-
-      dest_var->value->as.bytes.ptr[key->as._int] = value->as._int;
-    } else if (dest_var->value->kind == ValueKindDict) {
-      dict_set_value(dest_var->value->frame, &dest_var->value->as.dict, key, value);
-    } else {
-      StringBuilder sb = {0};
-      sb_push_value(&sb, dest_var->value, 0, true, true, vm);
-
-      PERROR(META_FMT, "set: destination should be list or dictionary, but got "STR_FMT"\n",
-             META_ARG(expr->meta), STR_ARG(sb_to_str(sb)));
-      vm->state = ExecStateExit;
-      vm->exit_code = 1;
-
-      free(sb.buffer);
-
-      return value_unit(vm->current_frame);
-    }
+    execute_set_at_expr(vm, &expr->meta, expr->as.set_at.dest, &expr->as.set_at.keys, value);
+    if (vm->state != ExecStateContinue)
+      return result;
   } break;
 
   case IrExprKindRet: {

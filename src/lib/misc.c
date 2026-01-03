@@ -77,7 +77,7 @@ static u64 value_hash(Value *value) {
   return result;
 }
 
-Value *dict_get_value(Dict *dict, Value *key) {
+Value **dict_get_value_root(Dict *dict, Value *key) {
   u64 index = value_hash(key) % DICT_HASH_TABLE_CAP;
 
   DictValue *entry = dict->items[index];
@@ -85,7 +85,16 @@ Value *dict_get_value(Dict *dict, Value *key) {
     entry = entry->next;
 
   if (entry && value_eq(entry->key, key))
-    return entry->value;
+    return &entry->value;
+  else
+    return NULL;
+}
+
+Value *dict_get_value(Dict *dict, Value *key) {
+  Value **root = dict_get_value_root(dict, key);
+
+  if (root)
+    return *root;
   else
     return NULL;
 }

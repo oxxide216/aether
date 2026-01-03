@@ -84,9 +84,9 @@ void eliminate_dead_code_expr(IrExpr *expr, Defs *defs) {
   } break;
 
   case IrExprKindSetAt: {
-    use_ident(expr->as.set_at.dest, defs);
+    for (u32 i = 0; i < expr->as.set_at.keys.len; ++i)
+    eliminate_dead_code_expr(expr->as.set_at.keys.items[i], defs);
 
-    eliminate_dead_code_expr(expr->as.set_at.key, defs);
     eliminate_dead_code_expr(expr->as.set_at.value, defs);
   } break;
 

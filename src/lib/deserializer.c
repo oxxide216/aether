@@ -91,11 +91,10 @@ static void load_expr_data(IrExpr *expr, u8 *data, u32 *end,
   } break;
 
   case IrExprKindSetAt: {
-    expr->as.set_at.key = arena_alloc(arena, sizeof(IrExpr));
     expr->as.set_at.value = arena_alloc(arena, sizeof(IrExpr));
 
     load_str_data(&expr->as.set_at.dest, data, end, arena);
-    load_expr_data(expr->as.set_at.key, data, end, path_offsets, arena);
+    load_block_data(&expr->as.set_at.keys, data, end, path_offsets, arena);
     load_expr_data(expr->as.set_at.value, data, end, path_offsets, arena);
   } break;
 
