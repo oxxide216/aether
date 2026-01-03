@@ -761,7 +761,7 @@ void execute_set_at_expr(Vm *vm, IrExprMeta *meta, Str dest, IrBlock *keys, Valu
     return;
   }
 
-  Value **dest_value_root = NULL;
+  Value **dest_value_root = &dest_var->value;
   Value *dest_value = dest_var->value;
 
   for (u32 i = 0; i + 1 < keys->len; ++i) {
