@@ -698,7 +698,9 @@ Value *execute_get_at_expr(Vm *vm, IrExprMeta *meta, Value *src, Value *key, Val
           wchar_len,
         };
 
-        *root = NULL;
+        if (root)
+          *root = NULL;
+
         return value_string(sub_string, vm->current_frame);
       }
 
