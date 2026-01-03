@@ -33,6 +33,7 @@ typedef Da(Font) Fonts;
 void load_font(Fonts *fonts, char *path);
 
 void render_text(f32 x, f32 y, u32 line_height, Str text,
-                 Font *font, f32 *width, bool measure_only);
+                 f32 r, f32 g, f32 b, f32 a, Font *font,
+                 f32 *width, bool measure_only);
 
 #endif // AETHER_GLASS_TEXT_H

@@ -113,7 +113,8 @@ static Glyph *load_glyph(Font *font, u32 _char, u32 line_height, f32 scale) {
 }
 
 void render_text(f32 x, f32 y, u32 line_height, Str text,
-                 Font *font, f32 *width, bool measure_only) {
+                 f32 r, f32 g, f32 b, f32 a,  Font *font,
+                 f32 *width, bool measure_only) {
   f32 scale = stbtt_ScaleForPixelHeight(&font->info, line_height);
   f32 x_offset = 0.0;
 
@@ -131,8 +132,7 @@ void render_text(f32 x, f32 y, u32 line_height, Str text,
       push_primitive(x + x_offset, y + glyph->y_offset + line_height,
                      glyph->size.x, glyph->size.y,
                      uv.x, uv.y, uv.z, uv.w,
-                     1.0, 1.0, 1.0, 1.0,
-                     font->texture.id, TYPE_TEXT);
+                     r, g, b, a, font->texture.id, TYPE_TEXT);
     }
 
     x_offset += glyph->size.x;

@@ -415,6 +415,7 @@ Value *text_width_intrinsic(Vm *vm, Value **args) {
     f32 result = 0.0;
     render_text(0.0, 0.0, args[0]->as._int,
                 args[2]->as.string.str,
+                1.0, 1.0, 1.0, 1.0,
                 font, &result, true);
 
     return value_float(result, vm->current_frame);
@@ -558,6 +559,26 @@ Value *textured_quad_intrinsic(Vm *vm, Value **args) {
   return value_unit(vm->current_frame);
 }
 
+Value *textured_quad_colored_intrinsic(Vm *vm, Value **args) {
+  if (!initialized)
+    return value_unit(vm->current_frame);
+
+  Value *id_key = value_string(STR_LIT("id"), vm->current_frame);
+  Value *id = try_get_dict_field_of_kind(&args[4]->as.dict, id_key,
+                                         ValueKindInt, "texture", "texture");
+  if (!id)
+    vm->state = ExecStateExit;
+
+  push_primitive(args[0]->as._float, args[1]->as._float,
+                 args[2]->as._float, args[3]->as._float,
+                 0.0, 0.0, 1.0, 1.0,
+                 args[5]->as._float, args[6]->as._float,
+                 args[7]->as._float, args[8]->as._float,
+                 id->as._int, TYPE_TEXTURE);
+
+  return value_unit(vm->current_frame);
+}
+
 Value *tile_intrinsic(Vm *vm, Value **args) {
   if (!initialized)
     return value_unit(vm->current_frame);
@@ -591,8 +612,32 @@ Value *text_intrinsic(Vm *vm, Value **args) {
   if (id->as._int < glass.fonts.len) {
     Font *font = glass.fonts.items + id->as._int;
 
-    render_text(args[0]->as._float, args[1]->as._float, args[2]->as._int,
-                args[4]->as.string.str, font, NULL, false);
+    render_text(args[0]->as._float, args[1]->as._float,
+                args[2]->as._int, args[4]->as.string.str,
+                1.0, 1.0, 1.0, 1.0, font, NULL, false);
+  }
+
+  return value_unit(vm->current_frame);
+}
+
+Value *text_colored_intrinsic(Vm *vm, Value **args) {
+  if (!initialized)
+    return value_unit(vm->current_frame);
+
+  Value *id_key = value_string(STR_LIT("id"), vm->current_frame);
+  Value *id = try_get_dict_field_of_kind(&args[3]->as.dict, id_key,
+                                         ValueKindInt, "font", "font");
+  if (!id)
+    vm->state = ExecStateExit;
+
+  if (id->as._int < glass.fonts.len) {
+    Font *font = glass.fonts.items + id->as._int;
+
+    render_text(args[0]->as._float, args[1]->as._float,
+                args[2]->as._int, args[4]->as.string.str,
+                args[5]->as._float, args[6]->as._float,
+                args[7]->as._float, args[8]->as._float,
+                font, NULL, false);
   }
 
   return value_unit(vm->current_frame);
@@ -626,6 +671,10 @@ Intrinsic glass_intrinsics[] = {
   { STR_LIT("glass/textured-quad"), false, 5,
     { ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindDict },
     &textured_quad_intrinsic, NULL },
+  { STR_LIT("glass/textured-quad-colored"), false, 9,
+    { ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindDict,
+      ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFloat },
+    &textured_quad_colored_intrinsic, NULL },
   { STR_LIT("glass/tile"), false, 9,
     { ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFloat,
       ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindDict },
@@ -633,6 +682,10 @@ Intrinsic glass_intrinsics[] = {
   { STR_LIT("glass/text"), false, 5,
     { ValueKindFloat, ValueKindFloat, ValueKindInt, ValueKindDict, ValueKindString },
     &text_intrinsic, NULL },
+  { STR_LIT("glass/text-colored"), false, 9,
+    { ValueKindFloat, ValueKindFloat, ValueKindInt, ValueKindDict, ValueKindString,
+      ValueKindFloat, ValueKindFloat, ValueKindFloat, ValueKindFloat },
+    &text_colored_intrinsic, NULL },
 };
 
 u32 glass_intrinsics_len = ARRAY_LEN(glass_intrinsics);
