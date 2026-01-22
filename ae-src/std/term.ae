@@ -51,19 +51,19 @@
 (let term/go-right   '\e[1C')
 (let term/go-left    '\e[1D')
 
-(let term/up-n         [n] ->  (+ '\e[' n 'A'))
-(let term/down-n       [n] ->  (+ '\e[' n 'B'))
-(let term/right-n      [n] ->  (+ '\e[' n 'C'))
-(let term/left-n       [n] ->  (+ '\e[' n 'D'))
+(let term/up-n         \n ->  (+ '\e[' n 'A'))
+(let term/down-n       \n ->  (+ '\e[' n 'B'))
+(let term/right-n      \n ->  (+ '\e[' n 'C'))
+(let term/left-n       \n ->  (+ '\e[' n 'D'))
 
-(let term/go-to        [x y] -> (+ '\e[' (+ (+ (to-str y) ';')
-                                            (+ (to-str x) 'H'))))
+(let term/go-to        \x y -> (+ '\e[' (+ (+ (to-str y) ';')
+                                           (+ (to-str x) 'H'))))
 
-(let term/get-size     [] -> import 'term/get-size')
-(let term/raw-mode-on  [] -> import 'term/raw-mode-on')
-(let term/raw-mode-off [] -> import 'term/raw-mode-off')
+(let term/get-size     \-> import 'term/get-size')
+(let term/raw-mode-on  \-> import 'term/raw-mode-on')
+(let term/raw-mode-off \-> import 'term/raw-mode-off')
 
-(let is-alpha [char] ->
+(let is-alpha \char ->
   (if (== char '')
     (ret false))
 
@@ -73,7 +73,7 @@
       (and (>= int (to-int (to-bytes 'a')))
            (<= int (to-int (to-bytes 'z'))))))
 
-(let is-num [char] ->
+(let is-num \char ->
   (if (== char '')
     (ret false))
 
@@ -81,12 +81,12 @@
   (and (>= int (to-int (to-bytes '0')))
        (<= int (to-int (to-bytes '9')))))
 
-(let is-alnum [char] ->
+(let is-alnum \char ->
   (match (is-alpha char)
     true => true
     false => (is-num char)))
 
-(let term/get-key [] ->
+(let term/get-key \->
   (let key (input-size 1))
   (if (== key '\e')
     (let char (input-size 1))

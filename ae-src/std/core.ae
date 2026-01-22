@@ -1,104 +1,107 @@
+(macro for \item in collection ...body ->
+  (for-each collection \item -> body))
+
+(macro from \lower to upper with item ...body ->
+  (for-each (gen-range lower upper) \item -> body))
+
 ; Base
-(let head [list] -> import 'head')
-(let tail [list] -> import 'tail')
-(let last [list] -> import 'last')
-(let get-index [collection item] -> import 'get-index')
-(let len [collection] -> import 'len')
-(let len-bytes [str] -> import 'len-bytes')
-(let get-range [list begin end] -> import 'get-range')
-(let gen-range [begin end] -> import 'gen-range')
-(let map [func list] -> import 'map')
-(let filter [func list] -> import 'filter')
-(let fold [func accumulator list] -> import 'fold')
-(let zip [list-a list-b] -> import 'zip')
-(let sort [list] -> import 'sort')
-(let for-each [collection func] -> import 'for-each')
+(let head \list -> import 'head')
+(let tail \list -> import 'tail')
+(let last \list -> import 'last')
+(let get-index \collection item -> import 'get-index')
+(let len \collection -> import 'len')
+(let len-bytes \str -> import 'len-bytes')
+(let get-range \list begin end -> import 'get-range')
+(let gen-range \begin end -> import 'gen-range')
+(let map \func list -> import 'map')
+(let filter \func list -> import 'filter')
+(let fold \func accumulator list -> import 'fold')
+(let zip \list-a list-b -> import 'zip')
+(let sort \list -> import 'sort')
+(let for-each \collection func -> import 'for-each')
 
 ; Bytes
-(let add-byte-64 [bytes byte] -> import 'add-byte-64')
-(let add-byte-32 [bytes byte] -> import 'add-byte-32')
-(let add-byte-16 [bytes byte] -> import 'add-byte-16')
-(let add-byte-8 [bytes byte] -> import 'add-byte-8')
+(let add-byte-64 \bytes byte -> import 'add-byte-64')
+(let add-byte-32 \bytes byte -> import 'add-byte-32')
+(let add-byte-16 \bytes byte -> import 'add-byte-16')
+(let add-byte-8 \bytes byte -> import 'add-byte-8')
 
 ; Conversions
-(let to-str [value] -> import 'to-str')
-(let to-bytes [value] -> import 'to-bytes')
-(let to-int [value] -> import 'to-int')
-(let to-float [value] -> import 'to-float')
-(let to-bool [value] -> import 'to-bool')
+(let to-str \value -> import 'to-str')
+(let to-bytes \value -> import 'to-bytes')
+(let to-int \value -> import 'to-int')
+(let to-float \value -> import 'to-float')
+(let to-bool \value -> import 'to-bool')
 
 ; Math
-(let + [a b] -> import 'add')
-(let - [a b] -> import 'sub')
-(let * [a b] -> import 'mul')
-(let / [a b] -> import 'div')
-(let % [a b] -> import 'mod')
+(let + \a b -> import 'add')
+(let - \a b -> import 'sub')
+(let * \a b -> import 'mul')
+(let / \a b -> import 'div')
+(let % \a b -> import 'mod')
 
 ; Comparisons
-(let == [a b] -> import 'eq')
-(let != [a b] -> import 'ne')
-(let < [a b] -> import 'ls')
-(let <= [a b] -> import 'le')
-(let > [a b] -> import 'gt')
-(let >= [a b] -> import 'ge')
+(let == \a b -> import 'eq')
+(let != \a b -> import 'ne')
+(let < \a b -> import 'ls')
+(let <= \a b -> import 'le')
+(let > \a b -> import 'gt')
+(let >= \a b -> import 'ge')
 
 ; Boolean
-(let and [a b] -> import 'and')
-(let or [a b] -> import 'or')
-(let xor [a b] -> import 'xor')
-(let not [value] -> import 'not')
+(let and \a b -> import 'and')
+(let or \a b -> import 'or')
+(let xor \a b -> import 'xor')
+(let not \value -> import 'not')
 
 ; Types
-(let type [value] -> import 'type')
-(let unit? [value] -> import 'is-unit')
-(let list? [value] -> import 'is-list')
-(let str? [value] -> import 'is-string')
-(let int? [value] -> import 'is-int')
-(let float? [value] -> import 'is-float')
-(let bool? [value] -> import 'is-bool')
-(let func? [value] -> import 'is-func')
-(let dict? [value] -> import 'is-dict')
-(let env? [value] -> import 'is-env')
-(let bytes? [value] -> import 'is-bytes')
-(let not-unit? [value] -> (not (unit? value)))
+(let type \value -> import 'type')
+(let unit? \value -> import 'is-unit')
+(let list? \value -> import 'is-list')
+(let str? \value -> import 'is-string')
+(let int? \value -> import 'is-int')
+(let float? \value -> import 'is-float')
+(let bool? \value -> import 'is-bool')
+(let func? \value -> import 'is-func')
+(let dict? \value -> import 'is-dict')
+(let env? \value -> import 'is-env')
+(let bytes? \value -> import 'is-bytes')
+(let not-unit? \value -> (not (unit? value)))
 
-(let make-env [args] -> import 'make-env')
-(let compile [env code path include-paths compile-macros dce] -> import 'compile')
-(let eval-compiled [env bytecode] -> import 'eval-compiled')
-(let eval-macros [env macro-bytecode] -> import 'eval-macros')
-(let eval [env code path include-paths] -> import 'eval')
+(let make-env \args -> import 'make-env')
+(let compile \env code path include-paths compile-macros dce -> import 'compile')
+(let eval-compiled \env bytecode -> import 'eval-compiled')
+(let eval-macros \env macro-bytecode -> import 'eval-macros')
+(let eval \env code path include-paths -> import 'eval')
 
 ; Other
-(let atom [value] -> import 'atom')
-(let copy [value] -> import 'copy')
-(let exit [exit-code] -> import 'exit')
+(let atom \value -> import 'atom')
+(let copy \value -> import 'copy')
+(let exit \exit-code -> import 'exit')
 
-(let contains? [collection item] ->
+(let contains? \collection item ->
   (let result
     (for -item in collection
       (if (== -item item)
         (break true))))
   (not-unit? result))
 
-(let lists-collide? [a b] ->
+(let lists-collide? \a b ->
   (let result
     (for item in a
       (if (contains? b item)
         (break true))))
   (not-unit? result))
 
-(let count [collection item] ->
+(let count \collection item ->
   (let i 0)
   (for -item in collection
     (if (== -item item)
       (set i (+ i 1))))
   i)
 
-(let dict-add-except [dest src except] ->
+(let dict-add-except \dest src except ->
   (for item in src
     (if (not (contains except item::'key'))
       (set dest::(do item::'key') item::'value')))
   dest)
-
-(macro for [item in collection ...body] ->
-  (for-each collection [item] -> body))

@@ -4,20 +4,21 @@
 
 (use 'config')
 
-(let parse-args [args] ->
+(let parse-args \args ->
   (let mode mode-default)
   (let output-path unit)
   (let output-macros-path unit)
   (let include-paths [])
   (let dce true)
 
-  (while (head args)
+  (while (not-unit? (head args))
     (if (or (== (head args) '-h') (== (head args) '--help'))
-      (print 'Usage: aether [FLAGS] [FILE] [ARGS]...\n\n'
+      (print 'Usage: aether [FLAGS]... [FILE] [ARGS]...\n\n'
              'With no FILE, start REPL.\n\n'
              '  -h --help                 show this message.\n'
              '  -c [FILE]                 output bytecode into [FILE].\n'
              '  -m [FILE]                 output macros bytecode into [FILE].\n'
+             '  -i [PATH]                 [PATH] where to search for included files.\n'
              '  --no-dce                  don\'t apply dead code ellimination.\n')
       (exit 0)
      elif (== (head args) '-c')

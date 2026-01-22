@@ -29,10 +29,9 @@ Value *str_remove_intrinsic(Vm *vm, Value **args) {
   Value *amount = args[2];
 
   if (index->as._int + amount->as._int > string->as.string.str.len) {
+    ERROR("str-remove: out of bounds\n");
     vm->state = ExecStateExit;
     vm->exit_code = 1;
-    PANIC(vm->current_frame, "str-remove: out of bounds\n");
-
     return value_unit(vm->current_frame);
   }
 
@@ -135,20 +134,18 @@ Value *join_intrinsic(Vm *vm, Value **args) {
   ListNode *node = parts->as.list->next;
   while (node) {
     if (node != parts->as.list->next)
-      SB_PUSH_VALUE(&sb, filler, 0, false, false, vm);
+      sb_push_value(&sb, filler, 0, false, false);
 
     if (node->value->kind == ValueKindBytes)
       is_binary = true;
     else if (node->value->kind != ValueKindString) {
+      ERROR("join: wrong part kinds\n");
       vm->state = ExecStateExit;
       vm->exit_code = 1;
-      PANIC(vm->current_frame,
-            "join: wrong part kinds\n");
-
       return value_unit(vm->current_frame);
     }
 
-    SB_PUSH_VALUE(&sb, node->value, 0, false, false, vm);
+    sb_push_value(&sb, node->value, 0, false, false);
 
     node = node->next;
   }

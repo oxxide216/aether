@@ -1,20 +1,20 @@
 ; Standard input stream
 (if (!= current-platform 'web')
-  (let unblock-input [] -> import 'unblock-input')
-  (let block-input [] -> import 'block-input'))
+  (let unblock-input \-> import 'unblock-input')
+  (let block-input \-> import 'block-input'))
 
 ; Files
 ; TODO: file data
-(let get-file-info [path] -> import 'get-file-info')
-(let read-file [path] -> import 'read-file')
-(let read-binary-file [path] -> import 'read-binary-file')
-(let write-file [path content] -> import 'write-file')
-(let write-binary-file [path content] -> import 'write-binary-file')
-(let delete-file [path] -> import 'delete-file')
-(let delete-directory [path] -> import 'delete-directory')
-(let list-directory [path] -> import 'list-directory')
+(let get-file-info \path -> import 'get-file-info')
+(let read-file \path -> import 'read-file')
+(let read-binary-file \path -> import 'read-binary-file')
+(let write-file \path content -> import 'write-file')
+(let write-binary-file \path content -> import 'write-binary-file')
+(let delete-file \path -> import 'delete-file')
+(let delete-directory \path -> import 'delete-directory')
+(let list-directory \path -> import 'list-directory')
 
 ;; Processes
-(let run-command [command] -> import 'run-command')
+(let run-command \command -> import 'run-command')
 
-(let sleep [time] -> import 'sleep')
+(let sleep \time -> import 'sleep')

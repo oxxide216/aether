@@ -1,7 +1,6 @@
 /aether
-/libs/
 /test.abc
 /eval.abc
-/src/lib/grammar.h
+/grammar.h
 /dest/
 /example-dest/

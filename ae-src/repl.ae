@@ -12,7 +12,7 @@
 (let is-running true)
 (let i 0)
 
-(let read-line [prompt] ->
+(let read-line \prompt ->
   (let buffer '')
   (let key (term/get-key))
   (let cursor-index 0)
@@ -77,7 +77,7 @@
    else
     buffer))
 
-(let repl [] ->
+(let repl \->
   (let env (make-env []))
   (load-module env 'core' core-paths)
   (load-module env 'base' base-paths)

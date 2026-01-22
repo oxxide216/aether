@@ -2,16 +2,13 @@
 
 (let EOF '\d3')
 
-(let printf [arg] -> import 'printf')
+(let printf \arg -> import 'printf')
+(let input-size \size -> import 'input-size')
+(let input \-> import 'input')
+(let get-args \-> import 'get-args')
 
-(if (!= current-platform 'web')
-  (let input-size [size] -> import 'input-size')
-  (let input [] -> import 'input'))
-
-(let get-args [] -> import 'get-args')
-
-(macro print [...args] ->
+(macro print \...args ->
   (printf [args]))
 
-(macro println [...args] ->
+(macro println \...args ->
   (printf [args '\n']))

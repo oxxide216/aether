@@ -296,6 +296,7 @@ Value *run_intrinsic(Vm *vm, Value **args) {
         execute_func(vm, args, event_handler, NULL, false);
         if (vm->state != ExecStateContinue)
           break;
+        --vm->stack.len;
 
         if (event.kind == WinxEventKindResize) {
           resized = true;
@@ -316,10 +317,12 @@ Value *run_intrinsic(Vm *vm, Value **args) {
     execute_func(vm, &state, update, NULL, false);
     if (vm->state != ExecStateContinue)
       break;
+    --vm->stack.len;
 
     execute_func(vm, &state, render, NULL, false);
     if (vm->state != ExecStateContinue)
       break;
+    --vm->stack.len;
 
     if (i++ == MAIN_LOOP_FRAME_LENGTH) {
       StackFrame *prev_frame = vm->current_frame->prev;

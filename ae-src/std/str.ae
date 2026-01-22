@@ -1,29 +1,29 @@
-(let str-insert [str at sub-str] -> import 'str-insert')
-(let str-remove [str at amount] -> import 'str-remove')
-(let str-replace [str at sub-str] -> import 'str-replace')
-(let split [str delimiter] -> import 'split')
-(let sub-str [str begin end] -> import 'sub-str')
-(let join [parts filler] -> import 'join')
-(let is-alpha [str] -> import 'is-alpha')
-(let is-number [str] -> import 'is-number')
-(let is-alpha-number [str] -> import 'is-alpha-number')
-(let is-whitespace [str] -> import 'is-whitespace')
+(let str-insert \str at sub-str -> import 'str-insert')
+(let str-remove \str at amount -> import 'str-remove')
+(let str-replace \str at sub-str -> import 'str-replace')
+(let split \str delimiter -> import 'split')
+(let sub-str \str begin end -> import 'sub-str')
+(let join \parts filler -> import 'join')
+(let is-alpha \str -> import 'is-alpha')
+(let is-number \str -> import 'is-number')
+(let is-alpha-number \str -> import 'is-alpha-number')
+(let is-whitespace \str -> import 'is-whitespace')
 
-(let begins-with [str begin] ->
+(let begins-with \str begin ->
   (if (< (len str) (len begin))
     false
    else
     (== (get-range str 0 (len begin)) begin)))
 
-(let ends-with [str end] ->
+(let ends-with \str end ->
   (if (< (len str) (len end))
     false
    else
     (== (get-range str (- (len str) (len end)) (len str)) end)))
 
-(let join-any [parts filler] ->
+(let join-any \parts filler ->
   (let strs
-    (map [part] ->
+    (map \part ->
            (if (str? part)
              part
             else

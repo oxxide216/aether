@@ -1,8 +1,8 @@
 (use 'std/core')
 (use 'std/log')
 
-(let load-module [env name paths] ->
-  (let right-paths (filter [path] ->
+(let load-module \env name paths ->
+  (let right-paths (filter \path ->
                              (to-bool (get-file-info path)) <> paths))
 
   (if (unit? right-paths)
@@ -16,8 +16,8 @@
 
   (eval env content right-paths::0 std-include-paths))
 
-(let load-compiled-module [env name path] ->
-  (let right-paths (filter [path] ->
+(let load-compiled-module \env name path ->
+  (let right-paths (filter \path ->
                              (get-file-info path) <> paths))
 
   (if (unit? right-paths)

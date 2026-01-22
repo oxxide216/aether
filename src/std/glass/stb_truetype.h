@@ -10,7 +10,7 @@
 //
 // =======================================================================
 //
-//   This library processes TrueType files:
+//   This library funcesses TrueType files:
 //        parse files
 //        extract glyph metrics
 //        extract glyph shapes
@@ -745,7 +745,7 @@ STBTT_DEF int stbtt_InitFont(stbtt_fontinfo *info, const unsigned char *data, in
 STBTT_DEF int stbtt_FindGlyphIndex(const stbtt_fontinfo *info, int unicode_codepoint);
 // If you're going to perform multiple operations on the same character
 // and you want a speed-up, call this function with the character you're
-// going to process, then use glyph-based functions instead of the
+// going to funcess, then use glyph-based functions instead of the
 // codepoint-based functions.
 // Returns 0 if the character codepoint is not defined in the font.
 
@@ -3005,7 +3005,7 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
             ++e;
          }
 
-         // now process all active edges in XOR fashion
+         // now funcess all active edges in XOR fashion
          if (active)
             stbtt__fill_active_edges(scanline, result->w, active, max_weight);
 
@@ -3356,7 +3356,7 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
          ++e;
       }
 
-      // now process all active edges
+      // now funcess all active edges
       if (active)
          stbtt__fill_active_edges_new(scanline, scanline2+1, result->w, active, scan_y_top);
 

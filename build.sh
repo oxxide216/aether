@@ -12,10 +12,6 @@ LIB_SRC="$(find src/lib -name "*.c")"
 STD_SRC="src/std/core.c src/std/math.c src/std/str.c"
 LIBS_SRC="$(find libs/lexgen/src/runtime -name "*.c") libs/lexgen/src/common/wstr.c"
 
-if [ "$AETHER_GRAPHICS" == "" ]; then
-  AETHER_GRAPHICS=x11
-fi
-
 if [ "$NOSYSTEM" == "" ]; then
   STD_SRC="$STD_SRC src/std/base.c src/std/io.c \
                     src/std/net.c src/std/path.c \
@@ -44,7 +40,7 @@ cd libs/lexgen
 ./build.sh
 cd ../..
 
-libs/lexgen/lexgen src/lib/grammar.h src/lib/grammar.lg
+libs/lexgen/lexgen include/aether/grammar.h grammar.lg
 
 $CC -o $OUT $BIN_SRC $MISC_SRC $LIB_SRC $STD_SRC \
             $LIBS_SRC $CFLAGS $LDFLAGS $BUILD_FLAGS

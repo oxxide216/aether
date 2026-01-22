@@ -1,4 +1,24 @@
 #include "aether/misc.h"
+#include "lexgen/runtime.h"
+
+#define META_FMT       STR_FMT":%u:%u: "
+#define META_ARG(meta) STR_ARG(*(meta).file_path), (meta).row + 1, (meta).col + 1
+
+#define PANIC(meta, text)                 \
+  do {                                    \
+    ERROR(META_FMT text, META_ARG(meta)); \
+    vm->state = ExecStateReturn;          \
+    vm->exit_code = 1;                    \
+    return NULL;                          \
+  } while (false)
+
+#define PANIC_ARGS(meta, text, ...)                    \
+  do {                                                 \
+    ERROR(META_FMT text, META_ARG(meta), __VA_ARGS__); \
+    vm->state = ExecStateReturn;                       \
+    vm->exit_code = 1;                                 \
+    return NULL;                                       \
+  } while (false)
 
 bool value_to_bool(Value *value) {
   if (value->kind == ValueKindUnit)
@@ -124,9 +144,38 @@ void dict_set_value(StackFrame *frame, Dict *dict,
   entry->value = value;
 }
 
+Value **get_child_root(Value *value, Value *key, InstrMeta *meta, Vm *vm) {
+  if (value->kind == ValueKindList) {
+    if (key->kind != ValueKindInt)
+      PANIC(*meta, "Lists can only be indexed with integers");
+
+    u32 j = 0;
+    ListNode *node = value->as.list->next;
+
+    while (j < key->as._int && node) {
+      node = node->next;
+      ++j;
+    }
+
+    if (!node)
+      PANIC(*meta, "List out of bounds");
+
+    return &node->value;
+  } else if (value->kind == ValueKindDict) {
+    return dict_get_value_root(&value->as.dict, key);
+  } else {
+    StringBuilder type_sb = {0};
+    sb_push_value(&type_sb, value, 0, true, true);
+
+    Str type = sb_to_str(type_sb);
+
+    PANIC_ARGS(*meta, "Value of type "STR_FMT" cannot be indexed\n",
+               STR_ARG(type));
+  }
+}
+
 void sb_push_value(StringBuilder *sb, Value *value,
-                   u32 level, bool kind,
-                   bool quote_string, Vm *vm) {
+                   u32 level, bool kind, bool quote_string) {
   switch (value->kind) {
   case ValueKindUnit: {
     sb_push(sb, "unit");
@@ -140,7 +189,7 @@ void sb_push_value(StringBuilder *sb, Value *value,
       if (node != value->as.list->next)
         sb_push_char(sb, ' ');
 
-      sb_push_value(sb, node->value, level, kind, true, vm);
+      sb_push_value(sb, node->value, level, kind, true);
 
       node = node->next;
     }
@@ -195,7 +244,7 @@ void sb_push_value(StringBuilder *sb, Value *value,
   } break;
 
   case ValueKindFunc: {
-    sb_push_char(sb, '[');
+    sb_push_char(sb, '\\');
 
     for (u32 i = 0; i < value->as.func->args.len; ++i) {
       if (i > 0)
@@ -203,7 +252,9 @@ void sb_push_value(StringBuilder *sb, Value *value,
       sb_push_str(sb, value->as.func->args.items[i]);
     }
 
-    sb_push(sb, "] -> ...");
+    if (value->as.func->args.len > 0)
+      sb_push_char(sb, ' ');
+    sb_push(sb, "-> ...");
   } break;
 
   case ValueKindDict: {
@@ -215,9 +266,9 @@ void sb_push_value(StringBuilder *sb, Value *value,
         for (u32 j = 0; j < level + 1; ++j)
           sb_push(sb, "  ");
 
-        sb_push_value(sb, entry->key, level + 1, kind, true, vm);
+        sb_push_value(sb, entry->key, level + 1, kind, true);
         sb_push(sb, ": ");
-        sb_push_value(sb, entry->value, level + 1, kind, true, vm);
+        sb_push_value(sb, entry->value, level + 1, kind, true);
 
         sb_push_char(sb, '\n');
 
@@ -249,8 +300,97 @@ void sb_push_value(StringBuilder *sb, Value *value,
 
   default: {
     ERROR("Unknown value kind: %u\n", value->kind);
-    vm->state = ExecStateExit;
-    vm->exit_code = 1;
+  } break;
+  }
+}
+
+static void print_value(Value *value) {
+  StringBuilder sb = {0};
+  sb_push_value(&sb, value, 0, false, true);
+
+  str_println(sb_to_str(sb));
+
+  free(sb.buffer);
+}
+
+void print_instr(Instr *instr, bool hide_strings) {
+  printf(META_FMT, META_ARG(instr->meta));
+
+  switch (instr->kind) {
+  case InstrKindPrimitive: {
+    printf("Value ");
+    if (instr->as.primitive.value->kind != ValueKindString || !hide_strings)
+      print_value(instr->as.primitive.value);
+    else
+      printf("string\n");
+  } break;
+
+  case InstrKindFuncCall: {
+    printf("Call %u\n", instr->as.func_call.args_len);
+  } break;
+
+  case InstrKindDefVar: {
+    printf("Define "STR_FMT"\n", STR_ARG(instr->as.def_var.name));
+  } break;
+
+  case InstrKindGetVar: {
+    printf("Get "STR_FMT"\n", STR_ARG(instr->as.get_var.name));
+  } break;
+
+  case InstrKindJump: {
+    printf("Jump to "STR_FMT"\n",
+           STR_ARG(instr->as.jump.label));
+  } break;
+
+  case InstrKindCondJump: {
+    printf("Jump to "STR_FMT" if condition\n",
+           STR_ARG(instr->as.cond_jump.label));
+  } break;
+
+  case InstrKindCondNotJump: {
+    printf("Jump to "STR_FMT" if not contidion\n",
+           STR_ARG(instr->as.cond_not_jump.label));
+  } break;
+
+  case InstrKindLabel: {
+    printf(STR_FMT":\n", STR_ARG(instr->as.label.name));
+  } break;
+
+  case InstrKindMatchBegin: {
+    printf("Match begin\n");
+  } break;
+
+  case InstrKindMatchCase: {
+    printf("Match case, next or "STR_FMT"\n",
+           STR_ARG(instr->as.match_case.not_label));
+  } break;
+
+  case InstrKindMatchEnd: {
+    printf("Match end\n");
+  } break;
+
+  case InstrKindGet: {
+    printf("Get\n");
+  } break;
+
+  case InstrKindSet: {
+    printf("Set\n");
+  } break;
+
+  case InstrKindRet: {
+    printf("Return\n");
+  } break;
+
+  case InstrKindList: {
+    printf("Make list\n");
+  } break;
+
+  case InstrKindDict: {
+    printf("Make dictionary\n");
+  } break;
+
+  case InstrKindSelf: {
+    printf("Self reference\n");
   } break;
   }
 }

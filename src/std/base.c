@@ -17,7 +17,7 @@ Value *printf_intrinsic(Vm *vm, Value **args) {
 
   ListNode *node = value->as.list->next;
   while (node) {
-    SB_PUSH_VALUE(&printf_sb, node->value, 0, false, false, vm);
+    sb_push_value(&printf_sb, node->value, 0, false, false);
 
     node = node->next;
   }
@@ -77,7 +77,10 @@ Value *input_intrinsic(Vm *vm, Value **args) {
 Value *get_args_intrinsic(Vm *vm, Value **args) {
   (void) args;
 
-  return value_list(vm->args, vm->current_frame);
+  Value *result = value_list(vm->args, vm->current_frame);
+  result->refs_count = 1;
+
+  return result;
 }
 #endif
 

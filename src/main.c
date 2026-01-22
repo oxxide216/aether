@@ -30,8 +30,9 @@ static Path loader_paths[] = {
   { "/usr/include/aether/loader.abc", true },
 };
 
-static CachedIrs cached_irs = {0};
+static CachedASTs cached_asts = {0};
 static Arena arena = {0};
+static Ir ir = {0};
 static Vm vm = {0};
 
 void cleanup(void) {
@@ -41,19 +42,21 @@ void cleanup(void) {
   if (printf_sb.buffer)
     free(printf_sb.buffer);
 
-  for (u32 i = 0; i < cached_irs.len; ++i)
-    arena_free(&cached_irs.items[i].arena);
-  if (cached_irs.items)
-    free(cached_irs.items);
-
   arena_free(&arena);
   vm_destroy(&vm);
+
+  for (u32 i = 0; i < cached_asts.len; ++i)
+    arena_free(&cached_asts.items[i].arena);
+
+  free(cached_asts.items);
 }
 
 void sigint_handler(i32 signal) {
   (void) signal;
 
+#ifndef NOSYSTEM
   if (!catch_kill)
+#endif
     vm_stop(&vm);
 }
 
@@ -77,23 +80,21 @@ i32 main(i32 argc, char **argv) {
     exit(1);
   }
 
-  signal(SIGINT, sigint_handler);
-
   Intrinsics intrinsics = {0};
   vm = vm_create(argc, argv, &intrinsics);
 
-  Ir ir;
   if (path->is_precompiled) {
     ir = deserialize((u8 *) code.ptr, code.len, &arena, &vm.current_file_path);
   } else {
     vm.current_file_path = (Str) { path->cstr, strlen(path->cstr) };
-    ir = parse(code, &vm.current_file_path, &cached_irs);
+    ir = parse(code, &vm.current_file_path, &cached_asts);
   }
 
+  signal(SIGINT, sigint_handler);
+
+  execute(&vm, &ir, false);
+
   free(code.ptr);
-
-  execute_block(&vm, &ir, false);
-
   cleanup();
 
   return vm.exit_code;

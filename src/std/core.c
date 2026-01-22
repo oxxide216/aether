@@ -3,7 +3,6 @@
 #include "aether/serializer.h"
 #include "aether/deserializer.h"
 #include "aether/misc.h"
-#include "aether/macros.h"
 #include "aether/arena.h"
 #include "lexgen/runtime.h"
 
@@ -225,12 +224,15 @@ Value *map_intrinsic(Vm *vm, Value **args) {
 
   ListNode *node = list->as.list->next;
   while (node) {
-    Value *func_args[] = { node->value };
+    DA_APPEND(vm->stack, node->value);
+
     // TODO: put real metadata here
-    Value *replacement =
-      execute_func(vm, func_args, func->as.func, NULL, true);
+    execute_func(vm, func->as.func, NULL, false);
+
     if (vm->state == ExecStateExit)
       break;
+
+    Value *replacement = stack_last(vm);
 
     if (list->is_atom) {
       --node->value->refs_count;
@@ -241,6 +243,7 @@ Value *map_intrinsic(Vm *vm, Value **args) {
       new_list_next = &(*new_list_next)->next;
     }
 
+    vm->stack.len -= 2;
     node = node->next;
   }
 
@@ -263,14 +266,22 @@ Value *filter_intrinsic(Vm *vm, Value **args) {
   ListNode *prev_node = list->as.list;
   ListNode *node = list->as.list->next;
   while (node) {
-    Value *func_args[] = { node->value };
+    DA_APPEND(vm->stack, node->value);
+
     // TODO: put real metadata here
-    Value *is_ok = execute_func(vm, func_args, func->as.func, NULL, true);
+    execute_func(vm, func->as.func, NULL, false);
+
     if (vm->state == ExecStateExit)
       break;
 
-    if (is_ok->kind != ValueKindBool)
-      PANIC(vm->current_frame, "filter: predicate should return bool\n");
+    Value *is_ok = stack_last(vm);
+
+    if (is_ok->kind != ValueKindBool) {
+      ERROR("filter: predicate should return bool\n");
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+      return value_unit(vm->current_frame);
+    }
 
     if (is_ok->as._bool) {
       if (!list->is_atom) {
@@ -285,6 +296,7 @@ Value *filter_intrinsic(Vm *vm, Value **args) {
       prev_node->next = node->next;
     }
 
+    vm->stack.len -= 2;
     node = node->next;
   }
 
@@ -301,15 +313,18 @@ Value *fold_intrinsic(Vm *vm, Value **args) {
   Value *accumulator = initial_value;
   ListNode *node = list->as.list->next;
   while (node) {
-    Value *func_args[] = { accumulator, node->value };
+    DA_APPEND(vm->stack, accumulator);
+    DA_APPEND(vm->stack, node->value);
+
     // TODO: put real metadata here
-    Value *new_accumulator =
-      execute_func(vm, func_args, func->as.func, NULL, true);
+    execute_func(vm, func->as.func, NULL, false);
+
     if (vm->state == ExecStateExit)
       break;
 
-    accumulator = new_accumulator;
+    accumulator = stack_last(vm);
 
+    vm->stack.len -= 3;
     node = node->next;
   }
 
@@ -457,20 +472,29 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
   if (collection->kind == ValueKindList) {
     ListNode *node = collection->as.list->next;
     while (node) {
-      Value *result = execute_func(vm, &node->value, func->as.func, NULL, true);
+      DA_APPEND(vm->stack, node->value);
+
+      execute_func(vm, func->as.func, NULL, false);
 
       if (vm->state != ExecStateContinue) {
-        if (vm->state == ExecStateBreak)
+        Value *result = stack_last(vm);
+
+        if (vm->state == ExecStateReturn &&
+            result->kind == ValueKindUnit)
           vm->state = ExecStateContinue;
 
+        --vm->stack.len;
         return result;
       }
 
       node = node->next;
+      --vm->stack.len;
     }
   } else if (collection->kind == ValueKindString) {
     char *filler = arena_alloc(&vm->current_frame->arena, sizeof(wchar));
     Value *_char = value_string(STR(filler, sizeof(wchar)), vm->current_frame);
+    DA_APPEND(vm->stack, _char);
+
     u32 wchar_len;
     u32 index = 0;
     wchar _wchar;
@@ -478,31 +502,48 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
     while ((_wchar = get_next_wchar(collection->as.string.str, index, &wchar_len)) != '\0') {
       *(wchar *) _char->as.string.str.ptr = _wchar;
 
-      Value *result = execute_func(vm, &_char, func->as.func, NULL, true);
+      execute_func(vm, func->as.func, NULL, false);
 
       if (vm->state != ExecStateContinue) {
-        if (vm->state == ExecStateBreak)
+        Value *result = stack_last(vm);
+
+        if (vm->state == ExecStateReturn &&
+            result->kind == ValueKindUnit)
           vm->state = ExecStateContinue;
 
+        --vm->stack.len;
         return result;
       }
 
       index += wchar_len;
+      --vm->stack.len;
     }
+
+    --vm->stack.len;
   } else if (collection->kind == ValueKindBytes) {
     Value *_int = value_int(0, vm->current_frame);
+    DA_APPEND(vm->stack, _int);
+
     for (u32 i = 0; i < collection->as.bytes.len; ++i) {
       _int->as._int = collection->as.bytes.ptr[i];
 
-      Value *result = execute_func(vm, &_int, func->as.func, NULL, true);
+      execute_func(vm, func->as.func, NULL, false);
 
       if (vm->state != ExecStateContinue) {
-        if (vm->state == ExecStateBreak)
+        Value *result = stack_last(vm);
+
+        if (vm->state == ExecStateReturn &&
+            result->kind == ValueKindUnit)
           vm->state = ExecStateContinue;
 
+        --vm->stack.len;
         return result;
       }
+
+      --vm->stack.len;
     }
+
+    --vm->stack.len;
   } else if (collection->kind == ValueKindDict) {
     Dict _pair = {0};
 
@@ -513,6 +554,7 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
     dict_set_value(vm->current_frame, &_pair, value, NULL);
 
     Value *pair = value_dict(_pair, vm->current_frame);
+    DA_APPEND(vm->stack, pair);
 
     for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
       DictValue *entry = collection->as.dict.items[i];
@@ -520,12 +562,16 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
         pair->as.dict.items[0]->key = entry->key;
         pair->as.dict.items[1]->value = entry->value;
 
-        Value *result = execute_func(vm, &pair, func->as.func, NULL, true);
+        execute_func(vm, func->as.func, NULL, true);
 
         if (vm->state != ExecStateContinue) {
-          if (vm->state == ExecStateBreak)
-            vm->state = ExecStateContinue;
+          Value *result = stack_last(vm);
 
+          if (vm->state == ExecStateReturn &&
+            result->kind == ValueKindUnit)
+          vm->state = ExecStateContinue;
+
+          --vm->stack.len;
           return result;
         }
 
@@ -534,6 +580,7 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
     }
 
     pair->as.dict = (Dict) {0};
+    --vm->stack.len;
   }
 
   return value_unit(vm->current_frame);
@@ -595,7 +642,7 @@ Value *to_str_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
   StringBuilder sb = {0};
-  SB_PUSH_VALUE(&sb, value, 0, false, true, vm);
+  sb_push_value(&sb, value, 0, false, true);
 
   Str string;
   string.len = sb.len;
@@ -1000,7 +1047,10 @@ Value *type_intrinsic(Vm *vm, Value **args) {
   } break;
 
   default: {
-    PANIC(vm->current_frame, "Unknown value king: %u\n", args[0]->kind);
+    ERROR("Unknown value king: %u\n", args[0]->kind);
+    vm->state = ExecStateExit;
+    vm->exit_code = 1;
+    return value_unit(vm->current_frame);
   }
   }
 }
@@ -1061,9 +1111,12 @@ Value *make_env_intrinsic(Vm *vm, Value **args) {
 
   ListNode *node = cmd_args->as.list->next;
   while (node) {
-    if (node->value->kind != ValueKindString)
-      PANIC(vm->current_frame,
-            "make-env: every program argument should be of type string\n");
+    if (node->value->kind != ValueKindString) {
+      ERROR("make-env: every program argument should be of type string\n");
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+      return value_unit(vm->current_frame);
+    }
 
     char *cstr_cmd_arg = str_to_cstr(node->value->as.string.str);
     DA_APPEND(cstr_cmd_args, cstr_cmd_arg);
@@ -1072,7 +1125,8 @@ Value *make_env_intrinsic(Vm *vm, Value **args) {
   }
 
   Intrinsics intrinsics = {0};
-  Vm new_vm = vm_create(cstr_cmd_args.len, cstr_cmd_args.items, &intrinsics);
+  Vm *new_vm = arena_alloc(&vm->current_frame->arena, sizeof(Vm));
+  *new_vm = vm_create(cstr_cmd_args.len, cstr_cmd_args.items, &intrinsics);
 
   for (u32 i = 0; i < cstr_cmd_args.len; ++i)
     free(cstr_cmd_args.items[i]);
@@ -1081,12 +1135,15 @@ Value *make_env_intrinsic(Vm *vm, Value **args) {
   return value_env(new_vm, vm->current_frame);
 }
 
-static Value *process_include_paths(IncludePaths *dest, Value *value,
-                                    char *func_name, StackFrame *frame) {
+static Value *process_include_paths(IncludePaths *dest, Value *value, char *func_name, Vm *vm) {
   ListNode *include_path = value->as.list->next;
   while (include_path) {
-    if (include_path->value->kind != ValueKindString)
-      PANIC(frame, "%s: every include path should be of type string\n", func_name);
+    if (include_path->value->kind != ValueKindString) {
+      ERROR("%s: every include path should be of type string\n", func_name);
+      vm->state = ExecStateExit;
+      vm->exit_code = 1;
+      return value_unit(vm->current_frame);
+    }
 
     DA_APPEND(*dest, include_path->value->as.string.str);
 
@@ -1118,22 +1175,20 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Arena ir_arena = {0};
   FilePaths included_files = {0};
   IncludePaths _include_paths = {0};
-  CachedIrs cached_irs = {0};
+  CachedASTs cached_asts = {0};
 
   Str file_dir = get_file_dir(path->as.string.str);
   DA_APPEND(_include_paths, file_dir);
 
-  Value *include_result = process_include_paths(&_include_paths, include_paths,
-                                                "compile", vm->current_frame);
+  Value *include_result = process_include_paths(&_include_paths, include_paths, "compile", vm);
   if (include_result)
     return include_result;
 
-  Ir ir = parse_ex(code->as.string.str, &path->as.string.str,
-                   &env->as.env->macros, &included_files, &_include_paths,
-                   &cached_irs, &ir_arena, true);
+  Exprs ast = parse_ex(code->as.string.str, &path->as.string.str,
+                       &env->as.env->macros, &included_files, &_include_paths,
+                       &cached_asts, &ir_arena, true, NULL);
 
-  expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false,
-                      &ir_arena, &path->as.string.str, 0, 0, false);
+  Ir ir = ast_to_ir(&ast, &ir_arena);
 
   Str bytecode = {0};
   bytecode.ptr = (char *) serialize(&ir, &bytecode.len,
@@ -1183,11 +1238,6 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   if (_include_paths.items)
     free(_include_paths.items);
 
-  for (u32 i = 0; i < cached_irs.len; ++i)
-    arena_free(&cached_irs.items[i].arena);
-  if (cached_irs.items)
-    free(cached_irs.items);
-
   return value_dict(dict, vm->current_frame);
 }
 
@@ -1198,15 +1248,20 @@ Value *eval_compiled_intrinsic(Vm *vm, Value **args) {
   Arena ir_arena = {0};
   Ir ir = deserialize(bytecode->as.bytes.ptr,
                       bytecode->as.bytes.len, &ir_arena,
-                      &env->as.env->vm.current_file_path);
+                      &env->as.env->vm->current_file_path);
 
-  Value *result = execute_block(&env->as.env->vm, &ir, true);
+  Value *result = execute(env->as.env->vm, &ir, true);
 
-  if (env->as.env->vm.state != ExecStateContinue)
-    env->as.env->vm.state = ExecStateContinue;
+  for (u32 i = 0; i < ir.len; ++i)
+    free(ir.items[i].instrs.items);
 
-  if (env->as.env->vm.exit_code != 0)
-    env->as.env->vm.exit_code = 0;
+  free(ir.items);
+
+  if (env->as.env->vm->state != ExecStateContinue)
+    env->as.env->vm->state = ExecStateContinue;
+
+  if (env->as.env->vm->exit_code != 0)
+    env->as.env->vm->exit_code = 0;
 
   return value_clone(result, vm->current_frame);
 }
@@ -1248,21 +1303,19 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
   Str file_dir = get_file_dir(path->as.string.str);
   DA_APPEND(_include_paths, file_dir);
 
-  Value *include_result = process_include_paths(&_include_paths, include_paths,
-                                                "eval", vm->current_frame);
+  Value *include_result = process_include_paths(&_include_paths, include_paths, "eval", vm);
   if (include_result)
     return include_result;
 
-  Ir ir = parse_ex(code->as.string.str, &path->as.string.str,
-                   &env->as.env->macros, &included_files, &_include_paths,
-                   &env->as.env->cached_irs, &ir_arena, false);
+  Exprs ast = parse_ex(code->as.string.str, &path->as.string.str,
+                       &env->as.env->macros, &included_files, &_include_paths,
+                       &env->as.env->cached_asts, &ir_arena, false, NULL);
 
-  expand_macros_block(&ir, &env->as.env->macros, NULL, NULL, false,
-                      &ir_arena, &path->as.string.str, 0, 0, false);
+  Ir ir = ast_to_ir(&ast, &ir_arena);
 
-  env->as.env->vm.current_file_path = path->as.string.str;
+  env->as.env->vm->current_file_path = path->as.string.str;
 
-  Value *result = execute_block(&env->as.env->vm, &ir, true);
+  Value *result = execute(env->as.env->vm, &ir, true);
 
   if (included_files.items)
     free(included_files.items);
@@ -1270,11 +1323,11 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
   if (_include_paths.items)
     free(_include_paths.items);
 
-  if (env->as.env->vm.state != ExecStateContinue)
-    env->as.env->vm.state = ExecStateContinue;
+  if (env->as.env->vm->state != ExecStateContinue)
+    env->as.env->vm->state = ExecStateContinue;
 
-  if (env->as.env->vm.exit_code != 0)
-    env->as.env->vm.exit_code = 0;
+  if (env->as.env->vm->exit_code != 0)
+    env->as.env->vm->exit_code = 0;
 
   return value_clone(result, vm->current_frame);
 }

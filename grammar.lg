@@ -7,14 +7,13 @@ if=if
 elif=elif
 else=else
 macro=macro
-while=while
 set=set
 use=use
 ret=ret
 import=import
 match=match
 do=do
-break=break
+while=while
 
 oparen=\(
 cparen=\)
@@ -28,8 +27,9 @@ right_arrow=\->
 colon=:
 qolon=::
 rhombus=<>
-double_arrow=<\->
 eq_arrow==>
+backslash=\\
+double_arrow=<\->
 
 int=\-?0-9+
 float=\-?0-9+.0-9+

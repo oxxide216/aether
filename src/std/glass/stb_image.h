@@ -139,7 +139,7 @@ RECENT REVISION HISTORY:
 // Basic usage (see HDR discussion below for HDR usage):
 //    int x,y,n;
 //    unsigned char *data = stbi_load(filename, &x, &y, &n, 0);
-//    // ... process data if not NULL ...
+//    // ... funcess data if not NULL ...
 //    // ... x = width, y = height, n = # 8-bit components per pixel ...
 //    // ... replace '0' with '1'..'4' to force that many components per pixel
 //    // ... but 'n' will always be the number that it would have been if you said 0
@@ -246,7 +246,7 @@ RECENT REVISION HISTORY:
 // I/O callbacks
 //
 // I/O callbacks allow you to read from arbitrary sources, like packaged
-// files or some other source. Data read from callbacks are processed
+// files or some other source. Data read from callbacks are funcessed
 // through a small internal buffer (currently 128 bytes) to try to reduce
 // overhead.
 //
@@ -321,7 +321,7 @@ RECENT REVISION HISTORY:
 // Call stbi_set_unpremultiply_on_load(1) as well to force a divide per
 // pixel to remove any premultiplied alpha *only* if the image file explicitly
 // says there's premultiplied data (currently only happens in iPhone images,
-// and only if iPhone convert-to-rgb processing is on).
+// and only if iPhone convert-to-rgb funcessing is on).
 //
 // ===========================================================================
 //
@@ -359,7 +359,7 @@ RECENT REVISION HISTORY:
 //     want the zlib decoder to be available, #define STBI_SUPPORT_ZLIB
 //
 //  - If you define STBI_MAX_DIMENSIONS, stb_image will reject images greater
-//    than that size (in either width or height) without further processing.
+//    than that size (in either width or height) without further funcessing.
 //    This is to let programs in the wild set an upper bound to prevent
 //    denial-of-service attacks on untrusted data, as one could generate a
 //    valid image of gigantic dimensions and force stb_image to allocate a
@@ -510,7 +510,7 @@ STBIDEF int      stbi_is_16_bit_from_file(FILE *f);
 // unpremultiplication. results are undefined if the unpremultiply overflow.
 STBIDEF void stbi_set_unpremultiply_on_load(int flag_true_if_should_unpremultiply);
 
-// indicate whether we should process iphone images back to canonical format,
+// indicate whether we should funcess iphone images back to canonical format,
 // or just pass them through "as-is"
 STBIDEF void stbi_convert_iphone_png_to_rgb(int flag_true_if_should_convert);
 
@@ -1257,7 +1257,7 @@ static void stbi__vertical_flip_slices(void *image, int w, int h, int z, int byt
 }
 #endif
 
-static unsigned char *stbi__load_and_postprocess_8bit(stbi__context *s, int *x, int *y, int *comp, int req_comp)
+static unsigned char *stbi__load_and_postfuncess_8bit(stbi__context *s, int *x, int *y, int *comp, int req_comp)
 {
    stbi__result_info ri;
    void *result = stbi__load_main(s, x, y, comp, req_comp, &ri, 8);
@@ -1283,7 +1283,7 @@ static unsigned char *stbi__load_and_postprocess_8bit(stbi__context *s, int *x, 
    return (unsigned char *) result;
 }
 
-static stbi__uint16 *stbi__load_and_postprocess_16bit(stbi__context *s, int *x, int *y, int *comp, int req_comp)
+static stbi__uint16 *stbi__load_and_postfuncess_16bit(stbi__context *s, int *x, int *y, int *comp, int req_comp)
 {
    stbi__result_info ri;
    void *result = stbi__load_main(s, x, y, comp, req_comp, &ri, 16);
@@ -1311,7 +1311,7 @@ static stbi__uint16 *stbi__load_and_postprocess_16bit(stbi__context *s, int *x, 
 }
 
 #if !defined(STBI_NO_HDR) && !defined(STBI_NO_LINEAR)
-static void stbi__float_postprocess(float *result, int *x, int *y, int *comp, int req_comp)
+static void stbi__float_postfuncess(float *result, int *x, int *y, int *comp, int req_comp)
 {
    if (stbi__vertically_flip_on_load && result != NULL) {
       int channels = req_comp ? req_comp : *comp;
@@ -1378,7 +1378,7 @@ STBIDEF stbi_uc *stbi_load_from_file(FILE *f, int *x, int *y, int *comp, int req
    unsigned char *result;
    stbi__context s;
    stbi__start_file(&s,f);
-   result = stbi__load_and_postprocess_8bit(&s,x,y,comp,req_comp);
+   result = stbi__load_and_postfuncess_8bit(&s,x,y,comp,req_comp);
    if (result) {
       // need to 'unget' all the characters in the IO buffer
       fseek(f, - (int) (s.img_buffer_end - s.img_buffer), SEEK_CUR);
@@ -1391,7 +1391,7 @@ STBIDEF stbi__uint16 *stbi_load_from_file_16(FILE *f, int *x, int *y, int *comp,
    stbi__uint16 *result;
    stbi__context s;
    stbi__start_file(&s,f);
-   result = stbi__load_and_postprocess_16bit(&s,x,y,comp,req_comp);
+   result = stbi__load_and_postfuncess_16bit(&s,x,y,comp,req_comp);
    if (result) {
       // need to 'unget' all the characters in the IO buffer
       fseek(f, - (int) (s.img_buffer_end - s.img_buffer), SEEK_CUR);
@@ -1416,28 +1416,28 @@ STBIDEF stbi_us *stbi_load_16_from_memory(stbi_uc const *buffer, int len, int *x
 {
    stbi__context s;
    stbi__start_mem(&s,buffer,len);
-   return stbi__load_and_postprocess_16bit(&s,x,y,channels_in_file,desired_channels);
+   return stbi__load_and_postfuncess_16bit(&s,x,y,channels_in_file,desired_channels);
 }
 
 STBIDEF stbi_us *stbi_load_16_from_callbacks(stbi_io_callbacks const *clbk, void *user, int *x, int *y, int *channels_in_file, int desired_channels)
 {
    stbi__context s;
    stbi__start_callbacks(&s, (stbi_io_callbacks *)clbk, user);
-   return stbi__load_and_postprocess_16bit(&s,x,y,channels_in_file,desired_channels);
+   return stbi__load_and_postfuncess_16bit(&s,x,y,channels_in_file,desired_channels);
 }
 
 STBIDEF stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, int *y, int *comp, int req_comp)
 {
    stbi__context s;
    stbi__start_mem(&s,buffer,len);
-   return stbi__load_and_postprocess_8bit(&s,x,y,comp,req_comp);
+   return stbi__load_and_postfuncess_8bit(&s,x,y,comp,req_comp);
 }
 
 STBIDEF stbi_uc *stbi_load_from_callbacks(stbi_io_callbacks const *clbk, void *user, int *x, int *y, int *comp, int req_comp)
 {
    stbi__context s;
    stbi__start_callbacks(&s, (stbi_io_callbacks *) clbk, user);
-   return stbi__load_and_postprocess_8bit(&s,x,y,comp,req_comp);
+   return stbi__load_and_postfuncess_8bit(&s,x,y,comp,req_comp);
 }
 
 #ifndef STBI_NO_GIF
@@ -1465,11 +1465,11 @@ static float *stbi__loadf_main(stbi__context *s, int *x, int *y, int *comp, int 
       stbi__result_info ri;
       float *hdr_data = stbi__hdr_load(s,x,y,comp,req_comp, &ri);
       if (hdr_data)
-         stbi__float_postprocess(hdr_data,x,y,comp,req_comp);
+         stbi__float_postfuncess(hdr_data,x,y,comp,req_comp);
       return hdr_data;
    }
    #endif
-   data = stbi__load_and_postprocess_8bit(s, x, y, comp, req_comp);
+   data = stbi__load_and_postfuncess_8bit(s, x, y, comp, req_comp);
    if (data)
       return stbi__ldr_to_hdr(data, *x, *y, req_comp ? req_comp : *comp);
    return stbi__errpf("unknown image type", "Image not of any known type, or corrupt");
@@ -2954,7 +2954,7 @@ static int stbi__parse_entropy_coded_data(stbi__jpeg *z)
          int i,j;
          STBI_SIMD_ALIGN(short, data[64]);
          int n = z->order[0];
-         // non-interleaved data, we just need to process one block at a time,
+         // non-interleaved data, we just need to funcess one block at a time,
          // in trivial scanline order
          // number of blocks to do just depends on how many actual "pixels" this
          // component has, independent of interleaved MCU blocking and such
@@ -2981,7 +2981,7 @@ static int stbi__parse_entropy_coded_data(stbi__jpeg *z)
          STBI_SIMD_ALIGN(short, data[64]);
          for (j=0; j < z->img_mcu_y; ++j) {
             for (i=0; i < z->img_mcu_x; ++i) {
-               // scan an interleaved mcu... process scan_n components in order
+               // scan an interleaved mcu... funcess scan_n components in order
                for (k=0; k < z->scan_n; ++k) {
                   int n = z->order[k];
                   // scan out an mcu's worth of this component; that's just determined
@@ -3011,7 +3011,7 @@ static int stbi__parse_entropy_coded_data(stbi__jpeg *z)
       if (z->scan_n == 1) {
          int i,j;
          int n = z->order[0];
-         // non-interleaved data, we just need to process one block at a time,
+         // non-interleaved data, we just need to funcess one block at a time,
          // in trivial scanline order
          // number of blocks to do just depends on how many actual "pixels" this
          // component has, independent of interleaved MCU blocking and such
@@ -3041,7 +3041,7 @@ static int stbi__parse_entropy_coded_data(stbi__jpeg *z)
          int i,j,k,x,y;
          for (j=0; j < z->img_mcu_y; ++j) {
             for (i=0; i < z->img_mcu_x; ++i) {
-               // scan an interleaved mcu... process scan_n components in order
+               // scan an interleaved mcu... funcess scan_n components in order
                for (k=0; k < z->scan_n; ++k) {
                   int n = z->order[k];
                   // scan out an mcu's worth of this component; that's just determined
@@ -3096,7 +3096,7 @@ static void stbi__jpeg_finish(stbi__jpeg *z)
    }
 }
 
-static int stbi__process_marker(stbi__jpeg *z, int m)
+static int stbi__funcess_marker(stbi__jpeg *z, int m)
 {
    int L;
    switch (m) {
@@ -3200,7 +3200,7 @@ static int stbi__process_marker(stbi__jpeg *z, int m)
 }
 
 // after we see SOS
-static int stbi__process_scan_header(stbi__jpeg *z)
+static int stbi__funcess_scan_header(stbi__jpeg *z)
 {
    int i;
    int Ls = stbi__get16be(z->s);
@@ -3261,7 +3261,7 @@ static int stbi__free_jpeg_components(stbi__jpeg *z, int ncomp, int why)
    return why;
 }
 
-static int stbi__process_frame_header(stbi__jpeg *z, int scan)
+static int stbi__funcess_frame_header(stbi__jpeg *z, int scan)
 {
    stbi__context *s = z->s;
    int Lf,p,i,q, h_max=1,v_max=1,c;
@@ -3373,7 +3373,7 @@ static int stbi__decode_jpeg_header(stbi__jpeg *z, int scan)
    if (scan == STBI__SCAN_type) return 1;
    m = stbi__get_marker(z);
    while (!stbi__SOF(m)) {
-      if (!stbi__process_marker(z,m)) return 0;
+      if (!stbi__funcess_marker(z,m)) return 0;
       m = stbi__get_marker(z);
       while (m == STBI__MARKER_none) {
          // some files have extra padding after their blocks, so ok, we'll scan
@@ -3382,7 +3382,7 @@ static int stbi__decode_jpeg_header(stbi__jpeg *z, int scan)
       }
    }
    z->progressive = stbi__SOF_progressive(m);
-   if (!stbi__process_frame_header(z, scan)) return 0;
+   if (!stbi__funcess_frame_header(z, scan)) return 0;
    return 1;
 }
 
@@ -3421,7 +3421,7 @@ static int stbi__decode_jpeg_image(stbi__jpeg *j)
    m = stbi__get_marker(j);
    while (!stbi__EOI(m)) {
       if (stbi__SOS(m)) {
-         if (!stbi__process_scan_header(j)) return 0;
+         if (!stbi__funcess_scan_header(j)) return 0;
          if (!stbi__parse_entropy_coded_data(j)) return 0;
          if (j->marker == STBI__MARKER_none ) {
          j->marker = stbi__skip_jpeg_junk_at_end(j);
@@ -3437,7 +3437,7 @@ static int stbi__decode_jpeg_image(stbi__jpeg *j)
          if (NL != j->s->img_y) return stbi__err("bad DNL height", "Corrupt JPEG");
          m = stbi__get_marker(j);
       } else {
-         if (!stbi__process_marker(j, m)) return 1;
+         if (!stbi__funcess_marker(j, m)) return 1;
          m = stbi__get_marker(j);
       }
    }
@@ -3538,7 +3538,7 @@ static stbi_uc *stbi__resample_row_hv_2_simd(stbi_uc *out, stbi_uc *in_near, stb
    }
 
    t1 = 3*in_near[0] + in_far[0];
-   // process groups of 8 pixels for as long as we can.
+   // funcess groups of 8 pixels for as long as we can.
    // note we can't handle the last pixel in a row in this loop
    // because we need to handle the filter boundary conditions.
    for (; i < ((w-1) & ~7); i += 8) {
@@ -4675,7 +4675,7 @@ static const stbi_uc stbi__depth_scale_table[9] = { 0, 0xff, 0x55, 0, 0x11, 0,0,
 static void stbi__create_png_alpha_expand8(stbi_uc *dest, stbi_uc *src, stbi__uint32 x, int img_n)
 {
    int i;
-   // must process data backwards since we allow dest==src
+   // must funcess data backwards since we allow dest==src
    if (img_n == 1) {
       for (i=x-1; i >= 0; --i) {
          dest[i*2+1] = 255;
@@ -6688,7 +6688,7 @@ static void stbi__out_gif_code(stbi__gif *g, stbi__uint16 code)
    }
 }
 
-static stbi_uc *stbi__process_gif_raster(stbi__context *s, stbi__gif *g)
+static stbi_uc *stbi__funcess_gif_raster(stbi__context *s, stbi__gif *g)
 {
    stbi_uc lzw_cs;
    stbi__int32 len, init_code;
@@ -6887,7 +6887,7 @@ static stbi_uc *stbi__gif_load_next(stbi__context *s, stbi__gif *g, int *comp, i
             } else
                return stbi__errpuc("missing color table", "Corrupt GIF");
 
-            o = stbi__process_gif_raster(s, g);
+            o = stbi__funcess_gif_raster(s, g);
             if (!o) return NULL;
 
             // if this was the first frame,

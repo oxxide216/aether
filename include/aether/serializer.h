@@ -1,9 +1,8 @@
 #ifndef SERIALIZER_H
 #define SERIALIZER_H
 
-#include "aether/ir.h"
+#include "aether/bytecode.h"
 #include "aether/parser.h"
-#include "aether/macros.h"
 #include "shl/shl-defs.h"
 
 typedef struct {

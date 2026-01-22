@@ -2,23 +2,23 @@
 (use 'std/str')
 (use 'std/term')
 
-(macro error [...messages] ->
+(macro error \...messages ->
   (println term/fg-red term/bold '[ERROR]'
            term/reset ' ' (join-any [messages] '')))
 
-(macro warn [...messages] ->
+(macro warn \...messages ->
   (println term/fg-yellow term/bold '[WARN]'
            term/reset ' ' (join-any [messages] '')))
 
-(macro info [...messages] ->
+(macro info \...messages ->
   (println term/fg-white term/bold '[INFO]'
            term/reset ' ' (join-any [messages] '')))
 
-(macro panic [...messages] ->
+(macro panic \...messages ->
   (error messages)
   (exit 1))
 
-(macro panic-if [expr ...messages] ->
+(macro panic-if \expr ...messages ->
   (if expr
     (error messages)
     (exit 1)))

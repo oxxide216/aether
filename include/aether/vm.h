@@ -1,16 +1,16 @@
 #ifndef AETHER_VM
 #define AETHER_VM
 
-#include "aether/ir.h"
 #include "aether/parser.h"
+#include "aether/bytecode.h"
 #include "arena.h"
 #include "shl/shl-defs.h"
 #include "shl/shl-str.h"
 #include "shl/shl-log.h"
 
 #define MAX_INTRINSIC_ARGS_COUNT  10
-#define DICT_HASH_TABLE_CAP       10
 #define INTRINSICS_HASH_TABLE_CAP 60
+#define LABELS_HASH_TABLE_CAP     60
 
 #define EXECUTE_FUNC(vm, args, func, meta, value_expected)              \
   do {                                                                  \
@@ -54,86 +54,14 @@
       return dest;                                         \
   } while (0)
 
-#define PANIC(frame, ...)     \
-  do {                        \
-    ERROR(__VA_ARGS__);       \
-    return value_unit(frame); \
-  } while(0)
-
-typedef enum {
-  ValueKindUnit = 0,
-  ValueKindList,
-  ValueKindString,
-  ValueKindInt,
-  ValueKindFloat,
-  ValueKindBool,
-  ValueKindDict,
-  ValueKindFunc,
-  ValueKindEnv,
-  ValueKindBytes,
-} ValueKind;
-
-typedef struct ListNode   ListNode;
-typedef struct NamedValue NamedValue;
-typedef Da(NamedValue)    NamedValues;
-
-typedef struct DictValue  DictValue;
-
-typedef struct {
-  DictValue *items[DICT_HASH_TABLE_CAP];
-} Dict;
-
-typedef struct {
-  Str  str;
-} String;
-
-typedef struct Vm Vm;
-typedef struct Value Value;
-typedef Da(Value *) Values;
-
-typedef enum {
-  VarKindLocal = 0,
-  VarKindGlobal,
-  VarKindCatched,
-} VarKind;
-
-typedef struct {
-  Str      name;
-  Value   *value;
-  VarKind  kind;
-} Var;
-
-typedef Da(Var) Vars;
-typedef Da(Var *) VarRefs;
-
-typedef struct StackFrame StackFrame;
-
-struct StackFrame {
-  Values      values;
-  Arena       arena;
-  Vars        vars;
-  bool        can_lookup_through;
-  StackFrame *next;
-  StackFrame *prev;
-};
-
-typedef struct Func Func;
-
-struct Func {
-  IrArgs       args;
-  IrBlock      body;
-  NamedValues  catched_values_names;
-  Func        *parent_func;
-  Str          intrinsic_name;
-  u32          refs_count;
-};
-
 typedef enum {
   ExecStateContinue = 0,
   ExecStateReturn,
   ExecStateExit,
   ExecStateBreak,
 } ExecState;
+
+typedef struct Vm Vm;
 
 typedef Value *(*IntrinsicFunc)(Vm *vm, Value **args);
 
@@ -152,95 +80,49 @@ typedef struct {
   Intrinsic *items[INTRINSICS_HASH_TABLE_CAP];
 } Intrinsics;
 
-struct Vm {
-  Vars        global_vars;
-  Intrinsics  intrinsics;
-  StackFrame *frames;
-  StackFrame *frames_end;
-  StackFrame *current_frame;
-  ListNode   *args;
-  ExecState   state;
-  i64         exit_code;
-  Func       *current_func;
-  Str         current_file_path;
-};
+typedef struct Label Label;
 
-typedef struct {
-  Macros       macros;
-  FilePaths    included_files;
-  IncludePaths include_paths;
-  CachedIrs    cached_irs;
-  Vm           vm;
-  u32          refs_count;
-} Env;
-
-typedef struct {
-  u8 *ptr;
-  u32 len;
-} Bytes;
-
-typedef union {
-  ListNode *list;
-  String    string;
-  i64      _int;
-  f64       _float;
-  bool      _bool;
-  Dict      dict;
-  Func     *func;
-  Env      *env;
-  Bytes     bytes;
-} ValueAs;
-
-struct Value {
-  ValueKind   kind;
-  ValueAs     as;
-  StackFrame *frame;
-  u32         refs_count;
-  bool        is_atom;
-};
-
-struct ListNode {
-  Value    *value;
-  bool      is_static;
-  ListNode *next;
-};
-
-struct DictValue {
-  Value     *key;
-  Value     *value;
-  DictValue *next;
-};
-
-struct NamedValue {
+struct Label {
   Str    name;
-  Value *value;
+  u32    instr_index;
+  Label *next;
 };
 
-ListNode *list_clone(ListNode *list, StackFrame *frame);
-Dict      dict_clone(Dict *dict, StackFrame *frame);
+typedef struct {
+  Label *items[LABELS_HASH_TABLE_CAP];
+} LabelsTable;
 
-Value *value_unit(StackFrame *frame);
-Value *value_list(ListNode *nodes, StackFrame *frame);
-Value *value_string(Str string, StackFrame *frame);
-Value *value_int(i64 _int, StackFrame *frame);
-Value *value_float(f64 _float, StackFrame *frame);
-Value *value_bool(bool _bool, StackFrame *frame);
-Value *value_dict(Dict dict, StackFrame *frame);
-Value *value_func(Func func, StackFrame *frame);
-Value *value_env(Vm vm, StackFrame *frame);
-Value *value_bytes(Bytes bytes, StackFrame *frame);
+typedef Da(LabelsTable) LabelsTables;
 
-Value *value_alloc(StackFrame *frame);
-Value *value_clone(Value *value, StackFrame *frame);
-void   value_free(Value *value);
-bool   value_eq(Value *a, Value *b);
+struct Vm {
+  Ir           *ir;
+  Values        stack;
+  Intrinsics    intrinsics;
+  LabelsTables  labels;
+  StackFrame   *frames;
+  StackFrame   *frames_end;
+  StackFrame   *current_frame;
+  ListNode     *args;
+  ExecState     state;
+  i64           exit_code;
+  Str           current_file_path;
+  FuncValue    *current_func;
+  u32           current_func_index;
+};
 
-Value *execute_func(Vm *vm, Value **args, Func *func,
-                    IrExprMeta *meta, bool value_expected);
-Value *execute_expr(Vm *vm, IrExpr *expr, bool value_expected);
-Value *execute_block(Vm *vm, IrBlock *block, bool value_expected);
-u32    execute(Ir *ir, i32 argc, char **argv, Arena *arena,
-               Intrinsics *intrinsics, Value **result_value);
+struct Env {
+  Macros        macros;
+  FilePaths     included_files;
+  IncludePaths  include_paths;
+  CachedASTs    cached_asts;
+  Vm           *vm;
+  u32           refs_count;
+};
+
+void   execute_func(Vm *vm, FuncValue *func, InstrMeta *meta, bool value_ignored);
+Value *execute(Vm *vm, Ir *ir, bool value_expected);
+
+Value *stack_last(Vm *vm);
 
 void intrinsics_append(Intrinsics *a, Intrinsic *b, u32 b_len, Arena *arena);
 
