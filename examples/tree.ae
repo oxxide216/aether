@@ -1,4 +1,5 @@
 (use 'std/io')
+(use 'std/str')
 
 (let DEPTH-LIMIT 4)
 (let TAB-WIDTH   2)
@@ -8,10 +9,7 @@
 (let base-directory (if (>= (len args) 3) args::1
                      else                 '.'))
 
-(let begins-with [str begin] ->
-  (== (get-range str 0 (len begin)) begin))
-
-(let print-directory [name path offset] ->
+(let print-directory \name path offset ->
   (if (> offset DEPTH-LIMIT)
     (ret))
 
@@ -20,7 +18,7 @@
     (ret))
 
   (let items (filter
-               [item] -> (not (begins-with item '.')) <>
+               \item -> (not (begins-with item '.')) <>
                content))
 
   (for item in items

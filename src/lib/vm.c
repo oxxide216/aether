@@ -137,8 +137,12 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta, bool value_ignored) 
 
     Value *result = (intrinsic->func)(vm, args);
 
-    if (!value_ignored)
+    if (!value_ignored) {
+      if (!result)
+        result = value_unit(vm->current_frame);
+
       DA_APPEND(vm->stack, result);
+    }
 
     return;
   }
@@ -230,7 +234,7 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
 
       execute_func(vm, func->as.func, &instr->meta, instr->as.func_call.value_ignored);
       if (vm->state == ExecStateExit) {
-        if (vm->exit_code != 0)
+        if (vm->tracing_enabled && vm->exit_code != 0)
           INFO("Trace: "STR_FMT":%u:%u\n",
                STR_ARG(*instr->meta.file_path),
                instr->meta.row + 1, instr->meta.col + 1);
@@ -380,16 +384,16 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
     } break;
 
     case InstrKindSet: {
-      if (!ensure_stack_len_is_enough(vm, instr->as.get.chain_len + 1, &instr->meta))
+      if (!ensure_stack_len_is_enough(vm, instr->as.set.chain_len + 1, &instr->meta))
         return;
 
-      Value *value = vm->stack.items[vm->stack.len - instr->as.get.chain_len];
+      Value *value = vm->stack.items[vm->stack.len - instr->as.set.chain_len];
       Value **root = NULL;
 
-      for (u32 j = 1; j < instr->as.get.chain_len; ++j) {
-        Value *key = vm->stack.items[vm->stack.len - instr->as.get.chain_len + j];
+      for (u32 j = 1; j < instr->as.set.chain_len; ++j) {
+        Value *key = vm->stack.items[vm->stack.len - instr->as.set.chain_len + j];
 
-        if (value->refs_count > 1) {
+        if (value->refs_count > 1 && !value->is_atom) {
           value = value_clone(value, value->frame);
           if (root)
             *root = value;
@@ -417,8 +421,8 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
           PANIC(instr->meta, "Value can only be assigned to a left hand side expression\n");
       }
 
-      u32 new_value_offset = vm->stack.len - instr->as.get.chain_len - 1;
-      if (!is_from_var)
+      u32 new_value_offset = vm->stack.len - instr->as.set.chain_len - 1;
+      if (is_from_var)
         ++new_value_offset;
       Value *new_value = vm->stack.items[new_value_offset];
 
@@ -428,6 +432,8 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
         new_value = value_clone(new_value, (*root)->frame);
 
       vm->stack.len -= instr->as.set.chain_len + 1;
+      if (is_from_var)
+        ++vm->stack.len;
 
       --(*root)->refs_count;
       *root = new_value;
@@ -460,19 +466,19 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
     } break;
 
     case InstrKindDict: {
-      if (!ensure_stack_len_is_enough(vm, instr->as.dict.len, &instr->meta))
+      if (!ensure_stack_len_is_enough(vm, instr->as.dict.len * 2, &instr->meta))
         return;
 
       Dict new_dict = {0};
 
-      for (u32 j = 0; j < instr->as.dict.len / 2; ++j) {
-        Value *key = vm->stack.items[vm->stack.len - instr->as.list.len + j * 2];
-        Value *value = vm->stack.items[vm->stack.len - instr->as.list.len + j * 2 + 1];
+      for (u32 j = 0; j < instr->as.dict.len; ++j) {
+        Value *key = vm->stack.items[vm->stack.len - instr->as.list.len * 2 + j * 2];
+        Value *value = vm->stack.items[vm->stack.len - instr->as.list.len * 2 + j * 2 + 1];
 
         dict_set_value(vm->current_frame, &new_dict, key, value);
       }
 
-      vm->stack.len -= instr->as.dict.len;
+      vm->stack.len -= instr->as.dict.len * 2;
 
       Value *new_value = value_dict(new_dict, vm->current_frame);
       DA_APPEND(vm->stack, new_value);
@@ -493,6 +499,10 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
 }
 
 static void load_labels(Ir *ir, LabelsTables *tables, Arena *arena) {
+  tables->len = ir->len;
+  tables->cap = tables->len;
+  tables->items = arena_alloc(arena, tables->cap * sizeof(LabelsTable));
+
   for (u32 i = 0; i < ir->len; ++i) {
     LabelsTable table = {0};
 
@@ -519,7 +529,7 @@ static void load_labels(Ir *ir, LabelsTables *tables, Arena *arena) {
         table.items[index] = label;
     }
 
-    DA_APPEND(*tables, table);
+    tables->items[i] = table;
   }
 }
 
@@ -529,9 +539,6 @@ Value *execute(Vm *vm, Ir *ir, bool value_expected) {
   load_labels(ir, &vm->labels, &vm->current_frame->arena);
 
   execute_instrs(vm, &ir->items[0].instrs);
-
-  if (vm->labels.items)
-    free(vm->labels.items);
 
   if (!value_expected)
     return NULL;

@@ -1,5 +1,6 @@
 #include "aether/vm.h"
 #include "aether/parser.h"
+#include "aether/macros.h"
 #include "aether/serializer.h"
 #include "aether/deserializer.h"
 #include "aether/misc.h"
@@ -1127,6 +1128,7 @@ Value *make_env_intrinsic(Vm *vm, Value **args) {
   Intrinsics intrinsics = {0};
   Vm *new_vm = arena_alloc(&vm->current_frame->arena, sizeof(Vm));
   *new_vm = vm_create(cstr_cmd_args.len, cstr_cmd_args.items, &intrinsics);
+  new_vm->tracing_enabled = true;
 
   for (u32 i = 0; i < cstr_cmd_args.len; ++i)
     free(cstr_cmd_args.items[i]);
@@ -1187,6 +1189,9 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Exprs ast = parse_ex(code->as.string.str, &path->as.string.str,
                        &env->as.env->macros, &included_files, &_include_paths,
                        &cached_asts, &ir_arena, true, NULL);
+
+  expand_macros_block(&ast, &env->as.env->macros, NULL, NULL, false,
+                      &ir_arena, &path->as.string.str, 0, 0, false);
 
   Ir ir = ast_to_ir(&ast, &ir_arena);
 
@@ -1310,6 +1315,9 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
   Exprs ast = parse_ex(code->as.string.str, &path->as.string.str,
                        &env->as.env->macros, &included_files, &_include_paths,
                        &env->as.env->cached_asts, &ir_arena, false, NULL);
+
+  expand_macros_block(&ast, &env->as.env->macros, NULL, NULL, false,
+                      &ir_arena, &path->as.string.str, 0, 0, false);
 
   Ir ir = ast_to_ir(&ast, &ir_arena);
 

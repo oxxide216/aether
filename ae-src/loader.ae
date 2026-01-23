@@ -8,7 +8,6 @@
 (use 'config')
 (use 'module-loader')
 (use 'args-parser')
-(use 'repl')
 
 (let args (get-args))
 
@@ -22,8 +21,8 @@
 (let dce parsed::'dce')
 
 (if (unit? input-path)
-  (repl)
-  (exit 0))
+  (error 'Input file was not provided')
+  (exit 1))
 
 (let input-file-content (read-binary-file input-path))
 (if (unit? input-file-content)

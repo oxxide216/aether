@@ -4,9 +4,9 @@
 CC=cc
 OUT=aether
 CFLAGS="-Wall -Wextra -Iinclude -Ilibs -Ilibs/winx/include \
-        -Ilibs/glass/include -Ilibs/lexgen/include -lm"
+        -Ilibs/glass/include -Ilibs/lexgen/include"
 BUILD_FLAGS="${@:1}"
-LDFLAGS="-z execstack"
+LDFLAGS="-z execstack -lm"
 BIN_SRC="src/main.c"
 LIB_SRC="$(find src/lib -name "*.c")"
 STD_SRC="src/std/core.c src/std/math.c src/std/str.c"
@@ -18,6 +18,10 @@ if [ "$NOSYSTEM" == "" ]; then
                     src/std/term.c src/std/system.c"
 else
   CFLAGS="$CFLAGS -DNOSYSTEM"
+fi
+
+if [ "$AETHER_GRAPHICS" == "" ]; then
+  AETHER_GRAPHICS="x11"
 fi
 
 if [ "$GLASS" != "" ]; then
@@ -42,8 +46,8 @@ cd ../..
 
 libs/lexgen/lexgen include/aether/grammar.h grammar.lg
 
-$CC -o $OUT $BIN_SRC $MISC_SRC $LIB_SRC $STD_SRC \
-            $LIBS_SRC $CFLAGS $LDFLAGS $BUILD_FLAGS
+$CC -o $OUT $BIN_SRC $LIB_SRC $STD_SRC $LIBS_SRC \
+       $CFLAGS $LDFLAGS $BUILD_FLAGS
 
 if [ "$WASM" != "" ]; then
   rm -rf dest/

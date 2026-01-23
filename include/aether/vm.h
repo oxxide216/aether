@@ -108,6 +108,7 @@ struct Vm {
   Str           current_file_path;
   FuncValue    *current_func;
   u32           current_func_index;
+  bool          tracing_enabled;
 };
 
 struct Env {

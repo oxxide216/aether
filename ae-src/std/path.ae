@@ -1,3 +1,3 @@
-(let get-current-path [] -> import 'get-current-path')
-(let set-current-path [path] -> import 'set-current-path')
-(let get-absolute-path [path] -> import 'get-absolute-path')
+(let get-current-path \-> import 'get-current-path')
+(let set-current-path \path -> import 'set-current-path')
+(let get-absolute-path \path -> import 'get-absolute-path')

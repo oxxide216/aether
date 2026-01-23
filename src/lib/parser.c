@@ -4,6 +4,7 @@
 
 #include "aether/parser.h"
 #include "aether/common.h"
+#include "aether/macros.h"
 #include "aether/deserializer.h"
 #include "aether/io.h"
 #include "lexgen/runtime.h"
@@ -339,17 +340,6 @@ static void include_file(FilePaths *included_files, Str *new_file) {
       return;
 
   DA_APPEND(*included_files, new_file);
-}
-
-static Macro *get_macro(Macros *macros, Str name) {
-  for (u32 i = macros->len; i > 0; --i) {
-    Macro *macro = macros->items + i - 1;
-
-    if (str_eq(macro->name, name))
-      return macro;
-  }
-
-  return NULL;
 }
 
 static Expr  *parser_parse_expr(Parser *parser, bool is_short);
@@ -851,7 +841,7 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
 
       expr->kind = ExprKindSet;
 
-      Expr *temp_expr = parser_parse_expr(parser, false);
+      Expr *temp_expr = parser_parse_expr(parser, true);
       DA_APPEND(expr->as.set.chain, temp_expr);
 
       token = parser_peek_token(parser);
@@ -975,6 +965,9 @@ Ir parse(Str code, Str *file_path, CachedASTs *cached_asts) {
   Exprs ast = parse_ex(code, file_path, &macros,
                        &included_files, &include_paths,
                        cached_asts, &arena, false, NULL);
+
+  expand_macros_block(&ast, &macros, NULL, NULL, false,
+                      &arena, file_path, 0, 0, false);
 
   Ir ir = ast_to_ir(&ast, &arena);
 

@@ -199,10 +199,10 @@ static u64 fnv_hash(u8 *data, u32 size) {
 }
 
 Value *run_intrinsic(Vm *vm, Value **args) {
-  Func *init = args[3]->as.func;
-  Func *event_handler = args[4]->as.func;
-  Func *update = args[5]->as.func;
-  Func *render = args[6]->as.func;
+  FuncValue *init = args[3]->as.func;
+  FuncValue *event_handler = args[4]->as.func;
+  FuncValue *update = args[5]->as.func;
+  FuncValue *render = args[6]->as.func;
 
   if (init->args.len != 0) {
     ERROR("glass/run: init should have zero arguments\n");
@@ -265,7 +265,7 @@ Value *run_intrinsic(Vm *vm, Value **args) {
   begin_frame(vm);
   vm->current_frame->can_lookup_through = true;
 
-  Value *state = execute_func(vm, &state, init, NULL, true);
+  execute_func(vm, init, NULL, false);
   if (vm->state != ExecStateContinue) {
     winx_destroy_window(&glass.window);
     winx_cleanup(&glass.winx);
@@ -273,6 +273,8 @@ Value *run_intrinsic(Vm *vm, Value **args) {
     vm->state = ExecStateExit;
     return NULL;
   }
+
+  vm->stack.items[vm->stack.len - 1]->is_atom = true;
 
   bool is_running = true;
   u64 prev_hash = 0;
@@ -292,10 +294,13 @@ Value *run_intrinsic(Vm *vm, Value **args) {
         is_running = false;
       } else {
         Value *event_value = winx_event_to_value(&event, vm);
-        Value *args[2] = { state, event_value };
-        execute_func(vm, args, event_handler, NULL, false);
+
+        DA_APPEND(vm->stack, event_value);
+
+        execute_func(vm, event_handler, NULL, true);
         if (vm->state != ExecStateContinue)
           break;
+
         --vm->stack.len;
 
         if (event.kind == WinxEventKindResize) {
@@ -314,20 +319,19 @@ Value *run_intrinsic(Vm *vm, Value **args) {
                          vec2((f32) width, (f32) height));
     }
 
-    execute_func(vm, &state, update, NULL, false);
+    execute_func(vm, update, NULL, true);
     if (vm->state != ExecStateContinue)
       break;
-    --vm->stack.len;
 
-    execute_func(vm, &state, render, NULL, false);
+    execute_func(vm, render, NULL, true);
     if (vm->state != ExecStateContinue)
       break;
-    --vm->stack.len;
 
     if (i++ == MAIN_LOOP_FRAME_LENGTH) {
       StackFrame *prev_frame = vm->current_frame->prev;
 
-      state = value_clone(state, prev_frame->prev);
+      Value **state = vm->stack.items + vm->stack.len - 1;
+      *state = value_clone(*state, prev_frame->prev);
 
       end_frame(vm);
       begin_frame(vm);
@@ -361,6 +365,8 @@ Value *run_intrinsic(Vm *vm, Value **args) {
 
     winx_draw(&glass.window);
   }
+
+  --vm->stack.len;
 
   vm->current_frame->can_lookup_through = false;
   end_frame(vm);

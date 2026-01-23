@@ -11,7 +11,8 @@
   (let include-paths [])
   (let dce true)
 
-  (while (not-unit? (head args))
+  (while (and (not-unit? (head args))
+              (begins-with (head args) '-'))
     (if (or (== (head args) '-h') (== (head args) '--help'))
       (print 'Usage: aether [FLAGS]... [FILE] [ARGS]...\n\n'
              'With no FILE, start REPL.\n\n'
@@ -50,9 +51,7 @@
         (set dce false)
      elif (begins-with (head args) '-')
       (error 'Unknown flag: ' (head args))
-      (exit 1)
-     else
-      (break))
+      (exit 1))
     (set args (tail args)))
 
   {

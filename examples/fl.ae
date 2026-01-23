@@ -7,7 +7,7 @@
 (let bg-color term/bg-magenta)
 (let items-glue (join [term/reset '\n' fg-color] ''))
 
-(let render-view [] ->
+(let render-view \->
   (print term/hide)
 
   (if (!= prev-row -1)
@@ -26,7 +26,7 @@
   (print (term/go-to 1 (+ row 1))
          term/fg-black bg-color items::row term/reset))
 
-(let render-prompt [] ->
+(let render-prompt \->
   (print term/show (term/go-to 1 term-size::'rows'))
 
   (if (< prompt-history-pos (len prompt-history))
@@ -36,21 +36,21 @@
 
   (print (term/go-to (+ (len prompt) (+ prompt-pos 1)) term-size::'rows')))
 
-(let get-directory-items [path begin end] ->
+(let get-directory-items \path begin end ->
   (set-current-path path)
   (sort (get-range (list-directory '.') begin end)))
 
-(let get-file-content-lines [content begin end] ->
+(let get-file-content-lines \content begin end ->
   (get-range (split content '\n') begin end))
 
-(let prepare-prompt [placeholder] ->
+(let prepare-prompt \placeholder ->
   (set prompt placeholder)
   (set prompt-buffer '')
   (set prompt-pos 0)
   (set prompt-file items::row)
   (set prompt-history-pos (len prompt-history)))
 
-(let update-view [] ->
+(let update-view \->
   (let key (term/get-key))
   (if (or (== key 'q') (== key '\3'))
     (set is-running false)
@@ -80,13 +80,13 @@
     (prepare-prompt 'search: ')
     (set search-mode true)))
 
-(let try-go-to-search-target [] ->
+(let try-go-to-search-target \->
   (if (and search-mode (> (len prompt-buffer) 0))
-    (let entries (filter [item] -> (begins-with item prompt-buffer) <> items))
+    (let entries (filter \item -> (begins-with item prompt-buffer) <> items))
     (if entries
       (set row (get-index items entries::0)))))
 
-(let update-prompt [] ->
+(let update-prompt \->
   (let key (term/get-key))
   (if (== key '\3')
     (set is-running false)

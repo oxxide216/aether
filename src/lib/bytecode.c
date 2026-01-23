@@ -468,7 +468,7 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
 
     Instr instr = {0};
     instr.kind = InstrKindDict;
-    instr.as.dict.len = node->as.dict.content.len;
+    instr.as.dict.len = node->as.dict.content.len / 2;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
   } break;
