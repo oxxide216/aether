@@ -422,8 +422,6 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       }
 
       u32 new_value_offset = vm->stack.len - instr->as.set.chain_len - 1;
-      if (is_from_var)
-        ++new_value_offset;
       Value *new_value = vm->stack.items[new_value_offset];
 
       if (new_value->frame == (*root)->frame)
@@ -432,8 +430,6 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
         new_value = value_clone(new_value, (*root)->frame);
 
       vm->stack.len -= instr->as.set.chain_len + 1;
-      if (is_from_var)
-        ++vm->stack.len;
 
       --(*root)->refs_count;
       *root = new_value;
