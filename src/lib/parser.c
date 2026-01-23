@@ -592,6 +592,9 @@ static ExprIf parser_parse_if(Parser *parser) {
     elif->as._if.if_body = parser_parse_block(parser, MASK(TT_CPAREN) |
                                                MASK(TT_ELIF) |
                                                MASK(TT_ELSE));
+    elif->meta.file_path = parser->file_path;
+    elif->meta.row = next_token->row;
+    elif->meta.col = next_token->col;
 
     DA_APPEND(last->else_body, elif);
     last = &elif->as._if;
