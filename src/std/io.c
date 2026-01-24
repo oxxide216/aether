@@ -127,11 +127,11 @@ Value *write_file_intrinsic(Vm *vm, Value **args) {
 
   char *path_cstring = str_to_cstr(path->as.string.str);
 
-  write_file(path_cstring, data);
+  bool success = write_file(path_cstring, data);
 
   free(path_cstring);
 
-  return value_unit(vm->current_frame);
+  return value_bool(success, vm->current_frame);
 }
 
 Value *delete_file_intrinsic(Vm *vm, Value **args) {
@@ -214,7 +214,7 @@ Intrinsic io_intrinsics[] = {
   { STR_LIT("write-file"), false, 2,
     { ValueKindString, ValueKindString },
     &write_file_intrinsic, NULL },
-  { STR_LIT("write-binary-file"), false, 2,
+  { STR_LIT("write-binary-file"), true, 2,
     { ValueKindString, ValueKindBytes },
     &write_file_intrinsic, NULL },
   { STR_LIT("delete-file"), false, 1, { ValueKindString }, &delete_file_intrinsic, NULL },
