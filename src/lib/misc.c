@@ -158,7 +158,7 @@ Value **get_child_root(Value *value, Value *key, InstrMeta *meta, Vm *vm) {
     }
 
     if (!node)
-      PANIC(*meta, "List out of bounds");
+      PANIC(*meta, "List index out of bounds\n");
 
     return &node->value;
   } else if (value->kind == ValueKindDict) {

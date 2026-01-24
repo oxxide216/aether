@@ -375,7 +375,11 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       for (u32 j = 1; j < instr->as.get.chain_len; ++j) {
         Value *key = vm->stack.items[vm->stack.len - instr->as.get.chain_len + j];
 
-        value = *get_child_root(value, key, &instr->meta, vm);
+        Value **root = get_child_root(value, key, &instr->meta, vm);
+        if (vm->state != ExecStateContinue)
+          return;
+
+        value = *root;
       }
 
       vm->stack.len -= instr->as.get.chain_len;

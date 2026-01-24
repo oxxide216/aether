@@ -14,6 +14,7 @@
 typedef struct {
   char *cstr;
   bool  is_precompiled;
+  bool  tracing_enabled;
 } Path;
 
 // From common.c
@@ -26,8 +27,8 @@ extern bool catch_kill;
 #endif
 
 static Path loader_paths[] = {
-  { "ae-src/loader.ae", false },
-  { "/usr/include/aether/loader.abc", true },
+  { "ae-src/loader.ae", false, true },
+  { "/usr/local/include/aether/loader.abc", true, false },
 };
 
 static CachedASTs cached_asts = {0};
@@ -82,6 +83,7 @@ i32 main(i32 argc, char **argv) {
 
   Intrinsics intrinsics = {0};
   vm = vm_create(argc, argv, &intrinsics);
+  vm.tracing_enabled = path->tracing_enabled;
 
   if (path->is_precompiled) {
     ir = deserialize((u8 *) code.ptr, code.len, &arena, &vm.current_file_path);
