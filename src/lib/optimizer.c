@@ -15,7 +15,24 @@ void eliminate_dead_code_instrs(Instrs *instrs, Ir *ir,
     Instr *instr = instrs->items + i;
 
     switch (instr->kind) {
-    case InstrKindPrimitive: break;
+    case InstrKindPrimitive: {
+      if (instr->as.primitive.value->kind == ValueKindFunc) {
+        u32 func_index = instr->as.primitive.value->as.func->body_index;
+
+        if (ir->items[func_index].is_dead) {
+          ir->items[func_index].is_dead = false;
+
+          FuncDefs temp_defs = {0};
+          eliminate_dead_code_instrs(&ir->items[func_index].instrs,
+                                     ir, &temp_defs, global_defs);
+          if (temp_defs.items)
+            free(temp_defs.items);
+        }
+
+        break;
+      }
+    } break;
+
     case InstrKindFuncCall:  break;
 
     case InstrKindDefVar: {
