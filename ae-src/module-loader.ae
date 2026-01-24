@@ -5,7 +5,7 @@
   (let right-paths (filter \path ->
                              (to-bool (get-file-info path)) <> paths))
 
-  (if (unit? right-paths)
+  (if (not right-paths)
     (error 'Could not load ' name ' module')
     (exit 1))
 
@@ -20,7 +20,7 @@
 
 (let load-compiled-module \env name path ->
   (let right-paths (filter \path ->
-                             (get-file-info path) <> paths))
+                             (to-bool (get-file-info path)) <> paths))
 
   (if (unit? right-paths)
     (error 'Could not load ' name ' module')
