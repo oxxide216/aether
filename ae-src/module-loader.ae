@@ -2,8 +2,8 @@
 (use 'std/log')
 
 (let load-module \env name paths ->
-  (let right-paths (filter \path ->
-                             (to-bool (get-file-info path)) <> paths))
+  (let right-paths
+    (filter \path -> (not-unit? (get-file-info path)) <> paths))
 
   (if (not right-paths)
     (error 'Could not load ' name ' module')
@@ -19,8 +19,8 @@
   content)
 
 (let load-compiled-module \env name path ->
-  (let right-paths (filter \path ->
-                             (to-bool (get-file-info path)) <> paths))
+  (let right-paths
+    (filter \path -> (not-unit? (get-file-info path)) <> paths))
 
   (if (not right-paths)
     (error 'Could not load ' name ' module')

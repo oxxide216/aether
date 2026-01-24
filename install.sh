@@ -9,7 +9,7 @@ if [ "$DEL" == "" ]; then
   sudo mkdir -p "$PREFIX/include/aether"
   sudo cp -r ae-src/std/ "$PREFIX/include/aether"
 
-  sudo aether -c "$PREFIX/include/aether/loader.abc" ae-src/loader.ae
+  sudo ./aether -c "$PREFIX/include/aether/loader.abc" ae-src/loader.ae
 
   if [ "$WASM" != "" ]; then
     sudo cp -r dest/ "$PREFIX/include/aether/wasm"
