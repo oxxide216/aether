@@ -2,6 +2,12 @@
 #include "aether/optimizer.h"
 #include "shl/shl-log.h"
 
+typedef struct {
+  u32 a, b;
+} IndexPair;
+
+typedef Da(IndexPair) IndicesMap;
+
 static void reserve_space(u32 amount, u8 **data, u32 *data_size, u32 *end) {
   u32 new_data_size = *data_size;
   while (*end + amount > new_data_size)
@@ -24,11 +30,246 @@ static void serialize_str(Str str, u8 **data, u32 *data_size, u32 *end) {
   }
 }
 
+static void serialize_value(Value *value, u8 **data, u32 *data_size,
+                             u32 *end, FilePathOffsets *path_offsets,
+                             Str *file_path, IndicesMap *map) {
+  reserve_space(sizeof(ValueKind), data, data_size, end);
+  *(ValueKind *) (*data + *end) = value->kind;
+  *end += sizeof(ValueKind);
+
+  switch (value->kind) {
+  case ValueKindUnit: break;
+
+  case ValueKindList: {
+    u32 len = 0;
+
+    ListNode *node = value->as.list->next;
+    while (node) {
+      ++len;
+
+      node = node->next;
+    }
+
+    reserve_space(sizeof(u32), data, data_size, end);
+    *(u32 *) (*data + *end) = len;
+    *end += sizeof(u32);
+
+    node = value->as.list->next;
+    while (node) {
+      serialize_value(node->value, data, data_size, end,
+                      path_offsets, file_path, map);
+
+      node = node->next;
+    }
+  } break;
+
+  case ValueKindString: {
+    serialize_str(value->as.string.str, data, data_size, end);
+  } break;
+
+  case ValueKindInt: {
+    reserve_space(sizeof(i64), data, data_size, end);
+    *(i64 *) (*data + *end) = value->as._int;
+    *end += sizeof(i64);
+  } break;
+
+  case ValueKindFloat: {
+    reserve_space(sizeof(f64), data, data_size, end);
+    *(f64 *) (*data + *end) = value->as._float;
+    *end += sizeof(f64);
+  } break;
+
+  case ValueKindBool: {
+    reserve_space(sizeof(u8), data, data_size, end);
+    *(u8 *) (*data + *end) = value->as._bool;
+    *end += sizeof(u8);
+  } break;
+
+  case ValueKindDict: {
+    for (u32 j = 0; j < DICT_HASH_TABLE_CAP; ++j) {
+      u32 len = 0;
+
+      DictValue *entry = value->as.dict.items[j];
+      while (entry) {
+        ++len;
+
+        entry = entry->next;
+      }
+
+      reserve_space(sizeof(u32), data, data_size, end);
+      *(u32 *) (*data + *end) = len;
+      *end += sizeof(u32);
+
+      entry = value->as.dict.items[j];
+      while (entry) {
+        serialize_value(entry->key, data, data_size, end,
+                        path_offsets, file_path, map);
+        serialize_value(entry->value, data, data_size, end,
+                        path_offsets, file_path, map);
+
+        entry = entry->next;
+      }
+    }
+  } break;
+
+  case ValueKindFunc: {
+    reserve_space(sizeof(u32), data, data_size, end);
+    *(u32 *) (*data + *end) = value->as.func->args.len;
+    *end += sizeof(u32);
+
+    for (u32 j = 0; j < value->as.func->args.len; ++j)
+      serialize_str(value->as.func->args.items[j], data, data_size, end);
+
+    u32 new_index = value->as.func->body_index;
+    for (u32 j = 0; j < map->len; ++j) {
+      if (map->items[j].a == value->as.func->body_index) {
+        new_index = map->items[j].b;
+
+        break;
+      }
+    }
+
+    reserve_space(sizeof(u32), data, data_size, end);
+    *(u32 *) (*data + *end) = new_index;
+    *end += sizeof(u32);
+
+    serialize_str(value->as.func->intrinsic_name, data, data_size, end);
+  } break;
+
+  case ValueKindEnv: break;
+
+  case ValueKindBytes: {
+    Str bytes_str = {
+      (char *) value->as.bytes.ptr,
+      value->as.bytes.len,
+    };
+
+    serialize_str(bytes_str, data, data_size, end);
+  } break;
+  }
+}
+
 static void serialize_instrs(Instrs *instrs, u8 **data, u32 *data_size,
                              u32 *end, FilePathOffsets *path_offsets,
-                             Str *file_path) {
-  ERROR("TODO: serialization\n");
-  exit(1);
+                             Str *file_path, IndicesMap *map) {
+  reserve_space(sizeof(u32), data, data_size, end);
+  *(u32 *) (*data + *end) = instrs->len;
+  *end += sizeof(u32);
+
+  for (u32 i = 0; i < instrs->len; ++i) {
+    Instr *instr = instrs->items + i;
+
+    reserve_space(sizeof(InstrKind), data, data_size, end);
+    *(InstrKind *) (*data + *end) = instr->kind;
+    *end += sizeof(InstrKind);
+
+    switch (instr->kind) {
+    case InstrKindPrimitive: {
+      serialize_value(instr->as.primitive.value, data, data_size,
+                      end, path_offsets, file_path, map);
+    } break;
+
+    case InstrKindFuncCall: {
+      reserve_space(sizeof(u32), data, data_size, end);
+      *(u32 *) (*data + *end) = instr->as.func_call.args_len;
+      *end += sizeof(u32);
+
+      reserve_space(sizeof(u8), data, data_size, end);
+      *(u8 *) (*data + *end) = instr->as.func_call.value_ignored;
+      *end += sizeof(u8);
+    } break;
+
+    case InstrKindDefVar: {
+      serialize_str(instr->as.def_var.name, data, data_size, end);
+    } break;
+
+    case InstrKindGetVar: {
+      serialize_str(instr->as.get_var.name, data, data_size, end);
+    } break;
+
+    case InstrKindJump: {
+      serialize_str(instr->as.jump.label, data, data_size, end);
+    } break;
+
+    case InstrKindCondJump: {
+      serialize_str(instr->as.cond_jump.label, data, data_size, end);
+    } break;
+
+    case InstrKindCondNotJump: {
+      serialize_str(instr->as.cond_not_jump.label, data, data_size, end);
+    } break;
+
+    case InstrKindLabel: {
+      serialize_str(instr->as.label.name, data, data_size, end);
+    } break;
+
+    case InstrKindMatchBegin: break;
+
+    case InstrKindMatchCase: {
+      serialize_str(instr->as.match_case.not_label, data, data_size, end);
+    } break;
+
+    case InstrKindMatchEnd: break;
+
+    case InstrKindGet: {
+      reserve_space(sizeof(u32), data, data_size, end);
+      *(u32 *) (*data + *end) = instr->as.get.chain_len;
+      *end += sizeof(u32);
+    } break;
+
+    case InstrKindSet: {
+      reserve_space(sizeof(u32), data, data_size, end);
+      *(u32 *) (*data + *end) = instr->as.set.chain_len;
+      *end += sizeof(u32);
+    } break;
+
+    case InstrKindRet: {
+      reserve_space(sizeof(u8), data, data_size, end);
+      *(u8 *) (*data + *end) = instr->as.ret.has_value;
+      *end += sizeof(u8);
+    } break;
+
+    case InstrKindList: {
+      reserve_space(sizeof(u32), data, data_size, end);
+      *(u32 *) (*data + *end) = instr->as.list.len;
+      *end += sizeof(u32);
+    } break;
+
+    case InstrKindDict: {
+      reserve_space(sizeof(u32), data, data_size, end);
+      *(u32 *) (*data + *end) = instr->as.dict.len;
+      *end += sizeof(u32);
+    } break;
+
+    case InstrKindSelf: break;
+    }
+
+
+    bool found = false;
+
+    for (u32 j = 0; j < path_offsets->len; ++j) {
+      if (str_eq(path_offsets->items[j].path, *instr->meta.file_path)) {
+        reserve_space(sizeof(u32), data, data_size, end);
+        *(u32 *) (*data + *end) = j;
+        *end += sizeof(u32);
+
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      ERROR("Could not find offset for "STR_FMT"\n",
+            STR_ARG(*instr->meta.file_path));
+      exit(1);
+    }
+
+    reserve_space(sizeof(u16) * 2, data, data_size, end);
+    *(u16 *) (*data + *end) = instr->meta.row;
+    *end += sizeof(u16);
+    *(u16 *) (*data + *end) = instr->meta.col;
+    *end += sizeof(u16);
+  }
 }
 
 static void serialize_included_files(u8 **data, u32 *data_size, u32 *end,
@@ -57,10 +298,47 @@ u8 *serialize(Ir *ir, u32 *size, FilePaths *included_files, bool dce) {
   FilePathOffsets path_offsets = {0};
   serialize_included_files(&data, &data_size, size, included_files, &path_offsets);
 
+  u32 ir_len_end = *size;
+  u32 funcs_skipped = 0;
+  IndicesMap map = {0};
+  u32 len = 0;
+
   for (u32 i = 0; i < ir->len; ++i) {
-    serialize_instrs(&ir->items[i].instrs, &data, &data_size, size,
-                     &path_offsets, included_files->items[0]);
+    Func *func = ir->items + i;
+
+    IndexPair pair = {
+      i,
+      i - funcs_skipped,
+    };
+    DA_APPEND(map, pair);
+
+    if (func->is_dead)
+      ++funcs_skipped;
   }
+
+  reserve_space(sizeof(u32), &data, &data_size, size);
+  *size += sizeof(u32);
+
+  for (u32 i = 0; i < ir->len; ++i) {
+    Func *func = ir->items + i;
+
+    if (func->is_dead)
+      continue;
+
+    reserve_space(sizeof(u32), &data, &data_size, size);
+    *(u32 *) (data + *size) = func->args.len;
+    *size += sizeof(u32);
+
+    for (u32 j = 0; j < func->args.len; ++j)
+      serialize_str(func->args.items[j], &data, &data_size, size);
+
+    serialize_instrs(&func->instrs, &data, &data_size, size,
+                     &path_offsets, included_files->items[0], &map);
+
+    ++len;
+  }
+
+  *(u32 *) (data + ir_len_end) = len;
 
   if (path_offsets.items)
     free(path_offsets.items);
@@ -73,13 +351,168 @@ u8 *serialize(Ir *ir, u32 *size, FilePaths *included_files, bool dce) {
 
 static void serialize_ast(Exprs *ast, u8 **data, u32 *data_size,
                           u32 *end, FilePathOffsets *path_offsets,
-                          Str *file_path) {
-  ERROR("TODO: serialization\n");
-  exit(1);
+                          Str *file_path, IndicesMap *map);
+
+static void serialize_ast_node(Expr *node, u8 **data, u32 *data_size,
+                               u32 *end, FilePathOffsets *path_offsets,
+                               Str *file_path, IndicesMap *map) {
+  reserve_space(sizeof(ExprKind), data, data_size, end);
+  *(ExprKind *) (*data + *end) = node->kind;
+  *end += sizeof(ExprKind);
+
+  switch (node->kind) {
+  case ExprKindPrimitive: {
+    serialize_value(node->as.primitive.value, data, data_size,
+                    end, path_offsets, file_path, map);
+  } break;
+
+  case ExprKindBlock: {
+    serialize_ast(&node->as.block, data, data_size, end,
+                  path_offsets, file_path, map);
+  } break;
+
+  case ExprKindIdent: {
+    serialize_str(node->as.ident.name, data, data_size, end);
+  } break;
+
+  case ExprKindFunc: {
+    reserve_space(sizeof(u32), data, data_size, end);
+    *(u32 *) (*data + *end) = node->as.func.args.len;
+    *end += sizeof(u32);
+
+    for (u32 i = 0; i < node->as.func.args.len; ++i)
+      serialize_str(node->as.func.args.items[i], data, data_size, end);
+
+    serialize_ast(&node->as.func.body, data, data_size,
+                  end, path_offsets, file_path, map);
+
+    serialize_str(node->as.func.intrinsic_name, data, data_size, end);
+  } break;
+
+  case ExprKindList: {
+    serialize_ast(&node->as.list.content, data, data_size,
+                  end, path_offsets, file_path, map);
+  } break;
+
+  case ExprKindDict: {
+    serialize_ast(&node->as.dict.content, data, data_size,
+                  end, path_offsets, file_path, map);
+  } break;
+
+  case ExprKindGet: {
+    serialize_ast(&node->as.get.chain, data, data_size,
+                  end, path_offsets, file_path, map);
+  } break;
+
+  case ExprKindSet: {
+    serialize_ast(&node->as.set.chain, data, data_size,
+                  end, path_offsets, file_path, map);
+    serialize_ast_node(node->as.set.new, data, data_size,
+                       end, path_offsets, file_path, map);
+  } break;
+
+  case ExprKindFuncCall: {
+    serialize_ast_node(node->as.func_call.func, data, data_size,
+                       end, path_offsets, file_path, map);
+    serialize_ast(&node->as.func_call.args, data, data_size,
+                  end, path_offsets, file_path, map);
+
+    reserve_space(sizeof(u8), data, data_size, end);
+    *(u8 *) (*data + *end) = node->as.func_call.value_ignored;
+    *end += sizeof(u8);
+  } break;
+
+  case ExprKindLet: {
+    serialize_str(node->as.let.name, data, data_size, end);
+    serialize_ast_node(node->as.let.value, data, data_size,
+                       end, path_offsets, file_path, map);
+  } break;
+
+  case ExprKindRet: {
+    reserve_space(sizeof(u8), data, data_size, end);
+    *(u8 *) (*data + *end) = node->as.ret.value != NULL;
+    *end += sizeof(u8);
+
+    if (node->as.ret.value)
+      serialize_ast_node(node->as.ret.value, data, data_size,
+                         end, path_offsets, file_path, map);
+  } break;
+
+  case ExprKindIf: {
+    serialize_ast_node(node->as._if.cond, data, data_size,
+                       end, path_offsets, file_path, map);
+    serialize_ast(&node->as._if.if_body, data, data_size,
+                  end, path_offsets, file_path, map);
+    serialize_ast(&node->as._if.else_body, data, data_size,
+                  end, path_offsets, file_path, map);
+  } break;
+
+  case ExprKindWhile: {
+    serialize_ast_node(node->as._while.cond, data, data_size,
+                       end, path_offsets, file_path, map);
+    serialize_ast(&node->as._while.body, data, data_size,
+                  end, path_offsets, file_path, map);
+  } break;
+
+  case ExprKindMatch: {
+    serialize_ast_node(node->as.match.value, data, data_size,
+                       end, path_offsets, file_path, map);
+    serialize_ast(&node->as.match.values, data, data_size,
+                  end, path_offsets, file_path, map);
+    serialize_ast(&node->as.match.branches, data, data_size,
+                  end, path_offsets, file_path, map);
+
+    reserve_space(sizeof(u8), data, data_size, end);
+    *(u8 *) (*data + *end) = node->as.match.else_branch != NULL;
+    *end += sizeof(u8);
+
+    if (node->as.match.else_branch)
+      serialize_ast_node(node->as.match.else_branch, data, data_size,
+                         end, path_offsets, file_path, map);
+  } break;
+
+  case ExprKindSelf: break;
+  }
+
+  bool found = false;
+
+  for (u32 j = 0; j < path_offsets->len; ++j) {
+    if (str_eq(path_offsets->items[j].path, *node->meta.file_path)) {
+      reserve_space(sizeof(u32), data, data_size, end);
+      *(u32 *) (*data + *end) = j;
+      *end += sizeof(u32);
+
+      found = true;
+      break;
+    }
+  }
+
+  if (!found) {
+    ERROR("Could not find offset for "STR_FMT"\n",
+          STR_ARG(*node->meta.file_path));
+    exit(1);
+  }
+
+  reserve_space(sizeof(u16) * 2, data, data_size, end);
+  *(u16 *) (*data + *end) = node->meta.row;
+  *end += sizeof(u16);
+  *(u16 *) (*data + *end) = node->meta.col;
+  *end += sizeof(u16);
 }
 
-u8 *serialize_macros(Macros *macros, u32 *size,
-                     FilePaths *included_files, bool dce) {
+static void serialize_ast(Exprs *ast, u8 **data, u32 *data_size,
+                          u32 *end, FilePathOffsets *path_offsets,
+                          Str *file_path, IndicesMap *map) {
+  reserve_space(sizeof(u32), data, data_size, end);
+  *(u32 *) (*data + *end) = ast->len;
+  *end += sizeof(u32);
+
+  for (u32 i = 0; i < ast->len; ++i)
+    serialize_ast_node(ast->items[i], data, data_size,
+                       end, path_offsets, file_path, map);
+}
+
+u8 *serialize_macros(Macros *macros, u32 *size, FilePaths *included_files) {
   *size = sizeof(u32) * 2;
   u32 data_size = sizeof(u32) * 2;
   u8 *data = malloc(data_size);
@@ -100,11 +533,12 @@ u8 *serialize_macros(Macros *macros, u32 *size,
     *(u32 *) (data + *size) = macro->arg_names.len;
     *size += sizeof(u32);
 
-    for (u32 i = 0; i < macro->arg_names.len; ++i)
-      serialize_str(macro->arg_names.items[i], &data, &data_size, size);
+    for (u32 j = 0; j < macro->arg_names.len; ++j)
+      serialize_str(macro->arg_names.items[j], &data, &data_size, size);
 
+    IndicesMap map = {0};
     serialize_ast(&macro->body, &data, &data_size, size,
-                  &path_offsets, included_files->items[0]);
+                  &path_offsets, included_files->items[0], &map);
 
     reserve_space(sizeof(u8), &data, &data_size, size);
     *(u8 *) (data + *size) = macro->has_unpack;

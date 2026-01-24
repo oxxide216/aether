@@ -790,12 +790,11 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
         exit(1);
       }
 
-      for (u32 i = 0; i < parser->included_files->len; ++i) {
-        if (str_eq(*parser->included_files->items[i], path)) {
-          expr->kind = ExprKindBlock;
+      expr->kind = ExprKindBlock;
+
+      for (u32 i = 0; i < parser->included_files->len; ++i)
+        if (str_eq(*parser->included_files->items[i], path))
           return expr;
-        }
-      }
 
       Str dir = get_file_dir(path);
       DA_APPEND(*parser->include_paths, dir);
@@ -831,7 +830,6 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
         parser->macros->len += macros.len;
       } else {
         Arena arena = {0};
-        expr->kind = ExprKindBlock;
         expr->as.block = parse_ex(code, path_ptr, parser->macros,
                                   parser->included_files, parser->include_paths,
                                   parser->cached_asts, &arena, parser->use_macros,

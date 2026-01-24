@@ -14,7 +14,9 @@
     (error 'Could not load ' name ' module')
     (exit 1))
 
-  (eval env content right-paths::0 std-include-paths))
+  (eval env content right-paths::0 std-include-paths)
+
+  content)
 
 (let load-compiled-module \env name path ->
   (let right-paths (filter \path ->
@@ -29,4 +31,6 @@
     (error 'Could not load precompiled ' name ' module')
     (exit 1))
 
-  (eval-compiled env content))
+  (eval-compiled env content)
+
+  content)

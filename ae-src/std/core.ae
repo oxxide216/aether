@@ -1,9 +1,6 @@
 (macro for \item in collection ...body ->
   (for-each collection \item -> body))
 
-(macro from \lower to upper with item ...body ->
-  (for-each (gen-range lower upper) \item -> body))
-
 ; Base
 (let head \list -> import 'head')
 (let tail \list -> import 'tail')

@@ -46,8 +46,8 @@
 
 (let env (make-env parsed-args))
 
-(load-module env 'core' core-paths)
-(load-module env 'base' base-paths)
+(let core-content (load-module env 'core' core-paths))
+(let base-content (load-module env 'base' base-paths))
 
 (match mode
   mode-default => (eval env (to-str input-file-content)
@@ -56,13 +56,14 @@
   mode-eval-macros => (eval-macros env input-file-content)
   mode-compile-only =>
     (do
-      (let compiled (compile env (to-str input-file-content)
-                             input-path include-paths false dce))
+      (let content (join [core-content base-content (to-str input-file-content)] '\n'))
+      (let compiled (compile env content input-path include-paths false dce))
 
       (write-file output-path compiled::'compiled'))
   mode-compile-macros-only =>
     (do
-      (let compiled (compile env input-file-content input-path true dce))
+      (let content (join [core-content base-content (to-str input-file-content)] '\n'))
+      (let compiled (compile env content input-path include-paths true dce))
 
       (if (unit? compiled::'compiled-macros')
         (info 'No macros found in ' input-path)

@@ -1,6 +1,7 @@
 #include "aether/deserializer.h"
 #include "aether/serializer.h"
 #include "aether/common.h"
+#include "aether/misc.h"
 #include "shl/shl-log.h"
 
 static void deserialize_str(Str *str, u8 *data, u32 *end, Arena *arena) {
@@ -14,19 +15,201 @@ static void deserialize_str(Str *str, u8 *data, u32 *end, Arena *arena) {
   }
 }
 
+static Value *deserialize_value(u8 *data, u32 *end,
+                                FilePathOffsets *path_offsets,
+                                Arena *arena) {
+  Value *value = arena_alloc(arena, sizeof(Value));
+
+  value->kind = *(ValueKind *) (data + *end);
+  *end += sizeof(ValueKind);
+
+  switch (value->kind) {
+  case ValueKindUnit: break;
+
+  case ValueKindList: {
+    u32 len = *(u32 *) (data + *end);
+    *end += sizeof(u32);
+
+    value->as.list = arena_alloc(arena, sizeof(ListNode));
+    ListNode **next_node = &value->as.list->next;
+    for (u32 i = 0; i < len; ++i) {
+      *next_node = arena_alloc(arena, sizeof(ListNode));
+      (*next_node)->value = deserialize_value(data, end, path_offsets, arena);
+
+      next_node = &(*next_node)->next;
+    }
+  } break;
+
+  case ValueKindString: {
+    deserialize_str(&value->as.string.str, data, end, arena);
+  } break;
+
+  case ValueKindInt: {
+    value->as._int = *(i64 *) (data + *end);
+    *end += sizeof(i64);
+  } break;
+
+  case ValueKindFloat: {
+    value->as._float = *(f64 *) (data + *end);
+    *end += sizeof(f64);
+  } break;
+
+  case ValueKindBool: {
+    value->as._bool = *(u8 *) (data + *end);
+    *end += sizeof(u8);
+  } break;
+
+  case ValueKindDict: {
+    for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
+      u32 len = *(u32 *) (data + *end);
+      *end += sizeof(u32);
+
+      DictValue **next_entry =  value->as.dict.items + i;
+      for (u32 j = 0; j < len; ++j) {
+        *next_entry = arena_alloc(arena, sizeof(DictValue));
+        (*next_entry)->key = deserialize_value(data, end, path_offsets, arena);
+        (*next_entry)->value = deserialize_value(data, end, path_offsets, arena);
+
+        next_entry = &(*next_entry)->next;
+      }
+    }
+  } break;
+
+  case ValueKindFunc: {
+    value->as.func = arena_alloc(arena, sizeof(FuncValue));
+
+    value->as.func->args.len = *(u32 *) (data + *end);
+    *end += sizeof(u32);
+
+    value->as.func->args.items =
+      arena_alloc(arena, value->as.func->args.len * sizeof(Str));
+
+    for (u32 i = 0; i < value->as.func->args.len; ++i)
+      deserialize_str(value->as.func->args.items + i, data, end, arena);
+
+    value->as.func->body_index = *(u32 *) (data + *end);
+    *end += sizeof(u32);
+
+    deserialize_str(&value->as.func->intrinsic_name, data, end, arena);
+  } break;
+
+  case ValueKindEnv: break;
+
+  case ValueKindBytes: {
+    Str bytes_str;
+    deserialize_str(&bytes_str, data, end, arena);
+
+    value->as.bytes.ptr = (u8 *) bytes_str.ptr;
+    value->as.bytes.len = bytes_str.len;
+  } break;
+  }
+
+  return value;
+}
+
 static void deserialize_instrs(Instrs *instrs, u8 *data, u32 *end,
                                FilePathOffsets *path_offsets,
                                Arena *arena) {
   instrs->len = *(u32 *) (data + *end);
+  instrs->cap = instrs->len;
   *end += sizeof(u32);
+
+  instrs->items = malloc(instrs->cap * sizeof(Instr));
 
   for (u32 i = 0; i < instrs->len; ++i) {
     Instr instr = {0};
 
-    ERROR("TODO: deserialization\n");
-    exit(1);
+    instr.kind = *(InstrKind *) (data + *end);
+    *end += sizeof(InstrKind);
 
-    DA_APPEND(*instrs, instr);
+    switch (instr.kind) {
+    case InstrKindPrimitive: {
+      instr.as.primitive.value = deserialize_value(data, end, path_offsets, arena);
+    } break;
+
+    case InstrKindFuncCall: {
+      instr.as.func_call.args_len = *(u32 *) (data + *end);
+      *end += sizeof(u32);
+
+      instr.as.func_call.value_ignored = *(u8 *) (data + *end);
+      *end += sizeof(u8);
+    } break;
+
+    case InstrKindDefVar: {
+      deserialize_str(&instr.as.def_var.name, data, end, arena);
+    } break;
+
+    case InstrKindGetVar: {
+      deserialize_str(&instr.as.get_var.name, data, end, arena);
+    } break;
+
+    case InstrKindJump: {
+      deserialize_str(&instr.as.jump.label, data, end, arena);
+    } break;
+
+    case InstrKindCondJump: {
+      deserialize_str(&instr.as.cond_jump.label, data, end, arena);
+    } break;
+
+    case InstrKindCondNotJump: {
+      deserialize_str(&instr.as.cond_not_jump.label, data, end, arena);
+    } break;
+
+    case InstrKindLabel: {
+      deserialize_str(&instr.as.label.name, data, end, arena);
+    } break;
+
+    case InstrKindMatchBegin: break;
+
+    case InstrKindMatchCase: {
+      deserialize_str(&instr.as.match_case.not_label, data, end, arena);
+    } break;
+
+    case InstrKindMatchEnd: break;
+
+    case InstrKindGet: {
+      instr.as.get.chain_len = *(u32 *) (data + *end);
+      *end += sizeof(u32);
+    } break;
+
+    case InstrKindSet: {
+      instr.as.set.chain_len = *(u32 *) (data + *end);
+      *end += sizeof(u32);
+    } break;
+
+    case InstrKindRet: {
+      instr.as.ret.has_value = *(u8 *) (data + *end);
+      *end += sizeof(u8);
+    } break;
+
+    case InstrKindList: {
+      instr.as.list.len = *(u32 *) (data + *end);
+      *end += sizeof(u32);
+    } break;
+
+    case InstrKindDict: {
+      instr.as.dict.len = *(u32 *) (data + *end);
+      *end += sizeof(u32);
+    } break;
+
+    case InstrKindSelf: break;
+    }
+
+    u32 path_index = *(u32 *) (data + *end);
+    *end += sizeof(u32);
+
+    if (path_index >= path_offsets->len) {
+      ERROR("Offset index out of bounds: %u\n", path_index);
+      exit(1);
+    }
+
+    instr.meta.file_path = &path_offsets->items[path_index].path;
+    instr.meta.row = *(u16 *) (data + *end);
+    *end += sizeof(u16);
+    instr.meta.col = *(u16 *) (data + *end);
+    *end += sizeof(u16);
+
+    instrs->items[i] = instr;
   }
 }
 
@@ -71,24 +254,185 @@ Ir deserialize(u8 *data, u32 size, Arena *arena, Str *file_path) {
   *file_path = path_offsets.items[0].path;
 
   ir.len = *(u32 *) (data + end);
+  ir.cap = ir.len;
   end += sizeof(u32);
+
+  ir.items = malloc(ir.cap * sizeof(Func));
 
   for (u32 i = 0; i < ir.len; ++i) {
     Func func = {0};
 
+    func.args.len = *(u32 *) (data + end);
+    func.args.cap = func.args.len;
+    end += sizeof(u32);
+
+    func.args.items = arena_alloc(arena, func.args.cap * sizeof(Str));
+    for (u32 j = 0; j < func.args.len; ++j)
+      deserialize_str(func.args.items + j, data, &end, arena);
+
     deserialize_instrs(&func.instrs, data, &end, &path_offsets, arena);
 
-    DA_APPEND(ir, func);
+    ir.items[i] = func;
   }
 
   return ir;
 }
 
-static void deserialize_ast(Exprs *exprs, u8 *data, u32 *end,
+static void deserialize_ast(Exprs *ast, u8 *data, u32 *end,
+                            FilePathOffsets *path_offsets,
+                            Arena *arena);
+
+static Expr *deserialize_ast_node(u8 *data, u32 *end,
+                                  FilePathOffsets *path_offsets,
+                                  Arena *arena) {
+  Expr *node = arena_alloc(arena, sizeof(Expr));
+
+  node->kind = *(ExprKind *) (data + *end);
+  *end += sizeof(ExprKind);
+
+  switch (node->kind) {
+  case ExprKindPrimitive: {
+    node->as.primitive.value =
+      deserialize_value(data, end,
+                        path_offsets, arena);
+  } break;
+
+  case ExprKindBlock: {
+    deserialize_ast(&node->as.block, data,
+                    end, path_offsets, arena);
+  } break;
+
+  case ExprKindIdent: {
+    deserialize_str(&node->as.ident.name, data, end, arena);
+  } break;
+
+  case ExprKindFunc: {
+    node->as.func.args.len = *(u32 *) (data + *end);
+    node->as.func.args.cap = node->as.func.args.len;
+    *end += sizeof(u32);
+
+    node->as.func.args.items =
+      arena_alloc(arena, node->as.func.args.cap * sizeof(Str));
+
+    for (u32 j = 0; j < node->as.func.args.len; ++j)
+      deserialize_str(&node->as.func.args.items[j], data, end, arena);
+
+    deserialize_ast(&node->as.func.body, data,
+                    end, path_offsets, arena);
+
+    deserialize_str(&node->as.func.intrinsic_name, data, end, arena);
+  } break;
+
+  case ExprKindList: {
+    deserialize_ast(&node->as.list.content, data,
+                    end, path_offsets, arena);
+  } break;
+
+  case ExprKindDict: {
+    deserialize_ast(&node->as.dict.content, data,
+                    end, path_offsets, arena);
+  } break;
+
+  case ExprKindGet: {
+    deserialize_ast(&node->as.get.chain, data,
+                    end, path_offsets, arena);
+  } break;
+
+  case ExprKindSet: {
+    deserialize_ast(&node->as.set.chain, data,
+                    end, path_offsets, arena);
+    node->as.set.new = deserialize_ast_node(data, end,
+                                            path_offsets, arena);
+  } break;
+
+  case ExprKindFuncCall: {
+    node->as.func_call.func = deserialize_ast_node(data, end,
+                                                   path_offsets, arena);
+    deserialize_ast(&node->as.func_call.args, data,
+                    end, path_offsets, arena);
+
+    node->as.func_call.value_ignored = *(u8 *) (data + *end);
+    *end += sizeof(u8);
+  } break;
+
+  case ExprKindLet: {
+    deserialize_str(&node->as.let.name, data, end, arena);
+    node->as.let.value = deserialize_ast_node(data, end,
+                                              path_offsets, arena);
+  } break;
+
+  case ExprKindRet: {
+    bool has_value = *(u8 *) (data + *end);
+    *end += sizeof(u8);
+
+    if (has_value)
+      node->as.ret.value = deserialize_ast_node(data, end,
+                                                path_offsets, arena);
+  } break;
+
+  case ExprKindIf: {
+    node->as._if.cond = deserialize_ast_node(data, end,
+                                             path_offsets, arena);
+    deserialize_ast(&node->as._if.if_body, data, end,
+                    path_offsets, arena);
+    deserialize_ast(&node->as._if.else_body, data, end,
+                    path_offsets, arena);
+  } break;
+
+  case ExprKindWhile: {
+    node->as._while.cond = deserialize_ast_node(data, end,
+                                                path_offsets, arena);
+    deserialize_ast(&node->as._while.body, data,
+                    end, path_offsets, arena);
+  } break;
+
+  case ExprKindMatch: {
+    node->as.match.value = deserialize_ast_node(data, end,
+                                                path_offsets, arena);
+    deserialize_ast(&node->as.match.values, data,
+                    end, path_offsets, arena);
+    deserialize_ast(&node->as.match.branches, data,
+                    end, path_offsets, arena);
+
+    bool has_else = *(u8 *) (data + *end);
+    *end += sizeof(u8);
+
+    if (has_else)
+      node->as.match.else_branch = deserialize_ast_node(data, end,
+                                                        path_offsets, arena);
+  } break;
+
+  case ExprKindSelf: break;
+  }
+
+  u32 path_index = *(u32 *) (data + *end);
+  *end += sizeof(u32);
+
+  if (path_index >= path_offsets->len) {
+    ERROR("Offset index out of bounds: %u\n", path_index);
+    exit(1);
+  }
+
+  node->meta.file_path = &path_offsets->items[path_index].path;
+  node->meta.row = *(u16 *) (data + *end);
+  *end += sizeof(u16);
+  node->meta.col = *(u16 *) (data + *end);
+  *end += sizeof(u16);
+
+  return node;
+}
+
+static void deserialize_ast(Exprs *ast, u8 *data, u32 *end,
                             FilePathOffsets *path_offsets,
                             Arena *arena) {
-  ERROR("TODO: deserialization\n");
-  exit(1);
+  ast->len = *(u32 *) (data + *end);
+  ast->cap = ast->len;
+  *end += sizeof(u32);
+
+  ast->items = arena_alloc(arena, ast->cap * sizeof(Expr *));
+
+  for (u32 i = 0; i < ast->len; ++i)
+    ast->items[i] = deserialize_ast_node(data, end, path_offsets, arena);
 }
 
 Macros deserialize_macros(u8 *data, u32 size,

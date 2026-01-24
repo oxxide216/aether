@@ -40,7 +40,7 @@ bool value_to_bool(Value *value) {
     return true;
 }
 
-static u64 value_hash(Value *value) {
+u64 value_hash(Value *value) {
   u64 result = 0;
 
   switch (value->kind) {

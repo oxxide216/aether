@@ -4,6 +4,7 @@
 #include "aether/vm.h"
 
 bool    value_to_bool(Value *value);
+u64     value_hash(Value *value);
 Value **dict_get_value_root(Dict *dict, Value *key);
 Value  *dict_get_value(Dict *dict, Value *key);
 void    dict_set_value(StackFrame *frame, Dict *dict,

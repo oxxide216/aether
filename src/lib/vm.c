@@ -406,15 +406,11 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
         value = *root;
       }
 
-      bool is_from_var = false;
-
       if (!root) {
         if (value->parent_var_name.len > 0) {
           Var *var = get_var(vm, value->parent_var_name);
-          if (var) {
+          if (var)
             root = &var->value;
-            is_from_var = true;
-          }
         }
 
         if (!root)

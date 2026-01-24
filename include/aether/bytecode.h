@@ -35,6 +35,7 @@ struct StackFrame {
 typedef struct {
   Args   args;
   Instrs instrs;
+  bool   is_dead;
 } Func;
 
 typedef Da(Func) Ir;

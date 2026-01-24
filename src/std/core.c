@@ -1222,7 +1222,7 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
 
     macros_bytecode.ptr = (char *) serialize_macros(&new_macros,
                                                     &macros_bytecode.len,
-                                                    &included_files, dce->as._bool);
+                                                    &included_files);
 
     char *new_ptr = arena_alloc(&vm->current_frame->arena, macros_bytecode.len);
     memcpy(new_ptr, macros_bytecode.ptr, macros_bytecode.len);
