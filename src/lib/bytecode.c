@@ -143,18 +143,18 @@ Value *value_clone(Value *value, StackFrame *frame) {
     ++copy->as.func->refs_count;
 
     if (frame != value->frame) {
-      copy->as.func = arena_alloc(&frame->arena, sizeof(Func));
+      copy->as.func = arena_alloc(&frame->arena, sizeof(FuncValue));
       *copy->as.func = *value->as.func;
 
-      copy->as.func->catched_values_names.items =
-        arena_alloc(&frame->arena, copy->as.func->catched_values_names.len *
-                                   sizeof(NamedValue));
+      copy->as.func->catched_vars.items =
+        arena_alloc(&frame->arena, copy->as.func->catched_vars.len *
+                                   sizeof(Var));
 
-      for (u32 i = 0; i < copy->as.func->catched_values_names.len; ++i) {
-        copy->as.func->catched_values_names.items[i].name =
-          value->as.func->catched_values_names.items[i].name;
-        copy->as.func->catched_values_names.items[i].value =
-          value_clone(value->as.func->catched_values_names.items[i].value, frame);
+      for (u32 i = 0; i < copy->as.func->catched_vars.len; ++i) {
+        copy->as.func->catched_vars.items[i].name =
+          value->as.func->catched_vars.items[i].name;
+        copy->as.func->catched_vars.items[i].value =
+          value_clone(value->as.func->catched_vars.items[i].value, frame);
       }
     }
 
@@ -173,9 +173,6 @@ Value *value_clone(Value *value, StackFrame *frame) {
 }
 
 void value_free(Value *value) {
-  if (value->refs_count == (u16) -1) // -1 means static
-    return;
-
   if (value->kind == ValueKindList) {
     ListNode *node = value->as.list->next;
     while (node) {
@@ -195,11 +192,12 @@ void value_free(Value *value) {
       }
     }
   } else if (value->kind == ValueKindEnv) {
-    if (value->as.env->refs_count == 0) {
-      for (u32 i = 0; i < value->as.env->macros.len; ++i) {
-        free(value->as.env->macros.items[i].arg_names.items);
-        free(value->as.env->macros.items[i].body.items);
-      }
+    if (--value->as.env->refs_count == 0) {
+      if (value->as.env->macros.items)
+        free(value->as.env->macros.items);
+
+      if (value->as.env->included_files.items)
+        free(value->as.env->included_files.items);
 
       if (value->as.env->include_paths.items)
         free(value->as.env->include_paths.items);
@@ -316,7 +314,10 @@ static Expr *ast_node_clone(Expr *node, Arena *arena) {
   copy->kind = node->kind;
 
   switch (node->kind) {
-  case ExprKindPrimitive: break;
+  case ExprKindString: break;
+  case ExprKindInt: break;
+  case ExprKindFloat: break;
+  case ExprKindBytes: break;
 
   case ExprKindBlock: {
     copy->as.block = ast_clone(&node->as.block, arena);
@@ -403,10 +404,34 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
                            u32 current_func, u32 *labels,
                            bool value_ignored) {
   switch (node->kind) {
-  case ExprKindPrimitive: {
+  case ExprKindString: {
     Instr instr = {0};
-    instr.kind = InstrKindPrimitive;
-    instr.as.primitive.value = node->as.primitive.value;
+    instr.kind = InstrKindString;
+    instr.as.string.string = node->as.string.string;
+    instr.meta = node->meta;
+    DA_APPEND(ir->items[current_func].instrs, instr);
+  } break;
+
+  case ExprKindInt: {
+    Instr instr = {0};
+    instr.kind = InstrKindInt;
+    instr.as._int._int = node->as._int._int;
+    instr.meta = node->meta;
+    DA_APPEND(ir->items[current_func].instrs, instr);
+  } break;
+
+  case ExprKindFloat: {
+    Instr instr = {0};
+    instr.kind = InstrKindFloat;
+    instr.as._float._float = node->as._float._float;
+    instr.meta = node->meta;
+    DA_APPEND(ir->items[current_func].instrs, instr);
+  } break;
+
+  case ExprKindBytes: {
+    Instr instr = {0};
+    instr.kind = InstrKindBytes;
+    instr.as.bytes.bytes = node->as.bytes.bytes;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
   } break;
@@ -426,13 +451,10 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
 
   case ExprKindFunc: {
     Instr instr = {0};
-    instr.kind = InstrKindPrimitive;
-    instr.as.primitive.value = arena_alloc(arena, sizeof(Value));
-    instr.as.primitive.value->kind = ValueKindFunc;
-    instr.as.primitive.value->as.func = arena_alloc(arena, sizeof(FuncValue));
-    instr.as.primitive.value->as.func->args = node->as.func.args;
-    instr.as.primitive.value->as.func->body_index = ir->len;
-    instr.as.primitive.value->as.func->intrinsic_name = node->as.func.intrinsic_name;
+    instr.kind = InstrKindFunc;
+    instr.as.func.args = node->as.func.args;
+    instr.as.func.body_index = ir->len;
+    instr.as.func.intrinsic_name = node->as.func.intrinsic_name;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
 

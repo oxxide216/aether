@@ -86,7 +86,10 @@ static void clone_expr(Expr **expr, Args *arg_names, Arena *arena) {
   *expr = new_expr;
 
   switch (new_expr->kind) {
-  case ExprKindPrimitive: break;
+  case ExprKindString: break;
+  case ExprKindInt: break;
+  case ExprKindFloat: break;
+  case ExprKindBytes: break;
 
   case ExprKindBlock: {
     clone_block(&new_expr->as.block, arg_names, arena);
@@ -179,7 +182,10 @@ static void rename_args_block(Exprs *block, Args *prev_arg_names,
 static void rename_args_expr(Expr *expr, Args *prev_arg_names,
                              Args *new_arg_names, Arena *arena) {
   switch (expr->kind) {
-  case ExprKindPrimitive: break;
+  case ExprKindString: break;
+  case ExprKindInt: break;
+  case ExprKindFloat: break;
+  case ExprKindBytes: break;
 
   case ExprKindBlock: {
     rename_args_block(&expr->as.block, prev_arg_names, new_arg_names, arena);
@@ -394,7 +400,10 @@ void expand_macros(Expr *expr, Macros *macros,
                    bool unpack, Arena *arena, Str *file_path,
                    i16 row, i16 col, bool is_inlined) {
   switch (expr->kind) {
-  case ExprKindPrimitive: break;
+  case ExprKindString: break;
+  case ExprKindInt: break;
+  case ExprKindFloat: break;
+  case ExprKindBytes: break;
 
   case ExprKindBlock: {
     INLINE_THEN_EXPAND_BLOCK(expr->as.block);

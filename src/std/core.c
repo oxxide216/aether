@@ -1325,6 +1325,10 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
 
   Value *result = execute(env->as.env->vm, &ir, true);
 
+  for (u32 i = 0; i < ir.len; ++i)
+    free(ir.items[i].instrs.items);
+  free(ir.items);
+
   if (included_files.items)
     free(included_files.items);
 

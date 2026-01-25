@@ -1,4 +1,5 @@
 #include "aether/common.h"
+#include "aether/misc.h"
 
 InternStrings intern_strings = {0};
 
@@ -13,7 +14,7 @@ Str copy_str(Str str, Arena *arena) {
   copy.ptr = arena_alloc(arena, str.len);
   memcpy(copy.ptr, str.ptr, copy.len);
 
-  DA_APPEND(intern_strings, copy);
+  DA_ARENA_APPEND(intern_strings, copy, arena);
 
   return copy;
 }

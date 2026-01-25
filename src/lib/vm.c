@@ -60,20 +60,30 @@ static bool ensure_stack_len_is_enough(Vm *vm, u32 min_len, InstrMeta *meta) {
   return true;
 }
 
+static Var *get_var_from(Vars *vars, Str name) {
+  for (u32 i = vars->len; i > 0; --i) {
+    Var *var = vars->items + i - 1;
+
+    if (str_eq(var->name, name))
+      return var;
+  }
+
+  return NULL;
+}
+
 static Var *get_var(Vm *vm, Str name) {
-  for (u32 i = vm->current_frame->vars.len; i > 0; --i) {
-    Var *var = vm->current_frame->vars.items + i - 1;
+  Var *var = get_var_from(&vm->current_frame->vars, name);
+  if (var)
+    return var;
 
-    if (str_eq(var->name, name))
-      return var;
-  }
+  if (vm->current_func)
+  var = get_var_from(&vm->current_func->catched_vars, name);
+  if (var)
+    return var;
 
-  for (u32 i = vm->frames->vars.len; i > 0; --i) {
-    Var *var = vm->frames->vars.items + i - 1;
-
-    if (str_eq(var->name, name))
-      return var;
-  }
+  var = get_var_from(&vm->frames->vars, name);
+  if (var)
+    return var;
 
   return NULL;
 }
@@ -121,6 +131,41 @@ static u32 get_instr_index(Vm *vm, Str label_name) {
   return (u32) -1;
 }
 
+void catch_vars(Vars *catched, Vm *vm, Instrs *instrs) {
+  Da(Str) defined_vars_names = {0};
+
+  for (u32 i = 0; i < instrs->len; ++i) {
+    Instr *instr = instrs->items + i;
+
+    if (instr->kind == InstrKindDefVar) {
+      Str new_var_name = instr->as.def_var.name;
+      DA_ARENA_APPEND(defined_vars_names, new_var_name, &vm->current_frame->arena);
+    } else if (instr->kind == InstrKindGetVar) {
+      bool found = false;
+
+      for (u32 j = 0; j < defined_vars_names.len; ++j) {
+        if (str_eq(defined_vars_names.items[j], instr->as.get_var.name)) {
+          found = true;
+
+          break;
+        }
+      }
+
+      if (!found) {
+        Var *var = get_var_from(&vm->current_frame->vars, instr->as.get_var.name);
+        if (var) {
+          Var new_var = {
+            instr->as.get_var.name,
+            var->value,
+          };
+          DA_ARENA_APPEND(*catched, new_var, &vm->current_frame->arena);
+          DA_ARENA_APPEND(defined_vars_names, new_var.name, &vm->current_frame->arena);
+        }
+      }
+    }
+  }
+}
+
 void execute_instrs(Vm *vm, Instrs *instrs);
 
 void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta, bool value_ignored) {
@@ -131,6 +176,7 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta, bool value_ignored) 
     if (!intrinsic) {
       ERROR(META_FMT"Intrinsic "STR_FMT":%u was not found\n",
             META_ARG(*meta), STR_ARG(func->intrinsic_name), func->args.len);
+      vm->state = ExecStateExit;
       vm->exit_code = 1;
       return;
     }
@@ -194,9 +240,40 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
     Instr *instr = instrs->items + i;
 
     switch (instr->kind) {
-    case InstrKindPrimitive: {
-      Value *new_value = instr->as.primitive.value;
-      new_value->frame = vm->current_frame;
+    case InstrKindString: {
+      Value *new_value = value_string(instr->as.string.string, vm->current_frame);
+      DA_APPEND(vm->stack, new_value);
+    } break;
+
+    case InstrKindInt: {
+      Value *new_value = value_int(instr->as._int._int, vm->current_frame);
+      DA_APPEND(vm->stack, new_value);
+    } break;
+
+    case InstrKindFloat: {
+      Value *new_value = value_float(instr->as._float._float, vm->current_frame);
+      DA_APPEND(vm->stack, new_value);
+    } break;
+
+    case InstrKindBytes: {
+      Value *new_value = value_bytes(instr->as.bytes.bytes, vm->current_frame);
+      DA_APPEND(vm->stack, new_value);
+    } break;
+
+    case InstrKindFunc: {
+      FuncValue *new_func = arena_alloc(&vm->current_frame->arena, sizeof(FuncValue));
+      new_func->args = instr->as.func.args;
+      new_func->body_index = instr->as.func.body_index;
+      new_func->intrinsic_name = instr->as.func.intrinsic_name;
+
+      if (new_func->intrinsic_name.len == 0) {
+        Func *body = vm->ir->items + new_func->body_index;
+        catch_vars(&new_func->catched_vars, vm, &body->instrs);
+        if (vm->state != ExecStateContinue)
+          return;
+      }
+
+      Value *new_value = value_func(new_func, vm->current_frame);
       DA_APPEND(vm->stack, new_value);
     } break;
 
@@ -231,6 +308,22 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       if (func->as.func->args.len != instr->as.func_call.args_len)
         PANIC_ARGS(instr->meta, "Expected %u arguments, got %u\n",
                    func->as.func->args.len, instr->as.func_call.args_len);
+
+      for (u32 j = 0; j < func->as.func->catched_vars.len; ++j) {
+        Var *catched_var = func->as.func->catched_vars.items + j;
+
+        if (!catched_var->value) {
+          Var *var = get_var_from(&vm->frames->vars, catched_var->name);
+          if (!var) {
+            PANIC_ARGS(instr->meta, "Symbol "STR_FMT" was not found\n",
+                       STR_ARG(catched_var->name));
+          }
+
+          ++var->value->refs_count;
+
+          catched_var->value = var->value;
+        }
+      }
 
       execute_func(vm, func->as.func, &instr->meta, instr->as.func_call.value_ignored);
       if (vm->state == ExecStateExit) {
@@ -404,6 +497,9 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
         }
 
         root = get_child_root(value, key, &instr->meta, vm);
+        if (vm->state != ExecStateContinue)
+          return;
+
         if (!root)
           break;
 
@@ -634,6 +730,14 @@ void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics) {
 
   Var platform_var = { STR_LIT("current-platform"), platform_value };
   DA_APPEND(vm->frames->vars, platform_var);
+
+  Value *true_value = value_bool(true, vm->current_frame);
+  Var true_var = { STR_LIT("true"), true_value };
+  DA_APPEND(vm->frames->vars, true_var);
+
+  Value *false_value = value_bool(false, vm->current_frame);
+  Var false_var = { STR_LIT("false"), false_value };
+  DA_APPEND(vm->frames->vars, false_var);
 }
 
 void vm_stop(Vm *vm) {

@@ -7,7 +7,7 @@
 #define PANIC(meta, text)                 \
   do {                                    \
     ERROR(META_FMT text, META_ARG(meta)); \
-    vm->state = ExecStateReturn;          \
+    vm->state = ExecStateExit;            \
     vm->exit_code = 1;                    \
     return NULL;                          \
   } while (false)
@@ -15,7 +15,7 @@
 #define PANIC_ARGS(meta, text, ...)                    \
   do {                                                 \
     ERROR(META_FMT text, META_ARG(meta), __VA_ARGS__); \
-    vm->state = ExecStateReturn;                       \
+    vm->state = ExecStateExit;                         \
     vm->exit_code = 1;                                 \
     return NULL;                                       \
   } while (false)
@@ -147,7 +147,7 @@ void dict_set_value(StackFrame *frame, Dict *dict,
 Value **get_child_root(Value *value, Value *key, InstrMeta *meta, Vm *vm) {
   if (value->kind == ValueKindList) {
     if (key->kind != ValueKindInt)
-      PANIC(*meta, "Lists can only be indexed with integers");
+      PANIC(*meta, "Lists can only be indexed with integers\n");
 
     u32 j = 0;
     ListNode *node = value->as.list->next;
@@ -254,7 +254,10 @@ void sb_push_value(StringBuilder *sb, Value *value,
 
     if (value->as.func->args.len > 0)
       sb_push_char(sb, ' ');
-    sb_push(sb, "-> ...");
+    if (value->as.func->intrinsic_name.len == 0)
+      sb_push(sb, "-> ...");
+    else
+      sb_push_str(sb, value->as.func->intrinsic_name);
   } break;
 
   case ValueKindDict: {
@@ -304,25 +307,50 @@ void sb_push_value(StringBuilder *sb, Value *value,
   }
 }
 
-static void print_value(Value *value) {
-  StringBuilder sb = {0};
-  sb_push_value(&sb, value, 0, false, true);
-
-  str_println(sb_to_str(sb));
-
-  free(sb.buffer);
-}
-
 void print_instr(Instr *instr, bool hide_strings) {
   printf(META_FMT, META_ARG(instr->meta));
 
   switch (instr->kind) {
-  case InstrKindPrimitive: {
+  case InstrKindString: {
     printf("Value ");
-    if (instr->as.primitive.value->kind != ValueKindString || !hide_strings)
-      print_value(instr->as.primitive.value);
+    if (hide_strings)
+      str_println(instr->as.string.string);
     else
       printf("string\n");
+  } break;
+
+  case InstrKindInt: {
+    printf("Value ");
+    printf("%ld\n", instr->as._int._int);
+  } break;
+
+  case InstrKindFloat: {
+    printf("Value ");
+    printf("%lf\n", instr->as._float._float);
+  } break;
+
+  case InstrKindBytes: {
+    printf("Value ");
+    printf("%.*s",
+           instr->as.bytes.bytes.len,
+           (char *) instr->as.bytes.bytes.ptr);
+  } break;
+
+  case InstrKindFunc: {
+    printf("\\");
+
+    for (u32 i = 0; i < instr->as.func.args.len; ++i) {
+      if (i > 0)
+        printf(" ");
+      str_print(instr->as.func.args.items[i]);
+    }
+
+    if (instr->as.func.args.len > 0)
+      printf(" ");
+    if (instr->as.func.intrinsic_name.len == 0)
+      printf("-> ...\n");
+    else
+      printf("-> "STR_FMT"\n", STR_ARG(instr->as.func.intrinsic_name));
   } break;
 
   case InstrKindFuncCall: {

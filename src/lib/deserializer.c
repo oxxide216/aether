@@ -15,98 +15,6 @@ static void deserialize_str(Str *str, u8 *data, u32 *end, Arena *arena) {
   }
 }
 
-static Value *deserialize_value(u8 *data, u32 *end,
-                                FilePathOffsets *path_offsets,
-                                Arena *arena) {
-  Value *value = arena_alloc(arena, sizeof(Value));
-
-  value->kind = *(ValueKind *) (data + *end);
-  *end += sizeof(ValueKind);
-
-  switch (value->kind) {
-  case ValueKindUnit: break;
-
-  case ValueKindList: {
-    u32 len = *(u32 *) (data + *end);
-    *end += sizeof(u32);
-
-    value->as.list = arena_alloc(arena, sizeof(ListNode));
-    ListNode **next_node = &value->as.list->next;
-    for (u32 i = 0; i < len; ++i) {
-      *next_node = arena_alloc(arena, sizeof(ListNode));
-      (*next_node)->value = deserialize_value(data, end, path_offsets, arena);
-
-      next_node = &(*next_node)->next;
-    }
-  } break;
-
-  case ValueKindString: {
-    deserialize_str(&value->as.string.str, data, end, arena);
-  } break;
-
-  case ValueKindInt: {
-    value->as._int = *(i64 *) (data + *end);
-    *end += sizeof(i64);
-  } break;
-
-  case ValueKindFloat: {
-    value->as._float = *(f64 *) (data + *end);
-    *end += sizeof(f64);
-  } break;
-
-  case ValueKindBool: {
-    value->as._bool = *(u8 *) (data + *end);
-    *end += sizeof(u8);
-  } break;
-
-  case ValueKindDict: {
-    for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
-      u32 len = *(u32 *) (data + *end);
-      *end += sizeof(u32);
-
-      DictValue **next_entry =  value->as.dict.items + i;
-      for (u32 j = 0; j < len; ++j) {
-        *next_entry = arena_alloc(arena, sizeof(DictValue));
-        (*next_entry)->key = deserialize_value(data, end, path_offsets, arena);
-        (*next_entry)->value = deserialize_value(data, end, path_offsets, arena);
-
-        next_entry = &(*next_entry)->next;
-      }
-    }
-  } break;
-
-  case ValueKindFunc: {
-    value->as.func = arena_alloc(arena, sizeof(FuncValue));
-
-    value->as.func->args.len = *(u32 *) (data + *end);
-    *end += sizeof(u32);
-
-    value->as.func->args.items =
-      arena_alloc(arena, value->as.func->args.len * sizeof(Str));
-
-    for (u32 i = 0; i < value->as.func->args.len; ++i)
-      deserialize_str(value->as.func->args.items + i, data, end, arena);
-
-    value->as.func->body_index = *(u32 *) (data + *end);
-    *end += sizeof(u32);
-
-    deserialize_str(&value->as.func->intrinsic_name, data, end, arena);
-  } break;
-
-  case ValueKindEnv: break;
-
-  case ValueKindBytes: {
-    Str bytes_str;
-    deserialize_str(&bytes_str, data, end, arena);
-
-    value->as.bytes.ptr = (u8 *) bytes_str.ptr;
-    value->as.bytes.len = bytes_str.len;
-  } break;
-  }
-
-  return value;
-}
-
 static void deserialize_instrs(Instrs *instrs, u8 *data, u32 *end,
                                FilePathOffsets *path_offsets,
                                Arena *arena) {
@@ -123,8 +31,42 @@ static void deserialize_instrs(Instrs *instrs, u8 *data, u32 *end,
     *end += sizeof(InstrKind);
 
     switch (instr.kind) {
-    case InstrKindPrimitive: {
-      instr.as.primitive.value = deserialize_value(data, end, path_offsets, arena);
+    case InstrKindString: {
+      deserialize_str(&instr.as.string.string, data, end, arena);
+    } break;
+
+    case InstrKindInt: {
+      instr.as._int._int = *(i64 *) (data + *end);
+      *end += sizeof(i64);
+    } break;
+
+    case InstrKindFloat: {
+      instr.as._float._float = *(f64 *) (data + *end);
+      *end += sizeof(f64);
+    } break;
+
+    case InstrKindBytes: {
+      Str bytes_str;
+      deserialize_str(&bytes_str, data, end, arena);
+
+      instr.as.bytes.bytes.ptr = (u8 *) bytes_str.ptr;
+      instr.as.bytes.bytes.len = bytes_str.len;
+    } break;
+
+    case InstrKindFunc: {
+      instr.as.func.args.len = *(u32 *) (data + *end);
+      *end += sizeof(u32);
+
+      instr.as.func.args.items =
+        arena_alloc(arena, instr.as.func.args.len * sizeof(Str));
+
+      for (u32 i = 0; i < instr.as.func.args.len; ++i)
+        deserialize_str(instr.as.func.args.items + i, data, end, arena);
+
+      instr.as.func.body_index = *(u32 *) (data + *end);
+      *end += sizeof(u32);
+
+      deserialize_str(&instr.as.func.intrinsic_name, data, end, arena);
     } break;
 
     case InstrKindFuncCall: {
@@ -291,10 +233,27 @@ static Expr *deserialize_ast_node(u8 *data, u32 *end,
   *end += sizeof(ExprKind);
 
   switch (node->kind) {
-  case ExprKindPrimitive: {
-    node->as.primitive.value =
-      deserialize_value(data, end,
-                        path_offsets, arena);
+  case ExprKindString: {
+    deserialize_str(&node->as.string.string, data, end, arena);
+  } break;
+
+  case ExprKindInt: {
+    node->as._int._int = *(i64 *) (data + *end);
+    *end += sizeof(i64);
+  } break;
+
+  case ExprKindFloat: {
+    node->as._float._float = *(f64 *) (data + *end);
+    *end += sizeof(f64);
+  } break;
+
+  case ExprKindBytes: {
+    Str bytes_str = {
+      (char *) node->as.bytes.bytes.ptr,
+      node->as.bytes.bytes.len,
+    };
+
+    deserialize_str(&bytes_str, data, end, arena);
   } break;
 
   case ExprKindBlock: {

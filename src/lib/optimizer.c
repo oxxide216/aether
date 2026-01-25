@@ -15,21 +15,22 @@ void eliminate_dead_code_instrs(Instrs *instrs, Ir *ir,
     Instr *instr = instrs->items + i;
 
     switch (instr->kind) {
-    case InstrKindPrimitive: {
-      if (instr->as.primitive.value->kind == ValueKindFunc) {
-        u32 func_index = instr->as.primitive.value->as.func->body_index;
+    case InstrKindString: break;
+    case InstrKindInt: break;
+    case InstrKindFloat: break;
+    case InstrKindBytes: break;
 
-        if (ir->items[func_index].is_dead) {
-          ir->items[func_index].is_dead = false;
+    case InstrKindFunc: {
+      u32 func_index = instr->as.func.body_index;
 
-          FuncDefs temp_defs = {0};
-          eliminate_dead_code_instrs(&ir->items[func_index].instrs,
-                                     ir, &temp_defs, global_defs);
-          if (temp_defs.items)
-            free(temp_defs.items);
-        }
+      if (ir->items[func_index].is_dead) {
+        ir->items[func_index].is_dead = false;
 
-        break;
+        FuncDefs temp_defs = {0};
+        eliminate_dead_code_instrs(&ir->items[func_index].instrs,
+                                   ir, &temp_defs, global_defs);
+        if (temp_defs.items)
+          free(temp_defs.items);
       }
     } break;
 
@@ -37,11 +38,10 @@ void eliminate_dead_code_instrs(Instrs *instrs, Ir *ir,
 
     case InstrKindDefVar: {
       Instr *last_instr = instrs->items + i - 1;
-      if (last_instr->kind == InstrKindPrimitive &&
-          last_instr->as.primitive.value->kind == ValueKindFunc) {
+      if (last_instr->kind == InstrKindFunc) {
         FuncDef new_def = {
           instr->as.def_var.name,
-          last_instr->as.primitive.value->as.func->body_index,
+          last_instr->as.func.body_index,
         };
         DA_APPEND(*defs, new_def);
       }

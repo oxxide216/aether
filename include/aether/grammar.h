@@ -33,10 +33,9 @@
 #define TT_DOUBLE_ARROW 29
 #define TT_INT 30
 #define TT_FLOAT 31
-#define TT_BOOL 32
-#define TT_IDENT 33
+#define TT_IDENT 32
 
-#define TTS_COLNT U34
+#define TTS_COLNT U33
 
 TransitionTable *get_transition_table(void);
 
@@ -227,18 +226,6 @@ TransitionCol table_col_float[] = {
   { 7, -1, -1, 0 },
 };
 
-TransitionCol table_col_bool[] = {
-  { 1, 116, 116, 2 },
-  { 2, 114, 114, 3 },
-  { 3, 117, 117, 4 },
-  { 4, 101, 101, 0 },
-  { 1, 102, 102, 2 },
-  { 2, 97, 97, 3 },
-  { 3, 108, 108, 4 },
-  { 4, 115, 115, 5 },
-  { 5, 101, 101, 0 },
-};
-
 TransitionCol table_col_ident[] = {
   { 1, 97, 122, 2 },
   { 1, 65, 90, 2 },
@@ -313,7 +300,6 @@ TransitionRow table_rows[] = {
   { table_col_double_arrow, sizeof(table_col_double_arrow) / sizeof(TransitionCol) },
   { table_col_int, sizeof(table_col_int) / sizeof(TransitionCol) },
   { table_col_float, sizeof(table_col_float) / sizeof(TransitionCol) },
-  { table_col_bool, sizeof(table_col_bool) / sizeof(TransitionCol) },
   { table_col_ident, sizeof(table_col_ident) / sizeof(TransitionCol) },
 };
 

@@ -17,8 +17,6 @@ typedef struct {
   bool  tracing_enabled;
 } Path;
 
-// From common.c
-extern InternStrings intern_strings;
 #ifndef NOSYSTEM
 // From base.c
 extern StringBuilder printf_sb;
@@ -37,9 +35,6 @@ static Ir ir = {0};
 static Vm vm = {0};
 
 void cleanup(void) {
-  if (intern_strings.items)
-    free(intern_strings.items);
-
   if (printf_sb.buffer)
     free(printf_sb.buffer);
 
@@ -95,6 +90,10 @@ i32 main(i32 argc, char **argv) {
   signal(SIGINT, sigint_handler);
 
   execute(&vm, &ir, false);
+
+  for (u32 i = 0; i < ir.len; ++i)
+    free(ir.items[i].instrs.items);
+  free(ir.items);
 
   free(code.ptr);
   cleanup();

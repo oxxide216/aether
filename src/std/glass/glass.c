@@ -377,8 +377,35 @@ Value *run_intrinsic(Vm *vm, Value **args) {
   winx_destroy_window(&glass.window);
   winx_cleanup(&glass.winx);
 
-  for (u32 i = 0; i < glass.fonts.len; ++i)
+  if (glass.events.items)
+    free(glass.events.items);
+  glass.events = (Events) {0};
+
+  if (glass.vertices.items)
+    free(glass.vertices.items);
+  glass.vertices = (Vertices) {0};
+
+  if (glass.indices.items)
+    free(glass.indices.items);
+  glass.indices = (Indices) {0};
+
+  if (glass.alt_vertices.items)
+    free(glass.alt_vertices.items);
+  glass.alt_vertices = (Vertices) {0};
+
+  if (glass.alt_indices.items)
+    free(glass.alt_indices.items);
+  glass.alt_indices = (Indices) {0};
+
+  for (u32 i = 0; i < glass.fonts.len; ++i) {
     free(glass.fonts.items[i].buffer);
+    free(glass.fonts.items[i].glyphs.items);
+    free(glass.fonts.items[i].glyphs_buffer);
+  }
+
+  if (glass.fonts.items)
+    free(glass.fonts.items);
+  glass.fonts = (Fonts) {0};
 
   initialized = false;
 

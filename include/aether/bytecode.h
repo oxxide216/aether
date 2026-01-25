@@ -75,23 +75,16 @@ typedef struct {
   Str  str;
 } String;
 
-typedef struct {
-  Str    name;
-  Value *value;
-} NamedValue;
-
-typedef Da(NamedValue) NamedValues;
-
 typedef struct FuncValue FuncValue;
 
 struct FuncValue {
-  Args         args;
-  u32          body_index;
-  NamedValues  catched_values_names;
-  Func        *parent_func;
-  Str          intrinsic_name;
-  u32          refs_count;
-  bool         cloned;
+  Args  args;
+  u32   body_index;
+  Vars  catched_vars;
+  Func *parent_func;
+  Str   intrinsic_name;
+  u32   refs_count;
+  bool  cloned;
 };
 
 typedef struct Env Env;
@@ -122,8 +115,15 @@ struct Value {
   Str         parent_var_name;
 };
 
+typedef struct Expr Expr;
+typedef Da(Expr *) Exprs;
+
 typedef enum {
-  InstrKindPrimitive = 0,
+  InstrKindString = 0,
+  InstrKindInt,
+  InstrKindFloat,
+  InstrKindBytes,
+  InstrKindFunc,
   InstrKindFuncCall,
   InstrKindDefVar,
   InstrKindGetVar,
@@ -143,8 +143,26 @@ typedef enum {
 } InstrKind;
 
 typedef struct {
-  Value *value;
-} InstrPrimitive;
+  Str string;
+} InstrString;
+
+typedef struct {
+  i64 _int;
+} InstrInt;
+
+typedef struct {
+  f64 _float;
+} InstrFloat;
+
+typedef struct {
+  Bytes bytes;
+} InstrBytes;
+
+typedef struct {
+  Args args;
+  u32  body_index;
+  Str  intrinsic_name;
+} InstrFunc;
 
 typedef struct {
   u32    args_len;
@@ -200,7 +218,11 @@ typedef struct {
 } InstrDict;
 
 typedef union {
-  InstrPrimitive   primitive;
+  InstrString      string;
+  InstrInt         _int;
+  InstrFloat       _float;
+  InstrBytes       bytes;
+  InstrFunc        func;
   InstrFuncCall    func_call;
   InstrDefVar      def_var;
   InstrGetVar      get_var;
@@ -228,11 +250,12 @@ struct Instr {
 };
 
 typedef struct Vm Vm;
-typedef struct Expr Expr;
-typedef Da(Expr *) Exprs;
 
 typedef enum {
-  ExprKindPrimitive = 0,
+  ExprKindString = 0,
+  ExprKindInt,
+  ExprKindFloat,
+  ExprKindBytes,
   ExprKindBlock,
   ExprKindIdent,
   ExprKindFunc,
@@ -250,8 +273,20 @@ typedef enum {
 } ExprKind;
 
 typedef struct  {
-  Value *value;
-} ExprPrimitive;
+  Str string;
+} ExprString;
+
+typedef struct  {
+  i64 _int;
+} ExprInt;
+
+typedef struct  {
+  f64 _float;
+} ExprFloat;
+
+typedef struct  {
+  Bytes bytes;
+} ExprBytes;
 
 typedef struct  {
   Str name;
@@ -314,20 +349,23 @@ typedef struct {
 } ExprWhile;
 
 typedef union {
-  ExprPrimitive primitive;
-  Exprs         block;
-  ExprIdent     ident;
+  ExprString   string;
+  ExprInt      _int;
+  ExprFloat    _float;
+  ExprBytes    bytes;
+  Exprs        block;
+  ExprIdent    ident;
   ExprFunc      func;
-  ExprList      list;
-  ExprDict      dict;
-  ExprGet       get;
-  ExprSet       set;
-  ExprFuncCall  func_call;
-  ExprLet       let;
-  ExprRet       ret;
-  ExprIf        _if;
-  ExprMatch     match;
-  ExprWhile     _while;
+  ExprList     list;
+  ExprDict     dict;
+  ExprGet      get;
+  ExprSet      set;
+  ExprFuncCall func_call;
+  ExprLet      let;
+  ExprRet      ret;
+  ExprIf       _if;
+  ExprMatch    match;
+  ExprWhile    _while;
 } ExprAs;
 
 struct Expr {
