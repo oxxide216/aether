@@ -1,15 +1,15 @@
 (use 'std/base')
 
-(let eof            (to-str (to-bytes -1)))
+(let eof             (to-str (to-bytes -1)))
 
-(let term/up        '\e[A')
-(let term/down      '\e[B')
-(let term/right     '\e[C')
-(let term/left      '\e[D')
-(let term/enter     '\r')
-(let term/escape    '\e')
-(let term/backspace '\x7f')
-(let term/delete    '\e[P')
+(let term/up         '\e[A')
+(let term/down       '\e[B')
+(let term/right      '\e[C')
+(let term/left       '\e[D')
+(let term/enter      '\r')
+(let term/escape     '\e')
+(let term/backspace  '\x7f')
+(let term/delete      '\e[P')
 
 (let term/reset      '\e[0m')
 
