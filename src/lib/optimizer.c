@@ -90,6 +90,19 @@ void eliminate_dead_code_instrs(Instrs *instrs, Ir *ir,
       }
     } break;
 
+    case InstrKindSetVar: {
+      Instr *last_instr = instrs->items + i - 1;
+      if (last_instr->kind == InstrKindFunc) {
+        for (u32 j = defs->len; j > 0; --j) {
+          if (str_eq(instr->as.set_var.name, defs->items[j - 1].name)) {
+            defs->items[j - 1].body_index = last_instr->as.func.body_index;
+
+            break;
+          }
+        }
+      }
+    } break;
+
     case InstrKindJump:        break;
     case InstrKindCondJump:    break;
     case InstrKindCondNotJump: break;

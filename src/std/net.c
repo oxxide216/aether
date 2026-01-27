@@ -169,7 +169,7 @@ Value *receive_intrinsic(Vm *vm, Value **args) {
   u32 cap = DEFAULT_RECEIVE_BUFFER_SIZE;
   Bytes buffer = { arena_alloc(&vm->current_frame->arena, cap), 0 };
 
-  struct pollfd pfd;
+  struct pollfd pfd = {0};
   pfd.fd = receiver->as._int;
   pfd.events = POLLIN | POLLERR | POLLHUP;
   i32 len = 0;

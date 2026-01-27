@@ -100,5 +100,5 @@
 (let dict-add-except \dest src except ->
   (for item in src
     (if (not (contains except item::'key'))
-      (set dest::(do item::'key') item::'value')))
+      (set! dest item::'key' item::'value')))
   dest)

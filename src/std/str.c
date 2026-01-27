@@ -95,7 +95,7 @@ Value *split_intrinsic(Vm *vm, Value **args) {
 
     if (found) {
       node->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-      node->next->value = value_alloc(vm->current_frame);
+      node->next->next = NULL;
 
       Str new_string;
       new_string.len = i - index;
@@ -111,7 +111,7 @@ Value *split_intrinsic(Vm *vm, Value **args) {
 
   if (i > 0) {
     node->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-    node->next->value = value_alloc(vm->current_frame);
+    node->next->next = NULL;
 
     Str new_string;
     new_string.len = i - index;

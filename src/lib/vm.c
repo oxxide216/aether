@@ -11,8 +11,6 @@
 
 #define PANIC(meta, text)                 \
   do {                                    \
-    if (match_stack.items)                \
-      free(match_stack.items);            \
     ERROR(META_FMT text, META_ARG(meta)); \
     vm->state = ExecStateExit;            \
     vm->exit_code = 1;                    \
@@ -21,8 +19,6 @@
 
 #define PANIC_ARGS(meta, text, ...)                    \
   do {                                                 \
-    if (match_stack.items)                             \
-      free(match_stack.items);                         \
     ERROR(META_FMT text, META_ARG(meta), __VA_ARGS__); \
     vm->state = ExecStateExit;                         \
     vm->exit_code = 1;                                 \
@@ -77,7 +73,7 @@ static Var *get_var(Vm *vm, Str name) {
     return var;
 
   if (vm->current_func)
-  var = get_var_from(&vm->current_func->catched_vars, name);
+    var = get_var_from(&vm->current_func->catched_vars, name);
   if (var)
     return var;
 
@@ -233,7 +229,6 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta, bool value_ignored) 
 }
 
 void execute_instrs(Vm *vm, Instrs *instrs) {
-  Da(Value *) match_stack = {0};
   u32 i = 0;
 
   while (i < instrs->len) {
@@ -293,8 +288,6 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
         INFO("Stack dump:\n");
         print_stack_dump(&vm->stack);
 
-        if (match_stack.items)
-          free(match_stack.items);
         ERROR(META_FMT "Value of type "STR_FMT" is not callable\n",
               META_ARG(instr->meta), STR_ARG(sb_to_str(kind_sb)));
         vm->state = ExecStateExit;
@@ -335,11 +328,13 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
         return;
       }
 
-      Value *result = stack_last(vm);
+      Value *result = NULL;
+      if (!instr->as.func_call.value_ignored)
+        result = stack_last(vm);
 
       vm->stack.len -= instr->as.func_call.args_len + 1;
 
-      if (!instr->as.func_call.value_ignored)
+      if (result)
         vm->stack.items[vm->stack.len - 1] = result;
     } break;
 
@@ -365,9 +360,29 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
         PANIC_ARGS(instr->meta, "Symbol "STR_FMT" was not found\n",
                    STR_ARG(instr->as.get_var.name));
 
-      var->value->parent_var_name = var->name;
-
       DA_APPEND(vm->stack, var->value);
+    } break;
+
+    case InstrKindSetVar: {
+      if (!ensure_stack_len_is_enough(vm, 1, &instr->meta))
+        return;
+
+      Var *var = get_var(vm, instr->as.set_var.name);
+      if (!var)
+        PANIC_ARGS(instr->meta, "Symbol "STR_FMT" was not found\n",
+                   STR_ARG(instr->as.set_var.name));
+
+      Value *new_value = stack_last(vm);
+
+      if (new_value->frame == var->value->frame)
+        ++new_value->refs_count;
+      else
+        new_value = value_clone(new_value, var->value->frame);
+
+      --vm->stack.len;
+
+      --var->value->refs_count;
+      var->value = new_value;
     } break;
 
     case InstrKindJump: {
@@ -425,19 +440,20 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       if (!ensure_stack_len_is_enough(vm, 1, &instr->meta))
         return;
 
-      DA_APPEND(match_stack, stack_last(vm));
+      DA_APPEND(vm->current_frame->match_values, stack_last(vm));
 
       --vm->stack.len;
     } break;
 
     case InstrKindMatchCase: {
-      if (match_stack.len == 0)
+      if (vm->current_frame->match_values.len == 0)
         PANIC(instr->meta, "Match case not inside of a match block\n");
 
       if (!ensure_stack_len_is_enough(vm, 1, &instr->meta))
         return;
 
-      Value *match_cond = match_stack.items[match_stack.len - 1];
+      Values *match_stack = &vm->current_frame->match_values;
+      Value *match_cond = match_stack->items[match_stack->len - 1];
       Value *case_cond = stack_last(vm);
 
       if (!value_eq(case_cond, match_cond)) {
@@ -453,10 +469,10 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
     } break;
 
     case InstrKindMatchEnd: {
-      if (match_stack.len == 0)
+      if (vm->current_frame->match_values.len == 0)
         PANIC(instr->meta, "Match end not inside of a match block\n");
 
-      --match_stack.len;
+      --vm->current_frame->match_values.len;
     } break;
 
     case InstrKindGet: {
@@ -468,11 +484,29 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       for (u32 j = 1; j < instr->as.get.chain_len; ++j) {
         Value *key = vm->stack.items[vm->stack.len - instr->as.get.chain_len + j];
 
-        Value **root = get_child_root(value, key, &instr->meta, vm);
-        if (vm->state != ExecStateContinue)
-          return;
+        if (value->kind == ValueKindString) {
+          if (key->kind != ValueKindInt)
+            PANIC(instr->meta, "Value of type string can only be indexed with integer\n");
 
-        value = *root;
+          Value *sub_string = get_from_string(vm, value->as.string.str,
+                                              key->as._int);
+
+          if (!sub_string)
+            PANIC(instr->meta, "String index out of bounds\n");
+
+          value = sub_string;
+        } else {
+          Value **root = get_child_root(value, key, &instr->meta, vm);
+          if (vm->state != ExecStateContinue)
+            return;
+
+          if (!root) {
+            value = value_unit(vm->current_frame);
+            break;
+          }
+
+          value = *root;
+        }
       }
 
       vm->stack.len -= instr->as.get.chain_len;
@@ -481,59 +515,38 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
     } break;
 
     case InstrKindSet: {
-      if (!ensure_stack_len_is_enough(vm, instr->as.set.chain_len + 1, &instr->meta))
+      if (!ensure_stack_len_is_enough(vm, 3, &instr->meta))
         return;
 
-      Value *value = vm->stack.items[vm->stack.len - instr->as.set.chain_len];
-      Value **root = NULL;
+      Value *parent = vm->stack.items[vm->stack.len - 3];
+      Value *key = vm->stack.items[vm->stack.len - 2];
+      Value *new_value = vm->stack.items[vm->stack.len - 1];
 
-      for (u32 j = 1; j < instr->as.set.chain_len; ++j) {
-        Value *key = vm->stack.items[vm->stack.len - instr->as.set.chain_len + j];
+      if (parent->kind == ValueKindString)
+        PANIC(instr->meta, "Value of type string cannot be mutated\n");
 
-        if (value->refs_count > 1 && !value->is_atom) {
-          value = value_clone(value, value->frame);
-          if (root)
-            *root = value;
-        }
+      Value **root = get_child_root(parent, key, &instr->meta, vm);
+      if (vm->state != ExecStateContinue)
+        return;
 
-        root = get_child_root(value, key, &instr->meta, vm);
-        if (vm->state != ExecStateContinue)
-          return;
-
-        if (!root)
-          break;
-
-        value = *root;
+      if (!root && parent->kind == ValueKindDict) {
+        dict_set_value(parent->frame, &parent->as.dict, key,
+                       value_unit(parent->frame));
+        root = get_child_root(parent, key, &instr->meta, vm);
       }
 
-      if (!root) {
-        if (value->parent_var_name.len > 0) {
-          Var *var = get_var(vm, value->parent_var_name);
-          if (var)
-            root = &var->value;
-        }
-
-        if (!root)
-          PANIC(instr->meta, "Value can only be assigned to a left hand side expression\n");
-      }
-
-      u32 new_value_offset = vm->stack.len - instr->as.set.chain_len - 1;
-      Value *new_value = vm->stack.items[new_value_offset];
-
-      if (new_value->frame == (*root)->frame)
+      if (new_value->frame == parent->frame)
         ++new_value->refs_count;
       else
-        new_value = value_clone(new_value, (*root)->frame);
+        new_value = value_clone(new_value, parent->frame);
 
-      vm->stack.len -= instr->as.set.chain_len + 1;
+      vm->stack.len -= 3;
 
       --(*root)->refs_count;
       *root = new_value;
     } break;
 
     case InstrKindRet: {
-      if (match_stack.items)
-        free(match_stack.items);
       return;
     } break;
 
@@ -585,9 +598,6 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
 
     ++i;
   }
-
-  if (match_stack.items)
-    free(match_stack.items);
 }
 
 static void load_labels(Ir *ir, LabelsTables *tables, Arena *arena) {
@@ -684,7 +694,7 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
     *new_arg->value = (Value) {
       ValueKindString,
       { .string = { { buffer, len } } },
-      0, 1, false, {},
+      0, 1, false,
     };
 
     args_end->next = new_arg;
@@ -789,6 +799,10 @@ void end_frame(Vm *vm) {
   for (u32 i = 0; i < frame->vars.len; ++i)
     --frame->vars.items[i].value->refs_count;
   frame->vars.len = 0;
+
+  for (u32 i = 0; i < frame->match_values.len; ++i)
+    value_free(frame->match_values.items[i]);
+  frame->match_values.len = 0;
 
   if (vm->current_frame->prev)
     vm->current_frame = vm->current_frame->prev;

@@ -1,6 +1,6 @@
 /aether
 /test.abc
 /eval.abc
-/grammar.h
+grammar.h
 /dest/
 /example-dest/

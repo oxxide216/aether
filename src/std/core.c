@@ -162,16 +162,16 @@ Value *get_range_intrinsic(Vm *vm, Value **args) {
     return value_list(sub_list, vm->current_frame);
   } else if (value->kind == ValueKindString) {
     u32 begin_byte = 0;
-    u32 index = 0;
+    u32 current_index = 0;
     u32 bytes_len = 0;
     u32 wchar_len;
 
-    while (get_next_wchar(value->as.string.str, index, &wchar_len) != '\0' &&
-           index < end->as._int) {
-      if (index == begin->as._int)
+    while (get_next_wchar(value->as.string.str, current_index, &wchar_len) != '\0' &&
+           current_index < end->as._int) {
+      if (current_index == begin->as._int)
         begin_byte = bytes_len;
 
-      ++index;
+      ++current_index;
       bytes_len += wchar_len;
     }
 

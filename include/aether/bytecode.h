@@ -27,6 +27,7 @@ struct StackFrame {
   Values      values;
   Arena       arena;
   Vars        vars;
+  Values      match_values;
   bool        can_lookup_through;
   StackFrame *next;
   StackFrame *prev;
@@ -107,12 +108,11 @@ typedef union {
 } ValueAs;
 
 struct Value {
-  ValueKind   kind;
-  ValueAs     as;
-  StackFrame *frame;
-  u16         refs_count;
-  u16         is_atom;
-  Str         parent_var_name;
+  ValueKind    kind;
+  ValueAs      as;
+  StackFrame  *frame;
+  u16          refs_count;
+  u16          is_atom;
 };
 
 typedef struct Expr Expr;
@@ -127,6 +127,7 @@ typedef enum {
   InstrKindFuncCall,
   InstrKindDefVar,
   InstrKindGetVar,
+  InstrKindSetVar,
   InstrKindJump,
   InstrKindCondJump,
   InstrKindCondNotJump,
@@ -178,6 +179,10 @@ typedef struct {
 } InstrGetVar;
 
 typedef struct {
+  Str name;
+} InstrSetVar;
+
+typedef struct {
   Str label;
 } InstrJump;
 
@@ -202,10 +207,6 @@ typedef struct {
 } InstrGet;
 
 typedef struct {
-  u32  chain_len;
-} InstrSet;
-
-typedef struct {
   bool has_value;
 } InstrRet;
 
@@ -226,13 +227,13 @@ typedef union {
   InstrFuncCall    func_call;
   InstrDefVar      def_var;
   InstrGetVar      get_var;
+  InstrSetVar      set_var;
   InstrJump        jump;
   InstrCondJump    cond_jump;
   InstrCondNotJump cond_not_jump;
   InstrLabel       label;
   InstrMatchCase   match_case;
   InstrGet         get;
-  InstrSet         set;
   InstrRet         ret;
   InstrList        list;
   InstrDict        dict;
@@ -263,6 +264,7 @@ typedef enum {
   ExprKindDict,
   ExprKindGet,
   ExprKindSet,
+  ExprKindSetVar,
   ExprKindFuncCall,
   ExprKindLet,
   ExprKindRet,
@@ -311,9 +313,15 @@ typedef struct  {
 } ExprGet;
 
 typedef struct  {
-  Exprs  chain;
+  Expr  *parent;
+  Expr  *key;
   Expr  *new;
 } ExprSet;
+
+typedef struct  {
+  Str   name;
+  Expr *new;
+} ExprSetVar;
 
 typedef struct {
   Expr  *func;
@@ -360,6 +368,7 @@ typedef union {
   ExprDict     dict;
   ExprGet      get;
   ExprSet      set;
+  ExprSetVar   set_var;
   ExprFuncCall func_call;
   ExprLet      let;
   ExprRet      ret;

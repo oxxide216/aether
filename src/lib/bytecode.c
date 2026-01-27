@@ -41,56 +41,56 @@ Dict dict_clone(Dict *dict, StackFrame *frame) {
 Value *value_unit(StackFrame *frame) {
   Value *value = value_alloc(frame);
   *value = (Value) { ValueKindUnit, {},
-                     frame, 0, false, {} };
+                     frame, 0, false, };
   return value;
 }
 
 Value *value_list(ListNode *nodes, StackFrame *frame) {
   Value *value = value_alloc(frame);
   *value = (Value) { ValueKindList, { .list = nodes },
-                     frame, 0, false, {} };
+                     frame, 0, false, };
   return value;
 }
 
 Value *value_string(Str string, StackFrame *frame) {
   Value *value = value_alloc(frame);
   *value = (Value) { ValueKindString, { .string = { string } },
-                     frame, 0, false, {} };
+                     frame, 0, false, };
   return value;
 }
 
 Value *value_bytes(Bytes bytes, StackFrame *frame) {
   Value *value = value_alloc(frame);
   *value = (Value) { ValueKindBytes, { .bytes = bytes },
-                     frame, 0, false, {} };
+                     frame, 0, false, };
   return value;
 }
 
 Value *value_int(i64 _int, StackFrame *frame) {
   Value *value = value_alloc(frame);
   *value = (Value) { ValueKindInt, { ._int = _int },
-                     frame, 0, false, {} };
+                     frame, 0, false, };
   return value;
 }
 
 Value *value_float(f64 _float, StackFrame *frame) {
   Value *value = value_alloc(frame);
   *value = (Value) { ValueKindFloat, { ._float = _float },
-                     frame, 0, false, {} };
+                     frame, 0, false, };
   return value;
 }
 
 Value *value_bool(bool _bool, StackFrame *frame) {
   Value *value = value_alloc(frame);
   *value = (Value) { ValueKindBool, { ._bool = _bool },
-                     frame, 0, false, {} };
+                     frame, 0, false, };
   return value;
 }
 
 Value *value_dict(Dict dict, StackFrame *frame) {
   Value *value = value_alloc(frame);
   *value = (Value) { ValueKindDict, { .dict = dict },
-                     frame, 0, false, {} };
+                     frame, 0, false, };
   return value;
 }
 
@@ -98,7 +98,7 @@ Value *value_func(FuncValue *func, StackFrame *frame) {
   Value *value = value_alloc(frame);
   func->refs_count = 1;
   *value = (Value) { ValueKindFunc, { .func = func },
-                     frame, 0, false, {} };
+                     frame, 0, false, };
   return value;
 }
 
@@ -109,7 +109,7 @@ Value *value_env(Vm *vm, StackFrame *frame) {
   env->vm = vm;
   env->refs_count = 1;
   *value = (Value) { ValueKindEnv, { .env = env },
-                     frame, 0, false, {} };
+                     frame, 0, false, };
   return value;
 }
 
@@ -305,6 +305,10 @@ void frame_free(StackFrame *frame) {
   arena_free(&frame->arena);
   if (frame->vars.items)
     free(frame->vars.items);
+  for (u32 i = 0; i < frame->match_values.len; ++i)
+    value_free(frame->match_values.items[i]);
+  if (frame->match_values.items)
+    free(frame->match_values.items);
   frame->vars.len = 0;
   free(frame);
 }
@@ -342,8 +346,13 @@ static Expr *ast_node_clone(Expr *node, Arena *arena) {
   } break;
 
   case ExprKindSet: {
-    copy->as.set.chain = ast_clone(&node->as.set.chain, arena);
+    copy->as.set.parent = ast_node_clone(node->as.set.parent, arena);
+    copy->as.set.key = ast_node_clone(node->as.set.key, arena);
     copy->as.set.new = ast_node_clone(node->as.set.new, arena);
+  } break;
+
+  case ExprKindSetVar: {
+    copy->as.set_var.new = ast_node_clone(node->as.set_var.new, arena);
   } break;
 
   case ExprKindFuncCall: {
@@ -508,15 +517,26 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
   } break;
 
   case ExprKindSet: {
+    ast_node_to_ir(ir, node->as.set.parent,
+                   arena, current_func, labels, false);
+    ast_node_to_ir(ir, node->as.set.key,
+                   arena, current_func, labels, false);
     ast_node_to_ir(ir, node->as.set.new,
                    arena, current_func, labels, false);
-    ast_block_to_ir(ir, &node->as.set.chain,
-                    arena, current_func,
-                    labels, false, true);
 
     Instr instr = {0};
     instr.kind = InstrKindSet;
-    instr.as.set.chain_len = node->as.set.chain.len;
+    instr.meta = node->meta;
+    DA_APPEND(ir->items[current_func].instrs, instr);
+  } break;
+
+  case ExprKindSetVar: {
+    ast_node_to_ir(ir, node->as.set_var.new,
+                   arena, current_func, labels, false);
+
+    Instr instr = {0};
+    instr.kind = InstrKindSetVar;
+    instr.as.set_var.name = node->as.set_var.name;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
   } break;

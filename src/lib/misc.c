@@ -58,11 +58,11 @@ u64 value_hash(Value *value) {
   } break;
 
   case ValueKindInt: {
-    result = value->as._int;
+    result = (u64) value->as._int;
   } break;
 
   case ValueKindFloat: {
-    result = *(i64 *) &value->as._float;
+    result = (u64) value->as._float;
   } break;
 
   case ValueKindBool: {
@@ -199,7 +199,7 @@ void sb_push_value(StringBuilder *sb, Value *value,
 
   case ValueKindString: {
     if (kind) {
-      sb_push(sb, "str");
+      sb_push(sb, "string");
     } else {
       if (quote_string)
         sb_push_char(sb, '\'');
@@ -313,7 +313,7 @@ void print_instr(Instr *instr, bool hide_strings) {
   switch (instr->kind) {
   case InstrKindString: {
     printf("Value ");
-    if (hide_strings)
+    if (!hide_strings)
       str_println(instr->as.string.string);
     else
       printf("string\n");
@@ -363,6 +363,10 @@ void print_instr(Instr *instr, bool hide_strings) {
 
   case InstrKindGetVar: {
     printf("Get "STR_FMT"\n", STR_ARG(instr->as.get_var.name));
+  } break;
+
+  case InstrKindSetVar: {
+    printf("Set "STR_FMT"\n", STR_ARG(instr->as.get_var.name));
   } break;
 
   case InstrKindJump: {
@@ -421,4 +425,44 @@ void print_instr(Instr *instr, bool hide_strings) {
     printf("Self reference\n");
   } break;
   }
+}
+
+void print_value(Value *value, bool kind) {
+  StringBuilder sb = {0};
+  sb_push_value(&sb, value, 0, kind, true);
+
+  str_println(sb_to_str(sb));
+
+  free(sb.buffer);
+}
+
+Value *get_from_string(Vm *vm, Str string, i64 index) {
+  u32 begin_byte = 0;
+  u32 current_index = 0;
+  u32 bytes_len = 0;
+  u32 wchar_len;
+  bool found = false;
+
+  while (get_next_wchar(string, current_index, &wchar_len) != '\0') {
+    if (current_index == index) {
+      begin_byte = bytes_len;
+      found = true;
+    }
+
+    ++current_index;
+    bytes_len += wchar_len;
+
+    if (found)
+      break;
+  }
+
+  if (!found)
+    return NULL;
+
+  Str sub_string = {
+    string.ptr + begin_byte,
+    bytes_len - begin_byte,
+  };
+
+  return value_string(sub_string, vm->current_frame);
 }

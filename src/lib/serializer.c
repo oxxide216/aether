@@ -113,6 +113,10 @@ static void serialize_instrs(Instrs *instrs, u8 **data, u32 *data_size,
       serialize_str(instr->as.get_var.name, data, data_size, end);
     } break;
 
+    case InstrKindSetVar: {
+      serialize_str(instr->as.set_var.name, data, data_size, end);
+    } break;
+
     case InstrKindJump: {
       serialize_str(instr->as.jump.label, data, data_size, end);
     } break;
@@ -143,11 +147,7 @@ static void serialize_instrs(Instrs *instrs, u8 **data, u32 *data_size,
       *end += sizeof(u32);
     } break;
 
-    case InstrKindSet: {
-      reserve_space(sizeof(u32), data, data_size, end);
-      *(u32 *) (*data + *end) = instr->as.set.chain_len;
-      *end += sizeof(u32);
-    } break;
+    case InstrKindSet: break;
 
     case InstrKindRet: {
       reserve_space(sizeof(u8), data, data_size, end);
@@ -351,9 +351,18 @@ static void serialize_ast_node(Expr *node, u8 **data, u32 *data_size,
   } break;
 
   case ExprKindSet: {
-    serialize_ast(&node->as.set.chain, data, data_size,
-                  end, path_offsets, file_path, map);
+    serialize_ast_node(node->as.set.parent, data, data_size,
+                       end, path_offsets, file_path, map);
+    serialize_ast_node(node->as.set.key, data, data_size,
+                       end, path_offsets, file_path, map);
     serialize_ast_node(node->as.set.new, data, data_size,
+                       end, path_offsets, file_path, map);
+  } break;
+
+  case ExprKindSetVar: {
+    serialize_str(node->as.set_var.name, data, data_size, end);
+
+    serialize_ast_node(node->as.set_var.new, data, data_size,
                        end, path_offsets, file_path, map);
   } break;
 

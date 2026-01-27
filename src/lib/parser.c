@@ -66,6 +66,7 @@ static char *token_names[] = {
   "match",
   "do",
   "while",
+  "set!",
   "`(`",
   "`)`",
   "`[`",
@@ -815,22 +816,21 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
     case TT_SET: {
       parser_next_token(parser);
 
+      Str name = parser_next_token(parser)->lexeme;
+
+      expr->kind = ExprKindSetVar;
+      expr->as.set_var.name = copy_str(name, parser->arena);
+      expr->as.set_var.new = parser_parse_expr(parser, false);
+
+      parser_expect_token(parser, MASK(TT_CPAREN));
+    } break;
+
+    case TT_SET_EXCL: {
+      parser_next_token(parser);
+
       expr->kind = ExprKindSet;
-
-      Expr *temp_expr = parser_parse_expr(parser, true);
-      DA_ARENA_APPEND(expr->as.set.chain, temp_expr, parser->arena);
-
-      token = parser_peek_token(parser);
-
-      while (token && token->id == TT_QOLON) {
-        parser_next_token(parser);
-
-        temp_expr = parser_parse_expr(parser, false);
-        DA_ARENA_APPEND(expr->as.set.chain, temp_expr, parser->arena);
-
-        token = parser_peek_token(parser);
-      }
-
+      expr->as.set.parent = parser_parse_expr(parser, false);
+      expr->as.set.key = parser_parse_expr(parser, false);
       expr->as.set.new = parser_parse_expr(parser, false);
 
       parser_expect_token(parser, MASK(TT_CPAREN));
