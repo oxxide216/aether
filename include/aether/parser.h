@@ -5,7 +5,7 @@
 #include "aether/arena.h"
 
 typedef struct {
-  Str   name;
+  u16   name_id;
   Args  arg_names;
   Exprs body;
   bool  has_unpack;

@@ -71,7 +71,7 @@ u64 value_hash(Value *value) {
 
   case ValueKindDict: {
     for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
-      DictValue *entry = value->as.dict.items[i];
+      DictValue *entry = value->as.dict->items[i];
       while (entry) {
         result += value_hash(entry->key);
         result += value_hash(entry->value);
@@ -162,7 +162,7 @@ Value **get_child_root(Value *value, Value *key, InstrMeta *meta, Vm *vm) {
 
     return &node->value;
   } else if (value->kind == ValueKindDict) {
-    return dict_get_value_root(&value->as.dict, key);
+    return dict_get_value_root(value->as.dict, key);
   } else {
     StringBuilder type_sb = {0};
     sb_push_value(&type_sb, value, 0, true, true);
@@ -249,22 +249,27 @@ void sb_push_value(StringBuilder *sb, Value *value,
     for (u32 i = 0; i < value->as.func->args.len; ++i) {
       if (i > 0)
         sb_push_char(sb, ' ');
-      sb_push_str(sb, value->as.func->args.items[i]);
+
+      Str arg_name = *get_str(value->as.func->args.items[i]);
+      sb_push_str(sb, arg_name);
     }
 
     if (value->as.func->args.len > 0)
       sb_push_char(sb, ' ');
-    if (value->as.func->intrinsic_name.len == 0)
+
+    Str intrinsic_name = *get_str(value->as.func->intrinsic_name_id);
+
+    if (intrinsic_name.len == 0)
       sb_push(sb, "-> ...");
     else
-      sb_push_str(sb, value->as.func->intrinsic_name);
+      sb_push_str(sb, intrinsic_name);
   } break;
 
   case ValueKindDict: {
     sb_push(sb, "{\n");
 
     for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
-      DictValue *entry = value->as.dict.items[i];
+      DictValue *entry = value->as.dict->items[i];
       while (entry) {
         for (u32 j = 0; j < level + 1; ++j)
           sb_push(sb, "  ");
@@ -313,10 +318,13 @@ void print_instr(Instr *instr, bool hide_strings) {
   switch (instr->kind) {
   case InstrKindString: {
     printf("Value ");
-    if (!hide_strings)
-      str_println(instr->as.string.string);
-    else
+
+    if (!hide_strings) {
+      Str string = *get_str(instr->as.string.string_id);
+      str_println(string);
+    } else {
       printf("string\n");
+    }
   } break;
 
   case InstrKindInt: {
@@ -342,15 +350,20 @@ void print_instr(Instr *instr, bool hide_strings) {
     for (u32 i = 0; i < instr->as.func.args.len; ++i) {
       if (i > 0)
         printf(" ");
-      str_print(instr->as.func.args.items[i]);
+
+      Str arg_name = *get_str(instr->as.func.args.items[i]);
+      str_print(arg_name);
     }
 
     if (instr->as.func.args.len > 0)
       printf(" ");
-    if (instr->as.func.intrinsic_name.len == 0)
+
+    Str intrinsic_name = *get_str(instr->as.func.intrinsic_name_id);
+
+    if (intrinsic_name.len == 0)
       printf("-> ...\n");
     else
-      printf("-> "STR_FMT"\n", STR_ARG(instr->as.func.intrinsic_name));
+      printf("-> "STR_FMT"\n", STR_ARG(intrinsic_name));
   } break;
 
   case InstrKindFuncCall: {
@@ -358,34 +371,38 @@ void print_instr(Instr *instr, bool hide_strings) {
   } break;
 
   case InstrKindDefVar: {
-    printf("Define "STR_FMT"\n", STR_ARG(instr->as.def_var.name));
+    Str name = *get_str(instr->as.def_var.name_id);
+    printf("Define "STR_FMT"\n", STR_ARG(name));
   } break;
 
   case InstrKindGetVar: {
-    printf("Get "STR_FMT"\n", STR_ARG(instr->as.get_var.name));
+    Str name = *get_str(instr->as.get_var.name_id);
+    printf("Get "STR_FMT"\n", STR_ARG(name));
   } break;
 
   case InstrKindSetVar: {
-    printf("Set "STR_FMT"\n", STR_ARG(instr->as.get_var.name));
+    Str name = *get_str(instr->as.get_var.name_id);
+    printf("Set "STR_FMT"\n", STR_ARG(name));
   } break;
 
   case InstrKindJump: {
-    printf("Jump to "STR_FMT"\n",
-           STR_ARG(instr->as.jump.label));
+    Str label = *get_str(instr->as.jump.label_id);
+    printf("Jump to "STR_FMT"\n", STR_ARG(label));
   } break;
 
   case InstrKindCondJump: {
-    printf("Jump to "STR_FMT" if condition\n",
-           STR_ARG(instr->as.cond_jump.label));
+    Str label = *get_str(instr->as.cond_jump.label_id);
+    printf("Jump to "STR_FMT" if condition\n", STR_ARG(label));
   } break;
 
   case InstrKindCondNotJump: {
-    printf("Jump to "STR_FMT" if not contidion\n",
-           STR_ARG(instr->as.cond_not_jump.label));
+    Str label = *get_str(instr->as.cond_not_jump.label_id);
+    printf("Jump to "STR_FMT" if not contidion\n", STR_ARG(label));
   } break;
 
   case InstrKindLabel: {
-    printf(STR_FMT":\n", STR_ARG(instr->as.label.name));
+    Str name = *get_str(instr->as.label.name_id);
+    printf(STR_FMT":\n", STR_ARG(name));
   } break;
 
   case InstrKindMatchBegin: {
@@ -393,8 +410,8 @@ void print_instr(Instr *instr, bool hide_strings) {
   } break;
 
   case InstrKindMatchCase: {
-    printf("Match case, next or "STR_FMT"\n",
-           STR_ARG(instr->as.match_case.not_label));
+    Str not_label = *get_str(instr->as.match_case.not_label_id);
+    printf("Match case, next or "STR_FMT"\n", STR_ARG(not_label));
   } break;
 
   case InstrKindMatchEnd: {

@@ -20,8 +20,8 @@ ListNode *list_clone(ListNode *nodes, StackFrame *frame) {
   return new_list;
 }
 
-Dict dict_clone(Dict *dict, StackFrame *frame) {
-  Dict copy = {0};
+Dict *dict_clone(Dict *dict, StackFrame *frame) {
+  Dict *copy = arena_alloc(&frame->arena, sizeof(Dict));
 
   for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
     DictValue *entry = dict->items[i];
@@ -29,7 +29,7 @@ Dict dict_clone(Dict *dict, StackFrame *frame) {
       Value *key = value_clone(entry->key, frame);
       Value *value = value_clone(entry->value, frame);
 
-      dict_set_value(frame, &copy, key, value);
+      dict_set_value(frame, copy, key, value);
 
       entry = entry->next;
     }
@@ -87,7 +87,7 @@ Value *value_bool(bool _bool, StackFrame *frame) {
   return value;
 }
 
-Value *value_dict(Dict dict, StackFrame *frame) {
+Value *value_dict(Dict *dict, StackFrame *frame) {
   Value *value = value_alloc(frame);
   *value = (Value) { ValueKindDict, { .dict = dict },
                      frame, 0, false, };
@@ -138,7 +138,7 @@ Value *value_clone(Value *value, StackFrame *frame) {
     copy->as.bytes.ptr = arena_alloc(&frame->arena, copy->as.bytes.len);
     memcpy(copy->as.bytes.ptr, value->as.bytes.ptr, copy->as.bytes.len);
   } else if (value->kind == ValueKindDict) {
-    copy->as.dict = dict_clone(&value->as.dict, frame);
+    copy->as.dict = dict_clone(value->as.dict, frame);
   } else if (value->kind == ValueKindFunc) {
     ++copy->as.func->refs_count;
 
@@ -183,7 +183,7 @@ void value_free(Value *value) {
     }
   } else if (value->kind == ValueKindDict) {
     for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
-      DictValue *entry = value->as.dict.items[i];
+      DictValue *entry = value->as.dict->items[i];
       while (entry) {
         value_free(entry->key);
         value_free(entry->value);
@@ -255,8 +255,8 @@ bool value_eq(Value *a, Value *b) {
 
   case ValueKindDict: {
     for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
-      DictValue *entry_a = a->as.dict.items[i];
-      DictValue *entry_b = b->as.dict.items[i];
+      DictValue *entry_a = a->as.dict->items[i];
+      DictValue *entry_b = b->as.dict->items[i];
 
       while (entry_a && entry_b) {
         if (!value_eq(entry_a->key, entry_b->key) ||
@@ -272,9 +272,10 @@ bool value_eq(Value *a, Value *b) {
   }
 
   case ValueKindFunc: {
-    if (a->as.func->intrinsic_name.len > 0)
-      return str_eq(a->as.func->intrinsic_name,
-                    b->as.func->intrinsic_name);
+    Str *intrinsic_name = get_str(a->as.func->intrinsic_name_id);
+    if (intrinsic_name->len > 0)
+      return a->as.func->intrinsic_name_id ==
+             b->as.func->intrinsic_name_id;
 
     return false;
   }
@@ -305,8 +306,6 @@ void frame_free(StackFrame *frame) {
   arena_free(&frame->arena);
   if (frame->vars.items)
     free(frame->vars.items);
-  for (u32 i = 0; i < frame->match_values.len; ++i)
-    value_free(frame->match_values.items[i]);
   if (frame->match_values.items)
     free(frame->match_values.items);
   frame->vars.len = 0;
@@ -376,9 +375,22 @@ static Expr *ast_node_clone(Expr *node, Arena *arena) {
 
   case ExprKindMatch: {
     copy->as.match.value = ast_node_clone(node->as.match.value, arena);
-    copy->as.match.values = ast_clone(&node->as.match.values, arena);
-    copy->as.match.branches = ast_clone(&node->as.match.branches, arena);
-    copy->as.match.else_branch = ast_node_clone(node->as.match.else_branch, arena);
+
+    Branches branches_copy;
+    branches_copy.len = node->as.match.branches.len;
+    branches_copy.cap = branches_copy.len;
+    branches_copy.items = arena_alloc(arena, branches_copy.cap * sizeof(Branch));
+
+    for (u32 i = 0; i < branches_copy.len; ++i) {
+      Branch *branch = node->as.match.branches.items + i;
+
+      branches_copy.items[i].value = ast_node_clone(branch->value, arena);
+      branches_copy.items[i].body = ast_node_clone(branch->body, arena);
+    }
+
+    copy->as.match.branches = branches_copy;
+
+    return copy;
   } break;
 
   case ExprKindWhile: {
@@ -395,8 +407,7 @@ static Expr *ast_node_clone(Expr *node, Arena *arena) {
 Exprs ast_clone(Exprs *ast, Arena *arena) {
   Exprs copy;
   copy.len = ast->len;
-  copy.cap = copy.len;
-  copy.items = arena_alloc(arena, copy.cap * sizeof(Expr *));
+  copy.items = arena_alloc(arena, copy.len * sizeof(Expr *));
 
   for (u32 i = 0; i < ast->len; ++i)
     copy.items[i] = ast_node_clone(ast->items[i], arena);
@@ -416,7 +427,7 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
   case ExprKindString: {
     Instr instr = {0};
     instr.kind = InstrKindString;
-    instr.as.string.string = node->as.string.string;
+    instr.as.string.string_id = node->as.string.string_id;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
   } break;
@@ -453,7 +464,7 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
   case ExprKindIdent: {
     Instr instr = {0};
     instr.kind = InstrKindGetVar;
-    instr.as.get_var.name = node->as.ident.name;
+    instr.as.get_var.name_id = node->as.ident.name_id;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
   } break;
@@ -463,11 +474,15 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
     instr.kind = InstrKindFunc;
     instr.as.func.args = node->as.func.args;
     instr.as.func.body_index = ir->len;
-    instr.as.func.intrinsic_name = node->as.func.intrinsic_name;
+    instr.as.func.intrinsic_name_id = node->as.func.intrinsic_name_id;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
 
-    if (node->as.func.intrinsic_name.len == 0) {
+    Str *intrinsic_name = NULL;
+    if (node->as.func.intrinsic_name_id != (u16) -1)
+      intrinsic_name = get_str(node->as.func.intrinsic_name_id);
+
+    if (!intrinsic_name) {
       Func new_func = {0};
       new_func.args = node->as.func.args;
       DA_APPEND(*ir, new_func);
@@ -536,7 +551,7 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
 
     Instr instr = {0};
     instr.kind = InstrKindSetVar;
-    instr.as.set_var.name = node->as.set_var.name;
+    instr.as.set_var.name_id = node->as.set_var.name_id;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
   } break;
@@ -562,7 +577,7 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
 
     Instr instr = {0};
     instr.kind = InstrKindDefVar;
-    instr.as.def_var.name = copy_str(node->as.let.name, arena);
+    instr.as.def_var.name_id = node->as.let.name_id;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
   } break;
@@ -584,12 +599,12 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
     sb_push_char(&sb, 'l');
 
     sb_push_u32(&sb, (*labels)++);
-    Str else_label = copy_str(sb_to_str(sb), arena);
+    u16 else_label_id = copy_str(sb_to_str(sb), arena);
 
     sb.len = 1;
 
     sb_push_u32(&sb, (*labels)++);
-    Str end_label = copy_str(sb_to_str(sb), arena);
+    u16 end_label_id = copy_str(sb_to_str(sb), arena);
 
     free(sb.buffer);
 
@@ -598,7 +613,7 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
 
     Instr instr = {0};
     instr.kind = InstrKindCondNotJump;
-    instr.as.cond_not_jump.label = else_label;
+    instr.as.cond_not_jump.label_id = else_label_id;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
 
@@ -607,12 +622,12 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
                     labels, value_ignored, false);
 
     instr.kind = InstrKindJump;
-    instr.as.jump.label = end_label;
+    instr.as.jump.label_id = end_label_id;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
 
     instr.kind = InstrKindLabel;
-    instr.as.label.name = else_label;
+    instr.as.label.name_id = else_label_id;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
 
@@ -621,7 +636,7 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
                     labels, value_ignored, false);
 
     instr.kind = InstrKindLabel;
-    instr.as.label.name = end_label;
+    instr.as.label.name_id = end_label_id;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
   } break;
@@ -631,7 +646,7 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
     sb_push_char(&sb, 'l');
 
     sb_push_u32(&sb, (*labels)++);
-    Str end_label = copy_str(sb_to_str(sb), arena);
+    u16 end_label_id = copy_str(sb_to_str(sb), arena);
 
     ast_node_to_ir(ir, node->as.match.value, arena,
                    current_func, labels, false);
@@ -641,42 +656,42 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
 
-    for (u32 i = 0; i < node->as.match.values.len; ++i) {
+    for (u32 i = 0; i < node->as.match.branches.len; ++i) {
       sb.len = 1;
 
       sb_push_u32(&sb, (*labels)++);
-      Str next_label = copy_str(sb_to_str(sb), arena);
+      u16 next_label_id = copy_str(sb_to_str(sb), arena);
 
-      ast_node_to_ir(ir, node->as.match.values.items[i],
-                     arena, current_func, labels, false);
+      if (node->as.match.branches.items[i].value)
+        ast_node_to_ir(ir, node->as.match.branches.items[i].value,
+                       arena, current_func, labels, false);
+      else
+        ast_node_to_ir(ir, node->as.match.value, arena,
+                       current_func, labels, false);
 
       instr.kind = InstrKindMatchCase;
-      instr.as.match_case.not_label = next_label;
+      instr.as.match_case.not_label_id = next_label_id;
       instr.meta = node->meta;
       DA_APPEND(ir->items[current_func].instrs, instr);
 
-      ast_node_to_ir(ir, node->as.match.branches.items[i],
+      ast_node_to_ir(ir, node->as.match.branches.items[i].body,
                      arena, current_func, labels, value_ignored);
 
       instr.kind = InstrKindJump;
-      instr.as.jump.label = end_label;
+      instr.as.jump.label_id = end_label_id;
       instr.meta = node->meta;
       DA_APPEND(ir->items[current_func].instrs, instr);
 
       instr.kind = InstrKindLabel;
-      instr.as.label.name = next_label;
+      instr.as.label.name_id = next_label_id;
       instr.meta = node->meta;
       DA_APPEND(ir->items[current_func].instrs, instr);
     }
 
     free(sb.buffer);
 
-    if (node->as.match.else_branch)
-      ast_node_to_ir(ir, node->as.match.else_branch,
-                     arena, current_func, labels, false);
-
     instr.kind = InstrKindLabel;
-    instr.as.label.name = end_label;
+    instr.as.label.name_id = end_label_id;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
 
@@ -690,18 +705,18 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
     sb_push_char(&sb, 'l');
 
     sb_push_u32(&sb, (*labels)++);
-    Str begin_label = copy_str(sb_to_str(sb), arena);
+    u16 begin_label_id = copy_str(sb_to_str(sb), arena);
 
     sb.len = 1;
 
     sb_push_u32(&sb, (*labels)++);
-    Str end_label = copy_str(sb_to_str(sb), arena);
+    u16 end_label_id = copy_str(sb_to_str(sb), arena);
 
     free(sb.buffer);
 
     Instr instr = {0};
     instr.kind = InstrKindLabel;
-    instr.as.label.name = begin_label;
+    instr.as.label.name_id = begin_label_id;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
 
@@ -709,7 +724,7 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
                    current_func, labels, false);
 
     instr.kind = InstrKindCondNotJump;
-    instr.as.cond_not_jump.label = end_label;
+    instr.as.cond_not_jump.label_id = end_label_id;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
 
@@ -718,12 +733,12 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
                     labels, true, false);
 
     instr.kind = InstrKindJump;
-    instr.as.jump.label = begin_label;
+    instr.as.jump.label_id = begin_label_id;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
 
     instr.kind = InstrKindLabel;
-    instr.as.label.name = end_label;
+    instr.as.label.name_id = end_label_id;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
   } break;

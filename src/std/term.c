@@ -16,19 +16,19 @@ Value *get_size_intrinsic(Vm *vm, Value **args) {
   struct winsize _size;
   ioctl(0, TIOCGWINSZ, &_size);
 
-  Dict size = {0};
+  Dict *size = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
 
   Value *rows = value_alloc(vm->current_frame);
   rows->kind = ValueKindInt;
   rows->as._int = _size.ws_row;
   Value *rows_key = value_string(STR_LIT("rows"), vm->current_frame);
-  dict_set_value(vm->current_frame, &size, rows_key, rows);
+  dict_set_value(vm->current_frame, size, rows_key, rows);
 
   Value *cols = value_alloc(vm->current_frame);
   cols->kind = ValueKindInt;
   cols->as._int = _size.ws_col;
   Value *cols_key = value_string(STR_LIT("cols"), vm->current_frame);
-  dict_set_value(vm->current_frame, &size, cols_key, cols);
+  dict_set_value(vm->current_frame, size, cols_key, cols);
 
   return value_dict(size, vm->current_frame);
 }

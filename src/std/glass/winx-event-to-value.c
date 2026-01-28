@@ -131,7 +131,7 @@ static Str mouse_button_names[] = {
 };
 
 Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
-  Dict result = {0};
+  Dict *result = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
   Str type = {0};
 
   switch (event->kind) {
@@ -142,13 +142,13 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
 
     WinxKeyCode key_code = event->as.key.key_code;
     Value *key_code_key = value_string(STR_LIT("key-code"), vm->current_frame);
-    dict_set_value(vm->current_frame, &result, key_code_key,
+    dict_set_value(vm->current_frame, result, key_code_key,
                    value_string(key_code_names[key_code], vm->current_frame));
 
     Str _char = { arena_alloc(&vm->current_frame->arena, 1), 1 };
     *_char.ptr = (char) event->as.key._char;
     Value *char_key = value_string(STR_LIT("char"), vm->current_frame);
-    dict_set_value(vm->current_frame, &result, char_key,
+    dict_set_value(vm->current_frame, result, char_key,
                    value_string(_char, vm->current_frame));
   } break;
 
@@ -157,13 +157,13 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
 
     WinxKeyCode key_code = event->as.key.key_code;
     Value *key_code_key = value_string(STR_LIT("key-code"), vm->current_frame);
-    dict_set_value(vm->current_frame, &result, key_code_key,
+    dict_set_value(vm->current_frame, result, key_code_key,
                    value_string(key_code_names[key_code], vm->current_frame));
 
     Str _char = { arena_alloc(&vm->current_frame->arena, 1), 1 };
     *_char.ptr = (char) event->as.key._char;
     Value *char_key = value_string(STR_LIT("char"), vm->current_frame);
-    dict_set_value(vm->current_frame, &result, char_key,
+    dict_set_value(vm->current_frame, result, char_key,
                    value_string(_char, vm->current_frame));
   } break;
 
@@ -172,13 +172,13 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
 
     WinxKeyCode key_code = event->as.key.key_code;
     Value *key_code_key = value_string(STR_LIT("key-code"), vm->current_frame);
-    dict_set_value(vm->current_frame, &result, key_code_key,
+    dict_set_value(vm->current_frame, result, key_code_key,
                    value_string(key_code_names[key_code], vm->current_frame));
 
     Str _char = { arena_alloc(&vm->current_frame->arena, 1), 1 };
     *_char.ptr = (char) event->as.key._char;
     Value *char_key = value_string(STR_LIT("char"), vm->current_frame);
-    dict_set_value(vm->current_frame, &result, char_key,
+    dict_set_value(vm->current_frame, result, char_key,
                    value_string(_char, vm->current_frame));
   } break;
 
@@ -187,7 +187,7 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
 
     WinxMouseButton button = event->as.button.button;
     Value *button_key = value_string(STR_LIT("button"), vm->current_frame);
-    dict_set_value(vm->current_frame, &result, button_key,
+    dict_set_value(vm->current_frame, result, button_key,
                    value_string(mouse_button_names[button], vm->current_frame));
   } break;
 
@@ -196,7 +196,7 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
 
     WinxMouseButton button = event->as.button.button;
     Value *button_key = value_string(STR_LIT("button"), vm->current_frame);
-    dict_set_value(vm->current_frame, &result, button_key,
+    dict_set_value(vm->current_frame, result, button_key,
                    value_string(mouse_button_names[button], vm->current_frame));
   } break;
 
@@ -204,11 +204,11 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
     type = STR_LIT("mouse-move");
 
     Value *x_key = value_string(STR_LIT("x"), vm->current_frame);
-    dict_set_value(vm->current_frame, &result, x_key,
+    dict_set_value(vm->current_frame, result, x_key,
                    value_int(event->as.mouse_move.x, vm->current_frame));
 
     Value *y_key = value_string(STR_LIT("y"), vm->current_frame);
-    dict_set_value(vm->current_frame, &result, y_key,
+    dict_set_value(vm->current_frame, result, y_key,
                    value_int(event->as.mouse_move.y, vm->current_frame));
   } break;
 
@@ -224,11 +224,11 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
     type = STR_LIT("resize");
 
     Value *width_key = value_string(STR_LIT("width"), vm->current_frame);
-    dict_set_value(vm->current_frame, &result, width_key,
+    dict_set_value(vm->current_frame, result, width_key,
                    value_float((f32) event->as.resize.width, vm->current_frame));
 
     Value *height_key = value_string(STR_LIT("height"), vm->current_frame);
-    dict_set_value(vm->current_frame, &result, height_key,
+    dict_set_value(vm->current_frame, result, height_key,
                    value_float((f32) event->as.resize.height, vm->current_frame));
   } break;
 
@@ -238,7 +238,7 @@ Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
   }
 
   Value *type_key = value_string(STR_LIT("type"), vm->current_frame);
-  dict_set_value(vm->current_frame, &result, type_key,
+  dict_set_value(vm->current_frame, result, type_key,
                  value_string(type, vm->current_frame));
 
   return value_dict(result, vm->current_frame);

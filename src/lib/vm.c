@@ -109,16 +109,16 @@ static Intrinsic *get_intrinsic(Vm *vm, Str name, u32 args_len, Value **args) {
   return NULL;
 }
 
-static u32 get_instr_index(Vm *vm, Str label_name) {
+static u32 get_instr_index(Vm *vm, u16 label_id) {
   u32 func_index = 0;
   if (vm->current_func)
     func_index = vm->current_func->body_index;
 
-  u64 index = str_hash(label_name) % LABELS_HASH_TABLE_CAP;
+  u64 index = label_id % LABELS_HASH_TABLE_CAP;
 
   Label *entry = vm->labels.items[func_index].items[index];
   while (entry) {
-    if (str_eq(entry->name, label_name))
+    if (entry->name_id == label_id)
       return entry->instr_index;
 
     entry = entry->next;
@@ -134,13 +134,14 @@ void catch_vars(Vars *catched, Vm *vm, Instrs *instrs) {
     Instr *instr = instrs->items + i;
 
     if (instr->kind == InstrKindDefVar) {
-      Str new_var_name = instr->as.def_var.name;
+      Str new_var_name = *get_str(instr->as.def_var.name_id);;
       DA_ARENA_APPEND(defined_vars_names, new_var_name, &vm->current_frame->arena);
     } else if (instr->kind == InstrKindGetVar) {
+      Str name = *get_str(instr->as.get_var.name_id);
       bool found = false;
 
       for (u32 j = 0; j < defined_vars_names.len; ++j) {
-        if (str_eq(defined_vars_names.items[j], instr->as.get_var.name)) {
+        if (str_eq(defined_vars_names.items[j], name)) {
           found = true;
 
           break;
@@ -148,12 +149,10 @@ void catch_vars(Vars *catched, Vm *vm, Instrs *instrs) {
       }
 
       if (!found) {
-        Var *var = get_var_from(&vm->current_frame->vars, instr->as.get_var.name);
+        Str name = *get_str(instr->as.get_var.name_id);
+        Var *var = get_var_from(&vm->current_frame->vars, name);
         if (var) {
-          Var new_var = {
-            instr->as.get_var.name,
-            var->value,
-          };
+          Var new_var = { name, var->value, };
           DA_ARENA_APPEND(*catched, new_var, &vm->current_frame->arena);
           DA_ARENA_APPEND(defined_vars_names, new_var.name, &vm->current_frame->arena);
         }
@@ -167,11 +166,12 @@ void execute_instrs(Vm *vm, Instrs *instrs);
 void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta, bool value_ignored) {
   Value **args = vm->stack.items + vm->stack.len - func->args.len;
 
-  if (func->intrinsic_name.len > 0) {
-    Intrinsic *intrinsic = get_intrinsic(vm, func->intrinsic_name, func->args.len, args);
+  if (func->intrinsic_name_id != (u16) -1) {
+    Str *intrinsic_name = get_str(func->intrinsic_name_id);
+    Intrinsic *intrinsic = get_intrinsic(vm, *intrinsic_name, func->args.len, args);
     if (!intrinsic) {
       ERROR(META_FMT"Intrinsic "STR_FMT":%u was not found\n",
-            META_ARG(*meta), STR_ARG(func->intrinsic_name), func->args.len);
+            META_ARG(*meta), STR_ARG(*intrinsic_name), func->args.len);
       vm->state = ExecStateExit;
       vm->exit_code = 1;
       return;
@@ -192,8 +192,9 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta, bool value_ignored) 
   begin_frame(vm);
 
   for (u32 i = 0; i < func->args.len; ++i) {
+    Str arg_name = *get_str(func->args.items[i]);
     Var new_var = {
-      func->args.items[i],
+      arg_name,
       vm->stack.items[vm->stack.len - func->args.len + i],
     };
     DA_APPEND(vm->current_frame->vars, new_var);
@@ -236,7 +237,8 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
 
     switch (instr->kind) {
     case InstrKindString: {
-      Value *new_value = value_string(instr->as.string.string, vm->current_frame);
+      Str string = *get_str(instr->as.string.string_id);
+      Value *new_value = value_string(string, vm->current_frame);
       DA_APPEND(vm->stack, new_value);
     } break;
 
@@ -259,9 +261,13 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       FuncValue *new_func = arena_alloc(&vm->current_frame->arena, sizeof(FuncValue));
       new_func->args = instr->as.func.args;
       new_func->body_index = instr->as.func.body_index;
-      new_func->intrinsic_name = instr->as.func.intrinsic_name;
+      new_func->intrinsic_name_id = instr->as.func.intrinsic_name_id;
 
-      if (new_func->intrinsic_name.len == 0) {
+      Str *intrinsic_name = NULL;
+      if (instr->as.func.intrinsic_name_id != (u16) -1)
+        intrinsic_name = get_str(instr->as.func.intrinsic_name_id);
+
+      if (!intrinsic_name) {
         Func *body = vm->ir->items + new_func->body_index;
         catch_vars(&new_func->catched_vars, vm, &body->instrs);
         if (vm->state != ExecStateContinue)
@@ -345,20 +351,19 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       Value *last = stack_last(vm);
       ++last->refs_count;
 
-      Var new_var = {
-        instr->as.def_var.name,
-        last,
-      };
+      Str name = *get_str(instr->as.def_var.name_id);
+      Var new_var = { name, last };
       DA_APPEND(vm->current_frame->vars, new_var);
 
       --vm->stack.len;
     } break;
 
     case InstrKindGetVar: {
-      Var *var = get_var(vm, instr->as.get_var.name);
+      Str name = *get_str(instr->as.get_var.name_id);
+      Var *var = get_var(vm, name);
       if (!var)
         PANIC_ARGS(instr->meta, "Symbol "STR_FMT" was not found\n",
-                   STR_ARG(instr->as.get_var.name));
+                   STR_ARG(name));
 
       DA_APPEND(vm->stack, var->value);
     } break;
@@ -367,10 +372,11 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       if (!ensure_stack_len_is_enough(vm, 1, &instr->meta))
         return;
 
-      Var *var = get_var(vm, instr->as.set_var.name);
+      Str name = *get_str(instr->as.set_var.name_id);
+      Var *var = get_var(vm, name);
       if (!var)
         PANIC_ARGS(instr->meta, "Symbol "STR_FMT" was not found\n",
-                   STR_ARG(instr->as.set_var.name));
+                   STR_ARG(name));
 
       Value *new_value = stack_last(vm);
 
@@ -386,10 +392,12 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
     } break;
 
     case InstrKindJump: {
-      u32 target = get_instr_index(vm, instr->as.jump.label);
-      if (target == (u32) -1)
+      u32 target = get_instr_index(vm, instr->as.jump.label_id);
+      if (target == (u32) -1) {
+        Str label = *get_str(instr->as.jump.label_id);
         PANIC_ARGS(instr->meta, "Target label was not found: "STR_FMT"\n",
-                   STR_ARG(instr->as.jump.label));
+                   STR_ARG(label));
+      }
 
       i = target - 1;
     } break;
@@ -401,10 +409,12 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       Value *cond = stack_last(vm);
 
       if (value_to_bool(cond)) {
-        u32 target = get_instr_index(vm, instr->as.cond_jump.label);
-        if (target == (u32) -1)
+        u32 target = get_instr_index(vm, instr->as.cond_jump.label_id);
+        if (target == (u32) -1) {
+          Str label = *get_str(instr->as.cond_jump.label_id);
           PANIC_ARGS(instr->meta, "Target label was not found: "STR_FMT"\n",
-                     STR_ARG(instr->as.cond_jump.label));
+                     STR_ARG(label));
+        }
 
         i = target - 1;
       }
@@ -419,13 +429,14 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       Value *cond = stack_last(vm);
 
       if (!value_to_bool(cond)) {
-        u32 target = get_instr_index(vm, instr->as.cond_not_jump.label);
+        u32 target = get_instr_index(vm, instr->as.cond_not_jump.label_id);
         if (target == (u32) -1) {
           for (u32 j = 0; j < instrs->len; ++j)
             print_instr(instrs->items + j, false);
 
+          Str label = *get_str(instr->as.cond_not_jump.label_id);
           PANIC_ARGS(instr->meta, "Target label was not found: "STR_FMT"\n",
-                     STR_ARG(instr->as.cond_not_jump.label));
+                     STR_ARG(label));
         }
 
         i = target - 1;
@@ -457,10 +468,12 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       Value *case_cond = stack_last(vm);
 
       if (!value_eq(case_cond, match_cond)) {
-        u32 target = get_instr_index(vm, instr->as.match_case.not_label);
-        if (target == (u32) -1)
+        u32 target = get_instr_index(vm, instr->as.match_case.not_label_id);
+        if (target == (u32) -1) {
+          Str not_label = *get_str(instr->as.match_case.not_label_id);
           PANIC_ARGS(instr->meta, "Target label not found: "STR_FMT"\n",
-                     STR_ARG(instr->as.match_case.not_label));
+                     STR_ARG(not_label));
+        }
 
         i = target - 1;
       }
@@ -530,7 +543,7 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
         return;
 
       if (!root && parent->kind == ValueKindDict) {
-        dict_set_value(parent->frame, &parent->as.dict, key,
+        dict_set_value(parent->frame, parent->as.dict, key,
                        value_unit(parent->frame));
         root = get_child_root(parent, key, &instr->meta, vm);
       }
@@ -574,13 +587,13 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       if (!ensure_stack_len_is_enough(vm, instr->as.dict.len * 2, &instr->meta))
         return;
 
-      Dict new_dict = {0};
+      Dict *new_dict = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
 
       for (u32 j = 0; j < instr->as.dict.len; ++j) {
         Value *key = vm->stack.items[vm->stack.len - instr->as.list.len * 2 + j * 2];
         Value *value = vm->stack.items[vm->stack.len - instr->as.list.len * 2 + j * 2 + 1];
 
-        dict_set_value(vm->current_frame, &new_dict, key, value);
+        dict_set_value(vm->current_frame, new_dict, key, value);
       }
 
       vm->stack.len -= instr->as.dict.len * 2;
@@ -613,7 +626,7 @@ static void load_labels(Ir *ir, LabelsTables *tables, Arena *arena) {
       if (instr->kind != InstrKindLabel)
         continue;
 
-      u64 index = str_hash(instr->as.label.name) % LABELS_HASH_TABLE_CAP;
+      u64 index = instr->as.label.name_id % LABELS_HASH_TABLE_CAP;
 
       Label *entry = table.items[index];
       while (entry && entry->next)
@@ -621,7 +634,7 @@ static void load_labels(Ir *ir, LabelsTables *tables, Arena *arena) {
 
       Label *label = arena_alloc(arena, sizeof(Label));
       *label = (Label) {
-        instr->as.label.name,
+        instr->as.label.name_id,
         j, NULL,
       };
 

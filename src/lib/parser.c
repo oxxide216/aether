@@ -22,9 +22,9 @@ typedef enum {
 } TokenStatus;
 
 typedef struct {
-  u64   id;
-  Str   lexeme;
-  u16   row, col;
+  u64 id;
+  u16 lexeme_id;
+  u16 row, col;
 } Token;
 
 typedef Da(Token) Tokens;
@@ -186,7 +186,8 @@ static char escape_char(Str *str, u32 *col) {
   }
 }
 
-static TokenStatus lex(Lexer *lexer, Token *token, Str *file_path, Arena *arena) {
+static TokenStatus lex(Lexer *lexer, Token *token,
+                       Str *file_path, Arena *arena) {
   if (lexer->code.len > 0) {
     u64 id = 0;
     u32 char_len;
@@ -266,14 +267,16 @@ static TokenStatus lex(Lexer *lexer, Token *token, Str *file_path, Arena *arena)
       --lexer->code.len;
       ++lexer->col;
 
-      lexeme = copy_str(STR(lexer->temp_sb.buffer, lexer->temp_sb.len), arena);
+      lexeme = sb_to_str(lexer->temp_sb);
 
       lexer->temp_sb.len = 0;
     } else {
       lexer->col += char_len;
     }
 
-    *token = (Token) { id, lexeme, row, col };
+    u16 lexeme_id = copy_str(lexeme, arena);
+
+    *token = (Token) { id, lexeme_id, row, col };
 
     return TokenStatusOk;
   }
@@ -327,12 +330,14 @@ static Token *parser_expect_token(Parser *parser, u64 id_mask) {
   if (MASK(token->id) & id_mask)
     return token;
 
+  Str *lexeme = get_str(token->lexeme_id);
+
   PERROR(STR_FMT":%u:%u: ", "Expected ",
          STR_ARG(*parser->file_path),
          token->row + 1, token->col + 1);
   print_id_mask(id_mask);
   fprintf(stderr, ", but got `"STR_FMT"`\n",
-          STR_ARG(token->lexeme));
+          STR_ARG(*lexeme));
   exit(1);
 }
 
@@ -438,7 +443,7 @@ static void parser_parse_macro_def(Parser *parser) {
   macro.col = begin_token->col;
 
   Token *name_token = parser_expect_token(parser, MASK(TT_IDENT));
-  macro.name = copy_str(name_token->lexeme, parser->arena);
+  macro.name_id = name_token->lexeme_id;
 
   parser_expect_token(parser, MASK(TT_BACKSLASH));
 
@@ -449,14 +454,12 @@ static void parser_parse_macro_def(Parser *parser) {
       macro.has_unpack = true;
 
       arg_token = parser_expect_token(parser, MASK(TT_IDENT));
-      Str arg_name = copy_str(arg_token->lexeme, parser->arena);
-      DA_ARENA_APPEND(macro.arg_names, arg_name, parser->arena);
+      DA_ARENA_APPEND(macro.arg_names, arg_token->lexeme_id, parser->arena);
 
       break;
     }
 
-    Str arg_name = copy_str(arg_token->lexeme, parser->arena);
-    DA_ARENA_APPEND(macro.arg_names, arg_name, parser->arena);
+    DA_ARENA_APPEND(macro.arg_names, arg_token->lexeme_id, parser->arena);
 
     next_token = parser_peek_token(parser);
   }
@@ -470,24 +473,29 @@ static void parser_parse_macro_def(Parser *parser) {
 }
 
 static ExprDict parser_parse_dict(Parser *parser) {
-  ExprDict result = {0};
+  DaExprs content = {0};
 
   Token *next_token = parser_peek_token(parser);
   while (next_token && next_token->id != TT_CCURLY) {
     Expr *expr = parser_parse_expr(parser, false);
-    DA_ARENA_APPEND(result.content, expr, parser->arena);
+    DA_ARENA_APPEND(content, expr, parser->arena);
 
     parser_expect_token(parser, MASK(TT_COLON));
 
     expr = parser_parse_expr(parser, false);
-    DA_ARENA_APPEND(result.content, expr, parser->arena);
+    DA_ARENA_APPEND(content, expr, parser->arena);
 
     next_token = parser_peek_token(parser);
   }
 
   parser_expect_token(parser, MASK(TT_CCURLY));
 
-  return result;
+  return (ExprDict) {
+    .content = {
+      content.items,
+      content.len,
+    }
+  };
 }
 
 static ExprFunc parser_parse_lambda(Parser *parser) {
@@ -496,8 +504,7 @@ static ExprFunc parser_parse_lambda(Parser *parser) {
   Token *arg_token = parser_expect_token(parser, MASK(TT_IDENT) |
                                                  MASK(TT_RIGHT_ARROW));
   while (arg_token && arg_token->id != TT_RIGHT_ARROW) {
-    Str arg = copy_str(arg_token->lexeme, parser->arena);
-    DA_ARENA_APPEND(result.args, arg, parser->arena);
+    DA_ARENA_APPEND(result.args, arg_token->lexeme_id, parser->arena);
 
     arg_token = parser_expect_token(parser, MASK(TT_IDENT) |
                                             MASK(TT_RIGHT_ARROW));
@@ -508,11 +515,13 @@ static ExprFunc parser_parse_lambda(Parser *parser) {
     parser_next_token(parser);
 
     Token *intrinsic_name_token = parser_expect_token(parser, MASK(TT_STR));
+    Str *lexeme = get_str(intrinsic_name_token->lexeme_id);
+
     Str intrinsic_name = {
-      intrinsic_name_token->lexeme.ptr + 1,
-      intrinsic_name_token->lexeme.len - 2,
+      lexeme->ptr + 1,
+      lexeme->len - 2,
     };
-    result.intrinsic_name = copy_str(intrinsic_name, parser->arena);
+    result.intrinsic_name_id = copy_str(intrinsic_name, parser->arena);
   } else {
     u32 prev_func = parser->current_func;
 
@@ -520,6 +529,8 @@ static ExprFunc parser_parse_lambda(Parser *parser) {
                                              MASK(TT_CBRACKET) |
                                              MASK(TT_CCURLY) |
                                              MASK(TT_RHOMBUS));
+
+    result.intrinsic_name_id = (u16) -1;
 
     parser->current_func = prev_func;
 
@@ -542,18 +553,19 @@ static ExprMatch parser_parse_match(Parser *parser) {
     if (token->id == TT_UNPACK) {
       parser_next_token(parser);
       parser_expect_token(parser, MASK(TT_EQ_ARROW));
+      Expr *body = parser_parse_expr(parser, false);
 
-      result.else_branch = parser_parse_expr(parser, false);
+      Branch branch = { NULL, body };
+      DA_ARENA_APPEND(result.branches, branch, parser->arena);
 
       break;
     }
 
     Expr *value = parser_parse_expr(parser, false);
-    DA_ARENA_APPEND(result.values, value, parser->arena);
-
     parser_expect_token(parser, MASK(TT_EQ_ARROW));
+    Expr *body = parser_parse_expr(parser, false);
 
-    Expr *branch = parser_parse_expr(parser, false);
+    Branch branch = { value, body };
     DA_ARENA_APPEND(result.branches, branch, parser->arena);
   }
 
@@ -588,7 +600,9 @@ static ExprIf parser_parse_if(Parser *parser) {
     elif->meta.row = next_token->row;
     elif->meta.col = next_token->col;
 
-    DA_ARENA_APPEND(last->else_body, elif, parser->arena);
+    last->else_body.len = 1;
+    last->else_body.items = arena_alloc(parser->arena, sizeof(Expr *));
+    last->else_body.items[0] = elif;
     last = &elif->as._if;
 
     next_token = parser_expect_token(parser, MASK(TT_CPAREN) |
@@ -634,26 +648,31 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
 
   switch (first_token->id) {
   case TT_STR: {
+    Str *lexeme = get_str(first_token->lexeme_id);
+
     expr->kind = ExprKindString;
-    expr->as.string.string = copy_str(STR(first_token->lexeme.ptr + 1,
-                                          first_token->lexeme.len - 2),
-                                      parser->arena);
+    expr->as.string.string_id = copy_str(STR(lexeme->ptr + 1,
+                                             lexeme->len - 2),
+                                         parser->arena);
   } break;
 
   case TT_IDENT: {
     expr->kind = ExprKindIdent;
-    expr->as.ident.name = copy_str(first_token->lexeme, parser->arena);
+    expr->as.ident.name_id = first_token->lexeme_id;
   } break;
 
   case TT_INT: {
-    expr->kind = ExprKindInt;
-    expr->as._int._int = str_to_i64(first_token->lexeme);
+    Str *lexeme = get_str(first_token->lexeme_id);
 
+    expr->kind = ExprKindInt;
+    expr->as._int._int = str_to_i64(*lexeme);
   } break;
 
   case TT_FLOAT: {
+    Str *lexeme = get_str(first_token->lexeme_id);
+
     expr->kind = ExprKindFloat;
-    expr->as._float._float = str_to_f64(first_token->lexeme);
+    expr->as._float._float = str_to_f64(*lexeme);
   } break;
 
   case TT_OBRACKET: {
@@ -692,7 +711,7 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
       Token *name_token = parser_expect_token(parser, MASK(TT_IDENT));
 
       expr->kind = ExprKindLet;
-      expr->as.let.name = name_token->lexeme;
+      expr->as.let.name_id = name_token->lexeme_id;
       expr->as.let.value = parser_parse_expr(parser, false);
 
       parser_expect_token(parser, MASK(TT_CPAREN));
@@ -712,7 +731,8 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
     case TT_USE: {
       parser_next_token(parser);
 
-      Str module_path = parser_expect_token(parser, MASK(TT_STR))->lexeme;
+      u16 module_path_id = parser_expect_token(parser, MASK(TT_STR))->lexeme_id;
+      Str module_path = *get_str(module_path_id);
       module_path.ptr += 1;
       module_path.len -= 2;
 
@@ -734,7 +754,8 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
 
         if (code.len != (u32) -1) {
           --path_sb.len; // exclude NULL-terminator
-          path = copy_str(sb_to_str(path_sb), parser->arena);
+          u16 path_id = copy_str(sb_to_str(path_sb), parser->arena);
+          path = *get_str(path_id);
 
           break;
         } else {
@@ -747,7 +768,8 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
 
           if (code.len != (u32) -1) {
             --path_sb.len; // exclude NULL-terminator
-            path = copy_str(sb_to_str(path_sb), parser->arena);
+            u16 path_id = copy_str(sb_to_str(path_sb), parser->arena);
+            path = *get_str(path_id);
 
             break;
           }
@@ -816,10 +838,10 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
     case TT_SET: {
       parser_next_token(parser);
 
-      Str name = parser_next_token(parser)->lexeme;
+      u16 name_id = parser_next_token(parser)->lexeme_id;
 
       expr->kind = ExprKindSetVar;
-      expr->as.set_var.name = copy_str(name, parser->arena);
+      expr->as.set_var.name_id = name_id;
       expr->as.set_var.new = parser_parse_expr(parser, false);
 
       parser_expect_token(parser, MASK(TT_CPAREN));
@@ -871,13 +893,20 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
       expr->kind = ExprKindFuncCall;
       expr->as.func_call.func = parser_parse_expr(parser, false);
 
+      DaExprs exprs = {0};
+
       Token *token = parser_peek_token(parser);
       while (token && token->id != TT_CPAREN) {
         Expr *temp_expr = parser_parse_expr(parser, false);
-        DA_ARENA_APPEND(expr->as.func_call.args, temp_expr, parser->arena);
+        DA_ARENA_APPEND(exprs, temp_expr, parser->arena);
 
         token = parser_peek_token(parser);
       }
+
+      expr->as.func_call.args = (Exprs) {
+        exprs.items,
+        exprs.len,
+      };
 
       parser_expect_token(parser, MASK(TT_CPAREN));
     } break;
@@ -888,17 +917,23 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
     Token *begin_token = parser_peek_token(parser);
     Token *token = begin_token;
     if (token && token->id == TT_QOLON) {
+      DaExprs exprs = {0};
       ExprGet get = {0};
-      DA_ARENA_APPEND(get.chain, expr, parser->arena);
+      DA_ARENA_APPEND(exprs, expr, parser->arena);
 
       while (token && token->id == TT_QOLON) {
         parser_next_token(parser);
 
         Expr *expr = parser_parse_expr(parser, true);
-        DA_ARENA_APPEND(get.chain, expr, parser->arena);
+        DA_ARENA_APPEND(exprs, expr, parser->arena);
 
         token = parser_peek_token(parser);
       }
+
+      get.chain = (Exprs) {
+        exprs.items,
+        exprs.len,
+      };
 
       expr = arena_alloc(parser->arena, sizeof(Expr));
       expr->kind = ExprKindGet;
@@ -913,7 +948,7 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
 }
 
 static Exprs parser_parse_block(Parser *parser, u64 end_id_mask) {
-  Exprs result = {0};
+  DaExprs result = {0};
 
   Token *token = parser_peek_token(parser);
   while (token && !(MASK(token->id) & end_id_mask)) {
@@ -923,7 +958,10 @@ static Exprs parser_parse_block(Parser *parser, u64 end_id_mask) {
     token = parser_peek_token(parser);
   }
 
-  return result;
+  return (Exprs) {
+    result.items,
+    result.len,
+  };
 }
 
 Ir parse(Str code, Str *file_path, CachedASTs *cached_asts) {

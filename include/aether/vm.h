@@ -83,7 +83,7 @@ typedef struct {
 typedef struct Label Label;
 
 struct Label {
-  Str    name;
+  u16    name_id;
   u32    instr_index;
   Label *next;
 };

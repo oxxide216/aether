@@ -37,10 +37,12 @@ void eliminate_dead_code_instrs(Instrs *instrs, Ir *ir,
     case InstrKindFuncCall:  break;
 
     case InstrKindDefVar: {
+      Str name = *get_str(instr->as.def_var.name_id);
       Instr *last_instr = instrs->items + i - 1;
+
       if (last_instr->kind == InstrKindFunc) {
         FuncDef new_def = {
-          instr->as.def_var.name,
+          name,
           last_instr->as.func.body_index,
         };
         DA_APPEND(*defs, new_def);
@@ -48,10 +50,11 @@ void eliminate_dead_code_instrs(Instrs *instrs, Ir *ir,
     } break;
 
     case InstrKindGetVar: {
+      Str name = *get_str(instr->as.get_var.name_id);
       bool found = false;
 
       for (u32 j = defs->len; j > 0; --j) {
-        if (str_eq(instr->as.get_var.name, defs->items[j - 1].name)) {
+        if (str_eq(name, defs->items[j - 1].name)) {
           u32 func_index = defs->items[j - 1].body_index;
 
           if (ir->items[func_index].is_dead) {
@@ -72,7 +75,7 @@ void eliminate_dead_code_instrs(Instrs *instrs, Ir *ir,
         break;
 
       for (u32 j = global_defs->len; j > 0; --j) {
-        if (str_eq(instr->as.get_var.name, global_defs->items[j - 1].name)) {
+        if (str_eq(name, global_defs->items[j - 1].name)) {
           u32 func_index = global_defs->items[j - 1].body_index;
 
           if (ir->items[func_index].is_dead) {
@@ -91,10 +94,12 @@ void eliminate_dead_code_instrs(Instrs *instrs, Ir *ir,
     } break;
 
     case InstrKindSetVar: {
+      Str name = *get_str(instr->as.set_var.name_id);
+
       Instr *last_instr = instrs->items + i - 1;
       if (last_instr->kind == InstrKindFunc) {
         for (u32 j = defs->len; j > 0; --j) {
-          if (str_eq(instr->as.set_var.name, defs->items[j - 1].name)) {
+          if (str_eq(name, defs->items[j - 1].name)) {
             defs->items[j - 1].body_index = last_instr->as.func.body_index;
 
             break;

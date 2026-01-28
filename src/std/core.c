@@ -546,22 +546,22 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
 
     --vm->stack.len;
   } else if (collection->kind == ValueKindDict) {
-    Dict _pair = {0};
+    Dict *_pair = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
 
     Value *key = value_string(STR_LIT("key"), vm->current_frame);
-    dict_set_value(vm->current_frame, &_pair, key, NULL);
+    dict_set_value(vm->current_frame, _pair, key, NULL);
 
     Value *value = value_string(STR_LIT("value"), vm->current_frame);
-    dict_set_value(vm->current_frame, &_pair, value, NULL);
+    dict_set_value(vm->current_frame, _pair, value, NULL);
 
     Value *pair = value_dict(_pair, vm->current_frame);
     DA_APPEND(vm->stack, pair);
 
     for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
-      DictValue *entry = collection->as.dict.items[i];
+      DictValue *entry = collection->as.dict->items[i];
       while (entry) {
-        pair->as.dict.items[0]->key = entry->key;
-        pair->as.dict.items[1]->value = entry->value;
+        pair->as.dict->items[0]->key = entry->key;
+        pair->as.dict->items[1]->value = entry->value;
 
         execute_func(vm, func->as.func, NULL, true);
 
@@ -580,7 +580,7 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
       }
     }
 
-    pair->as.dict = (Dict) {0};
+    *pair->as.dict = (Dict) {0};
     --vm->stack.len;
   }
 
@@ -828,9 +828,9 @@ Value *add_intrinsic(Vm *vm, Value **args) {
       dict_value = value_clone(dict_value, vm->current_frame);
 
     for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
-      DictValue *entry = b->as.dict.items[i];
+      DictValue *entry = b->as.dict->items[i];
       while (entry) {
-        dict_set_value(vm->current_frame, &dict_value->as.dict,
+        dict_set_value(vm->current_frame, dict_value->as.dict,
                        entry->key, entry->value);
 
         entry = entry->next;
@@ -1204,11 +1204,11 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   free(bytecode.ptr);
   bytecode.ptr = new_ptr;
 
-  Dict dict = {0};
+  Dict *dict = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
 
   Value *compiled = value_string(bytecode, vm->current_frame);
   Value *compiled_key = value_string(STR_LIT("compiled"), vm->current_frame);
-  dict_set_value(vm->current_frame, &dict, compiled_key, compiled);
+  dict_set_value(vm->current_frame, dict, compiled_key, compiled);
 
   Value *compiled_macros;
 
@@ -1235,7 +1235,7 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   }
 
   Value *compiled_macros_key = value_string(STR_LIT("compiled-macros"), vm->current_frame);
-  dict_set_value(vm->current_frame, &dict, compiled_macros_key, compiled_macros);
+  dict_set_value(vm->current_frame, dict, compiled_macros_key, compiled_macros);
 
   if (included_files.items)
     free(included_files.items);

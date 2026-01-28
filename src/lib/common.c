@@ -3,10 +3,10 @@
 
 InternStrings intern_strings = {0};
 
-Str copy_str(Str str, Arena *arena) {
-  for (u32 i = 0; i < intern_strings.len; ++i)
+u16 copy_str(Str str, Arena *arena) {
+  for (u16 i = 0; i < intern_strings.len; ++i)
     if (str_eq(intern_strings.items[i], str))
-      return intern_strings.items[i];
+      return i;
 
   Str copy;
 
@@ -16,7 +16,11 @@ Str copy_str(Str str, Arena *arena) {
 
   DA_ARENA_APPEND(intern_strings, copy, arena);
 
-  return copy;
+  return intern_strings.len - 1;
+}
+
+Str *get_str(u16 id) {
+  return intern_strings.items + id;
 }
 
 Str get_file_dir(Str path) {

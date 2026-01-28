@@ -83,7 +83,7 @@ struct FuncValue {
   u32   body_index;
   Vars  catched_vars;
   Func *parent_func;
-  Str   intrinsic_name;
+  u16   intrinsic_name_id;
   u32   refs_count;
   bool  cloned;
 };
@@ -101,7 +101,7 @@ typedef union {
   i64        _int;
   f64        _float;
   bool       _bool;
-  Dict       dict;
+  Dict      *dict;
   FuncValue *func;
   Env       *env;
   Bytes      bytes;
@@ -116,7 +116,19 @@ struct Value {
 };
 
 typedef struct Expr Expr;
-typedef Da(Expr *) Exprs;
+typedef Da(Expr *) DaExprs;
+
+typedef struct {
+  Expr **items;
+  u32    len;
+} Exprs;
+
+typedef struct {
+  Expr *value;
+  Expr *body;
+} Branch;
+
+typedef Da(Branch) Branches;
 
 typedef enum {
   InstrKindString = 0,
@@ -144,7 +156,7 @@ typedef enum {
 } InstrKind;
 
 typedef struct {
-  Str string;
+  u16 string_id;
 } InstrString;
 
 typedef struct {
@@ -161,8 +173,8 @@ typedef struct {
 
 typedef struct {
   Args args;
-  u32  body_index;
-  Str  intrinsic_name;
+  u16  body_index;
+  u16  intrinsic_name_id;
 } InstrFunc;
 
 typedef struct {
@@ -171,35 +183,35 @@ typedef struct {
 } InstrFuncCall;
 
 typedef struct {
-  Str name;
+  u16 name_id;
 } InstrDefVar;
 
 typedef struct {
-  Str name;
+  u16 name_id;
 } InstrGetVar;
 
 typedef struct {
-  Str name;
+  u16 name_id;
 } InstrSetVar;
 
 typedef struct {
-  Str label;
+  u16 label_id;
 } InstrJump;
 
 typedef struct {
-  Str label;
+  u16 label_id;
 } InstrCondJump;
 
 typedef struct {
-  Str label;
+  u16 label_id;
 } InstrCondNotJump;
 
 typedef struct {
-  Str name;
+  u16 name_id;
 } InstrLabel;
 
 typedef struct {
-  Str not_label;
+  u16 not_label_id;
 } InstrMatchCase;
 
 typedef struct {
@@ -275,7 +287,7 @@ typedef enum {
 } ExprKind;
 
 typedef struct  {
-  Str string;
+  u16 string_id;
 } ExprString;
 
 typedef struct  {
@@ -291,13 +303,13 @@ typedef struct  {
 } ExprBytes;
 
 typedef struct  {
-  Str name;
+  u16 name_id;
 } ExprIdent;
 
 typedef struct {
   Args  args;
   Exprs body;
-  Str   intrinsic_name;
+  u16   intrinsic_name_id;
 } ExprFunc;
 
 typedef struct  {
@@ -319,7 +331,7 @@ typedef struct  {
 } ExprSet;
 
 typedef struct  {
-  Str   name;
+  u16   name_id;
   Expr *new;
 } ExprSetVar;
 
@@ -330,7 +342,7 @@ typedef struct {
 } ExprFuncCall;
 
 typedef struct {
-  Str   name;
+  u16   name_id;
   Expr *value;
 } ExprLet;
 
@@ -345,10 +357,8 @@ typedef struct {
 } ExprIf;
 
 typedef struct {
-  Expr   *value;
-  Exprs   values;
-  Exprs   branches;
-  Expr   *else_branch;
+  Expr     *value;
+  Branches  branches;
 } ExprMatch;
 
 typedef struct {
@@ -384,7 +394,7 @@ struct Expr {
 };
 
 ListNode *list_clone(ListNode *list, StackFrame *frame);
-Dict      dict_clone(Dict *dict, StackFrame *frame);
+Dict     *dict_clone(Dict *dict, StackFrame *frame);
 
 Value *value_unit(StackFrame *frame);
 Value *value_list(ListNode *nodes, StackFrame *frame);
@@ -392,7 +402,7 @@ Value *value_string(Str string, StackFrame *frame);
 Value *value_int(i64 _int, StackFrame *frame);
 Value *value_float(f64 _float, StackFrame *frame);
 Value *value_bool(bool _bool, StackFrame *frame);
-Value *value_dict(Dict dict, StackFrame *frame);
+Value *value_dict(Dict *dict, StackFrame *frame);
 Value *value_func(FuncValue *func, StackFrame *frame);
 Value *value_env(Vm *vm, StackFrame *frame);
 Value *value_bytes(Bytes bytes, StackFrame *frame);
