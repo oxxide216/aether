@@ -66,7 +66,7 @@
 (let not-unit? \value -> (not (unit? value)))
 
 (let make-env \args -> import 'make-env')
-(let compile \env code path include-paths compile-macros dce -> import 'compile')
+(let compile \env code path include-paths compile-macros -> import 'compile')
 (let eval-compiled \env bytecode -> import 'eval-compiled')
 (let eval-macros \env macro-bytecode -> import 'eval-macros')
 (let eval \env code path include-paths -> import 'eval')

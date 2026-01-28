@@ -57,7 +57,7 @@
   mode-compile-only =>
     (do
       (let content (join [core-content base-content (to-str input-file-content)] '\n'))
-      (let compiled (compile env content input-path include-paths false dce))
+      (let compiled (compile env content input-path include-paths false))
 
       (let success (write-file output-path compiled::'compiled'))
       (if (not success)

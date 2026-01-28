@@ -1,5 +1,4 @@
 #include "aether/serializer.h"
-#include "aether/optimizer.h"
 #include "shl/shl-log.h"
 
 typedef struct {
@@ -223,13 +222,10 @@ static void serialize_included_files(u8 **data, u32 *data_size, u32 *end,
   }
 }
 
-u8 *serialize(Ir *ir, u32 *size, FilePaths *included_files, bool dce) {
+u8 *serialize(Ir *ir, u32 *size, FilePaths *included_files) {
   *size = sizeof(u32) * 2;
   u32 data_size = sizeof(u32) * 2;
   u8 *data = malloc(data_size);
-
-  if (dce)
-    eliminate_dead_code(ir);
 
   FilePathOffsets path_offsets = {0};
   serialize_included_files(&data, &data_size, size, included_files, &path_offsets);
@@ -240,16 +236,11 @@ u8 *serialize(Ir *ir, u32 *size, FilePaths *included_files, bool dce) {
   u32 len = 0;
 
   for (u32 i = 0; i < ir->len; ++i) {
-    Func *func = ir->items + i;
-
     IndexPair pair = {
       i,
       i - funcs_skipped,
     };
     DA_APPEND(map, pair);
-
-    if (func->is_dead)
-      ++funcs_skipped;
   }
 
   reserve_space(sizeof(u32), &data, &data_size, size);
@@ -257,9 +248,6 @@ u8 *serialize(Ir *ir, u32 *size, FilePaths *included_files, bool dce) {
 
   for (u32 i = 0; i < ir->len; ++i) {
     Func *func = ir->items + i;
-
-    if (func->is_dead)
-      continue;
 
     reserve_space(sizeof(u32), &data, &data_size, size);
     *(u32 *) (data + *size) = func->args.len;

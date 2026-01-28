@@ -1161,7 +1161,6 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Value *path = args[2];
   Value *include_paths = args[3];
   Value *compile_macros = args[4];
-  Value *dce = args[5];
 
   Str magic = {
     code->as.string.str.ptr,
@@ -1196,8 +1195,7 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Ir ir = ast_to_ir(&ast, &ir_arena);
 
   Str bytecode = {0};
-  bytecode.ptr = (char *) serialize(&ir, &bytecode.len,
-                                    &included_files, dce->as._bool);
+  bytecode.ptr = (char *) serialize(&ir, &bytecode.len, &included_files);
 
   char *new_ptr = arena_alloc(&vm->current_frame->arena, bytecode.len);
   memcpy(new_ptr, bytecode.ptr, bytecode.len);
@@ -1470,9 +1468,9 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("is-bytes"), true, 1, { ValueKindUnit }, &is_bytes_intrinsic, NULL },
   // Env
   { STR_LIT("make-env"), true, 1, { ValueKindList }, &make_env_intrinsic, NULL },
-  { STR_LIT("compile"), true, 6,
+  { STR_LIT("compile"), true, 5,
     { ValueKindEnv, ValueKindString, ValueKindString,
-      ValueKindList, ValueKindBool, ValueKindBool },
+      ValueKindList, ValueKindBool },
     &compile_intrinsic, NULL },
   { STR_LIT("eval-compiled"), false, 2,
     { ValueKindEnv, ValueKindBytes },
