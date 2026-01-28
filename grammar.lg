@@ -13,7 +13,6 @@ ret=ret
 import=import
 match=match
 do=do
-while=while
 set_excl=set!
 
 oparen=\(

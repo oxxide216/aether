@@ -393,11 +393,6 @@ static Expr *ast_node_clone(Expr *node, Arena *arena) {
     return copy;
   } break;
 
-  case ExprKindWhile: {
-    copy->as._while.cond = ast_node_clone(node->as._while.cond, arena);
-    copy->as._while.body = ast_clone(&node->as._while.body, arena);
-  } break;
-
   case ExprKindSelf: break;
   }
 
@@ -696,49 +691,6 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
     DA_APPEND(ir->items[current_func].instrs, instr);
 
     instr.kind = InstrKindMatchEnd;
-    instr.meta = node->meta;
-    DA_APPEND(ir->items[current_func].instrs, instr);
-  } break;
-
-  case ExprKindWhile: {
-    StringBuilder sb = {0};
-    sb_push_char(&sb, 'l');
-
-    sb_push_u32(&sb, (*labels)++);
-    u16 begin_label_id = copy_str(sb_to_str(sb), arena);
-
-    sb.len = 1;
-
-    sb_push_u32(&sb, (*labels)++);
-    u16 end_label_id = copy_str(sb_to_str(sb), arena);
-
-    free(sb.buffer);
-
-    Instr instr = {0};
-    instr.kind = InstrKindLabel;
-    instr.as.label.name_id = begin_label_id;
-    instr.meta = node->meta;
-    DA_APPEND(ir->items[current_func].instrs, instr);
-
-    ast_node_to_ir(ir, node->as._while.cond, arena,
-                   current_func, labels, false);
-
-    instr.kind = InstrKindCondNotJump;
-    instr.as.cond_not_jump.label_id = end_label_id;
-    instr.meta = node->meta;
-    DA_APPEND(ir->items[current_func].instrs, instr);
-
-    ast_block_to_ir(ir, &node->as._while.body,
-                    arena, current_func,
-                    labels, true, false);
-
-    instr.kind = InstrKindJump;
-    instr.as.jump.label_id = begin_label_id;
-    instr.meta = node->meta;
-    DA_APPEND(ir->items[current_func].instrs, instr);
-
-    instr.kind = InstrKindLabel;
-    instr.as.label.name_id = end_label_id;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
   } break;

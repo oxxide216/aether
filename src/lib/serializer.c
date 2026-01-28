@@ -405,13 +405,6 @@ static void serialize_ast_node(Expr *node, u8 **data, u32 *data_size,
                   end, path_offsets, file_path, map);
   } break;
 
-  case ExprKindWhile: {
-    serialize_ast_node(node->as._while.cond, data, data_size,
-                       end, path_offsets, file_path, map);
-    serialize_ast(&node->as._while.body, data, data_size,
-                  end, path_offsets, file_path, map);
-  } break;
-
   case ExprKindMatch: {
     serialize_ast_node(node->as.match.value, data, data_size,
                        end, path_offsets, file_path, map);

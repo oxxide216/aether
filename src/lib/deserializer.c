@@ -365,13 +365,6 @@ static Expr *deserialize_ast_node(u8 *data, u32 *end,
                     path_offsets, arena);
   } break;
 
-  case ExprKindWhile: {
-    node->as._while.cond = deserialize_ast_node(data, end,
-                                                path_offsets, arena);
-    deserialize_ast(&node->as._while.body, data,
-                    end, path_offsets, arena);
-  } break;
-
   case ExprKindMatch: {
     node->as.match.value = deserialize_ast_node(data, end,
                                                 path_offsets, arena);

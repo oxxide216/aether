@@ -619,18 +619,6 @@ static ExprIf parser_parse_if(Parser *parser) {
   return result;
 }
 
-static ExprWhile parser_parse_while(Parser *parser) {
-  parser_next_token(parser);
-
-  ExprWhile result = {0};
-  result.cond = parser_parse_expr(parser, false);
-  result.body = parser_parse_block(parser, MASK(TT_CPAREN));
-
-  parser_expect_token(parser, MASK(TT_CPAREN));
-
-  return result;
-}
-
 static Expr *parser_parse_expr(Parser *parser, bool is_short) {
   Expr *expr = arena_alloc(parser->arena, sizeof(Expr));
 
@@ -882,11 +870,6 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
       expr->as.block = parser_parse_block(parser, MASK(TT_CPAREN));
 
       parser_expect_token(parser, MASK(TT_CPAREN));
-    } break;
-
-    case TT_WHILE: {
-      expr->kind = ExprKindWhile;
-      expr->as._while = parser_parse_while(parser);
     } break;
 
     default: {

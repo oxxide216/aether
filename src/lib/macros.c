@@ -147,11 +147,6 @@ static void clone_expr(Expr **expr, Args *arg_names, Arena *arena) {
     clone_block(&new_expr->as._if.else_body, arg_names, arena);
   } break;
 
-  case ExprKindWhile: {
-    clone_expr(&new_expr->as._while.cond, arg_names, arena);
-    clone_block(&new_expr->as._while.body, arg_names, arena);
-  } break;
-
   case ExprKindMatch: {
     clone_expr(&new_expr->as.match.value, arg_names, arena);
 
@@ -273,11 +268,6 @@ static void rename_args_expr(Expr *expr, Args *prev_arg_names,
     rename_args_expr(expr->as._if.cond, prev_arg_names, new_arg_names, arena);
     rename_args_block(&expr->as._if.if_body, prev_arg_names, new_arg_names, arena);
     rename_args_block(&expr->as._if.else_body, prev_arg_names, new_arg_names, arena);
-  } break;
-
-  case ExprKindWhile: {
-    rename_args_expr(expr->as._while.cond, prev_arg_names, new_arg_names, arena);
-    rename_args_block(&expr->as._while.body, prev_arg_names, new_arg_names, arena);
   } break;
 
   case ExprKindMatch: {
@@ -545,11 +535,6 @@ void expand_macros(Expr *expr, Macros *macros,
     INLINE_THEN_EXPAND(expr->as._if.cond);
     INLINE_THEN_EXPAND_BLOCK(expr->as._if.if_body);
     INLINE_THEN_EXPAND_BLOCK(expr->as._if.else_body);
-  } break;
-
-  case ExprKindWhile: {
-    INLINE_THEN_EXPAND(expr->as._while.cond);
-    INLINE_THEN_EXPAND_BLOCK(expr->as._while.body);
   } break;
 
   case ExprKindMatch: {

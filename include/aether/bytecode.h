@@ -280,7 +280,6 @@ typedef enum {
   ExprKindLet,
   ExprKindRet,
   ExprKindIf,
-  ExprKindWhile,
   ExprKindMatch,
   ExprKindSelf,
 } ExprKind;
@@ -360,11 +359,6 @@ typedef struct {
   Branches  branches;
 } ExprMatch;
 
-typedef struct {
-  Expr  *cond;
-  Exprs  body;
-} ExprWhile;
-
 typedef union {
   ExprString   string;
   ExprInt      _int;
@@ -383,7 +377,6 @@ typedef union {
   ExprRet      ret;
   ExprIf       _if;
   ExprMatch    match;
-  ExprWhile    _while;
 } ExprAs;
 
 struct Expr {
