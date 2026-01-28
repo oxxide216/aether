@@ -18,7 +18,7 @@
                         row, col, is_inlined);          \
   } while (0)
 
-void block_append(Exprs *block, Expr *expr, Arena *arena) {
+void block_append(DaExprs *block, Expr *expr, Arena *arena) {
   if (!block->items) {
     block->cap = 1;
     block->items = arena_alloc(arena, sizeof(Expr *));
@@ -33,9 +33,9 @@ void block_append(Exprs *block, Expr *expr, Arena *arena) {
   block->items[block->len++] = expr;
 }
 
-static u32 get_macro_arg_index(Str name, Args *arg_names) {
+static u32 get_macro_arg_index(u16 name_id, Args *arg_names) {
   for (u32 i = 0; i < arg_names->len; ++i)
-    if (str_eq(arg_names->items[i], name))
+    if (arg_names->items[i] == name_id)
       return i;
 
   return (u32) -1;
@@ -44,7 +44,7 @@ static u32 get_macro_arg_index(Str name, Args *arg_names) {
 static bool needs_cloning(Expr *expr, Args *arg_names) {
   switch (expr->kind) {
     case ExprKindIdent: {
-      return get_macro_arg_index(expr->as.ident.name, arg_names) != (u32) -1;
+      return get_macro_arg_index(expr->as.ident.name_id, arg_names) != (u32) -1;
     }
 
     case ExprKindRet: {
@@ -61,11 +61,11 @@ static bool needs_cloning(Expr *expr, Args *arg_names) {
   }
 }
 
-static Macro *get_macro(Macros *macros, Str name, u32 args_len) {
+static Macro *get_macro(Macros *macros, u16 name_id, u32 args_len) {
   for (u32 i = 0; i < macros->len; ++i) {
     Macro *macro = macros->items + i;
 
-    if (str_eq(macro->name, name) &&
+    if (macro->name_id == name_id &&
         (macro->arg_names.len == args_len ||
          (macro->has_unpack &&
           macro->arg_names.len <= args_len + 1)))
@@ -98,8 +98,8 @@ static void clone_expr(Expr **expr, Args *arg_names, Arena *arena) {
   case ExprKindIdent: break;
 
   case ExprKindFunc: {
-    Str *new_items = arena_alloc(arena, new_expr->as.func.args.len * sizeof(Str));
-    memcpy(new_items, new_expr->as.func.args.items, new_expr->as.func.args.len * sizeof(Str));
+    u16 *new_items = arena_alloc(arena, new_expr->as.func.args.len * sizeof(u16));
+    memcpy(new_items, new_expr->as.func.args.items, new_expr->as.func.args.len * sizeof(u16));
     new_expr->as.func.args.items = new_items;
 
     clone_block(&new_expr->as.func.body, arg_names, arena);
@@ -155,14 +155,10 @@ static void clone_expr(Expr **expr, Args *arg_names, Arena *arena) {
   case ExprKindMatch: {
     clone_expr(&new_expr->as.match.value, arg_names, arena);
 
-    for (u32 i = 0; i < new_expr->as.match.values.len; ++i)
-      clone_expr(&new_expr->as.match.values.items[i], arg_names, arena);
-
-    for (u32 i = 0; i < new_expr->as.match.branches.len; ++i)
-      clone_expr(&new_expr->as.match.branches.items[i], arg_names, arena);
-
-    if (new_expr->as.match.else_branch)
-      clone_expr(&new_expr->as.match.else_branch, arg_names, arena);
+    for (u32 i = 0; i < new_expr->as.match.branches.len; ++i) {
+      clone_expr(&new_expr->as.match.branches.items[i].value, arg_names, arena);
+      clone_expr(&new_expr->as.match.branches.items[i].body, arg_names, arena);
+    }
   } break;
 
   case ExprKindSelf: break;
@@ -198,8 +194,8 @@ static void rename_args_expr(Expr *expr, Args *prev_arg_names,
 
   case ExprKindIdent: {
     for (u32 i = 0; i < prev_arg_names->len; ++i) {
-      if (str_eq(expr->as.ident.name, prev_arg_names->items[i])) {
-        expr->as.ident.name = new_arg_names->items[i];
+      if (expr->as.ident.name_id == prev_arg_names->items[i]) {
+        expr->as.ident.name_id = new_arg_names->items[i];
 
         break;
       }
@@ -209,7 +205,7 @@ static void rename_args_expr(Expr *expr, Args *prev_arg_names,
   case ExprKindFunc: {
     for (u32 i = 0; i < expr->as.func.args.len; ++i) {
       for (u32 j = 0; j < prev_arg_names->len; ++j) {
-        if (str_eq(expr->as.func.args.items[i], prev_arg_names->items[j])) {
+        if (expr->as.func.args.items[i] == prev_arg_names->items[j]) {
           expr->as.func.args.items[i] = new_arg_names->items[j];
 
           break;
@@ -241,8 +237,8 @@ static void rename_args_expr(Expr *expr, Args *prev_arg_names,
 
   case ExprKindSetVar: {
     for (u32 i = 0; i < prev_arg_names->len; ++i) {
-      if (str_eq(expr->as.set_var.name, prev_arg_names->items[i])) {
-        expr->as.set_var.name = new_arg_names->items[i];
+      if (expr->as.set_var.name_id == prev_arg_names->items[i]) {
+        expr->as.set_var.name_id = new_arg_names->items[i];
 
         break;
       }
@@ -260,8 +256,8 @@ static void rename_args_expr(Expr *expr, Args *prev_arg_names,
     rename_args_expr(expr->as.let.value, prev_arg_names, new_arg_names, arena);
 
     for (u32 i = 0; i < prev_arg_names->len; ++i) {
-      if (str_eq(expr->as.let.name, prev_arg_names->items[i])) {
-        expr->as.let.name = new_arg_names->items[i];
+      if (expr->as.let.name_id == prev_arg_names->items[i]) {
+        expr->as.let.name_id = new_arg_names->items[i];
 
         break;
       }
@@ -287,14 +283,10 @@ static void rename_args_expr(Expr *expr, Args *prev_arg_names,
   case ExprKindMatch: {
     rename_args_expr(expr->as.match.value, prev_arg_names, new_arg_names, arena);
 
-    for (u32 i = 0; i < expr->as.match.values.len; ++i)
-      rename_args_expr(expr->as.match.values.items[i], prev_arg_names, new_arg_names, arena);
-
-    for (u32 i = 0; i < expr->as.match.branches.len; ++i)
-      rename_args_expr(expr->as.match.branches.items[i], prev_arg_names, new_arg_names, arena);
-
-    if (expr->as.match.else_branch)
-      rename_args_expr(expr->as.match.else_branch, prev_arg_names, new_arg_names, arena);
+    for (u32 i = 0; i < expr->as.match.branches.len; ++i) {
+      rename_args_expr(expr->as.match.branches.items[i].value, prev_arg_names, new_arg_names, arena);
+      rename_args_expr(expr->as.match.branches.items[i].body, prev_arg_names, new_arg_names, arena);
+    }
   } break;
 
   case ExprKindSelf: break;
@@ -307,18 +299,18 @@ static void rename_args_block(Exprs *block, Args *prev_arg_names,
     rename_args_expr(block->items[i], prev_arg_names, new_arg_names, arena);
 }
 
-static void try_replace_macro_arg_ident(Str *ident, Args *arg_names, Exprs *args) {
-  u32 arg_index = get_macro_arg_index(*ident, arg_names);
+static void try_replace_macro_arg_ident(u16 *ident_id, Args *arg_names, Exprs *args) {
+  u32 arg_index = get_macro_arg_index(*ident_id, arg_names);
   if (arg_index != (u32) -1 && args->items[arg_index]->kind == ExprKindIdent)
-    *ident = args->items[arg_index]->as.ident.name;
+    *ident_id = args->items[arg_index]->as.ident.name_id;
 }
 
 static bool try_inline_macro_arg(Expr **expr, Args *arg_names,
-                                 Exprs *args, Exprs *dest,
+                                 Exprs *args, DaExprs *dest,
                                  bool unpack, Arena *arena);
 
 static void append_macro_arg(u32 index, Args *arg_names,
-                             Exprs *args, Exprs *dest,
+                             Exprs *args, DaExprs *dest,
                              bool unpack, Arena *arena) {
   Expr *arg = args->items[index];
 
@@ -339,13 +331,13 @@ static void append_macro_arg(u32 index, Args *arg_names,
 }
 
 static bool try_inline_macro_arg(Expr **expr, Args *arg_names,
-                                 Exprs *args, Exprs *dest,
+                                 Exprs *args, DaExprs *dest,
                                  bool unpack, Arena *arena) {
   if (!arg_names || !args)
     return false;
 
   if ((*expr)->kind == ExprKindLet) {
-    try_replace_macro_arg_ident(&(*expr)->as.let.name, arg_names, args);
+    try_replace_macro_arg_ident(&(*expr)->as.let.name_id, arg_names, args);
 
     return false;
   }
@@ -358,7 +350,7 @@ static bool try_inline_macro_arg(Expr **expr, Args *arg_names,
   }
 
   if ((*expr)->kind == ExprKindIdent) {
-    u32 arg_index = get_macro_arg_index((*expr)->as.ident.name, arg_names);
+    u32 arg_index = get_macro_arg_index((*expr)->as.ident.name_id, arg_names);
     if (arg_index != (u32) -1) {
       if (dest) {
         append_macro_arg(arg_index, arg_names, args, dest, unpack, arena);
@@ -379,7 +371,7 @@ void expand_macros_block(Exprs *block, Macros *macros,
                          Args *arg_names, Exprs *args,
                          bool unpack, Arena *arena, Str *file_path,
                          i16 row, i16 col, bool is_inlined) {
-  Exprs new_block = {0};
+  DaExprs new_block = {0};
   Da(bool) inlined_exprs = {0};
 
   for (u32 i = 0; i < block->len; ++i) {
@@ -407,7 +399,8 @@ void expand_macros_block(Exprs *block, Macros *macros,
                   temp_row, temp_col, is_inlined | inlined);
   }
 
-  *block = new_block;
+  block->items = new_block.items;
+  block->len = new_block.len;
 
   if (inlined_exprs.items)
     free(inlined_exprs.items);
@@ -460,13 +453,12 @@ void expand_macros(Expr *expr, Macros *macros,
     INLINE_THEN_EXPAND_BLOCK(expr->as.func_call.args);
 
     if (expr->as.func_call.func->kind == ExprKindIdent) {
-      Str name = expr->as.func_call.func->as.ident.name;
-      Macro *macro = get_macro(macros, name, expr->as.func_call.args.len);
+      u16 name_id = expr->as.func_call.func->as.ident.name_id;
+      Macro *macro = get_macro(macros, name_id, expr->as.func_call.args.len);
 
       if (macro) {
         Exprs new_args = {
           expr->as.func_call.args.items,
-          macro->arg_names.len,
           macro->arg_names.len,
         };
 
@@ -475,8 +467,7 @@ void expand_macros(Expr *expr, Macros *macros,
 
           Exprs variadic;
           variadic.len = expr->as.func_call.args.len - new_args.len;
-          variadic.cap = variadic.len;
-          variadic.items = arena_alloc(arena, variadic.cap * sizeof(Expr *));
+          variadic.items = arena_alloc(arena, variadic.len * sizeof(Expr *));
 
           for (u32 i = 0; i < variadic.len; ++i)
             variadic.items[i] = expr->as.func_call.args.items[new_args.len + i];
@@ -496,16 +487,19 @@ void expand_macros(Expr *expr, Macros *macros,
         Args new_arg_names = {0};
         StringBuilder sb = {0};
 
-        sb_push_str(&sb, macro->name);
+        Str name = *get_str(macro->name_id);
+
+        sb_push_str(&sb, name);
         sb_push_char(&sb, '@');
 
         u32 prev_len = sb.len;
 
         for (u32 i = 0; i < macro->arg_names.len; ++i) {
-          sb_push_str(&sb, macro->arg_names.items[i]);
+          Str arg_name = *get_str(macro->arg_names.items[i]);
+          sb_push_str(&sb, arg_name);
 
-          Str new_arg_name = copy_str(sb_to_str(sb), arena);
-          DA_APPEND(new_arg_names, new_arg_name);
+          u16 new_arg_name_id = copy_str(sb_to_str(sb), arena);
+          DA_APPEND(new_arg_names, new_arg_name_id);
 
           sb.len = prev_len;
         };
@@ -561,14 +555,11 @@ void expand_macros(Expr *expr, Macros *macros,
   case ExprKindMatch: {
     INLINE_THEN_EXPAND(expr->as.match.value);
 
-    for (u32 i = 0; i < expr->as.match.values.len; ++i)
-      INLINE_THEN_EXPAND(expr->as.match.values.items[i]);
-
-    for (u32 i = 0; i < expr->as.match.branches.len; ++i)
-      INLINE_THEN_EXPAND(expr->as.match.branches.items[i]);
-
-    if (expr->as.match.else_branch)
-      INLINE_THEN_EXPAND(expr->as.match.else_branch);
+    for (u32 i = 0; i < expr->as.match.branches.len; ++i) {
+      if (expr->as.match.branches.items[i].value)
+        INLINE_THEN_EXPAND(expr->as.match.branches.items[i].value);
+      INLINE_THEN_EXPAND(expr->as.match.branches.items[i].body);
+    }
   } break;
 
   case ExprKindSelf: break;
