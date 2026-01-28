@@ -150,13 +150,21 @@ void catch_vars(Vars *catched, Vm *vm, Instrs *instrs) {
 
       if (!found) {
         Str name = *get_str(instr->as.get_var.name_id);
+
         Var *var = get_var_from(&vm->current_frame->vars, name);
+
+        if (!var && vm->current_func)
+          var = get_var_from(&vm->current_func->catched_vars, name);
+
         if (var) {
           Var new_var = { name, var->value, };
           DA_ARENA_APPEND(*catched, new_var, &vm->current_frame->arena);
           DA_ARENA_APPEND(defined_vars_names, new_var.name, &vm->current_frame->arena);
         }
       }
+    } else if (instr->kind == InstrKindFunc) {
+      u32 body_index = instr->as.func.body_index;
+      catch_vars(catched, vm, &vm->ir->items[body_index].instrs);
     }
   }
 }
