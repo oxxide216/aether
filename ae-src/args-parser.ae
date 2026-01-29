@@ -4,60 +4,71 @@
 
 (use 'config')
 
+(let default-parsed-args {
+  'args': []
+  'mode': mode-default
+  'output-path': unit
+  'output-macros-path': unit
+  'include-paths': []
+  'dce': true
+})
+
+(let print-usage \->
+  (print 'Usage: aether [FLAGS]... [FILE] [ARGS]...\n\n'
+         '  -h --help                 show this message.\n'
+         '  -c [FILE]                 output bytecode into [FILE].\n'
+         '  -m [FILE]                 output macros bytecode into [FILE].\n'
+         '  -i [PATH]                 [PATH] where to search for included files.\n'
+         '  --no-dce                  don\'t apply dead code ellimination.\n')
+  (exit 0))
+
 (let parse-args \args ->
-  (let mode mode-default)
-  (let output-path unit)
-  (let output-macros-path unit)
-  (let include-paths [])
-  (let dce true)
+  (if (or (unit? args)
+          (not (begins-with (head args) '-')))
+    (ret (with default-parsed-args 'args' args)))
 
-  (while (and (not-unit? (head args))
-              (begins-with (head args) '-'))
-    (if (or (== (head args) '-h') (== (head args) '--help'))
-      (print 'Usage: aether [FLAGS]... [FILE] [ARGS]...\n\n'
-             '  -h --help                 show this message.\n'
-             '  -c [FILE]                 output bytecode into [FILE].\n'
-             '  -m [FILE]                 output macros bytecode into [FILE].\n'
-             '  -i [PATH]                 [PATH] where to search for included files.\n'
-             '  --no-dce                  don\'t apply dead code ellimination.\n')
-      (exit 0)
-     elif (== (head args) '-c')
-      (set args (tail args))
-      (if (unit? (head args))
-        (error '-c flag requires an argument')
-        (exit 1))
-      (set output-path (head args))
-      (set mode mode-compile-only)
-     elif (== (head args) '-m')
-      (set args (tail args))
-      (if (unit? (head args))
-        (error '-m flag requires an argument')
-        (exit 1))
-      (set output-macros-path (head args))
-      (set mode mode-compile-macros-only)
-     elif (== (head args) '-i')
-      (set args (tail args))
-      (if (unit? (head args))
-        (error '-i flag requires an argument')
-        (exit 1))
-      (let include-path (head args))
-      (set include-paths (+ include-paths
-                            (if (ends-with include-path '/')
-                              include-path
-                             else
-                              (+ include-path '/'))))
-     elif (== (head args) '--no-dce')
-        (set dce false)
-     elif (begins-with (head args) '-')
-      (error 'Unknown flag: ' (head args))
-      (exit 1))
-    (set args (tail args)))
-
-  {
-    'args': args
-    'mode': mode
-    'output-path': output-path
-    'output-macros-path': output-macros-path
-    'include-paths': include-paths
-    'dce': dce
-  })
+  (match (head args)
+    '-h' => (print-usage)
+    '--help' => (print-usage)
+    '-c' =>
+      (do
+        (if (< (len args) 2)
+          (error '-c flag requires an argument')
+          (exit 1))
+        (with
+          (with (parse-args (from args 2))
+            'mode'
+            mode-compile-only)
+          'output-path'
+          args::1))
+    '-m' =>
+      (do
+        (if (< (len args) 2)
+          (error '-m flag requires an argument')
+          (exit 1))
+        (with
+          (with (parse-args (from args 2))
+            'mode'
+            mode-compile-macros-only)
+          'output-macros-path'
+          args::1))
+    '-i' =>
+      (do
+        (if (< (len args) 2)
+          (error '-i flag requires an argument')
+          (exit 1))
+        (let include-path args::1)
+        (with
+          (parse-args (from args 2))
+          'include-paths'
+          (+ parsed::'include-paths'
+            (if (ends-with include-path '/')
+              include-path
+             else
+              (+ include-path '/')))))
+    '--no-dce' =>
+      (with (parse-args (tail args)) 'dce' false)
+    ... =>
+      (do
+        (error 'Unknown flag: ' (head args))
+        (exit 1))))

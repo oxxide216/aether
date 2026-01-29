@@ -102,3 +102,11 @@
     (if (not (contains except item::'key'))
       (set! dest item::'key' item::'value')))
   dest)
+
+(let with \collection key value ->
+  (let - collection)
+  (set! - key value)
+  -)
+
+(let from \collection index ->
+  (get-range collection index (len collection)))
