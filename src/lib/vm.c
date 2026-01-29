@@ -201,12 +201,8 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta, bool value_ignored) 
 
   begin_frame(vm);
 
-  puts("-------");
-
   for (u32 i = 0; i < func->args.len; ++i) {
     Str arg_name = get_str(func->args.items[i]);
-
-    str_println(arg_name);
 
     Var new_var = {
       arg_name,
