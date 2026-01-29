@@ -151,7 +151,8 @@ static void clone_expr(Expr **expr, Args *arg_names, Arena *arena) {
     clone_expr(&new_expr->as.match.value, arg_names, arena);
 
     for (u32 i = 0; i < new_expr->as.match.branches.len; ++i) {
-      clone_expr(&new_expr->as.match.branches.items[i].value, arg_names, arena);
+      if (new_expr->as.match.branches.items[i].value)
+        clone_expr(&new_expr->as.match.branches.items[i].value, arg_names, arena);
       clone_expr(&new_expr->as.match.branches.items[i].body, arg_names, arena);
     }
   } break;
@@ -477,7 +478,7 @@ void expand_macros(Expr *expr, Macros *macros,
         Args new_arg_names = {0};
         StringBuilder sb = {0};
 
-        Str name = *get_str(macro->name_id);
+        Str name = get_str(macro->name_id);
 
         sb_push_str(&sb, name);
         sb_push_char(&sb, '@');
@@ -485,7 +486,7 @@ void expand_macros(Expr *expr, Macros *macros,
         u32 prev_len = sb.len;
 
         for (u32 i = 0; i < macro->arg_names.len; ++i) {
-          Str arg_name = *get_str(macro->arg_names.items[i]);
+          Str arg_name = get_str(macro->arg_names.items[i]);
           sb_push_str(&sb, arg_name);
 
           u16 new_arg_name_id = copy_str(sb_to_str(sb), arena);

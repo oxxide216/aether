@@ -4,7 +4,9 @@
 #include "shl/shl-str.h"
 #include "shl/shl-log.h"
 
-#define STACK_DUMP_LEN 10
+#define STACK_DUMP_LEN            10
+#define MAX_RECURSION_LEVEL       1000
+#define MAX_RECURSION_TRACE_LEVEL 15
 
 #define META_FMT       STR_FMT":%u:%u: "
 #define META_ARG(meta) STR_ARG(*(meta).file_path), (meta).row + 1, (meta).col + 1
@@ -134,10 +136,10 @@ void catch_vars(Vars *catched, Vm *vm, Instrs *instrs) {
     Instr *instr = instrs->items + i;
 
     if (instr->kind == InstrKindDefVar) {
-      Str new_var_name = *get_str(instr->as.def_var.name_id);;
+      Str new_var_name = get_str(instr->as.def_var.name_id);;
       DA_ARENA_APPEND(defined_vars_names, new_var_name, &vm->current_frame->arena);
     } else if (instr->kind == InstrKindGetVar) {
-      Str name = *get_str(instr->as.get_var.name_id);
+      Str name = get_str(instr->as.get_var.name_id);
       bool found = false;
 
       for (u32 j = 0; j < defined_vars_names.len; ++j) {
@@ -149,7 +151,7 @@ void catch_vars(Vars *catched, Vm *vm, Instrs *instrs) {
       }
 
       if (!found) {
-        Str name = *get_str(instr->as.get_var.name_id);
+        Str name = get_str(instr->as.get_var.name_id);
 
         Var *var = get_var_from(&vm->current_frame->vars, name);
 
@@ -175,11 +177,11 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta, bool value_ignored) 
   Value **args = vm->stack.items + vm->stack.len - func->args.len;
 
   if (func->intrinsic_name_id != (u16) -1) {
-    Str *intrinsic_name = get_str(func->intrinsic_name_id);
-    Intrinsic *intrinsic = get_intrinsic(vm, *intrinsic_name, func->args.len, args);
+    Str intrinsic_name = get_str(func->intrinsic_name_id);
+    Intrinsic *intrinsic = get_intrinsic(vm, intrinsic_name, func->args.len, args);
     if (!intrinsic) {
       ERROR(META_FMT"Intrinsic "STR_FMT":%u was not found\n",
-            META_ARG(*meta), STR_ARG(*intrinsic_name), func->args.len);
+            META_ARG(*meta), STR_ARG(intrinsic_name), func->args.len);
       vm->state = ExecStateExit;
       vm->exit_code = 1;
       return;
@@ -199,8 +201,13 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta, bool value_ignored) 
 
   begin_frame(vm);
 
+  puts("-------");
+
   for (u32 i = 0; i < func->args.len; ++i) {
-    Str arg_name = *get_str(func->args.items[i]);
+    Str arg_name = get_str(func->args.items[i]);
+
+    str_println(arg_name);
+
     Var new_var = {
       arg_name,
       vm->stack.items[vm->stack.len - func->args.len + i],
@@ -245,7 +252,7 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
 
     switch (instr->kind) {
     case InstrKindString: {
-      Str string = *get_str(instr->as.string.string_id);
+      Str string = get_str(instr->as.string.string_id);
       Value *new_value = value_string(string, vm->current_frame);
       DA_APPEND(vm->stack, new_value);
     } break;
@@ -271,11 +278,11 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       new_func->body_index = instr->as.func.body_index;
       new_func->intrinsic_name_id = instr->as.func.intrinsic_name_id;
 
-      Str *intrinsic_name = NULL;
+      Str intrinsic_name = {0};
       if (instr->as.func.intrinsic_name_id != (u16) -1)
         intrinsic_name = get_str(instr->as.func.intrinsic_name_id);
 
-      if (!intrinsic_name) {
+      if (!intrinsic_name.ptr) {
         Func *body = vm->ir->items + new_func->body_index;
         catch_vars(&new_func->catched_vars, vm, &body->instrs);
         if (vm->state != ExecStateContinue)
@@ -287,6 +294,17 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
     } break;
 
     case InstrKindFuncCall: {
+      if (++vm->recursion_level >= MAX_RECURSION_LEVEL) {
+        ERROR(META_FMT"Infinite recursion detected\n",
+              META_ARG(instr->meta));
+        INFO("Long trace, showing last %u calls\n",
+             MAX_RECURSION_TRACE_LEVEL);
+        vm->max_trace_level = MAX_RECURSION_TRACE_LEVEL;
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+        return;
+      }
+
       if (!ensure_stack_len_is_enough(vm,
                                       instr->as.func_call.args_len + 1,
                                       &instr->meta))
@@ -332,9 +350,11 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
         }
       }
 
-      execute_func(vm, func->as.func, &instr->meta, instr->as.func_call.value_ignored);
+      execute_func(vm, func->as.func, &instr->meta,
+                   instr->as.func_call.value_ignored);
       if (vm->state == ExecStateExit) {
-        if (!vm->tracing_disabled && vm->exit_code != 0)
+        if (vm->trace_level++ < vm->max_trace_level &&
+            vm->exit_code != 0)
           INFO("Trace: "STR_FMT":%u:%u\n",
                STR_ARG(*instr->meta.file_path),
                instr->meta.row + 1, instr->meta.col + 1);
@@ -350,6 +370,8 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
 
       if (result)
         vm->stack.items[vm->stack.len - 1] = result;
+
+      --vm->recursion_level;
     } break;
 
     case InstrKindDefVar: {
@@ -359,7 +381,7 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       Value *last = stack_last(vm);
       ++last->refs_count;
 
-      Str name = *get_str(instr->as.def_var.name_id);
+      Str name = get_str(instr->as.def_var.name_id);
       Var new_var = { name, last };
       DA_APPEND(vm->current_frame->vars, new_var);
 
@@ -367,7 +389,7 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
     } break;
 
     case InstrKindGetVar: {
-      Str name = *get_str(instr->as.get_var.name_id);
+      Str name = get_str(instr->as.get_var.name_id);
       Var *var = get_var(vm, name);
       if (!var)
         PANIC_ARGS(instr->meta, "Symbol "STR_FMT" was not found\n",
@@ -380,7 +402,7 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       if (!ensure_stack_len_is_enough(vm, 1, &instr->meta))
         return;
 
-      Str name = *get_str(instr->as.set_var.name_id);
+      Str name = get_str(instr->as.set_var.name_id);
       Var *var = get_var(vm, name);
       if (!var)
         PANIC_ARGS(instr->meta, "Symbol "STR_FMT" was not found\n",
@@ -402,7 +424,7 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
     case InstrKindJump: {
       u32 target = get_instr_index(vm, instr->as.jump.label_id);
       if (target == (u32) -1) {
-        Str label = *get_str(instr->as.jump.label_id);
+        Str label = get_str(instr->as.jump.label_id);
         PANIC_ARGS(instr->meta, "Target label was not found: "STR_FMT"\n",
                    STR_ARG(label));
       }
@@ -419,7 +441,7 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       if (value_to_bool(cond)) {
         u32 target = get_instr_index(vm, instr->as.cond_jump.label_id);
         if (target == (u32) -1) {
-          Str label = *get_str(instr->as.cond_jump.label_id);
+          Str label = get_str(instr->as.cond_jump.label_id);
           PANIC_ARGS(instr->meta, "Target label was not found: "STR_FMT"\n",
                      STR_ARG(label));
         }
@@ -442,7 +464,7 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
           for (u32 j = 0; j < instrs->len; ++j)
             print_instr(instrs->items + j, false);
 
-          Str label = *get_str(instr->as.cond_not_jump.label_id);
+          Str label = get_str(instr->as.cond_not_jump.label_id);
           PANIC_ARGS(instr->meta, "Target label was not found: "STR_FMT"\n",
                      STR_ARG(label));
         }
@@ -478,7 +500,7 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       if (!value_eq(case_cond, match_cond)) {
         u32 target = get_instr_index(vm, instr->as.match_case.not_label_id);
         if (target == (u32) -1) {
-          Str not_label = *get_str(instr->as.match_case.not_label_id);
+          Str not_label = get_str(instr->as.match_case.not_label_id);
           PANIC_ARGS(instr->meta, "Target label not found: "STR_FMT"\n",
                      STR_ARG(not_label));
         }
@@ -702,6 +724,8 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
   vm.frames_end = vm.frames;
 
   vm.current_frame = vm.frames;
+
+  vm.max_trace_level = (u16) -1;
 
   ListNode *args = arena_alloc(&vm.current_frame->arena, sizeof(ListNode));
   ListNode *args_end = args;

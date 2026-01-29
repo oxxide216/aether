@@ -10,8 +10,8 @@ typedef Da(Str) IncludePaths;
 
 typedef Da(u16) Args;
 
-u16  copy_str(Str str, Arena *arena);
-Str *get_str(u16 id);
-Str  get_file_dir(Str path);
+u16 copy_str(Str str, Arena *arena);
+Str get_str(u16 id);
+Str get_file_dir(Str path);
 
 #endif // COMMON_H

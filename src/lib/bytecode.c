@@ -272,8 +272,7 @@ bool value_eq(Value *a, Value *b) {
   }
 
   case ValueKindFunc: {
-    Str *intrinsic_name = get_str(a->as.func->intrinsic_name_id);
-    if (intrinsic_name->len > 0)
+    if (a->as.func->intrinsic_name_id != (u16) -1)
       return a->as.func->intrinsic_name_id ==
              b->as.func->intrinsic_name_id;
 
@@ -473,11 +472,11 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
 
-    Str *intrinsic_name = NULL;
+    Str intrinsic_name = {0};
     if (node->as.func.intrinsic_name_id != (u16) -1)
       intrinsic_name = get_str(node->as.func.intrinsic_name_id);
 
-    if (!intrinsic_name) {
+    if (!intrinsic_name.ptr) {
       Func new_func = {0};
       new_func.args = node->as.func.args;
       DA_APPEND(*ir, new_func);

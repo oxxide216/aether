@@ -30,8 +30,8 @@ static void serialize_str_raw(Str *str, u8 **data, u32 *data_size, u32 *end) {
 }
 
 static void serialize_str(u16 id, u8 **data, u32 *data_size, u32 *end) {
-  Str *str = get_str(id);
-  serialize_str_raw(str, data, data_size, end);
+  Str str = get_str(id);
+  serialize_str_raw(&str, data, data_size, end);
 }
 
 static void serialize_instrs(Instrs *instrs, u8 **data, u32 *data_size,

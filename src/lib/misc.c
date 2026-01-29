@@ -250,19 +250,19 @@ void sb_push_value(StringBuilder *sb, Value *value,
       if (i > 0)
         sb_push_char(sb, ' ');
 
-      Str arg_name = *get_str(value->as.func->args.items[i]);
+      Str arg_name = get_str(value->as.func->args.items[i]);
       sb_push_str(sb, arg_name);
     }
 
     if (value->as.func->args.len > 0)
       sb_push_char(sb, ' ');
 
-    Str intrinsic_name = *get_str(value->as.func->intrinsic_name_id);
-
-    if (intrinsic_name.len == 0)
+    if (value->as.func->intrinsic_name_id == (u16) -1) {
       sb_push(sb, "-> ...");
-    else
+    } else {
+      Str intrinsic_name = get_str(value->as.func->intrinsic_name_id);
       sb_push_str(sb, intrinsic_name);
+    }
   } break;
 
   case ValueKindDict: {
@@ -320,7 +320,7 @@ void print_instr(Instr *instr, bool hide_strings) {
     printf("Value ");
 
     if (!hide_strings) {
-      Str string = *get_str(instr->as.string.string_id);
+      Str string = get_str(instr->as.string.string_id);
       str_println(string);
     } else {
       printf("string\n");
@@ -351,14 +351,14 @@ void print_instr(Instr *instr, bool hide_strings) {
       if (i > 0)
         printf(" ");
 
-      Str arg_name = *get_str(instr->as.func.args.items[i]);
+      Str arg_name = get_str(instr->as.func.args.items[i]);
       str_print(arg_name);
     }
 
     if (instr->as.func.args.len > 0)
       printf(" ");
 
-    Str intrinsic_name = *get_str(instr->as.func.intrinsic_name_id);
+    Str intrinsic_name = get_str(instr->as.func.intrinsic_name_id);
 
     if (intrinsic_name.len == 0)
       printf("-> ...\n");
@@ -371,37 +371,37 @@ void print_instr(Instr *instr, bool hide_strings) {
   } break;
 
   case InstrKindDefVar: {
-    Str name = *get_str(instr->as.def_var.name_id);
+    Str name = get_str(instr->as.def_var.name_id);
     printf("Define "STR_FMT"\n", STR_ARG(name));
   } break;
 
   case InstrKindGetVar: {
-    Str name = *get_str(instr->as.get_var.name_id);
+    Str name = get_str(instr->as.get_var.name_id);
     printf("Get "STR_FMT"\n", STR_ARG(name));
   } break;
 
   case InstrKindSetVar: {
-    Str name = *get_str(instr->as.get_var.name_id);
+    Str name = get_str(instr->as.get_var.name_id);
     printf("Set "STR_FMT"\n", STR_ARG(name));
   } break;
 
   case InstrKindJump: {
-    Str label = *get_str(instr->as.jump.label_id);
+    Str label = get_str(instr->as.jump.label_id);
     printf("Jump to "STR_FMT"\n", STR_ARG(label));
   } break;
 
   case InstrKindCondJump: {
-    Str label = *get_str(instr->as.cond_jump.label_id);
+    Str label = get_str(instr->as.cond_jump.label_id);
     printf("Jump to "STR_FMT" if condition\n", STR_ARG(label));
   } break;
 
   case InstrKindCondNotJump: {
-    Str label = *get_str(instr->as.cond_not_jump.label_id);
+    Str label = get_str(instr->as.cond_not_jump.label_id);
     printf("Jump to "STR_FMT" if not contidion\n", STR_ARG(label));
   } break;
 
   case InstrKindLabel: {
-    Str name = *get_str(instr->as.label.name_id);
+    Str name = get_str(instr->as.label.name_id);
     printf(STR_FMT":\n", STR_ARG(name));
   } break;
 
@@ -410,7 +410,7 @@ void print_instr(Instr *instr, bool hide_strings) {
   } break;
 
   case InstrKindMatchCase: {
-    Str not_label = *get_str(instr->as.match_case.not_label_id);
+    Str not_label = get_str(instr->as.match_case.not_label_id);
     printf("Match case, next or "STR_FMT"\n", STR_ARG(not_label));
   } break;
 

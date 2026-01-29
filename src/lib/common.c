@@ -19,8 +19,8 @@ u16 copy_str(Str str, Arena *arena) {
   return intern_strings.len - 1;
 }
 
-Str *get_str(u16 id) {
-  return intern_strings.items + id;
+Str get_str(u16 id) {
+  return intern_strings.items[id];
 }
 
 Str get_file_dir(Str path) {

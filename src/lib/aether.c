@@ -19,7 +19,7 @@ AetherCtx aether_init(i32 argc, char **argv, bool debug,
     intrinsics = &_intrinsics;
 
   ctx.vm = vm_create(argc, argv, intrinsics);
-  ctx.vm.tracing_disabled = !debug;
+  ctx.vm.trace_level = debug ? (u16) -1 : 0;
 
   return ctx;
 }

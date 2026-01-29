@@ -329,14 +329,14 @@ static Token *parser_expect_token(Parser *parser, u64 id_mask) {
   if (MASK(token->id) & id_mask)
     return token;
 
-  Str *lexeme = get_str(token->lexeme_id);
+  Str lexeme = get_str(token->lexeme_id);
 
   PERROR(STR_FMT":%u:%u: ", "Expected ",
          STR_ARG(*parser->file_path),
          token->row + 1, token->col + 1);
   print_id_mask(id_mask);
   fprintf(stderr, ", but got `"STR_FMT"`\n",
-          STR_ARG(*lexeme));
+          STR_ARG(lexeme));
   exit(1);
 }
 
@@ -514,11 +514,11 @@ static ExprFunc parser_parse_lambda(Parser *parser) {
     parser_next_token(parser);
 
     Token *intrinsic_name_token = parser_expect_token(parser, MASK(TT_STR));
-    Str *lexeme = get_str(intrinsic_name_token->lexeme_id);
+    Str lexeme = get_str(intrinsic_name_token->lexeme_id);
 
     Str intrinsic_name = {
-      lexeme->ptr + 1,
-      lexeme->len - 2,
+      lexeme.ptr + 1,
+      lexeme.len - 2,
     };
     result.intrinsic_name_id = copy_str(intrinsic_name, parser->arena);
   } else {
@@ -635,11 +635,11 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
 
   switch (first_token->id) {
   case TT_STR: {
-    Str *lexeme = get_str(first_token->lexeme_id);
+    Str lexeme = get_str(first_token->lexeme_id);
 
     expr->kind = ExprKindString;
-    expr->as.string.string_id = copy_str(STR(lexeme->ptr + 1,
-                                             lexeme->len - 2),
+    expr->as.string.string_id = copy_str(STR(lexeme.ptr + 1,
+                                             lexeme.len - 2),
                                          parser->arena);
   } break;
 
@@ -649,17 +649,17 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
   } break;
 
   case TT_INT: {
-    Str *lexeme = get_str(first_token->lexeme_id);
+    Str lexeme = get_str(first_token->lexeme_id);
 
     expr->kind = ExprKindInt;
-    expr->as._int._int = str_to_i64(*lexeme);
+    expr->as._int._int = str_to_i64(lexeme);
   } break;
 
   case TT_FLOAT: {
-    Str *lexeme = get_str(first_token->lexeme_id);
+    Str lexeme = get_str(first_token->lexeme_id);
 
     expr->kind = ExprKindFloat;
-    expr->as._float._float = str_to_f64(*lexeme);
+    expr->as._float._float = str_to_f64(lexeme);
   } break;
 
   case TT_OBRACKET: {
@@ -719,7 +719,7 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
       parser_next_token(parser);
 
       u16 module_path_id = parser_expect_token(parser, MASK(TT_STR))->lexeme_id;
-      Str module_path = *get_str(module_path_id);
+      Str module_path = get_str(module_path_id);
       module_path.ptr += 1;
       module_path.len -= 2;
 
@@ -742,7 +742,7 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
         if (code.len != (u32) -1) {
           --path_sb.len; // exclude NULL-terminator
           u16 path_id = copy_str(sb_to_str(path_sb), parser->arena);
-          path = *get_str(path_id);
+          path = get_str(path_id);
 
           break;
         } else {
@@ -756,7 +756,7 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
           if (code.len != (u32) -1) {
             --path_sb.len; // exclude NULL-terminator
             u16 path_id = copy_str(sb_to_str(path_sb), parser->arena);
-            path = *get_str(path_id);
+            path = get_str(path_id);
 
             break;
           }
