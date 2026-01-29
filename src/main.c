@@ -1,10 +1,4 @@
-#include <signal.h>
-#include <locale.h>
-
-#include "aether/parser.h"
-#include "aether/deserializer.h"
-#include "aether/common.h"
-#include "aether/vm.h"
+#include "aether/aether.h"
 #include "aether/io.h"
 #include "shl/shl-defs.h"
 #include "shl/shl-log.h"
@@ -14,51 +8,15 @@
 typedef struct {
   char *cstr;
   bool  is_precompiled;
-  bool  tracing_enabled;
+  bool  tracing_disabled;
 } Path;
 
-#ifndef NOSYSTEM
-// From base.c
-extern StringBuilder printf_sb;
-// From term.c
-extern bool catch_kill;
-#endif
-
 static Path loader_paths[] = {
-  { "ae-src/loader.ae", false, true },
-  { "/usr/local/include/aether/loader.abc", true, false },
+  { "ae-src/loader.ae", false, false },
+  { "/usr/local/include/aether/loader.abc", true, true },
 };
 
-static CachedASTs cached_asts = {0};
-static Arena arena = {0};
-static Ir ir = {0};
-static Vm vm = {0};
-
-void cleanup(void) {
-  if (printf_sb.buffer)
-    free(printf_sb.buffer);
-
-  arena_free(&arena);
-  vm_destroy(&vm);
-
-  for (u32 i = 0; i < cached_asts.len; ++i)
-    arena_free(&cached_asts.items[i].arena);
-
-  free(cached_asts.items);
-}
-
-void sigint_handler(i32 signal) {
-  (void) signal;
-
-#ifndef NOSYSTEM
-  if (!catch_kill)
-#endif
-    vm_stop(&vm);
-}
-
 i32 main(i32 argc, char **argv) {
-  setlocale(LC_ALL, "");
-
   Str code = { NULL, (u32) -1 };
   Path *path = NULL;
 
@@ -76,27 +34,18 @@ i32 main(i32 argc, char **argv) {
     exit(1);
   }
 
-  Intrinsics intrinsics = {0};
-  vm = vm_create(argc, argv, &intrinsics);
-  vm.tracing_enabled = path->tracing_enabled;
+  AetherCtx ctx = aether_init(argc, argv, false, NULL);
 
   if (path->is_precompiled) {
-    ir = deserialize((u8 *) code.ptr, code.len, &arena, &vm.current_file_path);
+    aether_eval_bytecode(&ctx, (u8 *) code.ptr, code.len, false);
   } else {
-    vm.current_file_path = (Str) { path->cstr, strlen(path->cstr) };
-    ir = parse(code, &vm.current_file_path, &cached_asts);
+    Str file_path = { path->cstr, strlen(path->cstr) };
+    aether_eval(&ctx, code, file_path, false);
   }
 
-  signal(SIGINT, sigint_handler);
-
-  execute(&vm, &ir, false);
-
-  for (u32 i = 0; i < ir.len; ++i)
-    free(ir.items[i].instrs.items);
-  free(ir.items);
-
   free(code.ptr);
-  cleanup();
 
-  return vm.exit_code;
+  aether_cleanup(&ctx);
+
+  return ctx.vm.exit_code;
 }

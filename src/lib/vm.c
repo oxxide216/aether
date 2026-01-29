@@ -334,7 +334,7 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
 
       execute_func(vm, func->as.func, &instr->meta, instr->as.func_call.value_ignored);
       if (vm->state == ExecStateExit) {
-        if (vm->tracing_enabled && vm->exit_code != 0)
+        if (!vm->tracing_disabled && vm->exit_code != 0)
           INFO("Trace: "STR_FMT":%u:%u\n",
                STR_ARG(*instr->meta.file_path),
                instr->meta.row + 1, instr->meta.col + 1);

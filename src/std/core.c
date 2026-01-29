@@ -1128,7 +1128,6 @@ Value *make_env_intrinsic(Vm *vm, Value **args) {
   Intrinsics intrinsics = {0};
   Vm *new_vm = arena_alloc(&vm->current_frame->arena, sizeof(Vm));
   *new_vm = vm_create(cstr_cmd_args.len, cstr_cmd_args.items, &intrinsics);
-  new_vm->tracing_enabled = true;
 
   for (u32 i = 0; i < cstr_cmd_args.len; ++i)
     free(cstr_cmd_args.items[i]);
