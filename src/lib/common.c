@@ -2,8 +2,9 @@
 #include "aether/misc.h"
 
 InternStrings intern_strings = {0};
+Arena intern_arena = {0};
 
-u16 copy_str(Str str, Arena *arena) {
+u16 copy_str(Str str) {
   for (u16 i = 0; i < intern_strings.len; ++i)
     if (str_eq(intern_strings.items[i], str))
       return i;
@@ -11,10 +12,10 @@ u16 copy_str(Str str, Arena *arena) {
   Str copy;
 
   copy.len = str.len;
-  copy.ptr = arena_alloc(arena, str.len);
+  copy.ptr = arena_alloc(&intern_arena, str.len);
   memcpy(copy.ptr, str.ptr, copy.len);
 
-  DA_ARENA_APPEND(intern_strings, copy, arena);
+  DA_ARENA_APPEND(intern_strings, copy, &intern_arena);
 
   return intern_strings.len - 1;
 }

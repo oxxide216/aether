@@ -185,8 +185,7 @@ static char escape_char(Str *str, u32 *col) {
   }
 }
 
-static TokenStatus lex(Lexer *lexer, Token *token,
-                       Str *file_path, Arena *arena) {
+static TokenStatus lex(Lexer *lexer, Token *token, Str *file_path) {
   if (lexer->code.len > 0) {
     u64 id = 0;
     u32 char_len;
@@ -273,7 +272,7 @@ static TokenStatus lex(Lexer *lexer, Token *token,
       lexer->col += char_len;
     }
 
-    u16 lexeme_id = copy_str(lexeme, arena);
+    u16 lexeme_id = copy_str(lexeme);
 
     *token = (Token) { id, lexeme_id, row, col };
 
@@ -381,7 +380,7 @@ Exprs parse_ex(Str code, Str *file_path, Macros *macros,
   TokenStatus status = TokenStatusEmpty;
   Token token;
   while (status != TokenStatusEOF) {
-    status = lex(&lexer, &token, file_path, arena);
+    status = lex(&lexer, &token, file_path);
     if (status != TokenStatusEOF && status != TokenStatusEmpty)
       DA_APPEND(parser.tokens, token);
   }
@@ -520,7 +519,7 @@ static ExprFunc parser_parse_lambda(Parser *parser) {
       lexeme.ptr + 1,
       lexeme.len - 2,
     };
-    result.intrinsic_name_id = copy_str(intrinsic_name, parser->arena);
+    result.intrinsic_name_id = copy_str(intrinsic_name);
   } else {
     u32 prev_func = parser->current_func;
 
@@ -639,8 +638,7 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
 
     expr->kind = ExprKindString;
     expr->as.string.string_id = copy_str(STR(lexeme.ptr + 1,
-                                             lexeme.len - 2),
-                                         parser->arena);
+                                             lexeme.len - 2));
   } break;
 
   case TT_IDENT: {
@@ -741,7 +739,7 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
 
         if (code.len != (u32) -1) {
           --path_sb.len; // exclude NULL-terminator
-          u16 path_id = copy_str(sb_to_str(path_sb), parser->arena);
+          u16 path_id = copy_str(sb_to_str(path_sb));
           path = get_str(path_id);
 
           break;
@@ -755,7 +753,7 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
 
           if (code.len != (u32) -1) {
             --path_sb.len; // exclude NULL-terminator
-            u16 path_id = copy_str(sb_to_str(path_sb), parser->arena);
+            u16 path_id = copy_str(sb_to_str(path_sb));
             path = get_str(path_id);
 
             break;

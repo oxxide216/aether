@@ -7,6 +7,8 @@
 // From base.c
 extern StringBuilder printf_sb;
 #endif // NOSYSTEM
+// From common.c
+extern Arena intern_arena;
 
 AetherCtx aether_init(i32 argc, char **argv, bool debug,
                       Intrinsics *intrinsics) {
@@ -57,7 +59,12 @@ void aether_cleanup(AetherCtx *ctx) {
 #ifndef NOSYSTEM
   if (printf_sb.buffer)
     free(printf_sb.buffer);
+  printf_sb.buffer = NULL;
+  printf_sb.len = 0;
+  printf_sb.cap = 0;
 #endif
+
+  arena_free(&intern_arena);
 
   arena_free(&ctx->arena);
   vm_destroy(&ctx->vm);

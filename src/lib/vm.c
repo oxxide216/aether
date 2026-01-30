@@ -275,6 +275,7 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       new_func->args = instr->as.func.args;
       new_func->body_index = instr->as.func.body_index + vm->funcs_offset;
       new_func->intrinsic_name_id = instr->as.func.intrinsic_name_id;
+      new_func->catched_vars = (Vars) {0};
 
       Str intrinsic_name = {0};
       if (instr->as.func.intrinsic_name_id != (u16) -1)

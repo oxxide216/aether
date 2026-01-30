@@ -489,7 +489,7 @@ void expand_macros(Expr *expr, Macros *macros,
           Str arg_name = get_str(macro->arg_names.items[i]);
           sb_push_str(&sb, arg_name);
 
-          u16 new_arg_name_id = copy_str(sb_to_str(sb), arena);
+          u16 new_arg_name_id = copy_str(sb_to_str(sb));
           DA_APPEND(new_arg_names, new_arg_name_id);
 
           sb.len = prev_len;

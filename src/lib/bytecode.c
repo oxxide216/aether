@@ -593,12 +593,12 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
     sb_push_char(&sb, 'l');
 
     sb_push_u32(&sb, (*labels)++);
-    u16 else_label_id = copy_str(sb_to_str(sb), arena);
+    u16 else_label_id = copy_str(sb_to_str(sb));
 
     sb.len = 1;
 
     sb_push_u32(&sb, (*labels)++);
-    u16 end_label_id = copy_str(sb_to_str(sb), arena);
+    u16 end_label_id = copy_str(sb_to_str(sb));
 
     free(sb.buffer);
 
@@ -640,7 +640,7 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
     sb_push_char(&sb, 'l');
 
     sb_push_u32(&sb, (*labels)++);
-    u16 end_label_id = copy_str(sb_to_str(sb), arena);
+    u16 end_label_id = copy_str(sb_to_str(sb));
 
     ast_node_to_ir(ir, node->as.match.value, arena,
                    current_func, labels, false);
@@ -654,7 +654,7 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
       sb.len = 1;
 
       sb_push_u32(&sb, (*labels)++);
-      u16 next_label_id = copy_str(sb_to_str(sb), arena);
+      u16 next_label_id = copy_str(sb_to_str(sb));
 
       if (node->as.match.branches.items[i].value)
         ast_node_to_ir(ir, node->as.match.branches.items[i].value,

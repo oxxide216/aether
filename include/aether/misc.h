@@ -6,7 +6,7 @@
 #define DA_ARENA_APPEND(da, element, arena)                               \
   do {                                                                    \
     if ((da).cap <= (da).len) {                                           \
-      if ((da).len != 0) {                                                \
+      if ((da).cap != 0) {                                                \
         while ((da).cap <= (da).len)                                      \
           (da).cap *= 2;                                                  \
         void *new_items = arena_alloc(arena, sizeof(element) * (da).cap); \
@@ -20,7 +20,7 @@
       }                                                                   \
     }                                                                     \
     (da).items[(da).len++] = element;                                     \
-  } while (0)
+  } while (false)
 
 bool    value_to_bool(Value *value);
 u64     value_hash(Value *value);

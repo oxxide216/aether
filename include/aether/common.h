@@ -10,7 +10,7 @@ typedef Da(Str) IncludePaths;
 
 typedef Da(u16) Args;
 
-u16 copy_str(Str str, Arena *arena);
+u16 copy_str(Str str);
 Str get_str(u16 id);
 Str get_file_dir(Str path);
 

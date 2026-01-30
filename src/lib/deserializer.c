@@ -20,7 +20,7 @@ static Str deserialize_str_raw(u8 *data, u32 *end, Arena *arena) {
 }
 
 static u16 deserialize_str(u8 *data, u32 *end, Arena *arena) {
-  return copy_str(deserialize_str_raw(data, end, arena), arena);
+  return copy_str(deserialize_str_raw(data, end, arena));
 }
 
 static void deserialize_instrs(Instrs *instrs, u8 *data, u32 *end,
