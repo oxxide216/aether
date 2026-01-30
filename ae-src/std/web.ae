@@ -4,32 +4,32 @@
 (let button-middle 1)
 (let button-right 2)
 
-(let alert [text] -> import 'alert')
-(let update-html [name html] -> import 'update-html')
-(let update-text [name text] -> import 'update-text')
-(let get-html [name] -> import 'get-html')
-(let get-text [name] -> import 'get-text')
+(let alert \text -> import 'alert')
+(let update-html \name html -> import 'update-html')
+(let update-text \name text -> import 'update-text')
+(let get-html \name -> import 'get-html')
+(let get-text \name -> import 'get-text')
 
-(let on-key-press [name callback] -> import 'on-key-press')
-(let on-key-down [name callback] -> import 'on-key-down')
-(let on-key-up [name callback] -> import 'on-key-up')
-(let on-click [name callback] -> import 'on-click')
-(let on-mouse-down [name callback] -> import 'on-mouse-down')
-(let on-mouse-up [name callback] -> import 'on-mouse-up')
-(let on-double-click [name callback] -> import 'on-double-click')
-(let on-mouse-move [name callback] -> import 'on-mouse-move')
-(let on-mouse-enter [name callback] -> import 'on-mouse-enter')
-(let on-mouse-leave [name callback] -> import 'on-mouse-leave')
+(let on-key-press \name callback -> import 'on-key-press')
+(let on-key-down \name callback -> import 'on-key-down')
+(let on-key-up \name callback -> import 'on-key-up')
+(let on-click \name callback -> import 'on-click')
+(let on-mouse-down \name callback -> import 'on-mouse-down')
+(let on-mouse-up \name callback -> import 'on-mouse-up')
+(let on-double-click \name callback -> import 'on-double-click')
+(let on-mouse-move \name callback -> import 'on-mouse-move')
+(let on-mouse-enter \name callback -> import 'on-mouse-enter')
+(let on-mouse-leave \name callback -> import 'on-mouse-leave')
 
-(let -console-log [message] -> import 'console-log')
-(let -console-warn [message] -> import 'console-warn')
-(let -console-error [message] -> import 'console-error')
+(let -console-log \message -> import 'console-log')
+(let -console-warn \message -> import 'console-warn')
+(let -console-error \message -> import 'console-error')
 
-(macro console-log [...messages] ->
+(macro console-log \...messages ->
   (-console-log (join [messages] '')))
 
-(macro console-warn [...messages] ->
+(macro console-warn \...messages ->
   (-console-warn (join [messages] '')))
 
-(macro console-error [...messages] ->
+(macro console-error \...messages ->
   (-console-error (join [messages] '')))
