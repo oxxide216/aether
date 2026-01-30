@@ -23,8 +23,10 @@
   (exit 0))
 
 (let parse-args \args ->
-  (if (or (unit? args)
-          (not (begins-with (head args) '-')))
+  (if (== (len args) 0)
+    (ret (with default-parsed-args 'args' args)))
+
+  (if (not (begins-with (head args) '-'))
     (ret (with default-parsed-args 'args' args)))
 
   (match (head args)

@@ -65,11 +65,11 @@
   mode-compile-macros-only =>
     (do
       (let content (join [core-content base-content (to-str input-file-content)] '\n'))
-      (let compiled (compile env content input-path include-paths true dce))
+      (let compiled (compile env content input-path include-paths true))
 
       (if (unit? compiled::'compiled-macros')
         (info 'No macros found in ' input-path)
-       elif
+       else
         (let success (write-file output-macros-path compiled::'compiled-macros'))
         (if (not success)
           (panic 'Could not write to ' output-macros-path)))))
