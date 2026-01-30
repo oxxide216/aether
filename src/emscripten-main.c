@@ -1,8 +1,6 @@
 #include <emscripten.h>
 
-#include "aether/deserializer.h"
-#include "aether/common.h"
-#include "aether/vm.h"
+#include "aether/aether.h"
 #include "aether/misc.h"
 #include "shl/shl-defs.h"
 #define SHL_STR_IMPLEMENTATION
@@ -10,11 +8,7 @@
 
 typedef Da(char *) CStrs;
 
-extern InternStrings intern_strings;
-extern CachedIrs cached_irs;
-#ifndef NOSYSTEM
-extern StringBuilder printf_sb;
-#endif
+AetherCtx ctx = {0};
 
 static Arena ir_arena = {0};
 static Macros macros = {0};
@@ -27,12 +21,12 @@ void emscripten_create(void) {
   i32 argc = 1;
   char *argv[] = { "aether", NULL };
   Intrinsics intrinsics = {0};
-  vm = vm_create(argc, argv, &intrinsics);
+  ctx = aether_init(argc, argv, false, &intrinsics);
 }
 
 static char *value_to_cstr(Value *value) {
   StringBuilder sb = {0};
-  sb_push_value(&sb, value, 0, false, &vm);
+  sb_push_value(&sb, value, 0, false, false);
 
   char *cstr = malloc(sb.len + 1);
   memcpy(cstr, sb.buffer, sb.len);
@@ -47,75 +41,28 @@ static char *value_to_cstr(Value *value) {
 
 EMSCRIPTEN_KEEPALIVE
 char *emscripten_eval_compiled(u8 *bytecode, u32 bytecode_len) {
-  Str prev_file_path = vm.current_file_path;
-
-  Arena ir_arena = {0};
-  Ir ir = deserialize(bytecode, bytecode_len, &ir_arena, &vm.current_file_path);
-
-  Value *result = execute_block(&vm, &ir, true);
-
-  vm.current_file_path = prev_file_path;
+  Value *result = aether_eval_bytecode(&ctx, bytecode, bytecode_len, true);
 
   return value_to_cstr(result);
 }
 
 EMSCRIPTEN_KEEPALIVE
 void emscripten_eval_macros(u8 *macro_bytecode, u32 macro_bytecode_len) {
-  Macros temp_macros = deserialize_macros(macro_bytecode,
-                                          macro_bytecode_len,
-                                          NULL, &ir_arena);
-
-  if (macros.cap < macros.len + temp_macros.len) {
-    macros.cap = macros.len + temp_macros.len;
-
-    if (macros.len == 0)
-      macros.items = malloc(macros.cap * sizeof(Macro));
-    else
-      macros.items = realloc(macros.items, macros.cap * sizeof(Macro));
-  }
-
-  memcpy(macros.items + macros.len,
-         temp_macros.items,
-         temp_macros.len * sizeof(Macro));
-  macros.len += temp_macros.len;
+  aether_eval_macros(&ctx, macro_bytecode, macro_bytecode_len);
 }
 
 EMSCRIPTEN_KEEPALIVE
 char *emscripten_eval(char *code, char *file_path) {
-  Str *file_path_str = arena_alloc(&ir_arena, sizeof(Str));
-  file_path_str->len = strlen(file_path);
-  file_path_str->ptr = arena_alloc(&ir_arena, file_path_str->len);
-  memcpy(file_path_str->ptr, file_path, file_path_str->len);
+  Str code_str = { code, strlen(code) };
+  Str file_path_str = { file_path, strlen(file_path) };
 
-  Ir ir = parse_ex(STR(code, strlen(code)), file_path_str,
-                   &macros, &included_files, &ir_arena, false);
-
-  expand_macros_block(&ir, &macros, NULL, NULL, false,
-                      &ir_arena, file_path_str, 0, 0);
-
-  Str prev_file_path = vm.current_file_path;
-
-  vm.current_file_path = *file_path_str;
-
-  Value *result = execute_block(&vm, &ir, true);
-
-  vm.current_file_path = prev_file_path;
+  Value *result = aether_eval(&ctx, code_str, file_path_str, true);
 
   return value_to_cstr(result);
 }
 
 EMSCRIPTEN_KEEPALIVE
 void emscripten_destroy(void) {
-  if (intern_strings.items)
-    free(intern_strings.items);
-
-  for (u32 i = 0; i < cached_irs.len; ++i)
-    arena_free(&cached_irs.items[i].arena);
-  if (cached_irs.items)
-    free(cached_irs.items);
-
-  free(printf_sb.buffer);
-
   arena_free(&ir_arena);
   free(macros.items);
   macros = (Macros) {0};

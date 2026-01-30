@@ -18,8 +18,8 @@
   }
 
 typedef struct {
-  Vm   *vm;
-  Func *callback;
+  Vm        *vm;
+  FuncValue *callback;
 } EventData;
 
 static char *str_to_cstr(Str str) {
@@ -124,32 +124,46 @@ bool key_event_callback(i32 event_type, const EmscriptenKeyboardEvent *key_event
   (void) event_type;
 
   EventData *event_data = data;
-  Dict event_data_dict = {0};
+  Dict *event_data_dict = arena_alloc(&event_data->vm->current_frame->arena, sizeof(Dict));
 
   u32 key_len = strlen(key_event->key);
   Str key_str = { (char *) key_event->key, key_len };
   u32 code_len = strlen(key_event->code);
   Str code_str = { (char *) key_event->code, code_len };
 
-  dict_push_value_str_key(event_data->vm->current_frame, &event_data_dict, STR_LIT("key"),
-                          value_string(key_str, event_data->vm->current_frame));
-  dict_push_value_str_key(event_data->vm->current_frame, &event_data_dict, STR_LIT("code"),
-                          value_string(code_str, event_data->vm->current_frame));
-  dict_push_value_str_key(event_data->vm->current_frame, &event_data_dict, STR_LIT("ctrl-key"),
-                          value_bool(key_event->ctrlKey, event_data->vm->current_frame));
-  dict_push_value_str_key(event_data->vm->current_frame, &event_data_dict, STR_LIT("shift-key"),
-                          value_bool(key_event->shiftKey, event_data->vm->current_frame));
-  dict_push_value_str_key(event_data->vm->current_frame, &event_data_dict, STR_LIT("alt-key"),
-                          value_bool(key_event->altKey, event_data->vm->current_frame));
-  dict_push_value_str_key(event_data->vm->current_frame, &event_data_dict, STR_LIT("meta-key"),
-                          value_bool(key_event->metaKey, event_data->vm->current_frame));
-  dict_push_value_str_key(event_data->vm->current_frame, &event_data_dict, STR_LIT("repeat"),
-                          value_bool(key_event->repeat, event_data->vm->current_frame));
+  Value *key = value_string(STR_LIT("key"), event_data->vm->current_frame);
+  dict_set_value(event_data->vm->current_frame, event_data_dict, key,
+                 value_string(key_str, event_data->vm->current_frame));
+
+  key = value_string(STR_LIT("code"), event_data->vm->current_frame);
+  dict_set_value(event_data->vm->current_frame, event_data_dict, key,
+                 value_string(code_str, event_data->vm->current_frame));
+
+  key = value_string(STR_LIT("ctrl-key"), event_data->vm->current_frame);
+  dict_set_value(event_data->vm->current_frame, event_data_dict, key,
+                 value_bool(key_event->ctrlKey, event_data->vm->current_frame));
+
+  key = value_string(STR_LIT("shift-key"), event_data->vm->current_frame);
+  dict_set_value(event_data->vm->current_frame, event_data_dict, key,
+                 value_bool(key_event->shiftKey, event_data->vm->current_frame));
+
+  key = value_string(STR_LIT("alt-key"), event_data->vm->current_frame);
+  dict_set_value(event_data->vm->current_frame, event_data_dict, key,
+                 value_bool(key_event->altKey, event_data->vm->current_frame));
+
+  key = value_string(STR_LIT("meta-key"), event_data->vm->current_frame);
+  dict_set_value(event_data->vm->current_frame, event_data_dict, key,
+                 value_bool(key_event->metaKey, event_data->vm->current_frame));
+
+  key = value_string(STR_LIT("repeat"), event_data->vm->current_frame);
+  dict_set_value(event_data->vm->current_frame, event_data_dict, key,
+                 value_bool(key_event->repeat, event_data->vm->current_frame));
 
   Value *event_data_value = value_dict(event_data_dict, event_data->vm->current_frame);
 
-  Value *args[] = { event_data_value };
-  execute_func(event_data->vm, args, event_data->callback, NULL, false);
+  DA_APPEND(event_data->vm->stack, event_data_value);
+  execute_func(event_data->vm, event_data->callback, NULL, false);
+  --event_data->vm->stack.len;
 
   return true;
 }
@@ -158,19 +172,25 @@ bool mouse_event_callback(i32 event_type, const EmscriptenMouseEvent *mouse_even
   (void) event_type;
 
   EventData *event_data = data;
-  Dict event_data_dict = {0};
+  Dict *event_data_dict = arena_alloc(&event_data->vm->current_frame->arena, sizeof(Dict));
 
-  dict_push_value_str_key(event_data->vm->current_frame, &event_data_dict, STR_LIT("x"),
-                          value_int(mouse_event->screenX, event_data->vm->current_frame));
-  dict_push_value_str_key(event_data->vm->current_frame, &event_data_dict, STR_LIT("y"),
-                          value_int(mouse_event->screenY, event_data->vm->current_frame));
-  dict_push_value_str_key(event_data->vm->current_frame, &event_data_dict, STR_LIT("button"),
-                          value_int(mouse_event->button, event_data->vm->current_frame));
+  Value *key = value_string(STR_LIT("x"), event_data->vm->current_frame);
+  dict_set_value(event_data->vm->current_frame, event_data_dict, key,
+                 value_int(mouse_event->screenX, event_data->vm->current_frame));
+
+  key = value_string(STR_LIT("y"), event_data->vm->current_frame);
+  dict_set_value(event_data->vm->current_frame, event_data_dict, key,
+                 value_int(mouse_event->screenY, event_data->vm->current_frame));
+
+  key = value_string(STR_LIT("button"), event_data->vm->current_frame);
+  dict_set_value(event_data->vm->current_frame, event_data_dict, key,
+                 value_int(mouse_event->button, event_data->vm->current_frame));
 
   Value *event_data_value = value_dict(event_data_dict, event_data->vm->current_frame);
 
-  Value *args[] = { event_data_value };
-  execute_func(event_data->vm, args, event_data->callback, NULL, false);
+  DA_APPEND(event_data->vm->stack, event_data_value);
+  execute_func(event_data->vm, event_data->callback, NULL, false);
+  --event_data->vm->stack.len;
 
   return true;
 }

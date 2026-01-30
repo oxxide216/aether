@@ -7,4 +7,4 @@ fi
 
 rm -rf "$1"
 mkdir -p "$1"
-cp -r /usr/include/aether/wasm/* "$1"
+cp -r /usr/local/include/aether/wasm/* "$1"

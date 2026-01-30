@@ -4,7 +4,6 @@
 
 #include "aether/parser.h"
 #include "aether/common.h"
-#include "aether/macros.h"
 #include "aether/deserializer.h"
 #include "aether/misc.h"
 #include "aether/io.h"
@@ -80,7 +79,7 @@ static char *token_names[] = {
   "`<>`",
   "`=>`",
   "`\\`",
-  "<->"
+  "<->",
   "int",
   "float",
   "bool",
@@ -942,37 +941,4 @@ static Exprs parser_parse_block(Parser *parser, u64 end_id_mask) {
     result.items,
     result.len,
   };
-}
-
-Ir parse(Str code, Str *file_path, CachedASTs *cached_asts) {
-  Macros macros = {0};
-  FilePaths included_files = {0};
-  IncludePaths include_paths = {0};
-  Arena arena = {0};
-
-  Str file_dir = get_file_dir(*file_path);
-
-  DA_APPEND(include_paths, file_dir);
-  DA_APPEND(include_paths, STR_LIT("ae-src/"));
-  DA_APPEND(include_paths, STR_LIT("/usr/include/aether/"));
-
-  Exprs ast = parse_ex(code, file_path, &macros,
-                       &included_files, &include_paths,
-                       cached_asts, &arena, false, NULL);
-
-  expand_macros_block(&ast, &macros, NULL, NULL, false,
-                      &arena, file_path, 0, 0, false);
-
-  Ir ir = ast_to_ir(&ast, &arena);
-
-  if (macros.items)
-    free(macros.items);
-
-  if (included_files.items)
-    free(included_files.items);
-
-  if (include_paths.items)
-    free(include_paths.items);
-
-  return ir;
 }

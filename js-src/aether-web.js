@@ -12,7 +12,6 @@ async function fetchBinaryFile(path) {
 
 async function aetherInit(dataPrefix, initCallback) {
   const appArray = await fetchBinaryFile(dataPrefix + '/app.abc');
-  const appMacrosArray = await fetchBinaryFile(dataPrefix + '/app.abm');
 
   Module = {
     onRuntimeInitialized: () => {
@@ -30,14 +29,6 @@ async function aetherInit(dataPrefix, initCallback) {
       dataOnHeap.set(appArray);
 
       aetherEvalCompiled(dataOnHeap);
-
-      Module._free(dataPtr);
-
-      dataPtr = Module._malloc(appMacrosArray.length);
-      dataOnHeap = new Uint8Array(Module.HEAPU8.buffer, dataPtr, appMacrosArray.length);
-      dataOnHeap.set(appMacrosArray);
-
-      aetherEvalMacros(dataOnHeap);
 
       Module._free(dataPtr);
 

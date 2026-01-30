@@ -13,6 +13,7 @@ if [ "$DEL" == "" ]; then
 
   if [ "$WASM" != "" ]; then
     sudo cp -r dest/ "$PREFIX/include/aether/wasm"
+    sudo cp js-src/aether-web.js "$PREFIX/include/aether/wasm"
   fi
 else
   sudo rm "$PREFIX/bin/aether" "$PREFIX/bin/aether-web-setup"

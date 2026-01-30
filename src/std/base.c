@@ -89,8 +89,8 @@ Intrinsic base_intrinsics[] = {
 #ifndef EMSCRIPTEN
   { STR_LIT("input-size"), true, 1, { ValueKindInt }, &input_size_intrinsic, NULL },
   { STR_LIT("input"), true, 0, {}, &input_intrinsic, NULL },
-#endif
   { STR_LIT("get-args"), true, 0, {}, &get_args_intrinsic, NULL },
+#endif
 };
 
 u32 base_intrinsics_len = ARRAY_LEN(base_intrinsics);
