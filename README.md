@@ -45,11 +45,6 @@ echo "(println 'Hello, World!')" > main.ae
 aether main.ae
 ```
 
-### Repl
-```shell
-aether
-```
-
 ## WebAssembly
 
 ### Build Aether
@@ -90,6 +85,7 @@ GLASS=on ./build.sh
 
 Check out [examples](examples) for:
 - hello-world.ae - you know it
+- pong.ae - classic pong game using built-in graphics API
 - fl.ae - TUI file manager
 - web - basic website built with Aether + WebAssembly
 - And other stuff!
@@ -100,6 +96,6 @@ Check out [examples](examples) for:
 
 ## ❤️ Support
 
- - ⭐ Star the repo (helps visibility!)
- - 🐛 [Report Issues](https://github.com/oxxide216/aether/issues)
- - 🏗️ Contribute - help to improve this project!
+ - Star the repo (helps visibility!)
+ - [Report issues](https://github.com/oxxide216/aether/issues)
+ - Contribute - help to improve this project!
