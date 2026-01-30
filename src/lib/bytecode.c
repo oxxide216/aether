@@ -472,11 +472,7 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);
 
-    Str intrinsic_name = {0};
-    if (node->as.func.intrinsic_name_id != (u16) -1)
-      intrinsic_name = get_str(node->as.func.intrinsic_name_id);
-
-    if (!intrinsic_name.ptr) {
+    if (node->as.func.intrinsic_name_id == (u16) -1) {
       Func new_func = {0};
       new_func.args = node->as.func.args;
       DA_APPEND(*ir, new_func);
@@ -553,6 +549,9 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
   case ExprKindFuncCall: {
     ast_node_to_ir(ir, node->as.func_call.func,
                    arena, current_func, labels, false);
+
+    u32 args_begin = ir->items[current_func].instrs.len;
+
     ast_block_to_ir(ir, &node->as.func_call.args,
                     arena, current_func,
                     labels, false, true);
@@ -560,6 +559,7 @@ static void ast_node_to_ir(Ir *ir, Expr *node, Arena *arena,
     Instr instr = {0};
     instr.kind = InstrKindFuncCall;
     instr.as.func_call.args_len = node->as.func_call.args.len;
+    instr.as.func_call.args_instrs_len = ir->items[current_func].instrs.len - args_begin;
     instr.as.func_call.value_ignored = value_ignored;
     instr.meta = node->meta;
     DA_APPEND(ir->items[current_func].instrs, instr);

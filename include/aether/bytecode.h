@@ -177,8 +177,9 @@ typedef struct {
 } InstrFunc;
 
 typedef struct {
-  u32    args_len;
-  bool   value_ignored;
+  u32  args_len;
+  u32  args_instrs_len;
+  bool value_ignored;
 } InstrFuncCall;
 
 typedef struct {

@@ -95,7 +95,7 @@ typedef struct {
 typedef Da(LabelsTable) LabelsTables;
 
 struct Vm {
-  Ir           *ir;
+  Ir            ir;
   Values        stack;
   Intrinsics    intrinsics;
   LabelsTables  labels;
@@ -108,6 +108,7 @@ struct Vm {
   Str           current_file_path;
   FuncValue    *current_func;
   u32           current_func_index;
+  u32           funcs_offset;
   u16           recursion_level;
   u16           trace_level;
   u16           max_trace_level;

@@ -89,7 +89,7 @@ static Var *get_var(Vm *vm, Str name) {
 static bool value_list_matches_kinds(u32 args_len, Value **args,
                                      ValueKind *arg_kinds) {
   for (u32 i = 0; i < args_len; ++i)
-    if (args[i]->kind != arg_kinds[i] && arg_kinds == ValueKindUnit)
+    if (args[i]->kind != arg_kinds[i] && arg_kinds[i] != ValueKindUnit)
       return false;
 
   return true;
@@ -152,8 +152,10 @@ void catch_vars(Vars *catched, Vm *vm, Instrs *instrs) {
 
       if (!found) {
         Str name = get_str(instr->as.get_var.name_id);
+        Var *var = NULL;
 
-        Var *var = get_var_from(&vm->current_frame->vars, name);
+        if (vm->current_frame != vm->frames)
+          var = get_var_from(&vm->current_frame->vars, name);
 
         if (!var && vm->current_func)
           var = get_var_from(&vm->current_func->catched_vars, name);
@@ -166,7 +168,7 @@ void catch_vars(Vars *catched, Vm *vm, Instrs *instrs) {
       }
     } else if (instr->kind == InstrKindFunc) {
       u32 body_index = instr->as.func.body_index;
-      catch_vars(catched, vm, &vm->ir->items[body_index].instrs);
+      catch_vars(catched, vm, &vm->ir.items[body_index].instrs);
     }
   }
 }
@@ -217,7 +219,7 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta, bool value_ignored) 
   vm->current_func = func;
   vm->current_func_index += 1;
 
-  execute_instrs(vm, &vm->ir->items[func->body_index].instrs);
+  execute_instrs(vm, &vm->ir.items[func->body_index].instrs);
 
   if (vm->state == ExecStateReturn)
     vm->state = ExecStateContinue;
@@ -271,7 +273,7 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
     case InstrKindFunc: {
       FuncValue *new_func = arena_alloc(&vm->current_frame->arena, sizeof(FuncValue));
       new_func->args = instr->as.func.args;
-      new_func->body_index = instr->as.func.body_index;
+      new_func->body_index = instr->as.func.body_index + vm->funcs_offset;
       new_func->intrinsic_name_id = instr->as.func.intrinsic_name_id;
 
       Str intrinsic_name = {0};
@@ -279,7 +281,7 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
         intrinsic_name = get_str(instr->as.func.intrinsic_name_id);
 
       if (!intrinsic_name.ptr) {
-        Func *body = vm->ir->items + new_func->body_index;
+        Func *body = vm->ir.items + new_func->body_index;
         catch_vars(&new_func->catched_vars, vm, &body->instrs);
         if (vm->state != ExecStateContinue)
           return;
@@ -350,10 +352,19 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
                    instr->as.func_call.value_ignored);
       if (vm->state == ExecStateExit) {
         if (vm->trace_level++ < vm->max_trace_level &&
-            vm->exit_code != 0)
-          INFO("Trace: "STR_FMT":%u:%u\n",
+            vm->exit_code != 0) {
+          Str func_name = STR_LIT("<lambda>");
+          u32 name_index = i - instr->as.func_call.args_instrs_len - 1;
+          if (instrs->items[name_index].kind == InstrKindGetVar) {
+            u16 name_id = instrs->items[name_index].as.get_var.name_id;
+            func_name = get_str(name_id);
+          }
+
+          INFO("Trace: "STR_FMT":%u:%u "STR_FMT"\n",
                STR_ARG(*instr->meta.file_path),
-               instr->meta.row + 1, instr->meta.col + 1);
+               instr->meta.row + 1, instr->meta.col + 1,
+               STR_ARG(func_name));
+        }
 
         return;
       }
@@ -457,9 +468,6 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
       if (!value_to_bool(cond)) {
         u32 target = get_instr_index(vm, instr->as.cond_not_jump.label_id);
         if (target == (u32) -1) {
-          for (u32 j = 0; j < instrs->len; ++j)
-            print_instr(instrs->items + j, false);
-
           Str label = get_str(instr->as.cond_not_jump.label_id);
           PANIC_ARGS(instr->meta, "Target label was not found: "STR_FMT"\n",
                      STR_ARG(label));
@@ -640,9 +648,10 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
 }
 
 static void load_labels(Ir *ir, LabelsTables *tables, Arena *arena) {
-  tables->len = ir->len;
-  tables->cap = tables->len;
-  tables->items = arena_alloc(arena, tables->cap * sizeof(LabelsTable));
+  tables->cap += ir->len;
+  LabelsTable *new_items = arena_alloc(arena, tables->cap * sizeof(LabelsTable));
+  memcpy(new_items, tables->items, tables->len * sizeof(LabelsTable));
+  tables->items = new_items;
 
   for (u32 i = 0; i < ir->len; ++i) {
     LabelsTable table = {0};
@@ -670,16 +679,20 @@ static void load_labels(Ir *ir, LabelsTables *tables, Arena *arena) {
         table.items[index] = label;
     }
 
-    tables->items[i] = table;
+    tables->items[i + tables->len] = table;
   }
+
+  tables->len += ir->len;
 }
 
 Value *execute(Vm *vm, Ir *ir, bool value_expected) {
-  vm->ir = ir;
+  DA_EXTEND(vm->ir, *ir);
 
   load_labels(ir, &vm->labels, &vm->current_frame->arena);
 
   execute_instrs(vm, &ir->items[0].instrs);
+
+  vm->funcs_offset += ir->len;
 
   if (!value_expected)
     return NULL;
