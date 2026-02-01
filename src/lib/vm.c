@@ -610,6 +610,11 @@ void execute(Vm *vm, Instrs *instrs) {
         return;
 
       if (!root && parent->kind == ValueKindDict) {
+        if (key->frame == parent->frame)
+          ++key->refs_count;
+        else
+          key = value_clone(key, parent->frame);
+
         dict_set_value(parent->frame, parent->as.dict, key,
                        value_unit(parent->frame));
         root = get_child_root(parent, key, &instr->meta, vm);
@@ -641,6 +646,8 @@ void execute(Vm *vm, Instrs *instrs) {
         node->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
         node->next->value = vm->stack.items[vm->stack.len - instr->as.list.len + j];
 
+        ++node->next->value->refs_count;
+
         node = node->next;
       }
 
@@ -661,6 +668,9 @@ void execute(Vm *vm, Instrs *instrs) {
       for (u32 j = 0; j < instr->as.dict.len; ++j) {
         Value *key = vm->stack.items[vm->stack.len - instr->as.list.len * 2 + j * 2];
         Value *value = vm->stack.items[vm->stack.len - instr->as.list.len * 2 + j * 2 + 1];
+
+        ++key->refs_count;
+        ++value->refs_count;
 
         dict_set_value(vm->current_frame, new_dict, key, value);
       }
