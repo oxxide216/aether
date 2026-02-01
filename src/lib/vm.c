@@ -306,8 +306,6 @@ void execute(Vm *vm, Instrs *instrs) {
   while (i < instrs->len) {
     Instr *instr = instrs->items + i;
 
-    print_instr(instr, true);
-
     switch (instr->kind) {
     case InstrKindString: {
       Str string = get_str(instr->as.string.string_id);
