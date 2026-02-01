@@ -256,9 +256,10 @@ void sb_push_value(StringBuilder *sb, Value *value,
 
     if (value->as.func->args.len > 0)
       sb_push_char(sb, ' ');
+    sb_push(sb, "-> ");
 
     if (value->as.func->intrinsic_name_id == (u16) -1) {
-      sb_push(sb, "-> ...");
+      sb_push(sb, "...");
     } else {
       Str intrinsic_name = get_str(value->as.func->intrinsic_name_id);
       sb_push_str(sb, intrinsic_name);
