@@ -270,7 +270,6 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta) {
     DA_APPEND(vm->current_frame->vars, new_var);
   }
 
-  u32 prev_stack_len = vm->stack.len;
   u32 prev_frame_begin = vm->frame_begin;
   FuncValue *prev_func = vm->current_func;
   LabelsTable *prev_labels = vm->current_func_labels;
@@ -285,19 +284,41 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta) {
     vm->state = ExecStateContinue;
 
   Value *result;
-  if (prev_stack_len == vm->stack.len)
+  if (vm->frame_begin == vm->stack.len)
     result = value_unit(vm->current_frame->prev);
   else
     result = value_clone(stack_last(vm), vm->current_frame->prev);
 
   vm->current_func_labels = prev_labels;
   vm->current_func = prev_func;
+  vm->stack.len = vm->frame_begin;
   vm->frame_begin = prev_frame_begin;
-  vm->stack.len = prev_stack_len;
 
   end_frame(vm);
 
   DA_APPEND(vm->stack, result);
+}
+
+static void tail_call(Vm *vm, FuncValue *func) {
+  Value **args = vm->stack.items + vm->stack.len - func->args.len;
+
+  end_frame(vm);
+  begin_frame(vm);
+
+  vm->stack.len = vm->frame_begin;
+
+  for (u32 i = 0; i < func->args.len; ++i) {
+    Str arg_name = get_str(func->args.items[i]);
+    Value *arg_value = value_clone(args[i], vm->current_frame);
+
+    ++arg_value->refs_count;
+
+    Var new_var = {
+      arg_name,
+      arg_value,
+    };
+    DA_APPEND(vm->current_frame->vars, new_var);
+  }
 }
 
 void execute(Vm *vm, Instrs *instrs) {
@@ -346,17 +367,6 @@ void execute(Vm *vm, Instrs *instrs) {
     } break;
 
     case InstrKindFuncCall: {
-      if (++vm->recursion_level >= MAX_RECURSION_LEVEL) {
-        ERROR(META_FMT"Infinite recursion detected\n",
-              META_ARG(instr->meta));
-        INFO("Long trace, showing last %u calls\n",
-             MAX_RECURSION_TRACE_LEVEL);
-        vm->max_trace_level = MAX_RECURSION_TRACE_LEVEL;
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
-        return;
-      }
-
       if (!ensure_stack_len_is_enough(vm,
                                       instr->as.func_call.args_len + 1,
                                       &instr->meta))
@@ -386,6 +396,26 @@ void execute(Vm *vm, Instrs *instrs) {
         PANIC_ARGS(instr->meta, "Expected %u arguments, got %u\n",
                    func->as.func->args.len, instr->as.func_call.args_len);
 
+      if (func->as.func == vm->current_func &&
+          (i + 1 == instrs->len ||
+           instrs->items[i + 1].kind == InstrKindRet)) {
+        tail_call(vm, func->as.func);
+
+        i = (u32) -1;
+        break;
+      }
+
+      if (++vm->recursion_level >= MAX_RECURSION_LEVEL) {
+        ERROR(META_FMT"Infinite recursion detected\n",
+              META_ARG(instr->meta));
+        INFO("Long trace, showing last %u calls\n",
+             MAX_RECURSION_TRACE_LEVEL);
+        vm->max_trace_level = MAX_RECURSION_TRACE_LEVEL;
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+        return;
+      }
+
       execute_func(vm, func->as.func, &instr->meta);
       if (vm->state == ExecStateExit) {
         if (vm->trace_level++ < vm->max_trace_level &&
@@ -406,13 +436,11 @@ void execute(Vm *vm, Instrs *instrs) {
         return;
       }
 
-      Value *result = stack_last(vm);
-
-      vm->stack.len -= instr->as.func_call.args_len + 1;
-
-      vm->stack.items[vm->stack.len - 1] = result;
-
       --vm->recursion_level;
+
+      Value *result = stack_last(vm);
+      vm->stack.len -= instr->as.func_call.args_len + 1;
+      vm->stack.items[vm->stack.len - 1] = result;
     } break;
 
     case InstrKindDefVar: {
