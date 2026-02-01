@@ -228,7 +228,7 @@ Value *map_intrinsic(Vm *vm, Value **args) {
     DA_APPEND(vm->stack, node->value);
 
     // TODO: put real metadata here
-    execute_func(vm, func->as.func, NULL, false);
+    execute_func(vm, func->as.func, NULL);
 
     if (vm->state == ExecStateExit)
       break;
@@ -270,7 +270,7 @@ Value *filter_intrinsic(Vm *vm, Value **args) {
     DA_APPEND(vm->stack, node->value);
 
     // TODO: put real metadata here
-    execute_func(vm, func->as.func, NULL, false);
+    execute_func(vm, func->as.func, NULL);
 
     if (vm->state == ExecStateExit)
       break;
@@ -318,7 +318,7 @@ Value *fold_intrinsic(Vm *vm, Value **args) {
     DA_APPEND(vm->stack, node->value);
 
     // TODO: put real metadata here
-    execute_func(vm, func->as.func, NULL, false);
+    execute_func(vm, func->as.func, NULL);
 
     if (vm->state == ExecStateExit)
       break;
@@ -475,7 +475,7 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
     while (node) {
       DA_APPEND(vm->stack, node->value);
 
-      execute_func(vm, func->as.func, NULL, false);
+      execute_func(vm, func->as.func, NULL);
 
       if (vm->state != ExecStateContinue) {
         Value *result = stack_last(vm);
@@ -488,8 +488,9 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
         return result;
       }
 
-      node = node->next;
       --vm->stack.len;
+
+      node = node->next;
     }
   } else if (collection->kind == ValueKindString) {
     char *filler = arena_alloc(&vm->current_frame->arena, sizeof(wchar));
@@ -503,7 +504,7 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
     while ((_wchar = get_next_wchar(collection->as.string.str, index, &wchar_len)) != '\0') {
       *(wchar *) _char->as.string.str.ptr = _wchar;
 
-      execute_func(vm, func->as.func, NULL, false);
+      execute_func(vm, func->as.func, NULL);
 
       if (vm->state != ExecStateContinue) {
         Value *result = stack_last(vm);
@@ -528,7 +529,7 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
     for (u32 i = 0; i < collection->as.bytes.len; ++i) {
       _int->as._int = collection->as.bytes.ptr[i];
 
-      execute_func(vm, func->as.func, NULL, false);
+      execute_func(vm, func->as.func, NULL);
 
       if (vm->state != ExecStateContinue) {
         Value *result = stack_last(vm);
@@ -563,7 +564,7 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
         pair->as.dict->items[0]->key = entry->key;
         pair->as.dict->items[1]->value = entry->value;
 
-        execute_func(vm, func->as.func, NULL, true);
+        execute_func(vm, func->as.func, NULL);
 
         if (vm->state != ExecStateContinue) {
           Value *result = stack_last(vm);
@@ -575,6 +576,8 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
           --vm->stack.len;
           return result;
         }
+
+        --vm->stack.len;
 
         entry = entry->next;
       }
@@ -1194,7 +1197,7 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   Ir ir = ast_to_ir(&ast, &ir_arena);
 
   Str bytecode = {0};
-  bytecode.ptr = (char *) serialize(&ir, &bytecode.len, &included_files);
+  bytecode.ptr = (char *) serialize(ir, &bytecode.len, &included_files);
 
   char *new_ptr = arena_alloc(&vm->current_frame->arena, bytecode.len);
   memcpy(new_ptr, bytecode.ptr, bytecode.len);
@@ -1252,12 +1255,9 @@ Value *eval_compiled_intrinsic(Vm *vm, Value **args) {
                       bytecode->as.bytes.len, &ir_arena,
                       &env->as.env->vm->current_file_path);
 
-  Value *result = execute(env->as.env->vm, &ir, true);
+  DA_APPEND(env->as.env->cached_irs, ir);
 
-  for (u32 i = 0; i < ir.len; ++i)
-    free(ir.items[i].instrs.items);
-
-  free(ir.items);
+  Value *result = execute_get(env->as.env->vm, ir);
 
   if (env->as.env->vm->state != ExecStateContinue)
     env->as.env->vm->state = ExecStateContinue;
@@ -1318,13 +1318,11 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
 
   Ir ir = ast_to_ir(&ast, &ir_arena);
 
+  DA_APPEND(env->as.env->cached_irs, ir);
+
   env->as.env->vm->current_file_path = path->as.string.str;
 
-  Value *result = execute(env->as.env->vm, &ir, true);
-
-  for (u32 i = 0; i < ir.len; ++i)
-    free(ir.items[i].instrs.items);
-  free(ir.items);
+  Value *result = execute_get(env->as.env->vm, ir);
 
   if (included_files.items)
     free(included_files.items);

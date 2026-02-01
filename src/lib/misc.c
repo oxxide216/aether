@@ -358,12 +358,12 @@ void print_instr(Instr *instr, bool hide_strings) {
     if (instr->as.func.args.len > 0)
       printf(" ");
 
-    Str intrinsic_name = get_str(instr->as.func.intrinsic_name_id);
-
-    if (intrinsic_name.len == 0)
+    if (instr->as.func.intrinsic_name_id == (u16) -1) {
       printf("-> ...\n");
-    else
+    } else {
+      Str intrinsic_name = get_str(instr->as.func.intrinsic_name_id);
       printf("-> "STR_FMT"\n", STR_ARG(intrinsic_name));
+    }
   } break;
 
   case InstrKindFuncCall: {
@@ -431,11 +431,11 @@ void print_instr(Instr *instr, bool hide_strings) {
   } break;
 
   case InstrKindList: {
-    printf("Make list\n");
+    printf("Make list of length %u\n", instr->as.list.len);
   } break;
 
   case InstrKindDict: {
-    printf("Make dictionary\n");
+    printf("Make dictionary of length %u\n", instr->as.dict.len);
   } break;
 
   case InstrKindSelf: {

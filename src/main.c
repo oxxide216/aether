@@ -8,12 +8,11 @@
 typedef struct {
   char *cstr;
   bool  is_precompiled;
-  bool  tracing_disabled;
 } Path;
 
 static Path loader_paths[] = {
-  { "ae-src/loader.ae", false, false },
-  { "/usr/local/include/aether/loader.abc", true, true },
+  { "ae-src/loader.ae", false },
+  { "/usr/local/include/aether/loader.abc", true },
 };
 
 i32 main(i32 argc, char **argv) {
@@ -34,13 +33,19 @@ i32 main(i32 argc, char **argv) {
     exit(1);
   }
 
-  AetherCtx ctx = aether_init(argc, argv, false, NULL);
+#ifdef NDEBUG
+  bool debug = false;
+#else
+  bool debug = true;
+#endif
+
+  AetherCtx ctx = aether_init(argc, argv, debug, NULL);
 
   if (path->is_precompiled) {
-    aether_eval_bytecode(&ctx, (u8 *) code.ptr, code.len, false);
+    aether_eval_bytecode(&ctx, (u8 *) code.ptr, code.len);
   } else {
     Str file_path = { path->cstr, strlen(path->cstr) };
-    aether_eval(&ctx, code, file_path, false);
+    aether_eval(&ctx, code, file_path);
   }
 
   free(code.ptr);

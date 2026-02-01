@@ -10,7 +10,6 @@
 
 #define MAX_INTRINSIC_ARGS_COUNT  10
 #define INTRINSICS_HASH_TABLE_CAP 60
-#define LABELS_HASH_TABLE_CAP     60
 
 #define EXECUTE_FUNC(vm, args, func, meta, value_expected)              \
   do {                                                                  \
@@ -80,35 +79,20 @@ typedef struct {
   Intrinsic *items[INTRINSICS_HASH_TABLE_CAP];
 } Intrinsics;
 
-typedef struct Label Label;
-
-struct Label {
-  u16    name_id;
-  u32    instr_index;
-  Label *next;
-};
-
-typedef struct {
-  Label *items[LABELS_HASH_TABLE_CAP];
-} LabelsTable;
-
-typedef Da(LabelsTable) LabelsTables;
-
 struct Vm {
   Ir            ir;
   Values        stack;
   Intrinsics    intrinsics;
-  LabelsTables  labels;
   StackFrame   *frames;
   StackFrame   *frames_end;
   StackFrame   *current_frame;
+  u32           frame_begin;
   ListNode     *args;
   ExecState     state;
   i64           exit_code;
   Str           current_file_path;
   FuncValue    *current_func;
-  u32           current_func_index;
-  u32           funcs_offset;
+  LabelsTable  *current_func_labels;
   u16           recursion_level;
   u16           trace_level;
   u16           max_trace_level;
@@ -119,12 +103,14 @@ struct Env {
   FilePaths     included_files;
   IncludePaths  include_paths;
   CachedASTs    cached_asts;
+  CachedIrs     cached_irs;
   Vm           *vm;
   u32           refs_count;
 };
 
-void   execute_func(Vm *vm, FuncValue *func, InstrMeta *meta, bool value_ignored);
-Value *execute(Vm *vm, Ir *ir, bool value_expected);
+void   execute_func(Vm *vm, FuncValue *func, InstrMeta *meta);
+void   execute(Vm *vm, Instrs *instrs);
+Value *execute_get(Vm *vm, Func *func);
 
 Value *stack_last(Vm *vm);
 

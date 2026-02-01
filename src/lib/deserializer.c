@@ -70,24 +70,22 @@ static void deserialize_instrs(Instrs *instrs, u8 *data, u32 *end,
       for (u32 i = 0; i < instr.as.func.args.len; ++i)
         instr.as.func.args.items[i] = deserialize_str(data, end, arena);
 
-      instr.as.func.body_index = *(u32 *) (data + *end);
-      *end += sizeof(u32);
-
       bool has_intrinsic_name  = *(u8 *) (data + *end);
       *end += sizeof(u8);
 
-      if (has_intrinsic_name)
+      if (has_intrinsic_name) {
         instr.as.func.intrinsic_name_id = deserialize_str(data, end, arena);
-      else
+      } else {
+        instr.as.func.body = arena_alloc(arena, sizeof(Func));
+        instr.as.func.body->args = instr.as.func.args;
+        deserialize_instrs(&instr.as.func.body->instrs, data, end, path_offsets, arena);
         instr.as.func.intrinsic_name_id = (u16) -1;
+      }
     } break;
 
     case InstrKindFuncCall: {
       instr.as.func_call.args_len = *(u32 *) (data + *end);
       *end += sizeof(u32);
-
-      instr.as.func_call.value_ignored = *(u8 *) (data + *end);
-      *end += sizeof(u8);
     } break;
 
     case InstrKindDefVar: {
@@ -183,7 +181,7 @@ static void deserialize_path_offsets(FilePathOffsets *path_offsets,
 }
 
 Ir deserialize(u8 *data, u32 size, Arena *arena, Str *file_path) {
-  Ir ir = {0};
+  Ir ir = arena_alloc(arena, sizeof(Func));
 
   if (size < sizeof(u32) * 3) {
     ERROR("Corrupted bytecode: not enough data\n");
@@ -209,27 +207,15 @@ Ir deserialize(u8 *data, u32 size, Arena *arena, Str *file_path) {
 
   *file_path = path_offsets.items[0].path;
 
-  ir.len = *(u32 *) (data + end);
-  ir.cap = ir.len;
+  ir->args.len = *(u32 *) (data + end);
+  ir->args.cap = ir->args.len;
   end += sizeof(u32);
 
-  ir.items = malloc(ir.cap * sizeof(Func));
+  ir->args.items = arena_alloc(arena, ir->args.cap * sizeof(Str));
+  for (u32 i = 0; i < ir->args.len; ++i)
+    ir->args.items[i] = deserialize_str(data, &end, arena);
 
-  for (u32 i = 0; i < ir.len; ++i) {
-    Func func = {0};
-
-    func.args.len = *(u32 *) (data + end);
-    func.args.cap = func.args.len;
-    end += sizeof(u32);
-
-    func.args.items = arena_alloc(arena, func.args.cap * sizeof(Str));
-    for (u32 j = 0; j < func.args.len; ++j)
-      func.args.items[j] = deserialize_str(data, &end, arena);
-
-    deserialize_instrs(&func.instrs, data, &end, &path_offsets, arena);
-
-    ir.items[i] = func;
-  }
+  deserialize_instrs(&ir->instrs, data, &end, &path_offsets, arena);
 
   return ir;
 }
@@ -336,9 +322,6 @@ static Expr *deserialize_ast_node(u8 *data, u32 *end,
                                                    path_offsets, arena);
     deserialize_ast(&node->as.func_call.args, data,
                     end, path_offsets, arena);
-
-    node->as.func_call.value_ignored = *(u8 *) (data + *end);
-    *end += sizeof(u8);
   } break;
 
   case ExprKindLet: {

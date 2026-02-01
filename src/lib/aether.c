@@ -27,8 +27,7 @@ AetherCtx aether_init(i32 argc, char **argv, bool debug,
   return ctx;
 }
 
-Value *aether_eval(AetherCtx *ctx, Str code,
-                   Str file_path, bool value_expected) {
+Value *aether_eval(AetherCtx *ctx, Str code, Str file_path) {
   Str file_dir = get_file_dir(file_path);
 
   DA_APPEND(ctx->include_paths, file_dir);
@@ -48,26 +47,21 @@ Value *aether_eval(AetherCtx *ctx, Str code,
 
   Ir ir = ast_to_ir(&ast, &ctx->arena);
 
-  Value *result = execute(&ctx->vm, &ir, value_expected);
+  DA_APPEND(ctx->irs, ir);
 
-  for (u32 i = 0; i < ir.len; ++i)
-    free(ir.items[i].instrs.items);
-  free(ir.items);
+  Value *result = execute_get(&ctx->vm, ir);
 
   return result;
 }
 
 Value *aether_eval_bytecode(AetherCtx *ctx,
-                            u8 *buffer, u32 size,
-                            bool value_expected) {
+                            u8 *buffer, u32 size) {
   Ir ir = deserialize(buffer, size, &ctx->arena,
                       &ctx->vm.current_file_path);
 
-  Value *result = execute(&ctx->vm, &ir, value_expected);
+  DA_APPEND(ctx->irs, ir);
 
-  for (u32 i = 0; i < ir.len; ++i)
-    free(ir.items[i].instrs.items);
-  free(ir.items);
+  Value *result = execute_get(&ctx->vm, ir);
 
   return result;
 }
@@ -108,6 +102,10 @@ void aether_cleanup(AetherCtx *ctx) {
   arena_free(&ctx->arena);
 
   free(ctx->asts.items);
+
+  for (u32 i = 0; i < ctx->irs.len; ++i)
+    ir_free(ctx->irs.items[i]);
+  free(ctx->irs.items);
 
   if (ctx->macros.items)
     free(ctx->macros.items);

@@ -82,25 +82,14 @@ static void serialize_instrs(Instrs *instrs, u8 **data, u32 *data_size,
       for (u32 j = 0; j < instr->as.func.args.len; ++j)
         serialize_str(instr->as.func.args.items[j], data, data_size, end);
 
-      u32 new_index = instr->as.func.body_index;
-
-      for (u32 j = 0; j < map->len; ++j) {
-        if (map->items[j].a == instr->as.func.body_index) {
-          new_index = map->items[j].b;
-
-          break;
-        }
-      }
-
-      reserve_space(sizeof(u32), data, data_size, end);
-      *(u32 *) (*data + *end) = new_index;
-      *end += sizeof(u32);
-
       reserve_space(sizeof(u8), data, data_size, end);
       *(u8 *) (*data + *end) = instr->as.func.intrinsic_name_id != (u16) -1;
       *end += sizeof(u8);
 
-      if (instr->as.func.intrinsic_name_id != (u16) -1)
+      if (instr->as.func.intrinsic_name_id == (u16) -1)
+        serialize_instrs(&instr->as.func.body->instrs, data,
+                         data_size, end, path_offsets, map);
+      else
         serialize_str(instr->as.func.intrinsic_name_id, data, data_size, end);
     } break;
 
@@ -108,10 +97,6 @@ static void serialize_instrs(Instrs *instrs, u8 **data, u32 *data_size,
       reserve_space(sizeof(u32), data, data_size, end);
       *(u32 *) (*data + *end) = instr->as.func_call.args_len;
       *end += sizeof(u32);
-
-      reserve_space(sizeof(u8), data, data_size, end);
-      *(u8 *) (*data + *end) = instr->as.func_call.value_ignored;
-      *end += sizeof(u8);
     } break;
 
     case InstrKindDefVar: {
@@ -222,7 +207,7 @@ static void serialize_included_files(u8 **data, u32 *data_size, u32 *end,
   }
 }
 
-u8 *serialize(Ir *ir, u32 *size, FilePaths *included_files) {
+u8 *serialize(Ir ir, u32 *size, FilePaths *included_files) {
   *size = sizeof(u32) * 2;
   u32 data_size = sizeof(u32) * 2;
   u8 *data = malloc(data_size);
@@ -230,39 +215,17 @@ u8 *serialize(Ir *ir, u32 *size, FilePaths *included_files) {
   FilePathOffsets path_offsets = {0};
   serialize_included_files(&data, &data_size, size, included_files, &path_offsets);
 
-  u32 ir_len_end = *size;
-  u32 funcs_skipped = 0;
   IndicesMap map = {0};
-  u32 len = 0;
-
-  for (u32 i = 0; i < ir->len; ++i) {
-    IndexPair pair = {
-      i,
-      i - funcs_skipped,
-    };
-    DA_APPEND(map, pair);
-  }
 
   reserve_space(sizeof(u32), &data, &data_size, size);
+  *(u32 *) (data + *size) = ir->args.len;
   *size += sizeof(u32);
 
-  for (u32 i = 0; i < ir->len; ++i) {
-    Func *func = ir->items + i;
+  for (u32 i = 0; i < ir->args.len; ++i)
+    serialize_str(ir->args.items[i], &data, &data_size, size);
 
-    reserve_space(sizeof(u32), &data, &data_size, size);
-    *(u32 *) (data + *size) = func->args.len;
-    *size += sizeof(u32);
-
-    for (u32 j = 0; j < func->args.len; ++j)
-      serialize_str(func->args.items[j], &data, &data_size, size);
-
-    serialize_instrs(&func->instrs, &data, &data_size,
-                     size, &path_offsets, &map);
-
-    ++len;
-  }
-
-  *(u32 *) (data + ir_len_end) = len;
+  serialize_instrs(&ir->instrs, &data, &data_size,
+                   size, &path_offsets, &map);
 
   if (path_offsets.items)
     free(path_offsets.items);
@@ -374,10 +337,6 @@ static void serialize_ast_node(Expr *node, u8 **data, u32 *data_size,
                        end, path_offsets, file_path, map);
     serialize_ast(&node->as.func_call.args, data, data_size,
                   end, path_offsets, file_path, map);
-
-    reserve_space(sizeof(u8), data, data_size, end);
-    *(u8 *) (*data + *end) = node->as.func_call.value_ignored;
-    *end += sizeof(u8);
   } break;
 
   case ExprKindLet: {

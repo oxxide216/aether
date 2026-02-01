@@ -6,7 +6,8 @@
 #include "shl/shl-defs.h"
 #include "shl/shl-str.h"
 
-#define DICT_HASH_TABLE_CAP 10
+#define DICT_HASH_TABLE_CAP   10
+#define LABELS_HASH_TABLE_CAP 60
 
 typedef struct Value Value;
 typedef Da(Value *)  Values;
@@ -33,12 +34,26 @@ struct StackFrame {
   StackFrame *prev;
 };
 
+typedef struct Label Label;
+
+struct Label {
+  u16    name_id;
+  u32    instr_index;
+  Label *next;
+};
+
 typedef struct {
-  Args   args;
-  Instrs instrs;
+  Label *items[LABELS_HASH_TABLE_CAP];
+} LabelsTable;
+
+typedef struct {
+  Args        args;
+  Instrs      instrs;
+  LabelsTable labels;
+  bool        loaded;
 } Func;
 
-typedef Da(Func) Ir;
+typedef Func *Ir;
 
 typedef enum {
   ValueKindUnit = 0,
@@ -79,7 +94,7 @@ typedef struct FuncValue FuncValue;
 
 struct FuncValue {
   Args  args;
-  u32   body_index;
+  Func *body;
   Vars  catched_vars;
   Func *parent_func;
   u16   intrinsic_name_id;
@@ -171,15 +186,14 @@ typedef struct {
 } InstrBytes;
 
 typedef struct {
-  Args args;
-  u16  body_index;
-  u16  intrinsic_name_id;
+  Args  args;
+  Func *body;
+  u16   intrinsic_name_id;
 } InstrFunc;
 
 typedef struct {
   u32  args_len;
   u32  args_instrs_len;
-  bool value_ignored;
 } InstrFuncCall;
 
 typedef struct {
@@ -337,7 +351,6 @@ typedef struct  {
 typedef struct {
   Expr  *func;
   Exprs  args;
-  bool   value_ignored;
 } ExprFuncCall;
 
 typedef struct {
@@ -409,5 +422,6 @@ void frame_free(StackFrame *frame);
 
 Exprs ast_clone(Exprs *ast, Arena *arena);
 Ir    ast_to_ir(Exprs *ast, Arena *arena);
+void  ir_free(Ir ir);
 
 #endif // BYTECODE_VM

@@ -24,6 +24,8 @@ typedef struct {
 
 typedef Da(CachedAST) CachedASTs;
 
+typedef Da(Ir) CachedIrs;
+
 Exprs parse_ex(Str code, Str *file_path, Macros *macros,
                FilePaths *included_files, IncludePaths *include_paths,
                CachedASTs *cached_asts, Arena *arena, bool use_macros,

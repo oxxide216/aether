@@ -265,7 +265,7 @@ Value *run_intrinsic(Vm *vm, Value **args) {
   begin_frame(vm);
   vm->current_frame->can_lookup_through = true;
 
-  execute_func(vm, init, NULL, false);
+  execute_func(vm, init, NULL);
   if (vm->state != ExecStateContinue) {
     winx_destroy_window(&glass.window);
     winx_cleanup(&glass.winx);
@@ -297,11 +297,10 @@ Value *run_intrinsic(Vm *vm, Value **args) {
 
         DA_APPEND(vm->stack, event_value);
 
-        execute_func(vm, event_handler, NULL, true);
+        execute_func(vm, event_handler, NULL);
         if (vm->state != ExecStateContinue)
           break;
-
-        --vm->stack.len;
+        vm->stack.len -= 2;
 
         if (event.kind == WinxEventKindResize) {
           resized = true;
@@ -319,13 +318,15 @@ Value *run_intrinsic(Vm *vm, Value **args) {
                          vec2((f32) width, (f32) height));
     }
 
-    execute_func(vm, update, NULL, true);
+    execute_func(vm, update, NULL);
     if (vm->state != ExecStateContinue)
       break;
+    --vm->stack.len;
 
-    execute_func(vm, render, NULL, true);
+    execute_func(vm, render, NULL);
     if (vm->state != ExecStateContinue)
       break;
+    --vm->stack.len;
 
     if (i++ == MAIN_LOOP_FRAME_LENGTH) {
       StackFrame *prev_frame = vm->current_frame->prev;

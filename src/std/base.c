@@ -15,8 +15,12 @@ Value *printf_intrinsic(Vm *vm, Value **args) {
 
   printf_sb.len = 0;
 
+  u32 len = 0;
+
   ListNode *node = value->as.list->next;
   while (node) {
+    printf("%u\n", len++);
+
     sb_push_value(&printf_sb, node->value, 0, false, false);
 
     node = node->next;

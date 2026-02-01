@@ -46,7 +46,7 @@ static void print_stack_dump(Values *stack) {
 }
 
 static bool ensure_stack_len_is_enough(Vm *vm, u32 min_len, InstrMeta *meta) {
-  if (vm->stack.len < min_len) {
+  if (vm->stack.len < min_len + vm->frame_begin) {
     INFO("Stack dump:\n");
     print_stack_dump(&vm->stack);
     ERROR(META_FMT"Not enough values on the stack: expected %u, got %u\n",
@@ -112,13 +112,11 @@ static Intrinsic *get_intrinsic(Vm *vm, Str name, u32 args_len, Value **args) {
 }
 
 static u32 get_instr_index(Vm *vm, u16 label_id) {
-  u32 func_index = 0;
-  if (vm->current_func)
-    func_index = vm->current_func->body_index;
+  LabelsTable *labels = vm->current_func_labels;
 
   u64 index = label_id % LABELS_HASH_TABLE_CAP;
 
-  Label *entry = vm->labels.items[func_index].items[index];
+  Label *entry = labels->items[index];
   while (entry) {
     if (entry->name_id == label_id)
       return entry->instr_index;
@@ -167,23 +165,55 @@ void catch_vars(Vars *catched, Vm *vm, Instrs *instrs) {
         }
       }
     } else if (instr->kind == InstrKindFunc) {
-      u32 body_index = instr->as.func.body_index;
-      catch_vars(catched, vm, &vm->ir.items[body_index].instrs);
+      catch_vars(catched, vm, &instr->as.func.body->instrs);
     }
   }
 }
 
-void execute_instrs(Vm *vm, Instrs *instrs);
+void load_labels(Func *func) {
+  if (func->loaded)
+    return;
 
-void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta, bool value_ignored) {
+  for (u32 j = 0; j < func->instrs.len; ++j) {
+    Instr *instr = func->instrs.items + j;
+    if (instr->kind != InstrKindLabel)
+      continue;
+
+    u64 index = instr->as.label.name_id % LABELS_HASH_TABLE_CAP;
+
+    Label *entry = func->labels.items[index];
+    while (entry && entry->next)
+      entry = entry->next;
+
+    Label *label = malloc(sizeof(Label));
+    *label = (Label) {
+      instr->as.label.name_id,
+      j, NULL,
+    };
+
+    if (entry)
+      entry->next = label;
+    else
+      func->labels.items[index] = label;
+  }
+
+  func->loaded = true;
+}
+
+void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta) {
   Value **args = vm->stack.items + vm->stack.len - func->args.len;
 
   if (func->intrinsic_name_id != (u16) -1) {
     Str intrinsic_name = get_str(func->intrinsic_name_id);
     Intrinsic *intrinsic = get_intrinsic(vm, intrinsic_name, func->args.len, args);
     if (!intrinsic) {
-      ERROR(META_FMT"Intrinsic "STR_FMT":%u was not found\n",
-            META_ARG(*meta), STR_ARG(intrinsic_name), func->args.len);
+      if (meta)
+        ERROR(META_FMT"Intrinsic "STR_FMT":%u was not found\n",
+              META_ARG(*meta), STR_ARG(intrinsic_name), func->args.len);
+      else
+        ERROR("Intrinsic "STR_FMT":%u was not found\n",
+              STR_ARG(intrinsic_name), func->args.len);
+
       vm->state = ExecStateExit;
       vm->exit_code = 1;
       return;
@@ -191,62 +221,92 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta, bool value_ignored) 
 
     Value *result = (intrinsic->func)(vm, args);
 
-    if (!value_ignored) {
-      if (!result)
-        result = value_unit(vm->current_frame);
+    if (!result)
+      result = value_unit(vm->current_frame);
 
-      DA_APPEND(vm->stack, result);
-    }
+    DA_APPEND(vm->stack, result);
 
     return;
   }
 
+  load_labels(func->body);
+
   begin_frame(vm);
+
+  for (u32 i = 0; i < func->catched_vars.len; ++i) {
+    Var *catched_var = func->catched_vars.items + i;
+
+    if (!catched_var->value) {
+      Var *var = get_var_from(&vm->frames->vars, catched_var->name);
+      if (!var) {
+        if (meta)
+          ERROR(META_FMT"Symbol "STR_FMT" was not found\n",
+                META_ARG(*meta), STR_ARG(catched_var->name));
+        else
+          ERROR("Symbol "STR_FMT" was not found\n",
+                STR_ARG(catched_var->name));
+
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+        return;
+      }
+
+      ++var->value->refs_count;
+
+      catched_var->value = var->value;
+    }
+  }
 
   for (u32 i = 0; i < func->args.len; ++i) {
     Str arg_name = get_str(func->args.items[i]);
+    Value *arg_value = args[i];
+
+    ++arg_value->refs_count;
 
     Var new_var = {
       arg_name,
-      vm->stack.items[vm->stack.len - func->args.len + i],
+      arg_value,
     };
     DA_APPEND(vm->current_frame->vars, new_var);
   }
 
   u32 prev_stack_len = vm->stack.len;
+  u32 prev_frame_begin = vm->frame_begin;
   FuncValue *prev_func = vm->current_func;
+  LabelsTable *prev_labels = vm->current_func_labels;
 
+  vm->frame_begin = vm->stack.len;
   vm->current_func = func;
-  vm->current_func_index += 1;
+  vm->current_func_labels = &func->body->labels;
 
-  execute_instrs(vm, &vm->ir.items[func->body_index].instrs);
+  execute(vm, &func->body->instrs);
 
   if (vm->state == ExecStateReturn)
     vm->state = ExecStateContinue;
 
-  Value *result = NULL;
-  if (!value_ignored) {
-    if (prev_stack_len == vm->stack.len)
-      result = value_unit(vm->current_frame->prev);
-    else
-      result = value_clone(stack_last(vm), vm->current_frame->prev);
-  }
+  Value *result;
+  if (prev_stack_len == vm->stack.len)
+    result = value_unit(vm->current_frame->prev);
+  else
+    result = value_clone(stack_last(vm), vm->current_frame->prev);
 
-  vm->current_func_index -= 1;
+  vm->current_func_labels = prev_labels;
   vm->current_func = prev_func;
+  vm->frame_begin = prev_frame_begin;
   vm->stack.len = prev_stack_len;
 
   end_frame(vm);
 
-  if (result)
-    DA_APPEND(vm->stack, result);
+  DA_APPEND(vm->stack, result);
 }
 
-void execute_instrs(Vm *vm, Instrs *instrs) {
+void execute(Vm *vm, Instrs *instrs) {
   u32 i = 0;
 
   while (i < instrs->len) {
     Instr *instr = instrs->items + i;
+
+    print_instr(instr, true);
 
     switch (instr->kind) {
     case InstrKindString: {
@@ -273,17 +333,12 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
     case InstrKindFunc: {
       FuncValue *new_func = arena_alloc(&vm->current_frame->arena, sizeof(FuncValue));
       new_func->args = instr->as.func.args;
-      new_func->body_index = instr->as.func.body_index + vm->funcs_offset;
+      new_func->body = instr->as.func.body;
       new_func->intrinsic_name_id = instr->as.func.intrinsic_name_id;
       new_func->catched_vars = (Vars) {0};
 
-      Str intrinsic_name = {0};
-      if (instr->as.func.intrinsic_name_id != (u16) -1)
-        intrinsic_name = get_str(instr->as.func.intrinsic_name_id);
-
-      if (!intrinsic_name.ptr) {
-        Func *body = vm->ir.items + new_func->body_index;
-        catch_vars(&new_func->catched_vars, vm, &body->instrs);
+      if (instr->as.func.intrinsic_name_id == (u16) -1) {
+        catch_vars(&new_func->catched_vars, vm, &new_func->body->instrs);
         if (vm->state != ExecStateContinue)
           return;
       }
@@ -333,24 +388,7 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
         PANIC_ARGS(instr->meta, "Expected %u arguments, got %u\n",
                    func->as.func->args.len, instr->as.func_call.args_len);
 
-      for (u32 j = 0; j < func->as.func->catched_vars.len; ++j) {
-        Var *catched_var = func->as.func->catched_vars.items + j;
-
-        if (!catched_var->value) {
-          Var *var = get_var_from(&vm->frames->vars, catched_var->name);
-          if (!var) {
-            PANIC_ARGS(instr->meta, "Symbol "STR_FMT" was not found\n",
-                       STR_ARG(catched_var->name));
-          }
-
-          ++var->value->refs_count;
-
-          catched_var->value = var->value;
-        }
-      }
-
-      execute_func(vm, func->as.func, &instr->meta,
-                   instr->as.func_call.value_ignored);
+      execute_func(vm, func->as.func, &instr->meta);
       if (vm->state == ExecStateExit) {
         if (vm->trace_level++ < vm->max_trace_level &&
             vm->exit_code != 0) {
@@ -370,14 +408,11 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
         return;
       }
 
-      Value *result = NULL;
-      if (!instr->as.func_call.value_ignored)
-        result = stack_last(vm);
+      Value *result = stack_last(vm);
 
       vm->stack.len -= instr->as.func_call.args_len + 1;
 
-      if (result)
-        vm->stack.items[vm->stack.len - 1] = result;
+      vm->stack.items[vm->stack.len - 1] = result;
 
       --vm->recursion_level;
     } break;
@@ -388,7 +423,6 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
 
       Value *last = stack_last(vm);
       ++last->refs_count;
-
       Str name = get_str(instr->as.def_var.name_id);
       Var new_var = { name, last };
       DA_APPEND(vm->current_frame->vars, new_var);
@@ -612,6 +646,8 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
         node = node->next;
       }
 
+      node->next = NULL;
+
       vm->stack.len -= instr->as.list.len;
 
       Value *new_value = value_list(new_list, vm->current_frame);
@@ -648,60 +684,16 @@ void execute_instrs(Vm *vm, Instrs *instrs) {
   }
 }
 
-static void load_labels(Ir *ir, LabelsTables *tables, Arena *arena) {
-  tables->cap += ir->len;
-  LabelsTable *new_items = arena_alloc(arena, tables->cap * sizeof(LabelsTable));
-  memcpy(new_items, tables->items, tables->len * sizeof(LabelsTable));
-  tables->items = new_items;
+Value *execute_get(Vm *vm, Func *func) {
+  vm->current_func_labels = &func->labels;
 
-  for (u32 i = 0; i < ir->len; ++i) {
-    LabelsTable table = {0};
-
-    for (u32 j = 0; j < ir->items[i].instrs.len; ++j) {
-      Instr *instr = ir->items[i].instrs.items + j;
-      if (instr->kind != InstrKindLabel)
-        continue;
-
-      u64 index = instr->as.label.name_id % LABELS_HASH_TABLE_CAP;
-
-      Label *entry = table.items[index];
-      while (entry && entry->next)
-        entry = entry->next;
-
-      Label *label = arena_alloc(arena, sizeof(Label));
-      *label = (Label) {
-        instr->as.label.name_id,
-        j, NULL,
-      };
-
-      if (entry)
-        entry->next = label;
-      else
-        table.items[index] = label;
-    }
-
-    tables->items[i + tables->len] = table;
-  }
-
-  tables->len += ir->len;
-}
-
-Value *execute(Vm *vm, Ir *ir, bool value_expected) {
-  DA_EXTEND(vm->ir, *ir);
-
-  load_labels(ir, &vm->labels, &vm->current_frame->arena);
-
-  execute_instrs(vm, &ir->items[0].instrs);
-
-  vm->funcs_offset += ir->len;
-
-  if (!value_expected)
-    return NULL;
+  load_labels(func);
+  execute(vm, &func->instrs);
 
   if (vm->stack.len == 0)
     return value_unit(vm->frames);
-
-  return stack_last(vm);
+  else
+    return vm->stack.items[--vm->stack.len];
 }
 
 Value *stack_last(Vm *vm) {
@@ -745,12 +737,7 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
     memcpy(buffer, argv[i], len);
 
     ListNode *new_arg = arena_alloc(&vm.current_frame->arena, sizeof(ListNode));
-    new_arg->value = arena_alloc(&vm.current_frame->arena, sizeof(Value));
-    *new_arg->value = (Value) {
-      ValueKindString,
-      { .string = { { buffer, len } } },
-      0, 1, false,
-    };
+    new_arg->value = value_string(STR(buffer, len), vm.current_frame);
 
     args_end->next = new_arg;
     args_end = new_arg;

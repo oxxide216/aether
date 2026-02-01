@@ -104,9 +104,9 @@
   dest)
 
 (let with \collection key value ->
-  (let - collection)
-  (set! - key value)
-  -)
+  (let new collection)
+  (set! new key value)
+  new)
 
 (let from \collection index ->
   (get-range collection index (len collection)))
