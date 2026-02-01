@@ -65,11 +65,10 @@
 (let term/raw-mode-off \-> import 'term/raw-mode-off')
 
 (let term/get-key-inner \char ->
-  (if (and (!= char '')
-           (not (is-alpha char)))
-    (+ char (term/get-key-inner (input-size 1)))
+  (if (or (== char '') (is-alpha char))
+    char
    else
-    ''))
+    (+ char (term/get-key-inner (input-size 1)))))
 
 (let term/get-key \->
   (let key (input-size 1))

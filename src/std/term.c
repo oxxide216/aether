@@ -15,6 +15,7 @@ Value *get_size_intrinsic(Vm *vm, Value **args) {
   ioctl(0, TIOCGWINSZ, &_size);
 
   Dict *size = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
+  memset(size, 0, sizeof(Dict));
 
   Value *rows = value_alloc(vm->current_frame);
   rows->kind = ValueKindInt;
