@@ -1,6 +1,6 @@
 # Aether
 
-### 🔥 [Try it online!](https://oxxide216.github.io/aether)
+### [Try it online!](https://oxxide216.github.io/aether)
 
 Lisp-like interpreted functional programming language.
 
