@@ -162,7 +162,7 @@
 (print term/save term/save-pos)
 
 (let is-running true)
-(while is-running
+(\->
   (set term-size (term/get-size))
   (render-view)
   (set prev-row row)
@@ -170,7 +170,10 @@
     (render-prompt)
     (update-prompt)
    else
-    (update-view)))
+    (update-view))
+
+  (if is-running
+    (<->)))
 
 (print term/show term/load-pos term/load)
 (term/raw-mode-off)
