@@ -5,8 +5,6 @@
 #include "aether/vm.h"
 #include "aether/misc.h"
 
-bool catch_kill = false;
-
 static struct termios default_term_state = {0};
 static bool is_term_state_initialized = false;
 
@@ -46,7 +44,7 @@ Value *raw_mode_on_intrinsic(Vm *vm, Value **args) {
   term_state.c_lflag = ~(ECHO | ICANON);
   tcsetattr(0, TCSANOW, &term_state);
 
-  catch_kill = true;
+  vm->catch_kill_signal = true;
 
   return value_unit(vm->current_frame);
 }
@@ -58,7 +56,7 @@ Value *raw_mode_off_intrinsic(Vm *vm, Value **args) {
   if (is_term_state_initialized)
     tcsetattr(0, TCSANOW, &default_term_state);
 
-  catch_kill = false;
+  vm->catch_kill_signal = false;
 
   return value_unit(vm->current_frame);
 }

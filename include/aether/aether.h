@@ -11,7 +11,7 @@ typedef struct {
   Macros       macros;
   FilePaths    included_files;
   IncludePaths include_paths;
-  Vm           vm;
+  u32          vm_index;
 } AetherCtx;
 
 AetherCtx  aether_init(i32 argc, char **argv, bool debug,
@@ -23,5 +23,6 @@ void       aether_eval_macros(AetherCtx *ctx,
                               u8 *macros_buffer,
                               u32 macros_len);
 void       aether_cleanup(AetherCtx *ctx);
+i32        aether_exit_code(AetherCtx *ctx);
 
 #endif // AETHER_H

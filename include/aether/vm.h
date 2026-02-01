@@ -96,6 +96,7 @@ struct Vm {
   u16           recursion_level;
   u16           trace_level;
   u16           max_trace_level;
+  bool          catch_kill_signal;
 };
 
 struct Env {

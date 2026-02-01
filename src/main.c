@@ -50,7 +50,9 @@ i32 main(i32 argc, char **argv) {
 
   free(code.ptr);
 
+  i32 exit_code = aether_exit_code(&ctx);
+
   aether_cleanup(&ctx);
 
-  return ctx.vm.exit_code;
+  return exit_code;
 }

@@ -214,17 +214,17 @@ void value_free(Value *value) {
       if (value->as.env->include_paths.items)
         free(value->as.env->include_paths.items);
 
-      for (u32 i = 0; i < value->as.env->cached_asts.len; ++i)
-        arena_free(&value->as.env->cached_asts.items[i].arena);
-
-      if (value->as.env->cached_asts.items)
-        free(value->as.env->cached_asts.items);
-
       for (u32 i = 0; i < value->as.env->cached_irs.len; ++i)
         ir_free(value->as.env->cached_irs.items[i]);
 
       if (value->as.env->cached_irs.items)
         free(value->as.env->cached_irs.items);
+
+      for (u32 i = 0; i < value->as.env->cached_asts.len; ++i)
+        arena_free(&value->as.env->cached_asts.items[i].arena);
+
+      if (value->as.env->cached_asts.items)
+        free(value->as.env->cached_asts.items);
 
       vm_destroy(value->as.env->vm);
     }
