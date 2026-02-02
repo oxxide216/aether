@@ -44,6 +44,7 @@ typedef struct {
   CachedASTs   *cached_asts;
   Arena        *arena;
   bool          use_macros;
+  bool          as_header;
   u32           index;
   u32           current_func;
   Da(u32)       label_indices;
@@ -352,7 +353,7 @@ static Exprs  parser_parse_block(Parser *parser, u64 end_id_mask);
 Exprs parse_ex(Str code, Str *file_path, Macros *macros,
                FilePaths *included_files, IncludePaths *include_paths,
                CachedASTs *cached_asts, Arena *arena, bool use_macros,
-               u32 *root_label_index) {
+               bool as_header, u32 *root_label_index) {
   u64 code_hash = str_hash(code);
 
   for (u32 i = 0; i < cached_asts->len; ++i) {
@@ -393,6 +394,7 @@ Exprs parse_ex(Str code, Str *file_path, Macros *macros,
   parser.include_paths = include_paths;
   parser.arena = arena;
   parser.use_macros = use_macros;
+  parser.as_header = as_header;
 
   if (root_label_index)
     DA_APPEND(parser.label_indices, *root_label_index);
@@ -722,6 +724,11 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
 
       parser_expect_token(parser, MASK(TT_CPAREN));
 
+      expr->kind = ExprKindBlock;
+
+      if (parser->as_header)
+        break;
+
       StringBuilder path_sb = {0};
       Str code = { NULL, (u32) -1 };
       Str path = {0};
@@ -772,8 +779,6 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
         exit(1);
       }
 
-      expr->kind = ExprKindBlock;
-
       for (u32 i = 0; i < parser->included_files->len; ++i)
         if (str_eq(*parser->included_files->items[i], path))
           return expr;
@@ -815,7 +820,7 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
         expr->as.block = parse_ex(code, path_ptr, parser->macros,
                                   parser->included_files, parser->include_paths,
                                   parser->cached_asts, &arena, parser->use_macros,
-                                  &parser->label_indices.items[0]);
+                                  parser->as_header, &parser->label_indices.items[0]);
       }
     } break;
 

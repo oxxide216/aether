@@ -29,7 +29,7 @@ typedef Da(Ir) CachedIrs;
 Exprs parse_ex(Str code, Str *file_path, Macros *macros,
                FilePaths *included_files, IncludePaths *include_paths,
                CachedASTs *cached_asts, Arena *arena, bool use_macros,
-               u32 *root_label_index);
+               bool as_header, u32 *root_label_index);
 Ir parse(Str code, Str *file_path, CachedASTs *cached_asts);
 
 #endif // PARSER_H

@@ -61,7 +61,7 @@ Value *aether_eval(AetherCtx *ctx, Str code, Str file_path) {
   Exprs ast = parse_ex(code, &vm->current_file_path,
                        &ctx->macros, &ctx->included_files,
                        &ctx->include_paths, &ctx->asts,
-                       &ctx->arena, false, NULL);
+                       &ctx->arena, false, false, NULL);
 
   expand_macros_block(&ast, &ctx->macros, NULL, NULL, false,
                       &ctx->arena, &vm->current_file_path,

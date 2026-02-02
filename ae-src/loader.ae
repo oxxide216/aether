@@ -64,7 +64,7 @@
         (panic 'Could not write to ' output-path)))
   mode-compile-macros-only =>
     (do
-      (let content (join [core-content base-content (to-str input-file-content)] '\n'))
+      (let content (to-str input-file-content))
       (let compiled (compile env content input-path include-paths true))
 
       (if (unit? compiled::'compiled-macros')

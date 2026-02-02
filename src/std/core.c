@@ -244,6 +244,8 @@ Value *map_intrinsic(Vm *vm, Value **args) {
       new_list_next = &(*new_list_next)->next;
     }
 
+    *new_list_next = NULL;
+
     vm->stack.len -= 2;
     node = node->next;
   }
@@ -1189,7 +1191,7 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
 
   Exprs ast = parse_ex(code->as.string.str, &path->as.string.str,
                        &env->as.env->macros, &included_files, &_include_paths,
-                       &cached_asts, &ir_arena, true, NULL);
+                       &cached_asts, &ir_arena, true, compile_macros->as._bool, NULL);
 
   expand_macros_block(&ast, &env->as.env->macros, NULL, NULL, false,
                       &ir_arena, &path->as.string.str, 0, 0, false);
@@ -1311,7 +1313,7 @@ Value *eval_intrinsic(Vm *vm, Value **args) {
 
   Exprs ast = parse_ex(code->as.string.str, &path->as.string.str,
                        &env->as.env->macros, &included_files, &_include_paths,
-                       &env->as.env->cached_asts, &ir_arena, false, NULL);
+                       &env->as.env->cached_asts, &ir_arena, false, false, NULL);
 
   expand_macros_block(&ast, &env->as.env->macros, NULL, NULL, false,
                       &ir_arena, &path->as.string.str, 0, 0, false);

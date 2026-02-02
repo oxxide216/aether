@@ -420,9 +420,6 @@ static void serialize_ast(Exprs *ast, u8 **data, u32 *data_size,
 }
 
 u8 *serialize_macros(Macros *macros, u32 *size, FilePaths *included_files) {
-  if (macros->len == 0)
-    return NULL;
-
   *size = sizeof(u32) * 2;
   u32 data_size = sizeof(u32) * 2;
   u8 *data = malloc(data_size);
