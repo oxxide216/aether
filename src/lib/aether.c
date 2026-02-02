@@ -1,7 +1,9 @@
 #include <locale.h>
 #include <signal.h>
 
+#ifdef CRYPTO
 #include "sodium.h"
+#endif
 #include "aether/aether.h"
 #include "aether/deserializer.h"
 #include "aether/macros.h"
