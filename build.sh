@@ -12,6 +12,9 @@ LIB_SRC="$(find src/lib -name "*.c")"
 STD_SRC="src/std/core.c src/std/math.c src/std/str.c"
 LIBS_SRC="$(find libs/lexgen/src/runtime -name "*.c") libs/lexgen/src/common/wstr.c"
 
+LIBSODIUM_VERSION="1.0.21"
+LIBSODIUM_NAME="libsodium-$LIBSODIUM_VERSION"
+
 if [ "$NOSYSTEM" == "" ]; then
   STD_SRC="$STD_SRC src/std/base.c src/std/io.c \
                     src/std/net.c src/std/path.c \
@@ -41,17 +44,9 @@ if [ "$GLASS" != "" ]; then
 fi
 
 if [ "$CRYPTO" != "" ]; then
-  CFLAGS="$CFLAGS -Ilibs/libsodium-stable/src/libsodium/include \
-          -L./libs/libsodium-stable/src/libsodium/.libs -lsodium -DCRYPTO"
+  CFLAGS="$CFLAGS -DCRYPTO -Ilibs/blake2/ref"
+  LIBS_SRC="$LIBS_SRC libs/blake2/ref/blake2b-ref.c"
   STD_SRC="$STD_SRC src/std/crypto.c"
-
-  if [ ! -e libs/libsodium-stable/src/libsodium/.libs/libsodium.a ]; then
-    cd libs/libsodium-stable
-    ./configure
-    make
-    make install
-    cd ../../
-  fi
 fi
 
 cd libs/lexgen
@@ -88,7 +83,7 @@ if [ "$WASM" != "" ]; then
 
   for FILE in ae-src/std/*.ae; do
     FILE_NAME="${FILE##*/}"
-    ./aether --no-dce -m "dest/std/${FILE_NAME%.*}.abm" "$FILE" > /dev/null
+    ./aether --no-dce -m "dest/std/${FILE_NAME%.*}.abm" "$FILE" &> /dev/null
   done
 
   cp -r dest/* js-src/aether-web.js docs/
