@@ -5,6 +5,10 @@ if [ "$1" == "" ]; then
   exit 1
 fi
 
-rm -rf "$1"
+if [ -e "$1" ]; then
+  echo "Output directory already exists"
+  exit 1
+fi
+
 mkdir -p "$1"
 cp -r /usr/local/include/aether/wasm/* "$1"
