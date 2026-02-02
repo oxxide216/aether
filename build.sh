@@ -40,6 +40,20 @@ if [ "$GLASS" != "" ]; then
   fi
 fi
 
+if [ "$CRYPTO" != "" ]; then
+  CFLAGS="$CFLAGS -Ilibs/libsodium-stable/src/libsodium/include \
+          -L./libs/libsodium-stable/src/libsodium/.libs -lsodium -DCRYPTO"
+  STD_SRC="$STD_SRC src/std/crypto.c"
+
+  if [ ! -e libs/libsodium-stable/src/libsodium/.libs/libsodium.a ]; then
+    cd libs/libsodium-stable
+    ./configure
+    make
+    make install
+    cd ../../
+  fi
+fi
+
 cd libs/lexgen
 ./build.sh
 cd ../..

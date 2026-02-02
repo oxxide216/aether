@@ -1,6 +1,7 @@
 #include <locale.h>
 #include <signal.h>
 
+#include "sodium.h"
 #include "aether/aether.h"
 #include "aether/deserializer.h"
 #include "aether/macros.h"
@@ -30,6 +31,11 @@ AetherCtx aether_init(i32 argc, char **argv, bool debug,
   setlocale(LC_ALL, "");
 
   signal(SIGINT, sigint_handler);
+
+#ifdef CRYPTO
+  if (sodium_init() < 0)
+    ERROR("Failed to initialize libsodium\n");
+#endif
 
   AetherCtx ctx = {0};
 

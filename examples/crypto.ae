@@ -1,0 +1,3 @@
+(use 'std/crypto')
+
+(println (crypto/hash 'hello world'))

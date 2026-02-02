@@ -22,5 +22,8 @@ MODULE(glass);
 #ifdef EMSCRIPTEN
 MODULE(web);
 #endif
+#ifdef CRYPTO
+MODULE(crypto);
+#endif
 
 #endif // INTRINSICS_H

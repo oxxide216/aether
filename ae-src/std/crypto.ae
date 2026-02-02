@@ -1,0 +1,1 @@
+(let crypto/hash \message -> import 'crypto/hash')
