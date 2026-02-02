@@ -41,7 +41,7 @@ static char *value_to_cstr(Value *value) {
 
 EMSCRIPTEN_KEEPALIVE
 char *emscripten_eval_compiled(u8 *bytecode, u32 bytecode_len) {
-  Value *result = aether_eval_bytecode(&ctx, bytecode, bytecode_len, true);
+  Value *result = aether_eval_bytecode(&ctx, bytecode, bytecode_len);
 
   return value_to_cstr(result);
 }
@@ -56,7 +56,7 @@ char *emscripten_eval(char *code, char *file_path) {
   Str code_str = { code, strlen(code) };
   Str file_path_str = { file_path, strlen(file_path) };
 
-  Value *result = aether_eval(&ctx, code_str, file_path_str, true);
+  Value *result = aether_eval(&ctx, code_str, file_path_str);
 
   return value_to_cstr(result);
 }

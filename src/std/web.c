@@ -162,7 +162,7 @@ bool key_event_callback(i32 event_type, const EmscriptenKeyboardEvent *key_event
   Value *event_data_value = value_dict(event_data_dict, event_data->vm->current_frame);
 
   DA_APPEND(event_data->vm->stack, event_data_value);
-  execute_func(event_data->vm, event_data->callback, NULL, false);
+  execute_func(event_data->vm, event_data->callback, NULL);
   --event_data->vm->stack.len;
 
   return true;
@@ -189,7 +189,7 @@ bool mouse_event_callback(i32 event_type, const EmscriptenMouseEvent *mouse_even
   Value *event_data_value = value_dict(event_data_dict, event_data->vm->current_frame);
 
   DA_APPEND(event_data->vm->stack, event_data_value);
-  execute_func(event_data->vm, event_data->callback, NULL, false);
+  execute_func(event_data->vm, event_data->callback, NULL);
   --event_data->vm->stack.len;
 
   return true;
