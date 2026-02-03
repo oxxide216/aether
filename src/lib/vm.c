@@ -852,6 +852,10 @@ void vm_stop(Vm *vm) {
 }
 
 void vm_destroy(Vm *vm) {
+#ifdef EMSCRIPTEN
+  while (vm->pending_fetches > 0);
+#endif
+
   StackFrame *frame = vm->frames;
   while (frame) {
     StackFrame *next = frame->next;

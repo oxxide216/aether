@@ -74,7 +74,8 @@ if [ "$WASM" != "" ]; then
                   -s WASM=1 -s MEMORY64 -s FULL_ES3=1 \
                   -s USE_WEBGL2=1 -s USE_GLFW=0 \
                   -s ENVIRONMENT=web -s SINGLE_FILE=1 \
-                  -s FETCH"
+                  -s FETCH=1"
+
   LDFLAGS=
   BIN_SRC="src/emscripten-main.c"
   STD_SRC="$STD_SRC src/std/web.c"

@@ -23,6 +23,12 @@ typedef struct {
   FuncValue *callback;
 } EventData;
 
+typedef struct {
+  Vm        *vm;
+  FuncValue *ok_callback;
+  FuncValue *fail_callback;
+} FetchData;
+
 static char *str_to_cstr(Str str) {
   char *cstr = malloc(str.len + 1);
   memcpy(cstr, str.ptr, str.len);
@@ -237,35 +243,91 @@ SET_CALLBACK(on_mouse_move, emscripten_set_mousemove_callback, mouse_event_callb
 SET_CALLBACK(on_mouse_enter, emscripten_set_mouseenter_callback, mouse_event_callback);
 SET_CALLBACK(on_mouse_leave, emscripten_set_mouseleave_callback, mouse_event_callback);
 
+void fetch_ok(emscripten_fetch_t *fetch) {
+  FetchData *fetch_data = fetch->userData;
+
+  Bytes bytes;
+  bytes.len = fetch->numBytes;
+  bytes.ptr = arena_alloc(&fetch_data->vm->current_frame->arena, fetch->numBytes);
+  memcpy(bytes.ptr, fetch->data, fetch->numBytes);
+  Value *resource = value_bytes(bytes, fetch_data->vm->current_frame);
+  DA_APPEND(fetch_data->vm->stack, resource);
+
+  execute_func(fetch_data->vm, fetch_data->ok_callback, NULL);
+
+  --fetch_data->vm->stack.len;
+  --fetch_data->vm->pending_fetches;
+
+  emscripten_fetch_close(fetch);
+}
+
+void fetch_fail(emscripten_fetch_t *fetch) {
+  FetchData *fetch_data = fetch->userData;
+
+  Value *code = value_int(fetch->status, fetch_data->vm->current_frame);
+  DA_APPEND(fetch_data->vm->stack, code);
+
+  execute_func(fetch_data->vm, fetch_data->fail_callback, NULL);
+
+  --fetch_data->vm->stack.len;
+  --fetch_data->vm->pending_fetches;
+
+  emscripten_fetch_close(fetch);
+}
+
 Value *fetch_intrinsic(Vm *vm, Value **args) {
   Value *path = args[0];
+  Value *ok_callback = args[1];
 
   char *path_cstr = arena_alloc(&vm->current_frame->arena,
                                 path->as.string.str.len + 1);
   memcpy(path_cstr, path->as.string.str.ptr, path->as.string.str.len);
   path_cstr[path->as.string.str.len] = '\0';
 
+  FetchData *fetch_data = arena_alloc(&vm->frames->arena, sizeof(FetchData));
+  fetch_data->vm = vm;
+  fetch_data->ok_callback = ok_callback->as.func;
+
   emscripten_fetch_attr_t attr;
   emscripten_fetch_attr_init(&attr);
   strcpy(attr.requestMethod, "GET");
-  attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY | EMSCRIPTEN_FETCH_SYNCHRONOUS;
-  emscripten_fetch_t *fetch = emscripten_fetch(&attr, path_cstr);
+  attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY;
+  attr.userData = fetch_data;
+  attr.onsuccess = fetch_ok;
+  emscripten_fetch(&attr, path_cstr);
 
-  Value *result;
+  ++vm->pending_fetches;
 
-  if (fetch->status == 200) {
-    Bytes bytes;
-    bytes.len = fetch->numBytes;
-    bytes.ptr = arena_alloc(&vm->current_frame->arena, fetch->numBytes);
-    memcpy(bytes.ptr, fetch->data, fetch->numBytes);
-    result = value_bytes(bytes, vm->current_frame);
-  } else {
-    result = value_unit(vm->current_frame);
-  }
+  return value_unit(vm->current_frame);
+}
 
-  emscripten_fetch_close(fetch);
+Value *fetch_check_intrinsic(Vm *vm, Value **args) {
+  Value *path = args[0];
+  Value *ok_callback = args[1];
+  Value *fail_callback = args[2];
 
-  return result;
+  char *path_cstr = arena_alloc(&vm->current_frame->arena,
+                                path->as.string.str.len + 1);
+  memcpy(path_cstr, path->as.string.str.ptr, path->as.string.str.len);
+  path_cstr[path->as.string.str.len] = '\0';
+
+  FetchData *fetch_data = arena_alloc(&vm->frames->arena, sizeof(FetchData));
+  fetch_data->vm = vm;
+  fetch_data->ok_callback = ok_callback->as.func;
+  fetch_data->fail_callback = fail_callback->as.func;
+
+  emscripten_fetch_attr_t attr;
+  emscripten_fetch_attr_init(&attr);
+  strcpy(attr.requestMethod, "GET");
+  attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY;
+  attr.userData = fetch_data;
+  attr.onsuccess = fetch_ok;
+  attr.onerror = fetch_fail;
+  emscripten_fetch(&attr, path_cstr);
+
+  ++vm->pending_fetches;
+
+  return value_unit(vm->current_frame);
 }
 
 Intrinsic web_intrinsics[] = {
@@ -287,7 +349,10 @@ Intrinsic web_intrinsics[] = {
   { STR_LIT("console-log"), false, 1, { ValueKindString }, &console_log_intrinsic, NULL },
   { STR_LIT("console-warn"), false, 1, { ValueKindString }, &console_warn_intrinsic, NULL },
   { STR_LIT("console-error"), false, 1, { ValueKindString }, &console_error_intrinsic, NULL },
-  { STR_LIT("fetch"), true, 1, { ValueKindString }, &fetch_intrinsic, NULL },
+  { STR_LIT("fetch"), false, 2, { ValueKindString, ValueKindFunc }, &fetch_intrinsic, NULL },
+  { STR_LIT("fetch-check"), false, 3,
+    { ValueKindString, ValueKindFunc, ValueKindFunc },
+    &fetch_check_intrinsic, NULL },
 };
 
 u32 web_intrinsics_len = ARRAY_LEN(web_intrinsics);

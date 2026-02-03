@@ -97,6 +97,9 @@ struct Vm {
   u16           trace_level;
   u16           max_trace_level;
   bool          catch_kill_signal;
+#ifdef EMSCRIPTEN
+  u16           pending_fetches;
+#endif
 };
 
 struct Env {
