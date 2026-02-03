@@ -227,6 +227,8 @@ static u32 value_str_len(Value *value, u32 level, bool kind, bool quote_string) 
         num /= 10;
         len += 1;
       }
+
+      len += 1;
     }
   } break;
 
@@ -247,6 +249,8 @@ static u32 value_str_len(Value *value, u32 level, bool kind, bool quote_string) 
         num *= 10.0;
         ++len;
       }
+
+      len += 1;
     }
   } break;
 
@@ -375,7 +379,7 @@ void buffer_append_value(char *buffer, u32 *used, Value *value,
       *used += 3;
     } else {
       i64 num = value->as._int;
-      u32 len = 0;
+      u32 len = 1;
 
       if (num < 0) {
         num *= -1;
@@ -398,7 +402,7 @@ void buffer_append_value(char *buffer, u32 *used, Value *value,
       *used += 5;
     } else {
       f64 num = value->as._float;
-      u32 len = 0;
+      u32 len = 1;
 
       if (num < 0.0) {
         num *= -1.0;
@@ -409,6 +413,8 @@ void buffer_append_value(char *buffer, u32 *used, Value *value,
         num /= 10.0;
         len += 1.0;
       }
+
+      ++len;
 
       while (num - (f64) (i64) num > 0.0) {
         num *= 10.0;
