@@ -25,8 +25,8 @@
 (let -console-warn \message -> import 'console-warn')
 (let -console-error \message -> import 'console-error')
 
-(let fetch \path ok-callback -> import 'fetch')
-(let fetch-check \path ok-callback fail-callback -> import 'fetch-check')
+(let fetch \method path ok-callback -> import 'fetch')
+(let fetch-check \method path ok-callback fail-callback -> import 'fetch-check')
 
 (macro console-log \...messages ->
   (-console-log (join [messages] '')))

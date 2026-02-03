@@ -276,8 +276,9 @@ void fetch_fail(emscripten_fetch_t *fetch) {
 }
 
 Value *fetch_intrinsic(Vm *vm, Value **args) {
-  Value *path = args[0];
-  Value *ok_callback = args[1];
+  Value *method = args[0];
+  Value *path = args[1];
+  Value *ok_callback = args[2];
 
   char *path_cstr = arena_alloc(&vm->current_frame->arena,
                                 path->as.string.str.len + 1);
@@ -289,8 +290,12 @@ Value *fetch_intrinsic(Vm *vm, Value **args) {
   fetch_data->ok_callback = ok_callback->as.func;
 
   emscripten_fetch_attr_t attr;
+
+  if (method->as.string.str.len > sizeof(attr.requestMethod))
+    return value_unit(vm->current_frame);
+
   emscripten_fetch_attr_init(&attr);
-  strcpy(attr.requestMethod, "GET");
+  memcpy(attr.requestMethod, method->as.string.str.ptr, method->as.string.str.len);
   attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY;
   attr.userData = fetch_data;
   attr.onsuccess = fetch_ok;
@@ -302,9 +307,10 @@ Value *fetch_intrinsic(Vm *vm, Value **args) {
 }
 
 Value *fetch_check_intrinsic(Vm *vm, Value **args) {
-  Value *path = args[0];
-  Value *ok_callback = args[1];
-  Value *fail_callback = args[2];
+  Value *method = args[0];
+  Value *path = args[1];
+  Value *ok_callback = args[2];
+  Value *fail_callback = args[3];
 
   char *path_cstr = arena_alloc(&vm->current_frame->arena,
                                 path->as.string.str.len + 1);
@@ -317,8 +323,12 @@ Value *fetch_check_intrinsic(Vm *vm, Value **args) {
   fetch_data->fail_callback = fail_callback->as.func;
 
   emscripten_fetch_attr_t attr;
+
+  if (method->as.string.str.len > sizeof(attr.requestMethod))
+    return value_unit(vm->current_frame);
+
   emscripten_fetch_attr_init(&attr);
-  strcpy(attr.requestMethod, "GET");
+  memcpy(attr.requestMethod, method->as.string.str.ptr, method->as.string.str.len);
   attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY;
   attr.userData = fetch_data;
   attr.onsuccess = fetch_ok;
@@ -349,9 +359,12 @@ Intrinsic web_intrinsics[] = {
   { STR_LIT("console-log"), false, 1, { ValueKindString }, &console_log_intrinsic, NULL },
   { STR_LIT("console-warn"), false, 1, { ValueKindString }, &console_warn_intrinsic, NULL },
   { STR_LIT("console-error"), false, 1, { ValueKindString }, &console_error_intrinsic, NULL },
-  { STR_LIT("fetch"), false, 2, { ValueKindString, ValueKindFunc }, &fetch_intrinsic, NULL },
-  { STR_LIT("fetch-check"), false, 3,
-    { ValueKindString, ValueKindFunc, ValueKindFunc },
+  { STR_LIT("fetch"), false, 3,
+    { ValueKindString, ValueKindString, ValueKindFunc },
+    &fetch_intrinsic, NULL },
+  { STR_LIT("fetch-check"), false, 4,
+    { ValueKindString, ValueKindString,
+      ValueKindFunc, ValueKindFunc },
     &fetch_check_intrinsic, NULL },
 };
 
