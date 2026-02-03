@@ -46,8 +46,8 @@
 
 (let env (make-env parsed-args))
 
-(let core-content (load-module env 'core' core-paths))
-(let base-content (load-module env 'base' base-paths))
+(load-module env 'core' core-paths)
+(load-module env 'base' base-paths)
 
 (match mode
   mode-default => (eval env (to-str input-file-content)
@@ -56,7 +56,7 @@
   mode-eval-macros => (eval-macros env input-file-content)
   mode-compile-only =>
     (do
-      (let content (join [core-content base-content (to-str input-file-content)] '\n'))
+      (let content (join [(to-str input-file-content) '(use \'core\')' '(use \'base\')\n'] '\n'))
       (let compiled (compile env content input-path include-paths false))
 
       (let success (write-file output-path compiled::'compiled'))
