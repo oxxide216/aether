@@ -401,6 +401,11 @@ Value *fetch_check_intrinsic(Vm *vm, Value **args) {
 void main_loop_callback(void *arg) {
   EventData *event_data = (EventData *) arg;
 
+  if (event_data->vm->state == ExecStateExit) {
+    emscripten_cancel_main_loop();
+    return;
+  }
+
   execute_func(event_data->vm, event_data->callback, NULL);
 
   Value *last = stack_last(event_data->vm);
