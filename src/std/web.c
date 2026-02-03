@@ -405,13 +405,14 @@ void main_loop_callback(void *arg) {
 }
 
 Value *main_loop_intrinsic(Vm *vm, Value **args) {
-  Value *body = args[0];
+  Value *fps = args[0];
+  Value *body = args[1];
 
   EventData *event_data = arena_alloc(&vm->frames->arena, sizeof(EventData));
   event_data->vm = vm;
   event_data->callback = body->as.func;
 
-  emscripten_set_main_loop_arg(main_loop_callback, event_data, 15, false);
+  emscripten_set_main_loop_arg(main_loop_callback, event_data, fps->as._int, false);
 
   return value_unit(vm->current_frame);
 }
@@ -445,7 +446,7 @@ Intrinsic web_intrinsics[] = {
     { ValueKindString, ValueKindString, ValueKindString,
       ValueKindFunc, ValueKindFunc },
     &fetch_check_intrinsic, NULL },
-  { STR_LIT("main-loop"), false, 1, { ValueKindFunc }, &main_loop_intrinsic, NULL },
+  { STR_LIT("main-loop"), false, 2, { ValueKindInt, ValueKindFunc }, &main_loop_intrinsic, NULL },
 };
 
 u32 web_intrinsics_len = ARRAY_LEN(web_intrinsics);

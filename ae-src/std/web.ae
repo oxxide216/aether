@@ -30,7 +30,7 @@
 (let fetch \method path body ok-callback -> import 'fetch')
 (let fetch-check \method path body ok-callback fail-callback -> import 'fetch-check')
 
-(let main-loop \body -> import 'main-loop')
+(let main-loop \fps body -> import 'main-loop')
 
 (macro console-log \...messages ->
   (-console-log (join [messages] '')))
