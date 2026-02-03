@@ -208,10 +208,10 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta) {
     Intrinsic *intrinsic = get_intrinsic(vm, intrinsic_name, func->args.len, args);
     if (!intrinsic) {
       if (meta)
-        ERROR(META_FMT"Intrinsic "STR_FMT,
+        ERROR(META_FMT"Intrinsic ("STR_FMT,
               META_ARG(*meta), STR_ARG(intrinsic_name));
       else
-        ERROR("Intrinsic "STR_FMT,
+        ERROR("Intrinsic ("STR_FMT,
               STR_ARG(intrinsic_name));
 
       for (u32 i = 0; i < func->args.len; ++i) {
@@ -219,7 +219,7 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta) {
         fprint_value(stderr, args[i], true);
       }
 
-      fprintf(stderr, " was not found\n");
+      fprintf(stderr, ") was not found\n");
 
       vm->state = ExecStateExit;
       vm->exit_code = 1;

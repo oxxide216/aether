@@ -449,13 +449,14 @@ void fprint_value(FILE *stream, Value *value, bool kind) {
   StringBuilder sb = {0};
   sb_push_value(&sb, value, 0, kind, true);
 
-  str_fprintln(stream, sb_to_str(sb));
+  str_fprint(stream, sb_to_str(sb));
 
   free(sb.buffer);
 }
 
 void print_value(Value *value, bool kind) {
   fprint_value(stdout, value, kind);
+  putc('\n', stdout);
 }
 
 Value *get_from_string(Vm *vm, Str string, i64 index) {
