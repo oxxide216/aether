@@ -1,5 +1,6 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
+#include <emscripten/fetch.h>
 
 #include "aether/vm.h"
 #include "aether/misc.h"
@@ -236,6 +237,37 @@ SET_CALLBACK(on_mouse_move, emscripten_set_mousemove_callback, mouse_event_callb
 SET_CALLBACK(on_mouse_enter, emscripten_set_mouseenter_callback, mouse_event_callback);
 SET_CALLBACK(on_mouse_leave, emscripten_set_mouseleave_callback, mouse_event_callback);
 
+Value *fetch_intrinsic(Vm *vm, Value **args) {
+  Value *path = args[0];
+
+  char *path_cstr = arena_alloc(&vm->current_frame->arena,
+                                path->as.string.str.len + 1);
+  memcpy(path_cstr, path->as.string.str.ptr, path->as.string.str.len);
+  path_cstr[path->as.string.str.len] = '\0';
+
+  emscripten_fetch_attr_t attr;
+  emscripten_fetch_attr_init(&attr);
+  strcpy(attr.requestMethod, "GET");
+  attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY | EMSCRIPTEN_FETCH_SYNCHRONOUS;
+  emscripten_fetch_t *fetch = emscripten_fetch(&attr, path_cstr);
+
+  Value *result;
+
+  if (fetch->status == 200) {
+    Bytes bytes;
+    bytes.len = fetch->numBytes;
+    bytes.ptr = arena_alloc(&vm->current_frame->arena, fetch->numBytes);
+    memcpy(bytes.ptr, fetch->data, fetch->numBytes);
+    result = value_bytes(bytes, vm->current_frame);
+  } else {
+    result = value_unit(vm->current_frame);
+  }
+
+  emscripten_fetch_close(fetch);
+
+  return result;
+}
+
 Intrinsic web_intrinsics[] = {
   { STR_LIT("alert"), false, 1, { ValueKindString }, &alert_intrinsic, NULL },
   { STR_LIT("update-html"), false, 2, { ValueKindString, ValueKindString }, &update_html_intrinsic, NULL },
@@ -255,6 +287,7 @@ Intrinsic web_intrinsics[] = {
   { STR_LIT("console-log"), false, 1, { ValueKindString }, &console_log_intrinsic, NULL },
   { STR_LIT("console-warn"), false, 1, { ValueKindString }, &console_warn_intrinsic, NULL },
   { STR_LIT("console-error"), false, 1, { ValueKindString }, &console_error_intrinsic, NULL },
+  { STR_LIT("fetch"), true, 1, { ValueKindString }, &fetch_intrinsic, NULL },
 };
 
 u32 web_intrinsics_len = ARRAY_LEN(web_intrinsics);

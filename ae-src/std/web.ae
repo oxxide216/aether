@@ -25,6 +25,8 @@
 (let -console-warn \message -> import 'console-warn')
 (let -console-error \message -> import 'console-error')
 
+(let fetch \path -> import 'fetch')
+
 (macro console-log \...messages ->
   (-console-log (join [messages] '')))
 
