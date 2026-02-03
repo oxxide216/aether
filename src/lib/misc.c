@@ -164,146 +164,342 @@ Value **get_child_root(Value *value, Value *key, InstrMeta *meta, Vm *vm) {
   } else if (value->kind == ValueKindDict) {
     return dict_get_value_root(value->as.dict, key);
   } else {
-    StringBuilder type_sb = {0};
-    sb_push_value(&type_sb, value, 0, true, true);
-
-    Str type = sb_to_str(type_sb);
+    Str type = value_to_str(value, true, false, &vm->current_frame->arena);
 
     PANIC_ARGS(*meta, "Value of type "STR_FMT" cannot be indexed\n",
                STR_ARG(type));
   }
 }
 
-void sb_push_value(StringBuilder *sb, Value *value,
-                   u32 level, bool kind, bool quote_string) {
+static u32 value_str_len(Value *value, u32 level, bool kind, bool quote_string) {
+  u32 len = 0;
+
   switch (value->kind) {
   case ValueKindUnit: {
-    sb_push(sb, "unit");
+    len += 4;
   } break;
 
   case ValueKindList: {
-    sb_push_char(sb, '[');
+    len += 2;
 
     ListNode *node = value->as.list->next;
     while (node) {
       if (node != value->as.list->next)
-        sb_push_char(sb, ' ');
+        len += 1;
 
-      sb_push_value(sb, node->value, level, kind, true);
+      len += value_str_len(node->value, level, kind, quote_string);
 
       node = node->next;
     }
 
-    sb_push_char(sb, ']');
   } break;
 
   case ValueKindString: {
     if (kind) {
-      sb_push(sb, "string");
+      len += 6;
     } else {
       if (quote_string)
-        sb_push_char(sb, '\'');
+        len += 2;
 
       for (u32 i = 0; i < value->as.string.str.len; ++i) {
         char _char = value->as.string.str.ptr[i];
 
         if (_char == '\n' && quote_string)
-          sb_push(sb, "\\n");
+          len += 2;
         else
-          sb_push_char(sb, _char);
+          len += 1;
       }
-
-      if (quote_string)
-        sb_push_char(sb, '\'');
     }
   } break;
 
   case ValueKindInt: {
-    if (kind)
-      sb_push(sb, "int");
-    else
-      sb_push_i64(sb, value->as._int);
+    if (kind) {
+      len += 3;
+    } else {
+      i64 num = value->as._int;
+
+      if (num < 0) {
+        num *= -1;
+        len += 1;
+      }
+
+      while (num >= 10) {
+        num /= 10;
+        len += 1;
+      }
+    }
   } break;
 
   case ValueKindFloat: {
-    if (kind)
-      sb_push(sb, "float");
-    else
-      sb_push_f64(sb, value->as._float);
+    if (kind) {
+      len += 5;
+    } else {
+      f64 num = value->as._float;
+
+      while (num >= 10.0) {
+        num /= 10.0;
+        len += 1;
+      }
+
+      len += 1;
+
+      while (num - (f64) (i64) num > 0.0) {
+        num *= 10.0;
+        ++len;
+      }
+    }
   } break;
 
   case ValueKindBool: {
     if (kind) {
-      sb_push(sb, "bool");
+      len += 4;
     } else {
       if (value->as._bool)
-        sb_push(sb, "true");
+        len += 4;
       else
-        sb_push(sb, "false");
+        len += 5;
     }
   } break;
 
   case ValueKindFunc: {
-    sb_push_char(sb, '\\');
+    len += 1;
 
     for (u32 i = 0; i < value->as.func->args.len; ++i) {
       if (i > 0)
-        sb_push_char(sb, ' ');
+        len += 1;
 
       Str arg_name = get_str(value->as.func->args.items[i]);
-      sb_push_str(sb, arg_name);
+      len += arg_name.len;
     }
 
     if (value->as.func->args.len > 0)
-      sb_push_char(sb, ' ');
-    sb_push(sb, "-> ");
+      len += 1;
+    len += 4;
 
     if (value->as.func->intrinsic_name_id == (u16) -1) {
-      sb_push(sb, "...");
+      len += 3;
     } else {
       Str intrinsic_name = get_str(value->as.func->intrinsic_name_id);
-      sb_push_str(sb, intrinsic_name);
+      len += intrinsic_name.len;
     }
   } break;
 
   case ValueKindDict: {
-    sb_push(sb, "{\n");
+    len += 3 + level;
 
     for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
       DictValue *entry = value->as.dict->items[i];
       while (entry) {
-        for (u32 j = 0; j < level + 1; ++j)
-          sb_push(sb, "  ");
+        len += level * 2 + 2;
 
-        sb_push_value(sb, entry->key, level + 1, kind, true);
-        sb_push(sb, ": ");
-        sb_push_value(sb, entry->value, level + 1, kind, true);
+        len += value_str_len(entry->key, level + 1, kind, quote_string);
+        len += 2;
+        len += value_str_len(entry->value, level + 1, kind, quote_string);
+        len += 1;
 
-        sb_push_char(sb, '\n');
+        entry = entry->next;
+      }
+    }
+  } break;
+
+  case ValueKindEnv: {
+    len += 11;
+  } break;
+
+  case ValueKindBytes: {
+    if (kind)
+      len += 5;
+    else
+      len += value->as.bytes.len;
+  } break;
+
+  default: {
+    ERROR("Unknown value kind: %u\n", value->kind);
+  } break;
+  }
+
+  return len;
+}
+
+void buffer_append_value(char *buffer, u32 *used, Value *value,
+                         u32 level, bool kind, bool quote_string) {
+  switch (value->kind) {
+  case ValueKindUnit: {
+    memcpy(buffer + *used, "unit", 4);
+    *used += 4;
+  } break;
+
+  case ValueKindList: {
+    buffer[(*used)++] = '[';
+
+    ListNode *node = value->as.list->next;
+    while (node) {
+      if (node != value->as.list->next)
+        buffer[(*used)++] = ' ';
+
+      buffer_append_value(buffer, used, node->value, level, kind, true);
+
+      node = node->next;
+    }
+
+    buffer[(*used)++] = ']';
+  } break;
+
+  case ValueKindString: {
+    if (kind) {
+      memcpy(buffer + *used, "string", 6);
+      *used += 6;
+    } else {
+      if (quote_string)
+        buffer[(*used)++] = '\'';
+
+      for (u32 i = 0; i < value->as.string.str.len; ++i) {
+        char _char = value->as.string.str.ptr[i];
+
+        if (_char == '\n' && quote_string) {
+          buffer[(*used)++] = '\\';
+          buffer[(*used)++] = 'n';
+        } else {
+          buffer[(*used)++] = _char;
+        }
+      }
+
+      if (quote_string)
+        buffer[(*used)++] = '\'';
+    }
+  } break;
+
+  case ValueKindInt: {
+    if (kind) {
+      memcpy(buffer + *used, "int", 3);
+      *used += 3;
+    } else {
+      i64 num = value->as._int;
+      u32 len = 0;
+
+      if (num < 0) {
+        num *= -1;
+        len += 1;
+      }
+
+      while (num >= 10) {
+        num /= 10;
+        len += 1;
+      }
+
+      snprintf(buffer + *used, len + 1, "%ld", value->as._int);
+      *used += len;
+    }
+  } break;
+
+  case ValueKindFloat: {
+    if (kind) {
+      memcpy(buffer + *used, "float", 5);
+      *used += 5;
+    } else {
+      f64 num = value->as._float;
+      u32 len = 0;
+
+      if (num < 0.0) {
+        num *= -1.0;
+        len += 1.0;
+      }
+
+      while (num >= 10.0) {
+        num /= 10.0;
+        len += 1.0;
+      }
+
+      while (num - (f64) (i64) num > 0.0) {
+        num *= 10.0;
+        len += 1;
+      }
+
+      snprintf(buffer + *used, len + 1, "%f", value->as._float);
+      *used += len;
+    }
+  } break;
+
+  case ValueKindBool: {
+    if (kind) {
+      memcpy(buffer + *used, "bool", 4);
+      *used += 4;
+    } else {
+      if (value->as._bool) {
+        memcpy(buffer + *used, "true", 4);
+        *used += 4;
+      } else {
+        memcpy(buffer + *used, "false", 5);
+        *used += 5;
+      }
+    }
+  } break;
+
+  case ValueKindFunc: {
+    buffer[(*used)++] = '\\';
+
+    for (u32 i = 0; i < value->as.func->args.len; ++i) {
+      if (i > 0)
+        buffer[(*used)++] = ' ';
+
+      Str arg_name = get_str(value->as.func->args.items[i]);
+      memcpy(buffer + *used, arg_name.ptr, arg_name.len);
+      *used += arg_name.len;
+    }
+
+    if (value->as.func->args.len > 0)
+      buffer[(*used)++] = ' ';
+    memcpy(buffer + *used, "-> ", 3);
+    *used += 3;
+
+    if (value->as.func->intrinsic_name_id == (u16) -1) {
+      memcpy(buffer + *used, "...", 3);
+      *used += 3;
+    } else {
+      Str intrinsic_name = get_str(value->as.func->intrinsic_name_id);
+      memcpy(buffer + *used, intrinsic_name.ptr, intrinsic_name.len);
+      *used += intrinsic_name.len;
+    }
+  } break;
+
+  case ValueKindDict: {
+    buffer[(*used)++] = '{';
+    buffer[(*used)++] = '\n';
+
+    for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
+      DictValue *entry = value->as.dict->items[i];
+      while (entry) {
+        for (u32 j = 0; j < level * 2 + 2; ++j)
+          buffer[(*used)++] = ' ';
+
+        buffer_append_value(buffer, used, entry->key, level + 1, kind, true);
+        buffer[(*used)++] = ':';
+        buffer[(*used)++] = ' ';
+        buffer_append_value(buffer, used, entry->value, level + 1, kind, true);
+
+        buffer[(*used)++] = '\n';
 
         entry = entry->next;
       }
     }
 
-    for (u32 j = 0; j < level; ++j)
-      sb_push(sb, "  ");
-    sb_push_char(sb, '}');
+    for (u32 i = 0; i < level * 2; ++i)
+      buffer[(*used)++] = ' ';
+    buffer[(*used)++] = '}';
   } break;
 
   case ValueKindEnv: {
-    sb_push(sb, "environment");
+    memcpy(buffer + *used, "environment", 11);
+    *used += 11;
   } break;
 
   case ValueKindBytes: {
     if (kind) {
-      sb_push(sb, "bytes");
+      memcpy(buffer + *used, "bytes", 5);
+      *used += 5;
     } else {
-      Str bytes_string = {
-        (char *) value->as.bytes.ptr,
-        value->as.bytes.len,
-      };
-
-      sb_push_str(sb, bytes_string);
+      memcpy(buffer + *used, value->as.bytes.ptr, value->as.bytes.len);
+      *used += value->as.bytes.len;
     }
   } break;
 
@@ -311,6 +507,17 @@ void sb_push_value(StringBuilder *sb, Value *value,
     ERROR("Unknown value kind: %u\n", value->kind);
   } break;
   }
+}
+
+Str value_to_str(Value *value, bool kind, bool quote_string, Arena *arena) {
+  Str result;
+  result.len = value_str_len(value, 0, kind, quote_string);
+  result.ptr = arena_alloc(arena, result.len);
+
+  u32 used = 0;
+  buffer_append_value(result.ptr, &used, value, 0, kind, quote_string);
+
+  return result;
 }
 
 void print_instr(Instr *instr, bool hide_strings) {
@@ -445,17 +652,13 @@ void print_instr(Instr *instr, bool hide_strings) {
   }
 }
 
-void fprint_value(FILE *stream, Value *value, bool kind) {
-  StringBuilder sb = {0};
-  sb_push_value(&sb, value, 0, kind, true);
-
-  str_fprint(stream, sb_to_str(sb));
-
-  free(sb.buffer);
+void fprint_value(FILE *stream, Value *value, bool kind, Arena *arena) {
+  Str str = value_to_str(value, kind, true, arena);
+  str_fprint(stream, str);
 }
 
-void print_value(Value *value, bool kind) {
-  fprint_value(stdout, value, kind);
+void print_value(Value *value, bool kind, Arena *arena) {
+  fprint_value(stdout, value, kind, arena);
   putc('\n', stdout);
 }
 

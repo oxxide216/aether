@@ -653,15 +653,7 @@ Value *add_byte_8_intrinsic(Vm *vm, Value **args) {
 Value *to_str_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
-  StringBuilder sb = {0};
-  sb_push_value(&sb, value, 0, false, true);
-
-  Str string;
-  string.len = sb.len;
-  string.ptr = arena_alloc(&vm->current_frame->arena, string.len);
-  memcpy(string.ptr, sb.buffer, string.len);
-
-  free(sb.buffer);
+  Str string = value_to_str(value, false, true, &vm->current_frame->arena);
 
   return value_string(string, vm->current_frame);
 }

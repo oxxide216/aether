@@ -25,16 +25,12 @@ void emscripten_create(void) {
 }
 
 static char *value_to_cstr(Value *value) {
-  StringBuilder sb = {0};
-  sb_push_value(&sb, value, 0, false, false);
-
-  char *cstr = malloc(sb.len + 1);
-  memcpy(cstr, sb.buffer, sb.len);
-  cstr[sb.len] = '\0';
+  Str str = value_to_str(value, false, false, &vm.current_frame->arena);
+  char *cstr = malloc(str.len + 1);
+  memcpy(cstr, str.ptr, str.len);
+  cstr[str.len] = '\0';
 
   DA_APPEND(cstrs, cstr);
-
-  free(sb.buffer);
 
   return cstr;
 }

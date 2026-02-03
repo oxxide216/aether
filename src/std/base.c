@@ -8,27 +8,33 @@
 
 #define DEFAULT_INPUT_BUFFER_SIZE   64
 
-StringBuilder printf_sb = {0};
+#ifdef EMSCRIPTEN
+StringBuilder log_sb = {0};
+#endif
 
 Value *printf_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
-  printf_sb.len = 0;
-
   ListNode *node = value->as.list->next;
   while (node) {
-    sb_push_value(&printf_sb, node->value, 0, false, false);
+    Str string = value_to_str(node->value, false, false, &vm->current_frame->arena);
+
+#ifdef EMSCRIPTEN
+    sb_push_str(&log_sb, string);
+#else
+    str_print(string);
+#endif
 
     node = node->next;
   }
 
 #ifdef EMSCRIPTEN
-  sb_push_char(&printf_sb, '\0');
+  Str string = sb_to_str(log_sb);
   EM_ASM({
     console.log(UTF8ToString($0));
-  }, printf_sb.buffer);
+  }, string);
+  log_sb.len = 0;
 #else
-  str_print(STR(printf_sb.buffer, printf_sb.len));
   fflush(stdout);
 #endif
 

@@ -7,7 +7,7 @@
 
 #ifndef NOSYSTEM
 // From base.c
-extern StringBuilder printf_sb;
+extern StringBuilder log_sb;
 #endif // NOSYSTEM
 // From common.c
 extern Arena intern_arena;
@@ -113,12 +113,12 @@ void aether_eval_macros(AetherCtx *ctx,
 }
 
 void aether_cleanup(AetherCtx *ctx) {
-#ifndef NOSYSTEM
-  if (printf_sb.buffer)
-    free(printf_sb.buffer);
-  printf_sb.buffer = NULL;
-  printf_sb.len = 0;
-  printf_sb.cap = 0;
+#ifdef EMSCRIPTEN
+  if (log_sb.buffer)
+    free(log_sb.buffer);
+  log_sb.buffer = NULL;
+  log_sb.len = 0;
+  log_sb.cap = 0;
 #endif
 
   arena_free(&intern_arena);

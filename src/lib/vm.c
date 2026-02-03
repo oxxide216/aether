@@ -27,28 +27,24 @@
     return;                                            \
   } while (false)
 
-static void print_stack_dump(Values *stack) {
-  StringBuilder sb = {0};
+static void print_stack_dump(Values *stack, Arena *arena) {
   u32 begin = 0;
 
   if (stack->len >= STACK_DUMP_LEN)
     begin = stack->len - STACK_DUMP_LEN;
 
   for (u32 j = begin; j < stack->len; ++j) {
-    sb_push(&sb, " -> ");
-    sb_push_value(&sb, stack->items[j], 0, false, true);
-    sb_push_char(&sb, '\n');
+    fputs(" -> ", stdout);
+    Str value = value_to_str(stack->items[j], false, true, arena);
+    str_print(value);
+    fputc('\n', stdout);
   }
-
-  str_print(sb_to_str(sb));
-
-  free(sb.buffer);
 }
 
 static bool ensure_stack_len_is_enough(Vm *vm, u32 min_len, InstrMeta *meta) {
   if (vm->stack.len < min_len + vm->frame_begin) {
     INFO("Stack dump:\n");
-    print_stack_dump(&vm->stack);
+    print_stack_dump(&vm->stack, &vm->current_frame->arena);
     ERROR(META_FMT"Not enough values on the stack: expected %u, got %u\n",
           META_ARG(*meta), min_len, vm->stack.len);
     vm->exit_code = 1;
@@ -216,7 +212,7 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta) {
 
       for (u32 i = 0; i < func->args.len; ++i) {
         putc(' ', stderr);
-        fprint_value(stderr, args[i], true);
+        fprint_value(stderr, args[i], true, &vm->current_frame->arena);
       }
 
       fprintf(stderr, ") was not found\n");
@@ -383,18 +379,15 @@ void execute(Vm *vm, Instrs *instrs) {
       Value *func = vm->stack.items[vm->stack.len - deep];
 
       if (func->kind != ValueKindFunc) {
-        StringBuilder kind_sb = {0};
-        sb_push_value(&kind_sb, func, 0, true, false);
+        Str kind = value_to_str(func, true, false, &vm->current_frame->arena);
 
         INFO("Stack dump:\n");
-        print_stack_dump(&vm->stack);
+        print_stack_dump(&vm->stack, &vm->current_frame->arena);
 
         ERROR(META_FMT "Value of type "STR_FMT" is not callable\n",
-              META_ARG(instr->meta), STR_ARG(sb_to_str(kind_sb)));
+              META_ARG(instr->meta), STR_ARG(kind));
         vm->state = ExecStateExit;
         vm->exit_code = 1;
-
-        free(kind_sb.buffer);
 
         return;
       }

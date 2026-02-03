@@ -29,11 +29,10 @@ Value  *dict_get_value(Dict *dict, Value *key);
 void    dict_set_value(StackFrame *frame, Dict *dict,
                        Value *key, Value *value);
 Value **get_child_root(Value *value, Value *key, InstrMeta *meta, Vm *vm);
-void    sb_push_value(StringBuilder *sb, Value *value,
-                      u32 level, bool kind, bool quote_string);
+Str     value_to_str(Value *value, bool kind, bool quote_string, Arena *arena);
 void    print_instr(Instr *instr, bool hide_strings);
-void    fprint_value(FILE *stream, Value *value, bool kind);
-void    print_value(Value *value, bool kind);
+void    fprint_value(FILE *stream, Value *value, bool kind, Arena *arena);
+void    print_value(Value *value, bool kind, Arena *arena);
 Value  *get_from_string(Vm *vm, Str string, i64 index);
 
 #endif // MISC_H
