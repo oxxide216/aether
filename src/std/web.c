@@ -325,6 +325,10 @@ void fetch_ok(emscripten_fetch_t *fetch) {
   --fetch_data->vm->stack.len;
   --fetch_data->vm->pending_fetches;
 
+  free(fetch_data->ok_callback);
+  if (fetch_data->fail_callback)
+    free(fetch_data->fail_callback);
+
   emscripten_fetch_close(fetch);
 }
 
@@ -338,6 +342,9 @@ void fetch_fail(emscripten_fetch_t *fetch) {
 
   --fetch_data->vm->stack.len;
   --fetch_data->vm->pending_fetches;
+
+  free(fetch_data->ok_callback);
+  free(fetch_data->fail_callback);
 
   emscripten_fetch_close(fetch);
 }
@@ -353,9 +360,12 @@ Value *fetch_intrinsic(Vm *vm, Value **args) {
   memcpy(path_cstr, path->as.string.str.ptr, path->as.string.str.len);
   path_cstr[path->as.string.str.len] = '\0';
 
+  FuncValue *ok_callback_temp = malloc(sizeof(FuncValue));
+  memcpy(ok_callback_temp, ok_callback->as.func, sizeof(FuncValue));
+
   FetchData *fetch_data = arena_alloc(&vm->frames->arena, sizeof(FetchData));
   fetch_data->vm = vm;
-  fetch_data->ok_callback = ok_callback->as.func;
+  fetch_data->ok_callback = ok_callback_temp;
 
   emscripten_fetch_attr_t attr;
 
@@ -388,10 +398,16 @@ Value *fetch_check_intrinsic(Vm *vm, Value **args) {
   memcpy(path_cstr, path->as.string.str.ptr, path->as.string.str.len);
   path_cstr[path->as.string.str.len] = '\0';
 
+  FuncValue *ok_callback_temp = malloc(sizeof(FuncValue));
+  memcpy(ok_callback_temp, ok_callback->as.func, sizeof(FuncValue));
+
+  FuncValue *fail_callback_temp = malloc(sizeof(FuncValue));
+  memcpy(fail_callback_temp, fail_callback->as.func, sizeof(FuncValue));
+
   FetchData *fetch_data = arena_alloc(&vm->frames->arena, sizeof(FetchData));
   fetch_data->vm = vm;
-  fetch_data->ok_callback = ok_callback->as.func;
-  fetch_data->fail_callback = fail_callback->as.func;
+  fetch_data->ok_callback = ok_callback_temp;
+  fetch_data->fail_callback = fail_callback_temp;
 
   emscripten_fetch_attr_t attr;
 
