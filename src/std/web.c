@@ -402,6 +402,13 @@ void main_loop_callback(void *arg) {
   EventData *event_data = (EventData *) arg;
 
   execute_func(event_data->vm, event_data->callback, NULL);
+
+  Value *last = stack_last(event_data->vm);
+  if ((last->kind == ValueKindBool && last->as._bool) ||
+      event_data->vm->state == ExecStateExit)
+    emscripten_cancel_main_loop();
+
+  --event_data->vm->stack.len;
 }
 
 Value *main_loop_intrinsic(Vm *vm, Value **args) {
