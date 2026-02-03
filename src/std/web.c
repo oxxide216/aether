@@ -170,9 +170,16 @@ bool key_event_callback(i32 event_type, const EmscriptenKeyboardEvent *key_event
 
   DA_APPEND(event_data->vm->stack, event_data_value);
   execute_func(event_data->vm, event_data->callback, NULL);
-  --event_data->vm->stack.len;
 
-  return true;
+  bool consumed = false;
+
+  Value *last = stack_last(event_data->vm);
+  if (last->kind == ValueKindBool && last->as._bool)
+    consumed = true;
+
+  event_data->vm->stack.len -= 2;
+
+  return consumed;
 }
 
 bool mouse_event_callback(i32 event_type, const EmscriptenMouseEvent *mouse_event, void *data) {
@@ -197,9 +204,16 @@ bool mouse_event_callback(i32 event_type, const EmscriptenMouseEvent *mouse_even
 
   DA_APPEND(event_data->vm->stack, event_data_value);
   execute_func(event_data->vm, event_data->callback, NULL);
-  --event_data->vm->stack.len;
 
-  return true;
+  bool consumed = false;
+
+  Value *last = stack_last(event_data->vm);
+  if (last->kind == ValueKindBool && last->as._bool)
+    consumed = true;
+
+  event_data->vm->stack.len -= 2;
+
+  return consumed;
 }
 
 Value *console_log_intrinsic(Vm *vm, Value **args) {
