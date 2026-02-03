@@ -87,6 +87,24 @@ Value *update_text_intrinsic(Vm *vm, Value **args) {
   return value_unit(vm->current_frame);
 }
 
+Value *update_value_intrinsic(Vm *vm, Value **args) {
+  Value *name = args[0];
+  Value *text = args[1];
+
+  char *name_cstr = str_to_cstr(name->as.string.str);
+  char *text_cstr = str_to_cstr(text->as.string.str);
+
+  EM_ASM({
+    const element = document.querySelector(UTF8ToString($0));
+    element.value = UTF8ToString($1);
+  }, name_cstr, text_cstr);
+
+  free(name_cstr);
+  free(text_cstr);
+
+  return value_unit(vm->current_frame);
+}
+
 Value *get_html_intrinsic(Vm *vm, Value **args) {
   Value *name = args[0];
 
@@ -115,6 +133,26 @@ Value *get_text_intrinsic(Vm *vm, Value **args) {
   char *text = EM_ASM_PTR({
     const element = document.querySelector(UTF8ToString($0));
     return stringToNewUTF8(element.textContent);
+  }, name_cstr);
+
+  u32 text_len = strlen(text);
+  char *text_in_arena = arena_alloc(&vm->current_frame->arena, text_len);
+  memcpy(text_in_arena, text, text_len);
+
+  free(name_cstr);
+  free(text);
+
+  return value_string(STR(text_in_arena, text_len), vm->current_frame);
+}
+
+Value *get_value_intrinsic(Vm *vm, Value **args) {
+  Value *name = args[0];
+
+  char *name_cstr = str_to_cstr(name->as.string.str);
+
+  char *text = EM_ASM_PTR({
+    const element = document.querySelector(UTF8ToString($0));
+    return stringToNewUTF8(element.value);
   }, name_cstr);
 
   u32 text_len = strlen(text);
@@ -358,8 +396,10 @@ Intrinsic web_intrinsics[] = {
   { STR_LIT("alert"), false, 1, { ValueKindString }, &alert_intrinsic, NULL },
   { STR_LIT("update-html"), false, 2, { ValueKindString, ValueKindString }, &update_html_intrinsic, NULL },
   { STR_LIT("update-text"), false, 2, { ValueKindString, ValueKindString }, &update_text_intrinsic, NULL },
+  { STR_LIT("update-value"), false, 2, { ValueKindString, ValueKindString }, &update_value_intrinsic, NULL },
   { STR_LIT("get-html"), true, 1, { ValueKindString }, &get_html_intrinsic, NULL },
   { STR_LIT("get-text"), true, 1, { ValueKindString }, &get_text_intrinsic, NULL },
+  { STR_LIT("get-value"), true, 1, { ValueKindString }, &get_value_intrinsic, NULL },
   { STR_LIT("on-key-press"), false, 2, { ValueKindString, ValueKindFunc }, &on_key_press_intrinsic, NULL },
   { STR_LIT("on-key-down"), false, 2, { ValueKindString, ValueKindFunc }, &on_key_down_intrinsic, NULL },
   { STR_LIT("on-key-up"), false, 2, { ValueKindString, ValueKindFunc }, &on_key_up_intrinsic, NULL },

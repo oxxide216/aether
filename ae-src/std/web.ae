@@ -7,8 +7,10 @@
 (let alert \text -> import 'alert')
 (let update-html \name html -> import 'update-html')
 (let update-text \name text -> import 'update-text')
+(let update-value \name value -> import 'update-value')
 (let get-html \name -> import 'get-html')
 (let get-text \name -> import 'get-text')
+(let get-value \name -> import 'get-value')
 
 (let on-key-press \name callback -> import 'on-key-press')
 (let on-key-down \name callback -> import 'on-key-down')
