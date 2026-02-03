@@ -209,6 +209,8 @@ Value *gen_range_intrinsic(Vm *vm, Value **args) {
     next = &(*next)->next;
   }
 
+  *next = NULL;
+
   return value_list(range, vm->current_frame);
 }
 
@@ -303,6 +305,8 @@ Value *filter_intrinsic(Vm *vm, Value **args) {
     node = node->next;
   }
 
+  *new_list_next = NULL;
+
   if (list->is_atom)
     return list;
   return value_list(new_list, vm->current_frame);
@@ -366,6 +370,8 @@ Value *zip_intrinsic(Vm *vm,Value **args) {
     node_a = node_a->next;
     node_b = node_b->next;
   }
+
+  *new_list_next = NULL;
 
   return value_list(new_list, vm->current_frame);
 }
