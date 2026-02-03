@@ -165,6 +165,21 @@ Value *get_value_intrinsic(Vm *vm, Value **args) {
   return value_string(STR(text_in_arena, text_len), vm->current_frame);
 }
 
+Value *focus_intrinsic(Vm *vm, Value **args) {
+  Value *name = args[0];
+
+  char *name_cstr = str_to_cstr(name->as.string.str);
+
+  EM_ASM({
+    const element = document.querySelector(UTF8ToString($0));
+    element.focus();
+  }, name_cstr);
+
+  free(name_cstr);
+
+  return value_unit(vm->current_frame);
+}
+
 bool key_event_callback(i32 event_type, const EmscriptenKeyboardEvent *key_event, void *data) {
   (void) event_type;
 
@@ -437,6 +452,7 @@ Intrinsic web_intrinsics[] = {
   { STR_LIT("get-html"), true, 1, { ValueKindString }, &get_html_intrinsic, NULL },
   { STR_LIT("get-text"), true, 1, { ValueKindString }, &get_text_intrinsic, NULL },
   { STR_LIT("get-value"), true, 1, { ValueKindString }, &get_value_intrinsic, NULL },
+  { STR_LIT("focus"), false, 1, { ValueKindString }, &focus_intrinsic, NULL },
   { STR_LIT("on-key-press"), false, 2, { ValueKindString, ValueKindFunc }, &on_key_press_intrinsic, NULL },
   { STR_LIT("on-key-down"), false, 2, { ValueKindString, ValueKindFunc }, &on_key_down_intrinsic, NULL },
   { STR_LIT("on-key-up"), false, 2, { ValueKindString, ValueKindFunc }, &on_key_up_intrinsic, NULL },

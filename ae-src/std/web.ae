@@ -11,6 +11,7 @@
 (let get-html \name -> import 'get-html')
 (let get-text \name -> import 'get-text')
 (let get-value \name -> import 'get-value')
+(let focus \name -> import 'focus')
 
 (let on-key-press \name callback -> import 'on-key-press')
 (let on-key-down \name callback -> import 'on-key-down')
