@@ -21,7 +21,7 @@ void emscripten_create(void) {
   i32 argc = 1;
   char *argv[] = { "aether", NULL };
   Intrinsics intrinsics = {0};
-  ctx = aether_init(argc, argv, false, &intrinsics);
+  ctx = aether_init(argc, argv, true, &intrinsics);
 }
 
 static char *value_to_cstr(Value *value) {

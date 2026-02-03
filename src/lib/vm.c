@@ -412,17 +412,6 @@ void execute(Vm *vm, Instrs *instrs) {
         break;
       }
 
-      if (++vm->recursion_level >= MAX_RECURSION_LEVEL) {
-        ERROR(META_FMT"Infinite recursion detected\n",
-              META_ARG(instr->meta));
-        INFO("Long trace, showing last %u calls\n",
-             MAX_RECURSION_TRACE_LEVEL);
-        vm->max_trace_level = MAX_RECURSION_TRACE_LEVEL;
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
-        return;
-      }
-
       execute_func(vm, func->as.func, &instr->meta);
       if (vm->state == ExecStateExit) {
         if (vm->trace_level++ < vm->max_trace_level &&
@@ -442,8 +431,6 @@ void execute(Vm *vm, Instrs *instrs) {
 
         return;
       }
-
-      --vm->recursion_level;
 
       Value *result = stack_last(vm);
       vm->stack.len -= instr->as.func_call.args_len + 1;
@@ -603,13 +590,20 @@ void execute(Vm *vm, Instrs *instrs) {
           if (key->kind != ValueKindInt)
             PANIC(instr->meta, "Value of type string can only be indexed with integer\n");
 
-          Value *sub_string = get_from_string(vm, value->as.string.str,
-                                              key->as._int);
+          Value *sub_string = get_from_string(vm, value->as.string.str, key->as._int);
 
           if (!sub_string)
             PANIC(instr->meta, "String index out of bounds\n");
 
           value = sub_string;
+        } else if (value->kind == ValueKindBytes) {
+          if (key->kind != ValueKindInt)
+            PANIC(instr->meta, "Value of type bytes can only be indexed with integer\n");
+
+          if (key->as._int >= value->as.bytes.len)
+            PANIC(instr->meta, "String index out of bounds\n");
+
+          value = value_int(value->as.bytes.ptr[key->as._int], vm->current_frame);
         } else {
           Value **root = get_child_root(value, key, &instr->meta, vm);
           if (vm->state != ExecStateContinue)
@@ -639,6 +633,21 @@ void execute(Vm *vm, Instrs *instrs) {
 
       if (parent->kind == ValueKindString)
         PANIC(instr->meta, "Value of type string cannot be mutated\n");
+
+      if (parent->kind == ValueKindBytes) {
+        if (key->kind != ValueKindInt)
+            PANIC(instr->meta, "Value of type bytes can only be indexed with integer\n");
+
+        if (new_value->kind != ValueKindInt)
+            PANIC(instr->meta, "Value of type bytes can only be mutated with integer\n");
+
+        if (key->as._int >= parent->as.bytes.len)
+          PANIC(instr->meta, "Bytes index out of bounds\n");
+
+        *(parent->as.bytes.ptr + key->as._int) = new_value->as._int;
+
+        continue;
+      }
 
       Value **root = get_child_root(parent, key, &instr->meta, vm);
       if (vm->state != ExecStateContinue)
