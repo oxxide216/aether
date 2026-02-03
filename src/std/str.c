@@ -128,48 +128,63 @@ Value *join_intrinsic(Vm *vm, Value **args) {
   Value *parts = args[0];
   Value *filler = args[1];
 
-  StringBuilder sb = {0};
+  u32 len = 0;
+  u32 used = 0;
   bool is_binary = false;
 
   ListNode *node = parts->as.list->next;
   while (node) {
     if (node != parts->as.list->next)
-      sb_push_value(&sb, filler, 0, false, false);
+      len += filler->as.string.str.len;
 
-    if (node->value->kind == ValueKindBytes)
+    if (node->value->kind == ValueKindBytes) {
       is_binary = true;
-    else if (node->value->kind != ValueKindString) {
+      len += node->value->as.bytes.len;
+    } else if (node->value->kind == ValueKindString) {
+      len += node->value->as.string.str.len;
+    } else {
       ERROR("join: wrong part kinds\n");
       vm->state = ExecStateExit;
       vm->exit_code = 1;
       return value_unit(vm->current_frame);
+    };
+
+    node = node->next;
+  }
+
+  char *joined_buffer = arena_alloc(&vm->current_frame->arena, len);
+
+  node = parts->as.list->next;
+  while (node) {
+    if (node != parts->as.list->next) {
+      memcpy(joined_buffer + used,
+             filler->as.string.str.ptr,
+             filler->as.string.str.len);
+      used += filler->as.string.str.len;
     }
 
-    sb_push_value(&sb, node->value, 0, false, false);
+    char *node_ptr = NULL;
+    u32 node_len = 0;
+    if (node->value->kind == ValueKindBytes) {
+      node_ptr = (char *) node->value->as.bytes.ptr;
+      node_len = node->value->as.bytes.len;
+    } else if (node->value->kind == ValueKindString) {
+      node_ptr = node->value->as.string.str.ptr;
+      node_len = node->value->as.string.str.len;
+    }
+
+    memcpy(joined_buffer + used, node_ptr, node_len);
+    used += node->value->as.string.str.len;
 
     node = node->next;
   }
 
   if (is_binary) {
-    Bytes joined = {
-      arena_alloc(&vm->current_frame->arena, sb.len),
-      sb.len,
-    };
-
-    memcpy(joined.ptr, sb.buffer, sb.len);
-    free(sb.buffer);
-
+    Bytes joined = { (u8 *) joined_buffer, len };
     return value_bytes(joined, vm->current_frame);
   }
 
-  Str joined = {
-    arena_alloc(&vm->current_frame->arena, sb.len),
-    sb.len,
-  };
-
-  memcpy(joined.ptr, sb.buffer, sb.len);
-  free(sb.buffer);
-
+  Str joined = { joined_buffer, len };
   return value_string(joined, vm->current_frame);
 }
 
