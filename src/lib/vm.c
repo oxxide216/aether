@@ -208,11 +208,18 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta) {
     Intrinsic *intrinsic = get_intrinsic(vm, intrinsic_name, func->args.len, args);
     if (!intrinsic) {
       if (meta)
-        ERROR(META_FMT"Intrinsic "STR_FMT":%u was not found\n",
-              META_ARG(*meta), STR_ARG(intrinsic_name), func->args.len);
+        ERROR(META_FMT"Intrinsic "STR_FMT,
+              META_ARG(*meta), STR_ARG(intrinsic_name));
       else
-        ERROR("Intrinsic "STR_FMT":%u was not found\n",
-              STR_ARG(intrinsic_name), func->args.len);
+        ERROR("Intrinsic "STR_FMT,
+              STR_ARG(intrinsic_name));
+
+      for (u32 i = 0; i < func->args.len; ++i) {
+        putc(' ', stderr);
+        fprint_value(stderr, args[i], true);
+      }
+
+      fprintf(stderr, " was not found\n");
 
       vm->state = ExecStateExit;
       vm->exit_code = 1;

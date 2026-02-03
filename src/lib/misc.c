@@ -445,13 +445,17 @@ void print_instr(Instr *instr, bool hide_strings) {
   }
 }
 
-void print_value(Value *value, bool kind) {
+void fprint_value(FILE *stream, Value *value, bool kind) {
   StringBuilder sb = {0};
   sb_push_value(&sb, value, 0, kind, true);
 
-  str_println(sb_to_str(sb));
+  str_fprintln(stream, sb_to_str(sb));
 
   free(sb.buffer);
+}
+
+void print_value(Value *value, bool kind) {
+  fprint_value(stdout, value, kind);
 }
 
 Value *get_from_string(Vm *vm, Str string, i64 index) {

@@ -32,6 +32,7 @@ Value **get_child_root(Value *value, Value *key, InstrMeta *meta, Vm *vm);
 void    sb_push_value(StringBuilder *sb, Value *value,
                       u32 level, bool kind, bool quote_string);
 void    print_instr(Instr *instr, bool hide_strings);
+void    fprint_value(FILE *stream, Value *value, bool kind);
 void    print_value(Value *value, bool kind);
 Value  *get_from_string(Vm *vm, Str string, i64 index);
 
