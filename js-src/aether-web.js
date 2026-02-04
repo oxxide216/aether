@@ -10,8 +10,8 @@ async function fetchBinaryFile(path) {
   return new Uint8Array(await content.arrayBuffer());
 }
 
-async function aetherInit(dataPrefix, initCallback) {
-  const appArray = await fetchBinaryFile(dataPrefix + '/app.abc');
+async function aetherInit(dataPrefix, mainFile, initCallback) {
+  const appArray = await fetchBinaryFile(dataPrefix + '/' + mainFile);
 
   Module = {
     onRuntimeInitialized: () => {
