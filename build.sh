@@ -87,6 +87,4 @@ if [ "$WASM" != "" ]; then
     FILE_NAME="${FILE##*/}"
     ./aether --no-dce -m "dest/std/${FILE_NAME%.*}.abm" "$FILE" &> /dev/null
   done
-
-  cp -r dest/* js-src/aether-web.js docs/
 fi
