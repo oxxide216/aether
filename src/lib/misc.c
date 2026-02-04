@@ -320,7 +320,7 @@ static u32 value_str_len(Value *value, u32 level, bool kind, bool quote_string) 
     if (kind)
       len += 5;
     else
-      len += value->as.bytes.len + 2;
+      len += value->as.bytes.len;
   } break;
 
   default: {
@@ -519,12 +519,8 @@ void buffer_append_value(char *buffer, u32 *used, Value *value,
       memcpy(buffer + *used, "bytes", 5);
       *used += 5;
     } else {
-      buffer[(*used)++] = '`';
-
       memcpy(buffer + *used, value->as.bytes.ptr, value->as.bytes.len);
       *used += value->as.bytes.len;
-
-      buffer[(*used)++] = '`';
     }
   } break;
 
