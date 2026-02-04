@@ -206,6 +206,12 @@ static u32 value_str_len(Value *value, u32 level, bool kind, bool quote_string) 
 
         if (_char == '\n' && quote_string)
           len += 2;
+        if (_char == '\r' && quote_string)
+          len += 2;
+        if (_char == '\t' && quote_string)
+          len += 2;
+        if (_char == '\v' && quote_string)
+          len += 2;
         else
           len += 1;
       }
@@ -314,7 +320,7 @@ static u32 value_str_len(Value *value, u32 level, bool kind, bool quote_string) 
     if (kind)
       len += 5;
     else
-      len += value->as.bytes.len;
+      len += value->as.bytes.len + 2;
   } break;
 
   default: {
@@ -363,6 +369,15 @@ void buffer_append_value(char *buffer, u32 *used, Value *value,
         if (_char == '\n' && quote_string) {
           buffer[(*used)++] = '\\';
           buffer[(*used)++] = 'n';
+        } else if (_char == '\r' && quote_string) {
+          buffer[(*used)++] = '\\';
+          buffer[(*used)++] = 'r';
+        } else if (_char == '\t' && quote_string) {
+          buffer[(*used)++] = '\\';
+          buffer[(*used)++] = 't';
+        } else if (_char == '\v' && quote_string) {
+          buffer[(*used)++] = '\\';
+          buffer[(*used)++] = 'v';
         } else {
           buffer[(*used)++] = _char;
         }
@@ -504,8 +519,12 @@ void buffer_append_value(char *buffer, u32 *used, Value *value,
       memcpy(buffer + *used, "bytes", 5);
       *used += 5;
     } else {
+      buffer[(*used)++] = '`';
+
       memcpy(buffer + *used, value->as.bytes.ptr, value->as.bytes.len);
       *used += value->as.bytes.len;
+
+      buffer[(*used)++] = '`';
     }
   } break;
 
