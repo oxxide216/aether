@@ -70,10 +70,11 @@ static Var *get_var(Vm *vm, Str name) {
   if (var)
     return var;
 
-  if (vm->current_func)
+  if (vm->current_func) {
     var = get_var_from(&vm->current_func->catched_vars, name);
-  if (var)
-    return var;
+    if (var)
+      return var;
+  }
 
   var = get_var_from(&vm->frames->vars, name);
   if (var)

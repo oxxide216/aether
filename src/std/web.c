@@ -25,6 +25,7 @@ typedef struct {
 
 typedef struct {
   Vm        *vm;
+  char      *body;
   FuncValue *ok_callback;
   FuncValue *fail_callback;
 } FetchData;
@@ -325,6 +326,8 @@ void fetch_ok(emscripten_fetch_t *fetch) {
   --fetch_data->vm->stack.len;
   --fetch_data->vm->pending_fetches;
 
+  if (fetch_data->body)
+    free(fetch_data->body);
   free(fetch_data->ok_callback);
   if (fetch_data->fail_callback)
     free(fetch_data->fail_callback);
@@ -343,6 +346,8 @@ void fetch_fail(emscripten_fetch_t *fetch) {
   --fetch_data->vm->stack.len;
   --fetch_data->vm->pending_fetches;
 
+  if (fetch_data->body)
+    free(fetch_data->body);
   free(fetch_data->ok_callback);
   free(fetch_data->fail_callback);
 
@@ -360,11 +365,15 @@ Value *fetch_intrinsic(Vm *vm, Value **args) {
   memcpy(path_cstr, path->as.string.str.ptr, path->as.string.str.len);
   path_cstr[path->as.string.str.len] = '\0';
 
+  char *body_data = malloc(body->as.string.str.len);
+  memcpy(body_data, body->as.string.str.ptr, body->as.string.str.len);
+
   FuncValue *ok_callback_temp = malloc(sizeof(FuncValue));
   memcpy(ok_callback_temp, ok_callback->as.func, sizeof(FuncValue));
 
   FetchData *fetch_data = arena_alloc(&vm->frames->arena, sizeof(FetchData));
   fetch_data->vm = vm;
+  fetch_data->body = body_data;
   fetch_data->ok_callback = ok_callback_temp;
 
   emscripten_fetch_attr_t attr;
@@ -377,7 +386,7 @@ Value *fetch_intrinsic(Vm *vm, Value **args) {
   attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY;
   attr.userData = fetch_data;
   attr.onsuccess = fetch_ok;
-  attr.requestData = body->as.string.str.ptr;
+  attr.requestData = body_data;
   attr.requestDataSize = body->as.string.str.len;
   emscripten_fetch(&attr, path_cstr);
 
@@ -398,6 +407,9 @@ Value *fetch_check_intrinsic(Vm *vm, Value **args) {
   memcpy(path_cstr, path->as.string.str.ptr, path->as.string.str.len);
   path_cstr[path->as.string.str.len] = '\0';
 
+  char *body_data = malloc(body->as.string.str.len);
+  memcpy(body_data, body->as.string.str.ptr, body->as.string.str.len);
+
   FuncValue *ok_callback_temp = malloc(sizeof(FuncValue));
   memcpy(ok_callback_temp, ok_callback->as.func, sizeof(FuncValue));
 
@@ -406,6 +418,7 @@ Value *fetch_check_intrinsic(Vm *vm, Value **args) {
 
   FetchData *fetch_data = arena_alloc(&vm->frames->arena, sizeof(FetchData));
   fetch_data->vm = vm;
+  fetch_data->body = body_data;
   fetch_data->ok_callback = ok_callback_temp;
   fetch_data->fail_callback = fail_callback_temp;
 
@@ -420,7 +433,7 @@ Value *fetch_check_intrinsic(Vm *vm, Value **args) {
   attr.userData = fetch_data;
   attr.onsuccess = fetch_ok;
   attr.onerror = fetch_fail;
-  attr.requestData = body->as.string.str.ptr;
+  attr.requestData = body_data;
   attr.requestDataSize = body->as.string.str.len;
   emscripten_fetch(&attr, path_cstr);
 
