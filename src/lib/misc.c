@@ -187,7 +187,7 @@ static u32 value_str_len(Value *value, u32 level, bool kind, bool quote_string) 
       if (node != value->as.list->next)
         len += 1;
 
-      len += value_str_len(node->value, level, kind, quote_string);
+      len += value_str_len(node->value, level, kind, true);
 
       node = node->next;
     }
@@ -289,16 +289,16 @@ static u32 value_str_len(Value *value, u32 level, bool kind, bool quote_string) 
   } break;
 
   case ValueKindDict: {
-    len += 3 + level;
+    len += 3 + level * 2;
 
     for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
       DictValue *entry = value->as.dict->items[i];
       while (entry) {
         len += level * 2 + 2;
 
-        len += value_str_len(entry->key, level + 1, kind, quote_string);
+        len += value_str_len(entry->key, level + 1, kind, true);
         len += 2;
-        len += value_str_len(entry->value, level + 1, kind, quote_string);
+        len += value_str_len(entry->value, level + 1, kind, true);
         len += 1;
 
         entry = entry->next;

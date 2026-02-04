@@ -174,7 +174,7 @@ Value *join_intrinsic(Vm *vm, Value **args) {
     }
 
     memcpy(joined_buffer + used, node_ptr, node_len);
-    used += node->value->as.string.str.len;
+    used += node_len;
 
     node = node->next;
   }
