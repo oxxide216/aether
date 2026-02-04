@@ -34,10 +34,10 @@
 (let main-loop \fps body -> import 'main-loop')
 
 (macro console-log \...messages ->
-  (-console-log (join [messages] '')))
+  (-console-log (join-any [messages] '')))
 
 (macro console-warn \...messages ->
-  (-console-warn (join [messages] '')))
+  (-console-warn (join-any [messages] '')))
 
 (macro console-error \...messages ->
-  (-console-error (join [messages] '')))
+  (-console-error (join-any [messages] '')))
