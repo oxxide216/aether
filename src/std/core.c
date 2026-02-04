@@ -653,7 +653,7 @@ Value *add_byte_8_intrinsic(Vm *vm, Value **args) {
 Value *to_str_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
-  Str string = value_to_str(value, false, true, &vm->current_frame->arena);
+  Str string = value_to_str(value, false, false, &vm->current_frame->arena);
 
   return value_string(string, vm->current_frame);
 }
@@ -687,7 +687,7 @@ Value *to_bytes_intrinsic(Vm *vm, Value **args) {
   return value_bytes(bytes, vm->current_frame);
 }
 
-Value *to_byte1_intrinsic(Vm *vm, Value **args) {
+Value *to_byte8_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
   Bytes bytes = {0};
@@ -697,7 +697,7 @@ Value *to_byte1_intrinsic(Vm *vm, Value **args) {
   return value_bytes(bytes, vm->current_frame);
 }
 
-Value *to_byte2_intrinsic(Vm *vm, Value **args) {
+Value *to_byte16_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
   Bytes bytes = {0};
@@ -707,7 +707,7 @@ Value *to_byte2_intrinsic(Vm *vm, Value **args) {
   return value_bytes(bytes, vm->current_frame);
 }
 
-Value *to_byte4_intrinsic(Vm *vm, Value **args) {
+Value *to_byte32_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
   Bytes bytes = {0};
@@ -717,7 +717,7 @@ Value *to_byte4_intrinsic(Vm *vm, Value **args) {
   return value_bytes(bytes, vm->current_frame);
 }
 
-Value *to_byte8_intrinsic(Vm *vm, Value **args) {
+Value *to_byte64_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
   Bytes bytes = {0};
@@ -730,25 +730,48 @@ Value *to_byte8_intrinsic(Vm *vm, Value **args) {
 Value *to_int_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
-  if (value->kind == ValueKindString) {
+  if (value->kind == ValueKindString)
     return value_int(str_to_i64(value->as.string.str), vm->current_frame);
-  } else if (value->kind == ValueKindBool) {
+  else if (value->kind == ValueKindBool)
     return value_int((i64) value->as._bool, vm->current_frame);
-  } else if (value->kind == ValueKindFloat) {
+  else if (value->kind == ValueKindFloat)
     return value_int((i64) value->as._float, vm->current_frame);
-  } else if (value->kind == ValueKindBytes) {
-    if (value->as.bytes.len >= sizeof(i64))
-      return value_int(*(i64 *) value->as.bytes.ptr, vm->current_frame);
 
-    if (value->as.bytes.len >= sizeof(i32))
-      return value_int(*(i32 *) value->as.bytes.ptr, vm->current_frame);
+  return value_unit(vm->current_frame);
+}
 
-    if (value->as.bytes.len >= sizeof(i16))
-      return value_int(*(i16 *) value->as.bytes.ptr, vm->current_frame);
+Value *to_int8_intrinsic(Vm *vm, Value **args) {
+  Value *value = args[0];
 
-    if (value->as.bytes.len >= sizeof(i8))
-      return value_int(*(i8 *) value->as.bytes.ptr, vm->current_frame);
-  }
+  if (value->as.bytes.len >= sizeof(u8))
+    return value_int(value->as.bytes.ptr[0], vm->current_frame);
+
+  return value_unit(vm->current_frame);
+}
+
+Value *to_int16_intrinsic(Vm *vm, Value **args) {
+  Value *value = args[0];
+
+  if (value->as.bytes.len >= sizeof(u16))
+    return value_int(((u16 *) value->as.bytes.ptr)[0], vm->current_frame);
+
+  return value_unit(vm->current_frame);
+}
+
+Value *to_int32_intrinsic(Vm *vm, Value **args) {
+  Value *value = args[0];
+
+  if (value->as.bytes.len >= sizeof(u32))
+    return value_int(((u32 *) value->as.bytes.ptr)[0], vm->current_frame);
+
+  return value_unit(vm->current_frame);
+}
+
+Value *to_int64_intrinsic(Vm *vm, Value **args) {
+  Value *value = args[0];
+
+  if (value->as.bytes.len >= sizeof(u64))
+    return value_int(((u64 *) value->as.bytes.ptr)[0], vm->current_frame);
 
   return value_unit(vm->current_frame);
 }
@@ -1435,25 +1458,23 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("for-each"), false, 2, { ValueKindString, ValueKindFunc }, &for_each_intrinsic, NULL },
   { STR_LIT("for-each"), false, 2, { ValueKindBytes, ValueKindFunc }, &for_each_intrinsic, NULL },
   { STR_LIT("for-each"), false, 2, { ValueKindDict, ValueKindFunc }, &for_each_intrinsic, NULL },
-  // Bytes
-  { STR_LIT("add-byte-64"), false, 2, { ValueKindBytes, ValueKindInt }, &add_byte_64_intrinsic, NULL },
-  { STR_LIT("add-byte-32"), false, 2, { ValueKindBytes, ValueKindInt }, &add_byte_32_intrinsic, NULL },
-  { STR_LIT("add-byte-16"), false, 2, { ValueKindBytes, ValueKindInt }, &add_byte_16_intrinsic, NULL },
-  { STR_LIT("add-byte-8"), false, 2, { ValueKindBytes, ValueKindInt }, &add_byte_8_intrinsic, NULL },
   // Conversions
   { STR_LIT("to-str"), true, 1, { ValueKindUnit }, &to_str_intrinsic, NULL },
   { STR_LIT("to-bytes"), true, 1, { ValueKindString }, &to_bytes_intrinsic, NULL },
   { STR_LIT("to-bytes"), true, 1, { ValueKindInt }, &to_bytes_intrinsic, NULL },
   { STR_LIT("to-bytes"), true, 1, { ValueKindFloat }, &to_bytes_intrinsic, NULL },
   { STR_LIT("to-bytes"), true, 1, { ValueKindBool }, &to_bytes_intrinsic, NULL },
-  { STR_LIT("to-byte1"), true, 1, { ValueKindInt }, &to_byte1_intrinsic, NULL },
-  { STR_LIT("to-byte2"), true, 1, { ValueKindInt }, &to_byte2_intrinsic, NULL },
-  { STR_LIT("to-byte4"), true, 1, { ValueKindInt }, &to_byte4_intrinsic, NULL },
   { STR_LIT("to-byte8"), true, 1, { ValueKindInt }, &to_byte8_intrinsic, NULL },
+  { STR_LIT("to-byte16"), true, 1, { ValueKindInt }, &to_byte16_intrinsic, NULL },
+  { STR_LIT("to-byte32"), true, 1, { ValueKindInt }, &to_byte32_intrinsic, NULL },
+  { STR_LIT("to-byte64"), true, 1, { ValueKindInt }, &to_byte64_intrinsic, NULL },
   { STR_LIT("to-int"), true, 1, { ValueKindString }, &to_int_intrinsic, NULL },
   { STR_LIT("to-int"), true, 1, { ValueKindBool }, &to_int_intrinsic, NULL },
   { STR_LIT("to-int"), true, 1, { ValueKindFloat }, &to_int_intrinsic, NULL },
-  { STR_LIT("to-int"), true, 1, { ValueKindBytes }, &to_int_intrinsic, NULL },
+  { STR_LIT("to-int8"), true, 1, { ValueKindBytes }, &to_int8_intrinsic, NULL },
+  { STR_LIT("to-int16"), true, 1, { ValueKindBytes }, &to_int16_intrinsic, NULL },
+  { STR_LIT("to-int32"), true, 1, { ValueKindBytes }, &to_int32_intrinsic, NULL },
+  { STR_LIT("to-int64"), true, 1, { ValueKindBytes }, &to_int64_intrinsic, NULL },
   { STR_LIT("to-float"), true, 1, { ValueKindInt }, &to_float_intrinsic, NULL },
   { STR_LIT("to-float"), true, 1, { ValueKindString }, &to_float_intrinsic, NULL },
   { STR_LIT("to-float"), true, 1, { ValueKindBytes }, &to_float_intrinsic, NULL },

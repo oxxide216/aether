@@ -130,7 +130,6 @@ Value *join_intrinsic(Vm *vm, Value **args) {
 
   u32 len = 0;
   u32 used = 0;
-  bool is_binary = false;
 
   ListNode *node = parts->as.list->next;
   while (node) {
@@ -138,7 +137,6 @@ Value *join_intrinsic(Vm *vm, Value **args) {
       len += filler->as.string.str.len;
 
     if (node->value->kind == ValueKindBytes) {
-      is_binary = true;
       len += node->value->as.bytes.len;
     } else if (node->value->kind == ValueKindString) {
       len += node->value->as.string.str.len;
@@ -177,11 +175,6 @@ Value *join_intrinsic(Vm *vm, Value **args) {
     used += node_len;
 
     node = node->next;
-  }
-
-  if (is_binary) {
-    Bytes joined = { (u8 *) joined_buffer, len };
-    return value_bytes(joined, vm->current_frame);
   }
 
   Str joined = { joined_buffer, len };

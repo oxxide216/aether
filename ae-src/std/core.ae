@@ -26,11 +26,15 @@
 ; Conversions
 (let to-str \value -> import 'to-str')
 (let to-bytes \value -> import 'to-bytes')
-(let to-byte1 \value -> import 'to-byte1')
-(let to-byte2 \value -> import 'to-byte2')
-(let to-byte4 \value -> import 'to-byte4')
 (let to-byte8 \value -> import 'to-byte8')
+(let to-byte16 \value -> import 'to-byte16')
+(let to-byte32 \value -> import 'to-byte32')
+(let to-byte64 \value -> import 'to-byte64')
 (let to-int \value -> import 'to-int')
+(let to-int8 \value -> import 'to-int8')
+(let to-int16 \value -> import 'to-int16')
+(let to-int32 \value -> import 'to-int32')
+(let to-int64 \value -> import 'to-int64')
 (let to-float \value -> import 'to-float')
 (let to-bool \value -> import 'to-bool')
 
