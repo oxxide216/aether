@@ -598,58 +598,6 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
   return value_unit(vm->current_frame);
 }
 
-Value *add_byte_64_intrinsic(Vm *vm, Value **args) {
-  Value *bytes = args[0];
-  Value *byte = args[1];
-
-  Bytes new_bytes;
-  new_bytes.len = bytes->as.bytes.len;
-  new_bytes.ptr = arena_alloc(&vm->current_frame->arena, new_bytes.len += sizeof(i64));
-  memcpy(new_bytes.ptr, bytes->as.bytes.ptr, new_bytes.len);
-  ((i64 *) new_bytes.ptr)[new_bytes.len] = byte->as._int;
-
-  return value_bytes(new_bytes, vm->current_frame);
-}
-
-Value *add_byte_32_intrinsic(Vm *vm, Value **args) {
-  Value *bytes = args[0];
-  Value *byte = args[1];
-
-  Bytes new_bytes;
-  new_bytes.len = bytes->as.bytes.len;
-  new_bytes.ptr = arena_alloc(&vm->current_frame->arena, new_bytes.len += sizeof(i32));
-  memcpy(new_bytes.ptr, bytes->as.bytes.ptr, new_bytes.len);
-  ((i32 *) new_bytes.ptr)[new_bytes.len] = byte->as._int;
-
-  return value_bytes(new_bytes, vm->current_frame);
-}
-
-Value *add_byte_16_intrinsic(Vm *vm, Value **args) {
-  Value *bytes = args[0];
-  Value *byte = args[1];
-
-  Bytes new_bytes;
-  new_bytes.len = bytes->as.bytes.len;
-  new_bytes.ptr = arena_alloc(&vm->current_frame->arena, new_bytes.len += sizeof(i16));
-  memcpy(new_bytes.ptr, bytes->as.bytes.ptr, new_bytes.len);
-  ((i16 *) new_bytes.ptr)[new_bytes.len] = byte->as._int;
-
-  return value_bytes(new_bytes, vm->current_frame);
-}
-
-Value *add_byte_8_intrinsic(Vm *vm, Value **args) {
-  Value *bytes = args[0];
-  Value *byte = args[1];
-
-  Bytes new_bytes;
-  new_bytes.len = bytes->as.bytes.len;
-  new_bytes.ptr = arena_alloc(&vm->current_frame->arena, new_bytes.len += sizeof(i8));
-  memcpy(new_bytes.ptr, bytes->as.bytes.ptr, new_bytes.len);
-  ((i8 *) new_bytes.ptr)[new_bytes.len] = byte->as._int;
-
-  return value_bytes(new_bytes, vm->current_frame);
-}
-
 Value *to_str_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
@@ -694,6 +642,7 @@ Value *to_byte8_intrinsic(Vm *vm, Value **args) {
   bytes.len = sizeof(u8);
   bytes.ptr = arena_alloc(&vm->current_frame->arena, sizeof(u8));
   *bytes.ptr = value->as._int;
+
   return value_bytes(bytes, vm->current_frame);
 }
 
@@ -704,6 +653,7 @@ Value *to_byte16_intrinsic(Vm *vm, Value **args) {
   bytes.len = sizeof(u16);
   bytes.ptr = arena_alloc(&vm->current_frame->arena, sizeof(u16));
   *(u16 *) bytes.ptr = value->as._int;
+
   return value_bytes(bytes, vm->current_frame);
 }
 
@@ -714,6 +664,7 @@ Value *to_byte32_intrinsic(Vm *vm, Value **args) {
   bytes.len = sizeof(u32);
   bytes.ptr = arena_alloc(&vm->current_frame->arena, sizeof(u32));
   *(u32 *) bytes.ptr = value->as._int;
+
   return value_bytes(bytes, vm->current_frame);
 }
 
@@ -724,6 +675,7 @@ Value *to_byte64_intrinsic(Vm *vm, Value **args) {
   bytes.len = sizeof(u64);
   bytes.ptr = arena_alloc(&vm->current_frame->arena, sizeof(u64));
   *(u64 *) bytes.ptr = value->as._int;
+
   return value_bytes(bytes, vm->current_frame);
 }
 
