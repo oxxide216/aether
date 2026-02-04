@@ -687,6 +687,46 @@ Value *to_bytes_intrinsic(Vm *vm, Value **args) {
   return value_bytes(bytes, vm->current_frame);
 }
 
+Value *to_byte1_intrinsic(Vm *vm, Value **args) {
+  Value *value = args[0];
+
+  Bytes bytes = {0};
+  bytes.len = sizeof(u8);
+  bytes.ptr = arena_alloc(&vm->current_frame->arena, sizeof(u8));
+  *bytes.ptr = value->as._int;
+  return value_bytes(bytes, vm->current_frame);
+}
+
+Value *to_byte2_intrinsic(Vm *vm, Value **args) {
+  Value *value = args[0];
+
+  Bytes bytes = {0};
+  bytes.len = sizeof(u16);
+  bytes.ptr = arena_alloc(&vm->current_frame->arena, sizeof(u16));
+  *(u16 *) bytes.ptr = value->as._int;
+  return value_bytes(bytes, vm->current_frame);
+}
+
+Value *to_byte4_intrinsic(Vm *vm, Value **args) {
+  Value *value = args[0];
+
+  Bytes bytes = {0};
+  bytes.len = sizeof(u32);
+  bytes.ptr = arena_alloc(&vm->current_frame->arena, sizeof(u32));
+  *(u32 *) bytes.ptr = value->as._int;
+  return value_bytes(bytes, vm->current_frame);
+}
+
+Value *to_byte8_intrinsic(Vm *vm, Value **args) {
+  Value *value = args[0];
+
+  Bytes bytes = {0};
+  bytes.len = sizeof(u64);
+  bytes.ptr = arena_alloc(&vm->current_frame->arena, sizeof(u64));
+  *(u64 *) bytes.ptr = value->as._int;
+  return value_bytes(bytes, vm->current_frame);
+}
+
 Value *to_int_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
@@ -1406,6 +1446,10 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("to-bytes"), true, 1, { ValueKindInt }, &to_bytes_intrinsic, NULL },
   { STR_LIT("to-bytes"), true, 1, { ValueKindFloat }, &to_bytes_intrinsic, NULL },
   { STR_LIT("to-bytes"), true, 1, { ValueKindBool }, &to_bytes_intrinsic, NULL },
+  { STR_LIT("to-byte1"), true, 1, { ValueKindInt }, &to_byte1_intrinsic, NULL },
+  { STR_LIT("to-byte2"), true, 1, { ValueKindInt }, &to_byte2_intrinsic, NULL },
+  { STR_LIT("to-byte4"), true, 1, { ValueKindInt }, &to_byte4_intrinsic, NULL },
+  { STR_LIT("to-byte8"), true, 1, { ValueKindInt }, &to_byte8_intrinsic, NULL },
   { STR_LIT("to-int"), true, 1, { ValueKindString }, &to_int_intrinsic, NULL },
   { STR_LIT("to-int"), true, 1, { ValueKindBool }, &to_int_intrinsic, NULL },
   { STR_LIT("to-int"), true, 1, { ValueKindFloat }, &to_int_intrinsic, NULL },
