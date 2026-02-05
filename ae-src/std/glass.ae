@@ -1,4 +1,4 @@
-(let glass/load-texture \path -> import 'glass/load-texture')
+(let glass/load-texture \path pixeled -> import 'glass/load-texture')
 (let glass/load-font \path -> import 'glass/load-font')
 (let glass/run \title width height init
                 event-hanlder update render -> import 'glass/run')
@@ -9,10 +9,10 @@
 (let glass/circle \x y radius r g b a -> import 'glass/circle')
 (let glass/quad \x y width height r g b a -> import 'glass/quad')
 (let glass/texture \x y id -> import 'glass/texture')
-(let glass/textured-quad \x y width height id -> import 'glass/textured-quad')
-(let glass/textured-quad-colored \x y width height id r g b a ->
+(let glass/textured-quad \x y width height texture -> import 'glass/textured-quad')
+(let glass/textured-quad-colored \x y width height texture r g b a ->
   import 'glass/textured-quad-colored')
-(let glass/tile \x y width height u0 v0 u1 v1 id -> import 'glass/tile')
+(let glass/tile \x y width height u0 v0 u1 v1 iexture -> import 'glass/tile')
 (let glass/text \x y line-height font text -> import 'glass/text')
 (let glass/text-colored \x y line-height font text r g b a ->
   import 'glass/text-colored')

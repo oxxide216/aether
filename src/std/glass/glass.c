@@ -134,7 +134,8 @@ Value *load_texture_intrinsic(Vm *vm, Value **args) {
     return value_unit(vm->current_frame);
   }
 
-  GlassTexture texture = glass_init_texture(GlassFilteringModeLinear);
+  GlassTexture texture = glass_init_texture(args[1]->as._bool ? GlassFilteringModeNearest :
+                                                                GlassFilteringModeLinear);
 
   if (texture.id == 0) {
     stbi_image_free(buffer);
@@ -681,7 +682,9 @@ Value *text_colored_intrinsic(Vm *vm, Value **args) {
 }
 
 Intrinsic glass_intrinsics[] = {
-  { STR_LIT("glass/load-texture"), true, 1, { ValueKindString }, &load_texture_intrinsic, NULL },
+  { STR_LIT("glass/load-texture"), true, 2,
+    { ValueKindString, ValueKindBool },
+    &load_texture_intrinsic, NULL },
   { STR_LIT("glass/load-font"), true, 1, { ValueKindString }, &load_font_intrinsic, NULL },
   { STR_LIT("glass/run"), false, 7,
     { ValueKindString, ValueKindInt, ValueKindInt,
