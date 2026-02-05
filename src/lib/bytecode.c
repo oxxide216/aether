@@ -649,15 +649,14 @@ static void ast_node_to_ir(Converter *converter, Expr *node) {
       sb_push_u32(&sb, converter->labels++);
       u16 next_label_id = copy_str(sb_to_str(sb));
 
-      if (node->as.match.branches.items[i].value)
+      if (node->as.match.branches.items[i].value) {
         ast_node_to_ir(converter, node->as.match.branches.items[i].value);
-      else
-        ast_node_to_ir(converter, node->as.match.value);
 
-      instr.kind = InstrKindMatchCase;
-      instr.as.match_case.not_label_id = next_label_id;
-      instr.meta = node->meta;
-      DEST_APPEND(converter, instr);
+        instr.kind = InstrKindMatchCase;
+        instr.as.match_case.not_label_id = next_label_id;
+        instr.meta = node->meta;
+        DEST_APPEND(converter, instr);
+      }
 
       ast_node_to_ir(converter, node->as.match.branches.items[i].body);
 
@@ -666,10 +665,12 @@ static void ast_node_to_ir(Converter *converter, Expr *node) {
       instr.meta = node->meta;
       DEST_APPEND(converter, instr);
 
-      instr.kind = InstrKindLabel;
-      instr.as.label.name_id = next_label_id;
-      instr.meta = node->meta;
-      DEST_APPEND(converter, instr);
+      if (node->as.match.branches.items[i].value) {
+        instr.kind = InstrKindLabel;
+        instr.as.label.name_id = next_label_id;
+        instr.meta = node->meta;
+        DEST_APPEND(converter, instr);
+      }
     }
 
     free(sb.buffer);
