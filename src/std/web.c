@@ -90,18 +90,36 @@ Value *update_text_intrinsic(Vm *vm, Value **args) {
 
 Value *update_value_intrinsic(Vm *vm, Value **args) {
   Value *name = args[0];
-  Value *text = args[1];
+  Value *value = args[1];
 
   char *name_cstr = str_to_cstr(name->as.string.str);
-  char *text_cstr = str_to_cstr(text->as.string.str);
+  char *value_cstr = str_to_cstr(value->as.string.str);
 
   EM_ASM({
     const element = document.querySelector(UTF8ToString($0));
     element.value = UTF8ToString($1);
-  }, name_cstr, text_cstr);
+  }, name_cstr, value_cstr);
 
   free(name_cstr);
-  free(text_cstr);
+  free(value_cstr);
+
+  return value_unit(vm->current_frame);
+}
+
+Value *update_display_intrinsic(Vm *vm, Value **args) {
+  Value *name = args[0];
+  Value *display = args[1];
+
+  char *name_cstr = str_to_cstr(name->as.string.str);
+  char *display_cstr = str_to_cstr(display->as.string.str);
+
+  EM_ASM({
+    const element = document.querySelector(UTF8ToString($0));
+    element.style.display = UTF8ToString($1);
+  }, name_cstr, display_cstr);
+
+  free(name_cstr);
+  free(display_cstr);
 
   return value_unit(vm->current_frame);
 }
@@ -177,6 +195,30 @@ Value *focus_intrinsic(Vm *vm, Value **args) {
   }, name_cstr);
 
   free(name_cstr);
+
+  return value_unit(vm->current_frame);
+}
+
+Value *append_clone_intrinsic(Vm *vm, Value **args) {
+  Value *parent_name = args[0];
+  Value *to_clone_name = args[1];
+  Value *clone_class = args[2];
+
+  char *parent_name_cstr = str_to_cstr(parent_name->as.string.str);
+  char *to_clone_name_cstr = str_to_cstr(to_clone_name->as.string.str);
+  char *clone_class_cstr = str_to_cstr(clone_class->as.string.str);
+
+  EM_ASM({
+    const parent = document.querySelector(UTF8ToString($0));
+    const to_clone = document.querySelector(UTF8ToString($1));
+    const clone = to_clone.cloneNode(true);
+    clone.classList.add(UTF8ToString($2));
+    parent.append(clone);
+  }, parent_name_cstr, to_clone_name_cstr, clone_class_cstr);
+
+  free(parent_name_cstr);
+  free(to_clone_name_cstr);
+  free(clone_class_cstr);
 
   return value_unit(vm->current_frame);
 }
@@ -478,10 +520,12 @@ Intrinsic web_intrinsics[] = {
   { STR_LIT("update-html"), false, 2, { ValueKindString, ValueKindString }, &update_html_intrinsic, NULL },
   { STR_LIT("update-text"), false, 2, { ValueKindString, ValueKindString }, &update_text_intrinsic, NULL },
   { STR_LIT("update-value"), false, 2, { ValueKindString, ValueKindString }, &update_value_intrinsic, NULL },
+  { STR_LIT("update-display"), false, 2, { ValueKindString, ValueKindString }, &update_display_intrinsic, NULL },
   { STR_LIT("get-html"), true, 1, { ValueKindString }, &get_html_intrinsic, NULL },
   { STR_LIT("get-text"), true, 1, { ValueKindString }, &get_text_intrinsic, NULL },
   { STR_LIT("get-value"), true, 1, { ValueKindString }, &get_value_intrinsic, NULL },
   { STR_LIT("focus"), false, 1, { ValueKindString }, &focus_intrinsic, NULL },
+  { STR_LIT("append-clone"), false, 3, { ValueKindString, ValueKindString, ValueKindString }, &append_clone_intrinsic, NULL },
   { STR_LIT("on-key-press"), false, 2, { ValueKindString, ValueKindFunc }, &on_key_press_intrinsic, NULL },
   { STR_LIT("on-key-down"), false, 2, { ValueKindString, ValueKindFunc }, &on_key_down_intrinsic, NULL },
   { STR_LIT("on-key-up"), false, 2, { ValueKindString, ValueKindFunc }, &on_key_up_intrinsic, NULL },

@@ -8,10 +8,12 @@
 (let update-html \name html -> import 'update-html')
 (let update-text \name text -> import 'update-text')
 (let update-value \name value -> import 'update-value')
+(let update-display \name display -> import 'update-display')
 (let get-html \name -> import 'get-html')
 (let get-text \name -> import 'get-text')
 (let get-value \name -> import 'get-value')
 (let focus \name -> import 'focus')
+(let append-clone \parent-name to-clone-name clone-class -> import 'append-clone')
 
 (let on-key-press \name callback -> import 'on-key-press')
 (let on-key-down \name callback -> import 'on-key-down')
