@@ -704,6 +704,7 @@ void execute(Vm *vm, Instrs *instrs) {
         return;
 
       Dict *new_dict = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
+      memset(new_dict, 0, sizeof(Dict));
 
       for (u32 j = 0; j < instr->as.dict.len; ++j) {
         Value *key = vm->stack.items[vm->stack.len - instr->as.list.len * 2 + j * 2];
