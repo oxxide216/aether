@@ -586,8 +586,10 @@ void execute(Vm *vm, Instrs *instrs) {
 
           Value *sub_string = get_from_string(vm, value->as.string.str, key->as._int);
 
-          if (!sub_string)
-            PANIC(instr->meta, "String index out of bounds\n");
+          if (!sub_string) {
+            value = value_unit(vm->current_frame);
+            break;
+          }
 
           value = sub_string;
         } else if (value->kind == ValueKindBytes) {
