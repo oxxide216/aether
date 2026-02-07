@@ -48,6 +48,7 @@ Value *get_file_info_intrinsic(Vm *vm, Value **args) {
   }
 
   Dict *info = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
+  memset(info, 0, sizeof(Dict));
 
   DIR *directory = opendir(path_cstring);
 

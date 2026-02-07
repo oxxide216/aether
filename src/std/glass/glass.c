@@ -148,6 +148,7 @@ Value *load_texture_intrinsic(Vm *vm, Value **args) {
   stbi_image_free(buffer);
 
   Dict *result = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
+  memset(result, 0, sizeof(Dict));
 
   Value *id_key = value_string(STR_LIT("id"), vm->current_frame);
   dict_set_value(vm->current_frame, result, id_key,
@@ -180,6 +181,7 @@ Value *load_font_intrinsic(Vm *vm, Value **args) {
     return value_unit(vm->current_frame);
 
   Dict *result = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
+  memset(result, 0, sizeof(Dict));
 
   Value *id_key = value_string(STR_LIT("id"), vm->current_frame);
   dict_set_value(vm->current_frame, result, id_key,
@@ -421,6 +423,7 @@ Value *window_size_intrinsic(Vm *vm, Value **args) {
     return value_unit(vm->current_frame);
 
   Dict *size = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
+  memset(size, 0, sizeof(Dict));
 
   Value *width = value_alloc(vm->current_frame);
   width->kind = ValueKindFloat;

@@ -559,6 +559,7 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
     --vm->stack.len;
   } else if (collection->kind == ValueKindDict) {
     Dict *_pair = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
+    memset(_pair, 0, sizeof(Dict));
 
     Value *key = value_string(STR_LIT("key"), vm->current_frame);
     dict_set_value(vm->current_frame, _pair, key, NULL);
@@ -1223,6 +1224,7 @@ Value *compile_intrinsic(Vm *vm, Value **args) {
   bytecode.ptr = new_ptr;
 
   Dict *dict = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
+  memset(dict, 0, sizeof(Dict));
 
   Value *compiled = value_string(bytecode, vm->current_frame);
   Value *compiled_key = value_string(STR_LIT("compiled"), vm->current_frame);

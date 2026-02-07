@@ -34,6 +34,7 @@ ListNode *list_clone(ListNode *nodes, StackFrame *frame) {
 
 Dict *dict_clone(Dict *dict, StackFrame *frame) {
   Dict *copy = arena_alloc(&frame->arena, sizeof(Dict));
+  memset(copy, 0, sizeof(Dict));
 
   for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
     DictValue *entry = dict->items[i];

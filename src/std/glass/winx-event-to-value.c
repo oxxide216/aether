@@ -132,6 +132,7 @@ static Str mouse_button_names[] = {
 
 Value *winx_event_to_value(WinxEvent *event, Vm *vm) {
   Dict *result = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
+  memset(result, 0, sizeof(Dict));
   Str type = {0};
 
   switch (event->kind) {

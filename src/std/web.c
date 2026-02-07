@@ -228,6 +228,7 @@ bool key_event_callback(i32 event_type, const EmscriptenKeyboardEvent *key_event
 
   EventData *event_data = data;
   Dict *event_data_dict = arena_alloc(&event_data->vm->current_frame->arena, sizeof(Dict));
+  memset(event_data_dict, 0, sizeof(Dict));
 
   u32 key_len = strlen(key_event->key);
   Str key_str = { (char *) key_event->key, key_len };
@@ -283,6 +284,7 @@ bool mouse_event_callback(i32 event_type, const EmscriptenMouseEvent *mouse_even
 
   EventData *event_data = data;
   Dict *event_data_dict = arena_alloc(&event_data->vm->current_frame->arena, sizeof(Dict));
+  memset(event_data_dict, 0, sizeof(Dict));
 
   Value *key = value_string(STR_LIT("x"), event_data->vm->current_frame);
   dict_set_value(event_data->vm->current_frame, event_data_dict, key,
