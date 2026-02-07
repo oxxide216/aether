@@ -234,7 +234,7 @@ static u32 value_str_len(Value *value, u32 level, bool kind, bool quote_string) 
         len += 1;
       }
 
-      len += 1;
+      len += 2;
     }
   } break;
 
@@ -256,7 +256,7 @@ static u32 value_str_len(Value *value, u32 level, bool kind, bool quote_string) 
         ++len;
       }
 
-      len += 1;
+      len += 2;
     }
   } break;
 
