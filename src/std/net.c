@@ -10,7 +10,7 @@
 #include "aether/misc.h"
 
 #define DEFAULT_RECEIVE_BUFFER_SIZE 64
-#define POLL_TIMEOUT_MS             10
+#define POLL_TIMEOUT_MS             50
 
 Value *create_server_intrinsic(Vm *vm, Value **args) {
   Value *port = args[0];
@@ -65,6 +65,7 @@ Value *create_client_intrinsic(Vm *vm, Value **args) {
   struct addrinfo hints = {0};
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
+  hints.ai_protocol = IPPROTO_TCP;
 
   struct addrinfo *result;
 
@@ -83,6 +84,11 @@ Value *create_client_intrinsic(Vm *vm, Value **args) {
 
   i32 enable = 1;
   setsockopt(client_socket, SOL_TCP, TCP_NODELAY, &enable, sizeof(enable));
+
+  struct timeval timeout;
+  timeout.tv_sec = 5;
+  timeout.tv_usec = 0;
+  setsockopt(client_socket, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 
   i32 connected = connect(client_socket, result->ai_addr, result->ai_addrlen);
   if (connected < 0) {
@@ -147,18 +153,17 @@ Value *receive_size_intrinsic(Vm *vm, Value **args) {
   Value *receiver = args[0];
   Value *size = args[1];
 
-  Bytes buffer = { arena_alloc(&vm->current_frame->arena, size->as._int), 0 };
-
   struct pollfd pfd;
   pfd.fd = receiver->as._int;
-  pfd.events = POLLIN | POLLERR | POLLHUP;
-  poll(&pfd, 1, POLL_TIMEOUT_MS);
+  pfd.events = POLLIN;
 
-  if (pfd.revents != 0)
-    buffer.len = recv(receiver->as._int, buffer.ptr, size->as._int, 0);
-
-  if (buffer.len == 0)
+  i32 result = poll(&pfd, 1, POLL_TIMEOUT_MS);
+  if (result < 0 || pfd.revents == 0)
     return value_unit(vm->current_frame);
+
+  Bytes buffer;
+  buffer.ptr = arena_alloc(&vm->current_frame->arena, size->as._int);
+  buffer.len = recv(receiver->as._int, buffer.ptr, size->as._int, 0);
 
   return value_bytes(buffer, vm->current_frame);
 }
@@ -171,37 +176,29 @@ Value *receive_intrinsic(Vm *vm, Value **args) {
 
   struct pollfd pfd = {0};
   pfd.fd = receiver->as._int;
-  pfd.events = POLLIN | POLLERR | POLLHUP;
-  i32 len = 0;
+  pfd.events = POLLIN;
 
-  while (true) {
-    poll(&pfd, 1, POLL_TIMEOUT_MS);
-    if (pfd.revents == 0)
-      break;
-
-    len = recv(receiver->as._int,
-               buffer.ptr + buffer.len,
-               cap - buffer.len, 0);
-
-    if (len == 0)
-      break;
-
-    if (len < 0)
-      return value_unit(vm->current_frame);
-
-    buffer.len += (u32) len;
-
-    if (buffer.len >= cap) {
-      u8 *prev_ptr = buffer.ptr;
-
-      cap += DEFAULT_RECEIVE_BUFFER_SIZE;
-      buffer.ptr = arena_alloc(&vm->current_frame->arena, cap);
-      memcpy(buffer.ptr, prev_ptr, buffer.len);
-    }
-  }
-
-  if (buffer.len == 0)
+  i32 result = poll(&pfd, 1, POLL_TIMEOUT_MS);
+  if (result < 0 || pfd.revents == 0)
     return value_unit(vm->current_frame);
+
+  i32 len = recv(receiver->as._int,
+                 buffer.ptr + buffer.len,
+                 cap - buffer.len, 0);
+
+  if (len <= 0)
+    return value_unit(vm->current_frame);
+
+  buffer.len = (u32) len;
+
+  if (buffer.len >= cap) {
+    u8 *prev_ptr = buffer.ptr;
+
+    while (buffer.len >= cap)
+      cap += DEFAULT_RECEIVE_BUFFER_SIZE;
+    buffer.ptr = arena_alloc(&vm->current_frame->arena, cap);
+    memcpy(buffer.ptr, prev_ptr, buffer.len);
+  }
 
   return value_bytes(buffer, vm->current_frame);
 }
