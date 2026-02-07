@@ -10,7 +10,6 @@
 #include "aether/misc.h"
 
 #define DEFAULT_RECEIVE_BUFFER_SIZE 64
-#define POLL_TIMEOUT_MS             50
 
 Value *create_server_intrinsic(Vm *vm, Value **args) {
   Value *port = args[0];
@@ -152,12 +151,13 @@ Value *send_intrinsic(Vm *vm, Value **args) {
 Value *receive_size_intrinsic(Vm *vm, Value **args) {
   Value *receiver = args[0];
   Value *size = args[1];
+  Value *timeout = args[2];
 
   struct pollfd pfd;
   pfd.fd = receiver->as._int;
   pfd.events = POLLIN;
 
-  i32 result = poll(&pfd, 1, POLL_TIMEOUT_MS);
+  i32 result = poll(&pfd, 1, timeout->as._int);
   if (result < 0 || pfd.revents == 0)
     return value_unit(vm->current_frame);
 
@@ -170,6 +170,7 @@ Value *receive_size_intrinsic(Vm *vm, Value **args) {
 
 Value *receive_intrinsic(Vm *vm, Value **args) {
   Value *receiver = args[0];
+  Value *timeout = args[1];
 
   u32 cap = DEFAULT_RECEIVE_BUFFER_SIZE;
   Bytes buffer = { arena_alloc(&vm->current_frame->arena, cap), 0 };
@@ -178,27 +179,37 @@ Value *receive_intrinsic(Vm *vm, Value **args) {
   pfd.fd = receiver->as._int;
   pfd.events = POLLIN;
 
-  i32 result = poll(&pfd, 1, POLL_TIMEOUT_MS);
-  if (result < 0 || pfd.revents == 0)
-    return value_unit(vm->current_frame);
+  while (true) {
+    i32 result = poll(&pfd, 1, timeout->as._int);
+    if (result < 0)
+      return value_unit(vm->current_frame);
 
-  i32 len = recv(receiver->as._int,
-                 buffer.ptr + buffer.len,
-                 cap - buffer.len, 0);
+    if (pfd.revents == 0)
+      break;
 
-  if (len <= 0)
-    return value_unit(vm->current_frame);
+    i32 len = recv(receiver->as._int,
+                   buffer.ptr + buffer.len,
+                   cap - buffer.len, 0);
 
-  buffer.len = (u32) len;
+    if (len < 0)
+      return value_unit(vm->current_frame);
 
-  if (buffer.len >= cap) {
-    u8 *prev_ptr = buffer.ptr;
+    if (len == 0)
+      break;
 
-    while (buffer.len >= cap)
+    buffer.len += (u32) len;
+
+    if (buffer.len == cap) {
+      u8 *prev_ptr = buffer.ptr;
+
       cap += DEFAULT_RECEIVE_BUFFER_SIZE;
-    buffer.ptr = arena_alloc(&vm->current_frame->arena, cap);
-    memcpy(buffer.ptr, prev_ptr, buffer.len);
+      buffer.ptr = arena_alloc(&vm->current_frame->arena, cap);
+      memcpy(buffer.ptr, prev_ptr, buffer.len);
+    }
   }
+
+  if (buffer.len == 0)
+    return value_unit(vm->current_frame);
 
   return value_bytes(buffer, vm->current_frame);
 }
@@ -214,10 +225,10 @@ Intrinsic net_intrinsics[] = {
   { STR_LIT("close-connection"), false, 1, { ValueKindInt }, &close_connection_intrinsic, NULL },
   { STR_LIT("send"), false, 2, { ValueKindInt, ValueKindString }, &send_intrinsic, NULL },
   { STR_LIT("send"), false, 2, { ValueKindInt, ValueKindBytes }, &send_intrinsic, NULL },
-  { STR_LIT("receive-size"), true, 2,
-    { ValueKindInt, ValueKindInt },
+  { STR_LIT("receive-size"), true, 3,
+    { ValueKindInt, ValueKindInt, ValueKindInt },
     &receive_size_intrinsic, NULL },
-  { STR_LIT("receive"), true, 1, { ValueKindInt }, &receive_intrinsic, NULL },
+  { STR_LIT("receive"), true, 2, { ValueKindInt, ValueKindInt }, &receive_intrinsic, NULL },
 };
 
 u32 net_intrinsics_len = ARRAY_LEN(net_intrinsics);
