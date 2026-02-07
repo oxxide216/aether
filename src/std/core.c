@@ -166,6 +166,9 @@ Value *get_range_intrinsic(Vm *vm, Value **args) {
     u32 bytes_len = 0;
     u32 wchar_len;
 
+    if (begin->as._int == end->as._int)
+      return value_string((Str) {0}, vm->current_frame);
+
     while (get_next_wchar(value->as.string.str, current_index, &wchar_len) != '\0' &&
            current_index < end->as._int) {
       if (current_index == begin->as._int)
