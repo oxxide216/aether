@@ -191,6 +191,8 @@ Value *list_directory_intrinsic(Vm *vm, Value **args) {
       list_end->value = value_string(path, vm->current_frame);
     }
 
+    list_end->next = NULL;
+
     closedir(dir);
   } else {
     free(path_cstring);

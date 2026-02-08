@@ -159,6 +159,8 @@ Value *get_range_intrinsic(Vm *vm, Value **args) {
       sub_list_node = sub_list_node->next;
     }
 
+    sub_list_node->next = NULL;
+
     return value_list(sub_list, vm->current_frame);
   } else if (value->kind == ValueKindString) {
     u32 begin_byte = 0;
@@ -471,6 +473,8 @@ Value *sort_intrinsic(Vm *vm, Value **args) {
     (*next)->value = value_clone(sorted[i], vm->current_frame);
     next = &(*next)->next;
   }
+
+  *next = NULL;
 
   free(sorted);
 

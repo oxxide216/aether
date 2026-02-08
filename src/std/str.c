@@ -111,7 +111,6 @@ Value *split_intrinsic(Vm *vm, Value **args) {
 
   if (i > 0) {
     node->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-    node->next->next = NULL;
 
     Str new_string;
     new_string.len = i - index;
@@ -119,7 +118,10 @@ Value *split_intrinsic(Vm *vm, Value **args) {
     memcpy(new_string.ptr, string->as.string.str.ptr + index, new_string.len);
 
     node->next->value = value_string(new_string, vm->current_frame);
+    node = node->next;
   }
+
+  node->next = NULL;
 
   return value_list(list, vm->current_frame);
 }

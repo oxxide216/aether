@@ -792,6 +792,8 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
     args_end = new_arg;
   }
 
+  args_end->next = NULL;
+
   vm_init(&vm, args, intrinsics);
 
   return vm;
