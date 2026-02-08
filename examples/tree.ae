@@ -6,7 +6,7 @@
 (let FILLER      ' ')
 
 (let args (get-args))
-(let base-directory (if (>= (len args) 3) args::1
+(let base-directory (if (>= (len args) 2) args::1
                      else                 '.'))
 
 (let print-directory \name path offset ->
