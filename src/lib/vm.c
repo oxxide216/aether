@@ -284,8 +284,22 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta) {
 
   execute(vm, &func->body->instrs);
 
-  if (vm->state == ExecStateReturn)
-    vm->state = ExecStateContinue;
+  if (vm->state == ExecStateExit &&
+      vm->exit_code != 0 &&
+      vm->trace_level++ < vm->max_trace_level) {
+    for (u32 j = vm->current_frame->calls_data.len; j > 0; --j) {
+      if (vm->trace_level++ >= vm->max_trace_level)
+        break;
+
+      CallData *data = vm->current_frame->calls_data.items + j - 1;
+      INFO("Trace: "STR_FMT":%u:%u "STR_FMT"\n",
+           STR_ARG(*data->meta.file_path),
+           data->meta.row + 1, data->meta.col + 1,
+           STR_ARG(data->func_name));
+
+      ++vm->trace_level;
+    }
+  }
 
   Value *result;
   if (vm->frame_begin == vm->stack.len)
@@ -371,6 +385,15 @@ void execute(Vm *vm, Instrs *instrs) {
     } break;
 
     case InstrKindFuncCall: {
+      if (++vm->recursion_level >= MAX_RECURSION_LEVEL) {
+        ERROR(META_FMT "Infinite recursion detected\n",
+              META_ARG(instr->meta));
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+
+        return;
+      }
+
       if (!ensure_stack_len_is_enough(vm,
                                       instr->as.func_call.args_len + 1,
                                       &instr->meta))
@@ -402,33 +425,68 @@ void execute(Vm *vm, Instrs *instrs) {
            instrs->items[i + 1].kind == InstrKindRet)) {
         tail_call(vm, func->as.func);
 
+        Str func_name = STR_LIT("<lambda>");
+        u32 name_index = i - instr->as.func_call.args_instrs_len - 1;
+        if (instrs->items[name_index].kind == InstrKindGetVar) {
+          u16 name_id = instrs->items[name_index].as.get_var.name_id;
+          func_name = get_str(name_id);
+        }
+
+        CallData data = {
+          func_name,
+          instr->meta,
+        };
+        DA_APPEND(vm->current_frame->calls_data, data);
+
+        if (vm->state == ExecStateReturn)
+          vm->state = ExecStateContinue;
+
         i = (u32) -1;
         break;
       }
 
       execute_func(vm, func->as.func, &instr->meta);
       if (vm->state == ExecStateExit) {
-        if (vm->trace_level++ < vm->max_trace_level &&
-            vm->exit_code != 0) {
-          Str func_name = STR_LIT("<lambda>");
-          u32 name_index = i - instr->as.func_call.args_instrs_len - 1;
-          if (instrs->items[name_index].kind == InstrKindGetVar) {
-            u16 name_id = instrs->items[name_index].as.get_var.name_id;
-            func_name = get_str(name_id);
+        if (vm->exit_code != 0) {
+          for (u32 j = vm->current_frame->calls_data.len; j > 0; --j) {
+            if (vm->trace_level++ >= vm->max_trace_level)
+              break;
+
+            CallData *data = vm->current_frame->calls_data.items + j - 1;
+            INFO("Trace: "STR_FMT":%u:%u "STR_FMT"\n",
+                 STR_ARG(*data->meta.file_path),
+                 data->meta.row + 1, data->meta.col + 1,
+                 STR_ARG(data->func_name));
+
+            ++vm->trace_level;
           }
 
-          INFO("Trace: "STR_FMT":%u:%u "STR_FMT"\n",
-               STR_ARG(*instr->meta.file_path),
-               instr->meta.row + 1, instr->meta.col + 1,
-               STR_ARG(func_name));
+          if (vm->trace_level++ < vm->max_trace_level) {
+            Str func_name = STR_LIT("<lambda>");
+            u32 name_index = i - instr->as.func_call.args_instrs_len - 1;
+            if (instrs->items[name_index].kind == InstrKindGetVar) {
+              u16 name_id = instrs->items[name_index].as.get_var.name_id;
+              func_name = get_str(name_id);
+            }
+
+            INFO("Trace: "STR_FMT":%u:%u "STR_FMT"\n",
+                 STR_ARG(*instr->meta.file_path),
+                 instr->meta.row + 1, instr->meta.col + 1,
+                 STR_ARG(func_name));
+          }
         }
 
         return;
       }
 
+      if (vm->state == ExecStateReturn)
+        vm->state = ExecStateContinue;
+
       Value *result = stack_last(vm);
       vm->stack.len -= instr->as.func_call.args_len + 1;
       vm->stack.items[vm->stack.len - 1] = result;
+
+      --vm->recursion_level;
     } break;
 
     case InstrKindDefVar: {
@@ -672,6 +730,7 @@ void execute(Vm *vm, Instrs *instrs) {
     } break;
 
     case InstrKindRet: {
+      vm->state = ExecStateReturn;
       return;
     } break;
 

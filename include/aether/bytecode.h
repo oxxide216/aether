@@ -22,6 +22,10 @@ typedef struct {
 
 typedef Da(Var) Vars;
 
+typedef struct CallData CallData;
+
+typedef Da(CallData) CallsData;
+
 typedef struct StackFrame StackFrame;
 
 struct StackFrame {
@@ -29,6 +33,7 @@ struct StackFrame {
   Arena       arena;
   Vars        vars;
   Values      match_values;
+  CallsData   calls_data;
   bool        can_lookup_through;
   StackFrame *next;
   StackFrame *prev;
@@ -396,6 +401,11 @@ typedef union {
 struct Expr {
   ExprKind  kind;
   ExprAs    as;
+  InstrMeta meta;
+};
+
+struct CallData {
+  Str       func_name;
   InstrMeta meta;
 };
 

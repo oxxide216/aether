@@ -326,6 +326,8 @@ void frame_free(StackFrame *frame) {
     free(frame->vars.items);
   if (frame->match_values.items)
     free(frame->match_values.items);
+  if (frame->calls_data.items)
+    free(frame->calls_data.items);
   frame->vars.len = 0;
   free(frame);
 }

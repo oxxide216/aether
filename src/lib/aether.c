@@ -5,12 +5,15 @@
 #include "aether/deserializer.h"
 #include "aether/macros.h"
 
+#define MAX_RECURSION_TRACE_LEVEL 25
+
 #ifndef NOSYSTEM
 // From base.c
 extern StringBuilder log_sb;
 #endif // NOSYSTEM
 // From common.c
 extern Arena intern_arena;
+
 
 static Da(Vm) vms = {0};
 
@@ -38,7 +41,7 @@ AetherCtx aether_init(i32 argc, char **argv, bool debug,
     intrinsics = &_intrinsics;
 
   Vm vm = vm_create(argc, argv, intrinsics);
-  vm.max_trace_level = debug ? (u16) -1 : 0;
+  vm.max_trace_level = debug ? (u16) MAX_RECURSION_TRACE_LEVEL : 0;
 
   ctx.vm_index = vms.len;
   DA_APPEND(vms, vm);

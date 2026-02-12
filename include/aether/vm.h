@@ -28,7 +28,7 @@
 #define EXECUTE_BLOCK(vm, block, value_expected)              \
   do {                                                        \
     Value *result = execute_block(vm, block, value_expected); \
-    if (vm->state != ExecStatContinue)                       \
+    if (vm->state != ExecStatContinue)                        \
       return result;                                          \
   } while (0)
 
@@ -57,7 +57,6 @@ typedef enum {
   ExecStateContinue = 0,
   ExecStateReturn,
   ExecStateExit,
-  ExecStateBreak,
 } ExecState;
 
 typedef struct Vm Vm;
