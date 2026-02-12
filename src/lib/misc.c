@@ -134,6 +134,7 @@ void dict_set_value(StackFrame *frame, Dict *dict,
       entry->next = arena_alloc(&frame->arena, sizeof(DictValue));
       entry = entry->next;
       entry->key = key;
+      entry->next = NULL;
     }
   } else {
     entry = arena_alloc(&frame->arena, sizeof(DictValue));
