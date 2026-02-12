@@ -4,9 +4,9 @@
 #include "shl/shl-str.h"
 #include "shl/shl-log.h"
 
-#define STACK_DUMP_LEN            10
-#define MAX_RECURSION_LEVEL       1000
-#define MAX_RECURSION_TRACE_LEVEL 15
+#define STACK_DUMP_LEN      10
+#define MAX_RECURSION_LEVEL 1000
+#define MAX_TRACE_LEVEL     25
 
 #define META_FMT       STR_FMT":%u:%u: "
 #define META_ARG(meta) STR_ARG(*(meta).file_path), (meta).row + 1, (meta).col + 1
@@ -284,11 +284,9 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta) {
 
   execute(vm, &func->body->instrs);
 
-  if (vm->state == ExecStateExit &&
-      vm->exit_code != 0 &&
-      vm->trace_level++ < vm->max_trace_level) {
+  if (vm->state == ExecStateExit && vm->exit_code != 0) {
     for (u32 j = vm->current_frame->calls_data.len; j > 0; --j) {
-      if (vm->trace_level++ >= vm->max_trace_level)
+      if (vm->trace_level++ <= vm->max_trace_level)
         break;
 
       CallData *data = vm->current_frame->calls_data.items + j - 1;
@@ -296,8 +294,6 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta) {
            STR_ARG(*data->meta.file_path),
            data->meta.row + 1, data->meta.col + 1,
            STR_ARG(data->func_name));
-
-      ++vm->trace_level;
     }
   }
 
@@ -390,6 +386,11 @@ void execute(Vm *vm, Instrs *instrs) {
     } break;
 
     case InstrKindFuncCall: {
+      if (!ensure_stack_len_is_enough(vm,
+                                      instr->as.func_call.args_len + 1,
+                                      &instr->meta))
+        return;
+
       if (++vm->recursion_level >= MAX_RECURSION_LEVEL) {
         ERROR(META_FMT "Infinite recursion detected\n",
               META_ARG(instr->meta));
@@ -398,11 +399,6 @@ void execute(Vm *vm, Instrs *instrs) {
 
         return;
       }
-
-      if (!ensure_stack_len_is_enough(vm,
-                                      instr->as.func_call.args_len + 1,
-                                      &instr->meta))
-        return;
 
       u32 deep = instr->as.func_call.args_len + 1;
       Value *func = vm->stack.items[vm->stack.len - deep];
@@ -454,7 +450,7 @@ void execute(Vm *vm, Instrs *instrs) {
       if (vm->state == ExecStateExit) {
         if (vm->exit_code != 0) {
           for (u32 j = vm->current_frame->calls_data.len; j > 0; --j) {
-            if (vm->trace_level++ >= vm->max_trace_level)
+            if (vm->trace_level++ <= vm->max_trace_level)
               break;
 
             CallData *data = vm->current_frame->calls_data.items + j - 1;
@@ -462,11 +458,9 @@ void execute(Vm *vm, Instrs *instrs) {
                  STR_ARG(*data->meta.file_path),
                  data->meta.row + 1, data->meta.col + 1,
                  STR_ARG(data->func_name));
-
-            ++vm->trace_level;
           }
 
-          if (vm->trace_level++ < vm->max_trace_level) {
+          if (vm->trace_level++ <= vm->max_trace_level) {
             Str func_name = STR_LIT("<lambda>");
             u32 name_index = i - instr->as.func_call.args_instrs_len - 1;
             if (instrs->items[name_index].kind == InstrKindGetVar) {
@@ -843,7 +837,7 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
   vm.temp_frame = malloc(sizeof(StackFrame));
   *vm.temp_frame = (StackFrame) {0};
 
-  vm.max_trace_level = (u16) -1;
+  vm.max_trace_level = MAX_TRACE_LEVEL;
 
   ListNode *args = arena_alloc(&vm.current_frame->arena, sizeof(ListNode));
   ListNode *args_end = args;
