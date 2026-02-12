@@ -85,6 +85,7 @@ struct Vm {
   StackFrame   *frames;
   StackFrame   *frames_end;
   StackFrame   *current_frame;
+  StackFrame   *temp_frame;
   u32           frame_begin;
   ListNode     *args;
   ExecState     state;
@@ -125,6 +126,7 @@ void vm_stop(Vm *Vm);
 void vm_destroy(Vm *vm);
 
 void begin_frame(Vm *vm);
+void reset_frame(StackFrame *frame);
 void end_frame(Vm *vm);
 
 #endif // AETHER_VM

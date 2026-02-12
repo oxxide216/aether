@@ -320,6 +320,9 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta) {
 static void tail_call(Vm *vm, FuncValue *func) {
   Value **args = vm->stack.items + vm->stack.len - func->args.len;
 
+  for (u32 i = 0; i < func->args.len; ++i)
+    args[i] = value_clone(args[i], vm->temp_frame);
+
   end_frame(vm);
   begin_frame(vm);
 
@@ -337,6 +340,8 @@ static void tail_call(Vm *vm, FuncValue *func) {
     };
     DA_APPEND(vm->current_frame->vars, new_var);
   }
+
+  reset_frame(vm->temp_frame);
 }
 
 void execute(Vm *vm, Instrs *instrs) {
@@ -835,6 +840,9 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
 
   vm.current_frame = vm.frames;
 
+  vm.temp_frame = malloc(sizeof(StackFrame));
+  *vm.temp_frame = (StackFrame) {0};
+
   vm.max_trace_level = (u16) -1;
 
   ListNode *args = arena_alloc(&vm.current_frame->arena, sizeof(ListNode));
@@ -930,6 +938,8 @@ void vm_destroy(Vm *vm) {
     frame = next;
   }
 
+  frame_free(vm->temp_frame);
+
   if (vm->stack.items)
     free(vm->stack.items);
 }
@@ -946,9 +956,7 @@ void begin_frame(Vm *vm) {
   vm->current_frame = vm->current_frame->next;
 }
 
-void end_frame(Vm *vm) {
-  StackFrame *frame = vm->current_frame;
-
+void reset_frame(StackFrame *frame) {
   for (u32 i = 0; i < frame->values.len; ++i)
     value_free(frame->values.items[i]);
   frame->values.len = 0;
@@ -962,7 +970,10 @@ void end_frame(Vm *vm) {
   for (u32 i = 0; i < frame->match_values.len; ++i)
     value_free(frame->match_values.items[i]);
   frame->match_values.len = 0;
+}
 
+void end_frame(Vm *vm) {
+  reset_frame(vm->current_frame);
   if (vm->current_frame->prev)
     vm->current_frame = vm->current_frame->prev;
 }
