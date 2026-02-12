@@ -85,10 +85,11 @@
 (let exit \exit-code -> import 'exit')
 
 (let contains? \collection item ->
-  (for -item in collection
-    (if (== -item item)
-      (ret true)))
-  false)
+  (let result
+    (for -item in collection
+      (if (== -item item)
+        (ret true))))
+  (not-unit? result))
 
 (let lists-collide? \a b ->
   (for item in a
