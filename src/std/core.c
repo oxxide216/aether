@@ -381,53 +381,12 @@ Value *zip_intrinsic(Vm *vm,Value **args) {
   return value_list(new_list, vm->current_frame);
 }
 
-static bool value_bigger(Value *a, Value *b) {
-  if (a->kind != b->kind)
-    return false;
-
-  switch (a->kind) {
-  case ValueKindString: {
-    Value *min_len_string = a->as.string.str.len < b->as.string.str.len ? a : b;
-    for (u32 i = 0; i < min_len_string->as.string.str.len; ++i) {
-      if (a->as.string.str.ptr[i] > b->as.string.str.ptr[i])
-        return true;
-      else if (a->as.string.str.ptr[i] < b->as.string.str.ptr[i])
-        return false;
-    }
-
-    return a->as.string.str.len > b->as.string.str.len;
-  }
-
-  case ValueKindInt: {
-    return a->as._int > b->as._int;
-  }
-
-  case ValueKindFloat: {
-    return a->as._float > b->as._float;
-  }
-
-  case ValueKindBool: {
-    return a->as._bool > b->as._bool;
-  }
-
-  case ValueKindUnit:
-  case ValueKindList:
-  case ValueKindDict:
-  case ValueKindFunc:
-  case ValueKindEnv:
-  case ValueKindBytes: {
-    return false;
-  }
-  }
-
-  return false;
-}
-
 // Shellsort with Ciura gap sequence
 Value *sort_intrinsic(Vm *vm, Value **args) {
-  Value *list = args[0];
+  Value *func = args[0];
+  Value *list = args[1];
 
-  Value *len = len_intrinsic(vm, args);
+  Value *len = len_intrinsic(vm, args + 1);
   Value **sorted = malloc(len->as._int * sizeof(Value *));
 
   ListNode *node = list->as.list->next;
@@ -446,8 +405,19 @@ Value *sort_intrinsic(Vm *vm, Value **args) {
       Value *temp = sorted[j];
       u32 k = j;
 
-      for (; (k >= gaps[i]) && value_bigger(sorted[k - gaps[i]], temp); k -= gaps[i])
+      while (k >= gaps[i]) {
+        DA_APPEND(vm->stack, sorted[k - gaps[i]]);
+        DA_APPEND(vm->stack, temp);
+        execute_func(vm, func->as.func, NULL);
+
+        if (!value_to_bool(stack_last(vm))) {
+          vm->stack.len -= 3;
+          break;
+        }
+        vm->stack.len -= 3;
         sorted[k] = sorted[k - gaps[i]];
+        k -= gaps[i];
+      }
 
       sorted[k] = temp;
     }
@@ -1424,7 +1394,7 @@ Intrinsic core_intrinsics[] = {
     { ValueKindFunc, ValueKindUnit, ValueKindList },
     &fold_intrinsic, NULL },
   { STR_LIT("zip"), true, 2, { ValueKindList, ValueKindList }, &zip_intrinsic, NULL },
-  { STR_LIT("sort"), true, 1, { ValueKindList }, &sort_intrinsic, NULL },
+  { STR_LIT("sort"), true, 2, { ValueKindFunc, ValueKindList }, &sort_intrinsic, NULL },
   { STR_LIT("for-each"), false, 2, { ValueKindList, ValueKindFunc }, &for_each_intrinsic, NULL },
   { STR_LIT("for-each"), false, 2, { ValueKindString, ValueKindFunc }, &for_each_intrinsic, NULL },
   { STR_LIT("for-each"), false, 2, { ValueKindBytes, ValueKindFunc }, &for_each_intrinsic, NULL },
