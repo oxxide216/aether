@@ -511,27 +511,119 @@ void execute(Vm *vm, Instrs *instrs) {
       DA_APPEND(vm->stack, var->value);
     } break;
 
-    case InstrKindSetVar: {
-      if (!ensure_stack_len_is_enough(vm, 1, &instr->meta))
+    case InstrKindGet: {
+      if (!ensure_stack_len_is_enough(vm, instr->as.get.chain_len, &instr->meta))
         return;
 
-      Str name = get_str(instr->as.set_var.name_id);
+      Value *value = vm->stack.items[vm->stack.len - instr->as.get.chain_len];
+
+      for (u32 j = 1; j < instr->as.get.chain_len; ++j) {
+        Value *key = vm->stack.items[vm->stack.len - instr->as.get.chain_len + j];
+
+        if (value->kind == ValueKindString) {
+          if (key->kind != ValueKindInt)
+            PANIC(instr->meta, "Value of type string can only be indexed with integer\n");
+
+          Value *sub_string = get_from_string(vm, value->as.string.str, key->as._int);
+
+          if (!sub_string) {
+            value = value_unit(vm->current_frame);
+            break;
+          }
+
+          value = sub_string;
+        } else if (value->kind == ValueKindBytes) {
+          if (key->kind != ValueKindInt)
+            PANIC(instr->meta, "Value of type bytes can only be indexed with integer\n");
+
+          if (key->as._int >= value->as.bytes.len)
+            PANIC(instr->meta, "String index out of bounds\n");
+
+          value = value_int(value->as.bytes.ptr[key->as._int], vm->current_frame);
+        } else {
+          Value **root = get_child_root(value, key, &instr->meta, vm);
+          if (vm->state != ExecStateContinue)
+            return;
+
+          if (!root) {
+            value = value_unit(vm->current_frame);
+            break;
+          }
+
+          value = *root;
+        }
+      }
+
+      vm->stack.len -= instr->as.get.chain_len;
+
+      DA_APPEND(vm->stack, value);
+    } break;
+
+    case InstrKindSet: {
+      if (!ensure_stack_len_is_enough(vm, instr->as.set.chain_len + 1, &instr->meta))
+        return;
+
+      Str name = get_str(instr->as.set.name_id);
       Var *var = get_var(vm, name);
       if (!var)
         PANIC_ARGS(instr->meta, "Symbol "STR_FMT" was not found\n",
                    STR_ARG(name));
 
-      Value *new_value = stack_last(vm);
 
-      if (new_value->frame == var->value->frame)
+      if (var->value->refs_count > 1 && !var->value->is_atom)
+        var->value = value_clone(var->value, var->value->frame);
+
+      Value *parent = var->value;
+      Value *new_value = vm->stack.items[vm->stack.len - 1];
+      Value **root = &var->value;
+
+      for (u32 j = 0; j < instr->as.set.chain_len; ++j) {
+        Value *key = vm->stack.items[vm->stack.len - instr->as.set.chain_len + j - 1];
+
+        if (parent->kind == ValueKindString) {
+          PANIC(instr->meta, "Value of type string cannot be mutated\n");
+        } else if (parent->kind == ValueKindBytes) {
+          PANIC(instr->meta, "Value of type bytes cannot be mutated\n");
+        } else {
+          root = get_child_root(parent, key, &instr->meta, vm);
+          if (vm->state != ExecStateContinue)
+            return;
+
+          if (!root && parent->kind == ValueKindDict) {
+            if (key->frame == parent->frame)
+              ++key->refs_count;
+            else
+              key = value_clone(key, parent->frame);
+
+            dict_set_value(parent->frame, parent->as.dict, key,
+                           value_unit(parent->frame));
+            root = get_child_root(parent, key, &instr->meta, vm);
+          }
+
+          if (!root) {
+            ERROR(META_FMT"Value of type ", META_ARG(instr->meta));
+            fprint_value(stderr, parent, true, &vm->current_frame->arena);
+            fputs(" cannot be indexed with ", stderr);
+            fprint_value(stderr, key, true, &vm->current_frame->arena);
+            fputc('\n', stderr);
+            vm->state = ExecStateExit;
+            vm->exit_code = 1;
+            return;
+          }
+
+          parent = *root;
+        }
+      }
+
+      if (new_value->frame == parent->frame)
         ++new_value->refs_count;
       else
-        new_value = value_clone(new_value, var->value->frame);
+        new_value = value_clone(new_value, parent->frame);
 
-      --vm->stack.len;
+      vm->stack.len -= instr->as.set.chain_len + 1;
 
-      --var->value->refs_count;
-      var->value = new_value;
+      --(*root)->refs_count;
+      *root = new_value;
     } break;
 
     case InstrKindJump: {
@@ -626,106 +718,6 @@ void execute(Vm *vm, Instrs *instrs) {
         PANIC(instr->meta, "Match end not inside of a match block\n");
 
       --vm->current_frame->match_values.len;
-    } break;
-
-    case InstrKindGet: {
-      if (!ensure_stack_len_is_enough(vm, instr->as.get.chain_len, &instr->meta))
-        return;
-
-      Value *value = vm->stack.items[vm->stack.len - instr->as.get.chain_len];
-
-      for (u32 j = 1; j < instr->as.get.chain_len; ++j) {
-        Value *key = vm->stack.items[vm->stack.len - instr->as.get.chain_len + j];
-
-        if (value->kind == ValueKindString) {
-          if (key->kind != ValueKindInt)
-            PANIC(instr->meta, "Value of type string can only be indexed with integer\n");
-
-          Value *sub_string = get_from_string(vm, value->as.string.str, key->as._int);
-
-          if (!sub_string) {
-            value = value_unit(vm->current_frame);
-            break;
-          }
-
-          value = sub_string;
-        } else if (value->kind == ValueKindBytes) {
-          if (key->kind != ValueKindInt)
-            PANIC(instr->meta, "Value of type bytes can only be indexed with integer\n");
-
-          if (key->as._int >= value->as.bytes.len)
-            PANIC(instr->meta, "String index out of bounds\n");
-
-          value = value_int(value->as.bytes.ptr[key->as._int], vm->current_frame);
-        } else {
-          Value **root = get_child_root(value, key, &instr->meta, vm);
-          if (vm->state != ExecStateContinue)
-            return;
-
-          if (!root) {
-            value = value_unit(vm->current_frame);
-            break;
-          }
-
-          value = *root;
-        }
-      }
-
-      vm->stack.len -= instr->as.get.chain_len;
-
-      DA_APPEND(vm->stack, value);
-    } break;
-
-    case InstrKindSet: {
-      if (!ensure_stack_len_is_enough(vm, 3, &instr->meta))
-        return;
-
-      Value *parent = vm->stack.items[vm->stack.len - 3];
-      Value *key = vm->stack.items[vm->stack.len - 2];
-      Value *new_value = vm->stack.items[vm->stack.len - 1];
-
-      if (parent->kind == ValueKindString)
-        PANIC(instr->meta, "Value of type string cannot be mutated\n");
-
-      if (parent->kind == ValueKindBytes) {
-        if (key->kind != ValueKindInt)
-            PANIC(instr->meta, "Value of type bytes can only be indexed with integer\n");
-
-        if (new_value->kind != ValueKindInt)
-            PANIC(instr->meta, "Value of type bytes can only be mutated with integer\n");
-
-        if (key->as._int >= parent->as.bytes.len)
-          PANIC(instr->meta, "Bytes index out of bounds\n");
-
-        *(parent->as.bytes.ptr + key->as._int) = new_value->as._int;
-
-        continue;
-      }
-
-      Value **root = get_child_root(parent, key, &instr->meta, vm);
-      if (vm->state != ExecStateContinue)
-        return;
-
-      if (!root && parent->kind == ValueKindDict) {
-        if (key->frame == parent->frame)
-          ++key->refs_count;
-        else
-          key = value_clone(key, parent->frame);
-
-        dict_set_value(parent->frame, parent->as.dict, key,
-                       value_unit(parent->frame));
-        root = get_child_root(parent, key, &instr->meta, vm);
-      }
-
-      if (new_value->frame == parent->frame)
-        ++new_value->refs_count;
-      else
-        new_value = value_clone(new_value, parent->frame);
-
-      vm->stack.len -= 3;
-
-      --(*root)->refs_count;
-      *root = new_value;
     } break;
 
     case InstrKindRet: {

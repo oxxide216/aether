@@ -611,8 +611,12 @@ void print_instr(Instr *instr, bool hide_strings) {
     printf("Get "STR_FMT"\n", STR_ARG(name));
   } break;
 
-  case InstrKindSetVar: {
-    Str name = get_str(instr->as.get_var.name_id);
+  case InstrKindGet: {
+    printf("Get\n");
+  } break;
+
+  case InstrKindSet: {
+    Str name = get_str(instr->as.set.name_id);
     printf("Set "STR_FMT"\n", STR_ARG(name));
   } break;
 
@@ -647,14 +651,6 @@ void print_instr(Instr *instr, bool hide_strings) {
 
   case InstrKindMatchEnd: {
     printf("Match end\n");
-  } break;
-
-  case InstrKindGet: {
-    printf("Get\n");
-  } break;
-
-  case InstrKindSet: {
-    printf("Set\n");
   } break;
 
   case InstrKindRet: {

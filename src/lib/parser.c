@@ -827,21 +827,28 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
     case TT_SET: {
       parser_next_token(parser);
 
-      u16 name_id = parser_next_token(parser)->lexeme_id;
-
-      expr->kind = ExprKindSetVar;
-      expr->as.set_var.name_id = name_id;
-      expr->as.set_var.new = parser_parse_expr(parser, false);
-
-      parser_expect_token(parser, MASK(TT_CPAREN));
-    } break;
-
-    case TT_SET_EXCL: {
-      parser_next_token(parser);
-
       expr->kind = ExprKindSet;
-      expr->as.set.parent = parser_parse_expr(parser, false);
-      expr->as.set.key = parser_parse_expr(parser, false);
+      expr->as.set.name_id = parser_next_token(parser)->lexeme_id;
+
+      token = parser_peek_token(parser);
+      if (token && token->id == TT_QOLON) {
+        DaExprs exprs = {0};
+
+        while (token && token->id == TT_QOLON) {
+          parser_next_token(parser);
+
+          Expr *temp_expr = parser_parse_expr(parser, true);
+          DA_ARENA_APPEND(exprs, temp_expr, parser->arena);
+
+          token = parser_peek_token(parser);
+        }
+
+        expr->as.set.chain = (Exprs) {
+          exprs.items,
+          exprs.len,
+        };
+      }
+
       expr->as.set.new = parser_parse_expr(parser, false);
 
       parser_expect_token(parser, MASK(TT_CPAREN));
@@ -908,8 +915,8 @@ static Expr *parser_parse_expr(Parser *parser, bool is_short) {
       while (token && token->id == TT_QOLON) {
         parser_next_token(parser);
 
-        Expr *expr = parser_parse_expr(parser, true);
-        DA_ARENA_APPEND(exprs, expr, parser->arena);
+        Expr *temp_expr = parser_parse_expr(parser, true);
+        DA_ARENA_APPEND(exprs, temp_expr, parser->arena);
 
         token = parser_peek_token(parser);
       }

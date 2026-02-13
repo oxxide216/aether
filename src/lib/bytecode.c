@@ -365,13 +365,8 @@ static Expr *ast_node_clone(Expr *node, Arena *arena) {
   } break;
 
   case ExprKindSet: {
-    copy->as.set.parent = ast_node_clone(node->as.set.parent, arena);
-    copy->as.set.key = ast_node_clone(node->as.set.key, arena);
+    copy->as.set.chain = ast_clone(&node->as.set.chain, arena);
     copy->as.set.new = ast_node_clone(node->as.set.new, arena);
-  } break;
-
-  case ExprKindSetVar: {
-    copy->as.set_var.new = ast_node_clone(node->as.set_var.new, arena);
   } break;
 
   case ExprKindFuncCall: {
@@ -532,22 +527,13 @@ static void ast_node_to_ir(Converter *converter, Expr *node) {
   } break;
 
   case ExprKindSet: {
-    ast_node_to_ir(converter, node->as.set.parent);
-    ast_node_to_ir(converter, node->as.set.key);
+    ast_block_to_ir(converter, &node->as.set.chain);
     ast_node_to_ir(converter, node->as.set.new);
 
     Instr instr = {0};
     instr.kind = InstrKindSet;
-    instr.meta = node->meta;
-    DEST_APPEND(converter, instr);
-  } break;
-
-  case ExprKindSetVar: {
-    ast_node_to_ir(converter, node->as.set_var.new);
-
-    Instr instr = {0};
-    instr.kind = InstrKindSetVar;
-    instr.as.set_var.name_id = node->as.set_var.name_id;
+    instr.as.set.name_id = node->as.set.name_id;
+    instr.as.set.chain_len = node->as.set.chain.len;
     instr.meta = node->meta;
     DEST_APPEND(converter, instr);
   } break;

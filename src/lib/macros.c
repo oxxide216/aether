@@ -118,13 +118,8 @@ static void clone_expr(Expr **expr, Args *arg_names, Arena *arena) {
   } break;
 
   case ExprKindSet: {
-    clone_expr(&new_expr->as.set.parent, arg_names, arena);
-    clone_expr(&new_expr->as.set.key, arg_names, arena);
+    clone_block(&new_expr->as.set.chain, arg_names, arena);
     clone_expr(&new_expr->as.set.new, arg_names, arena);
-  } break;
-
-  case ExprKindSetVar: {
-    clone_expr(&new_expr->as.set_var.new, arg_names, arena);
   } break;
 
   case ExprKindFuncCall: {
@@ -226,21 +221,16 @@ static void rename_args_expr(Expr *expr, Args *prev_arg_names,
   } break;
 
   case ExprKindSet: {
-    rename_args_expr(expr->as.set.parent, prev_arg_names, new_arg_names, arena);
-    rename_args_expr(expr->as.set.key, prev_arg_names, new_arg_names, arena);
-    rename_args_expr(expr->as.set.new, prev_arg_names, new_arg_names, arena);
-  } break;
-
-  case ExprKindSetVar: {
     for (u32 i = 0; i < prev_arg_names->len; ++i) {
-      if (expr->as.set_var.name_id == prev_arg_names->items[i]) {
-        expr->as.set_var.name_id = new_arg_names->items[i];
+      if (expr->as.set.name_id == prev_arg_names->items[i]) {
+        expr->as.set.name_id = new_arg_names->items[i];
 
         break;
       }
     }
 
-    rename_args_expr(expr->as.set_var.new, prev_arg_names, new_arg_names, arena);
+    rename_args_block(&expr->as.set.chain, prev_arg_names, new_arg_names, arena);
+    rename_args_expr(expr->as.set.new, prev_arg_names, new_arg_names, arena);
   } break;
 
   case ExprKindFuncCall: {
@@ -430,13 +420,8 @@ void expand_macros(Expr *expr, Macros *macros,
   } break;
 
   case ExprKindSet: {
-    INLINE_THEN_EXPAND(expr->as.set.parent);
-    INLINE_THEN_EXPAND(expr->as.set.key);
+    INLINE_THEN_EXPAND_BLOCK(expr->as.set.chain);
     INLINE_THEN_EXPAND(expr->as.set.new);
-  } break;
-
-  case ExprKindSetVar: {
-    INLINE_THEN_EXPAND(expr->as.set_var.new);
   } break;
 
   case ExprKindFuncCall: {

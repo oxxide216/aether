@@ -158,7 +158,8 @@ typedef enum {
   InstrKindFuncCall,
   InstrKindDefVar,
   InstrKindGetVar,
-  InstrKindSetVar,
+  InstrKindGet,
+  InstrKindSet,
   InstrKindJump,
   InstrKindCondJump,
   InstrKindCondNotJump,
@@ -166,8 +167,6 @@ typedef enum {
   InstrKindMatchBegin,
   InstrKindMatchCase,
   InstrKindMatchEnd,
-  InstrKindGet,
-  InstrKindSet,
   InstrKindRet,
   InstrKindList,
   InstrKindDict,
@@ -210,8 +209,13 @@ typedef struct {
 } InstrGetVar;
 
 typedef struct {
+  u32 chain_len;
+} InstrGet;
+
+typedef struct {
   u16 name_id;
-} InstrSetVar;
+  u32 chain_len;
+} InstrSet;
 
 typedef struct {
   u16 label_id;
@@ -234,10 +238,6 @@ typedef struct {
 } InstrMatchCase;
 
 typedef struct {
-  u32 chain_len;
-} InstrGet;
-
-typedef struct {
   bool has_value;
 } InstrRet;
 
@@ -258,13 +258,13 @@ typedef union {
   InstrFuncCall    func_call;
   InstrDefVar      def_var;
   InstrGetVar      get_var;
-  InstrSetVar      set_var;
+  InstrGet         get;
+  InstrSet         set;
   InstrJump        jump;
   InstrCondJump    cond_jump;
   InstrCondNotJump cond_not_jump;
   InstrLabel       label;
   InstrMatchCase   match_case;
-  InstrGet         get;
   InstrRet         ret;
   InstrList        list;
   InstrDict        dict;
@@ -295,7 +295,6 @@ typedef enum {
   ExprKindDict,
   ExprKindGet,
   ExprKindSet,
-  ExprKindSetVar,
   ExprKindFuncCall,
   ExprKindLet,
   ExprKindRet,
@@ -343,15 +342,10 @@ typedef struct  {
 } ExprGet;
 
 typedef struct  {
-  Expr  *parent;
-  Expr  *key;
+  u16    name_id;
+  Exprs  chain;
   Expr  *new;
 } ExprSet;
-
-typedef struct  {
-  u16   name_id;
-  Expr *new;
-} ExprSetVar;
 
 typedef struct {
   Expr  *func;
@@ -390,7 +384,6 @@ typedef union {
   ExprDict     dict;
   ExprGet      get;
   ExprSet      set;
-  ExprSetVar   set_var;
   ExprFuncCall func_call;
   ExprLet      let;
   ExprRet      ret;

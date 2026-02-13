@@ -114,7 +114,7 @@
 
 (let with \collection key value ->
   (let new collection)
-  (set! new key value)
+  (set new::key value)
   new)
 
 (let from \collection index ->

@@ -15,27 +15,26 @@
 #define TT_IMPORT 11
 #define TT_MATCH 12
 #define TT_DO 13
-#define TT_SET_EXCL 14
-#define TT_OPAREN 15
-#define TT_CPAREN 16
-#define TT_OBRACKET 17
-#define TT_CBRACKET 18
-#define TT_OCURLY 19
-#define TT_CCURLY 20
-#define TT_STR 21
-#define TT_UNPACK 22
-#define TT_RIGHT_ARROW 23
-#define TT_COLON 24
-#define TT_QOLON 25
-#define TT_RHOMBUS 26
-#define TT_EQ_ARROW 27
-#define TT_BACKSLASH 28
-#define TT_DOUBLE_ARROW 29
-#define TT_INT 30
-#define TT_FLOAT 31
-#define TT_IDENT 32
+#define TT_OPAREN 14
+#define TT_CPAREN 15
+#define TT_OBRACKET 16
+#define TT_CBRACKET 17
+#define TT_OCURLY 18
+#define TT_CCURLY 19
+#define TT_STR 20
+#define TT_UNPACK 21
+#define TT_RIGHT_ARROW 22
+#define TT_COLON 23
+#define TT_QOLON 24
+#define TT_RHOMBUS 25
+#define TT_EQ_ARROW 26
+#define TT_BACKSLASH 27
+#define TT_DOUBLE_ARROW 28
+#define TT_INT 29
+#define TT_FLOAT 30
+#define TT_IDENT 31
 
-#define TTS_COLNT U33
+#define TTS_COLNT U32
 
 TransitionTable *get_transition_table(void);
 
@@ -127,13 +126,6 @@ TransitionCol table_col_match[] = {
 TransitionCol table_col_do[] = {
   { 1, 100, 100, 2 },
   { 2, 111, 111, 0 },
-};
-
-TransitionCol table_col_set_excl[] = {
-  { 1, 115, 115, 2 },
-  { 2, 101, 101, 3 },
-  { 3, 116, 116, 4 },
-  { 4, 33, 33, 0 },
 };
 
 TransitionCol table_col_oparen[] = {
@@ -281,7 +273,6 @@ TransitionRow table_rows[] = {
   { table_col_import, sizeof(table_col_import) / sizeof(TransitionCol) },
   { table_col_match, sizeof(table_col_match) / sizeof(TransitionCol) },
   { table_col_do, sizeof(table_col_do) / sizeof(TransitionCol) },
-  { table_col_set_excl, sizeof(table_col_set_excl) / sizeof(TransitionCol) },
   { table_col_oparen, sizeof(table_col_oparen) / sizeof(TransitionCol) },
   { table_col_cparen, sizeof(table_col_cparen) / sizeof(TransitionCol) },
   { table_col_obracket, sizeof(table_col_obracket) / sizeof(TransitionCol) },

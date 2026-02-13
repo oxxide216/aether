@@ -96,8 +96,16 @@ static void deserialize_instrs(Instrs *instrs, u8 *data, u32 *end,
       instr.as.get_var.name_id = deserialize_str(data, end, arena);
     } break;
 
-    case InstrKindSetVar: {
-      instr.as.set_var.name_id = deserialize_str(data, end, arena);
+    case InstrKindGet: {
+      instr.as.get.chain_len = *(u32 *) (data + *end);
+      *end += sizeof(u32);
+    } break;
+
+    case InstrKindSet: {
+      instr.as.set.name_id = deserialize_str(data, end, arena);
+
+      instr.as.set.chain_len = *(u32 *) (data + *end);
+      *end += sizeof(u32);
     } break;
 
     case InstrKindJump: {
@@ -123,13 +131,6 @@ static void deserialize_instrs(Instrs *instrs, u8 *data, u32 *end,
     } break;
 
     case InstrKindMatchEnd: break;
-
-    case InstrKindGet: {
-      instr.as.get.chain_len = *(u32 *) (data + *end);
-      *end += sizeof(u32);
-    } break;
-
-    case InstrKindSet: break;
 
     case InstrKindRet: {
       instr.as.ret.has_value = *(u8 *) (data + *end);
@@ -302,19 +303,12 @@ static Expr *deserialize_ast_node(u8 *data, u32 *end,
   } break;
 
   case ExprKindSet: {
-    node->as.set.parent = deserialize_ast_node(data, end,
-                                               path_offsets, arena);
-    node->as.set.key = deserialize_ast_node(data, end,
-                                            path_offsets, arena);
+    node->as.set.name_id = deserialize_str(data, end, arena);
+
+    deserialize_ast(&node->as.set.chain, data,
+                    end, path_offsets, arena);
     node->as.set.new = deserialize_ast_node(data, end,
                                             path_offsets, arena);
-  } break;
-
-  case ExprKindSetVar: {
-    node->as.set_var.name_id = deserialize_str(data, end, arena);
-
-    node->as.set_var.new = deserialize_ast_node(data, end,
-                                                path_offsets, arena);
   } break;
 
   case ExprKindFuncCall: {
