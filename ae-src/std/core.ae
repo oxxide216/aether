@@ -44,6 +44,8 @@
 (let * \a b -> import 'mul')
 (let / \a b -> import 'div')
 (let % \a b -> import 'mod')
+(let before \item list -> import 'before')
+(let after \list item -> import 'after')
 
 ; Comparisons
 (let == \a b -> import 'eq')

@@ -801,39 +801,6 @@ Value *add_intrinsic(Vm *vm, Value **args) {
     if (a->is_atom)
       return a;
     return value_list(new_list, vm->current_frame);
-  } else if (a->kind == ValueKindList) {
-    ListNode *new_list = a->as.list;
-    if (!a->is_atom) {
-      new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-      new_list->next = list_clone(a->as.list->next, vm->current_frame);
-    }
-
-    ListNode *last = new_list;
-    while (last && last->next)
-      last = last->next;
-
-    if (a->is_atom)
-      last->next = arena_alloc(&a->frame->arena, sizeof(ListNode));
-    else
-      last->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-
-    if (a->is_atom && b->frame != a->frame)
-      last->next->value = value_clone(b, a->frame);
-    else
-      last->next->value = b;
-
-    last->next->next = NULL;
-
-    if (a->is_atom)
-      return a;
-    return value_list(new_list, vm->current_frame);
-  } else if (b->kind == ValueKindList) {
-    ListNode *new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-    new_list->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-    new_list->next->value = a;
-    new_list->next->next = list_clone(b->as.list->next, vm->current_frame);
-
-    return value_list(new_list, vm->current_frame);
   } else if (a->kind == ValueKindBytes &&
              b->kind == ValueKindBytes) {
     Bytes bytes;
@@ -925,6 +892,49 @@ Value *mod_intrinsic(Vm *vm, Value **args) {
   Value *b = args[1];
 
   return value_int(a->as._int % b->as._int, vm->current_frame);
+}
+
+Value *before_intrinsic(Vm *vm, Value **args) {
+  Value *a = args[0];
+  Value *b = args[1];
+
+  ListNode *new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+  new_list->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+  new_list->next->value = a;
+  new_list->next->next = list_clone(b->as.list->next, vm->current_frame);
+
+  return value_list(new_list, vm->current_frame);
+}
+
+Value *after_intrinsic(Vm *vm, Value **args) {
+  Value *a = args[0];
+  Value *b = args[1];
+
+  ListNode *new_list = a->as.list;
+  if (!a->is_atom) {
+    new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+    new_list->next = list_clone(a->as.list->next, vm->current_frame);
+  }
+
+  ListNode *last = new_list;
+  while (last && last->next)
+    last = last->next;
+
+  if (a->is_atom)
+    last->next = arena_alloc(&a->frame->arena, sizeof(ListNode));
+  else
+    last->next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+
+  if (a->is_atom && b->frame != a->frame)
+    last->next->value = value_clone(b, a->frame);
+  else
+    last->next->value = b;
+
+  last->next->next = NULL;
+
+  if (a->is_atom)
+    return a;
+  return value_list(new_list, vm->current_frame);
 }
 
 Value *eq_intrinsic(Vm *vm, Value **args) {
@@ -1441,23 +1451,23 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("to-float"), true, 1, { ValueKindBytes }, &to_float_intrinsic, NULL },
   { STR_LIT("to-bool"), true, 1, { ValueKindUnit }, &to_bool_intrinsic, NULL },
   // Math
-  { STR_LIT("add"), true, 2, { ValueKindInt, ValueKindInt }, &add_intrinsic, NULL },
-  { STR_LIT("add"), true, 2, { ValueKindFloat, ValueKindFloat }, &add_intrinsic, NULL },
-  { STR_LIT("add"), true, 2, { ValueKindString, ValueKindString }, &add_intrinsic, NULL },
-  { STR_LIT("add"), true, 2, { ValueKindList, ValueKindList }, &add_intrinsic, NULL },
-  { STR_LIT("add"), true, 2, { ValueKindList, ValueKindUnit }, &add_intrinsic, NULL },
-  { STR_LIT("add"), true, 2, { ValueKindUnit, ValueKindList }, &add_intrinsic, NULL },
-  { STR_LIT("add"), true, 2, { ValueKindBytes, ValueKindBytes }, &add_intrinsic, NULL },
-  { STR_LIT("add"), true, 2, { ValueKindDict, ValueKindDict }, &add_intrinsic, NULL },
-  { STR_LIT("sub"), true, 2, { ValueKindInt, ValueKindInt }, &sub_intrinsic, NULL },
-  { STR_LIT("sub"), true, 2, { ValueKindFloat, ValueKindFloat }, &sub_intrinsic, NULL },
-  { STR_LIT("mul"), true, 2, { ValueKindInt, ValueKindInt }, &mul_intrinsic, NULL },
-  { STR_LIT("mul"), true, 2, { ValueKindFloat, ValueKindFloat }, &mul_intrinsic, NULL },
-  { STR_LIT("mul"), true, 2, { ValueKindString, ValueKindInt }, &mul_intrinsic, NULL },
-  { STR_LIT("div"), true, 2, { ValueKindInt, ValueKindInt }, &div_intrinsic, NULL },
-  { STR_LIT("div"), true, 2, { ValueKindFloat, ValueKindFloat }, &div_intrinsic, NULL },
-  { STR_LIT("mod"), true, 2, { ValueKindInt, ValueKindInt }, mod_intrinsic, NULL },
-  { STR_LIT("mod"), true, 2, { ValueKindFloat, ValueKindFloat }, &mod_intrinsic, NULL },
+  { STR_LIT("add"),    true, 2, { ValueKindInt, ValueKindInt }, &add_intrinsic, NULL },
+  { STR_LIT("add"),    true, 2, { ValueKindFloat, ValueKindFloat }, &add_intrinsic, NULL },
+  { STR_LIT("add"),    true, 2, { ValueKindString, ValueKindString }, &add_intrinsic, NULL },
+  { STR_LIT("add"),    true, 2, { ValueKindList, ValueKindList }, &add_intrinsic, NULL },
+  { STR_LIT("add"),    true, 2, { ValueKindBytes, ValueKindBytes }, &add_intrinsic, NULL },
+  { STR_LIT("add"),    true, 2, { ValueKindDict, ValueKindDict }, &add_intrinsic, NULL },
+  { STR_LIT("sub"),    true, 2, { ValueKindInt, ValueKindInt }, &sub_intrinsic, NULL },
+  { STR_LIT("sub"),    true, 2, { ValueKindFloat, ValueKindFloat }, &sub_intrinsic, NULL },
+  { STR_LIT("mul"),    true, 2, { ValueKindInt, ValueKindInt }, &mul_intrinsic, NULL },
+  { STR_LIT("mul"),    true, 2, { ValueKindFloat, ValueKindFloat }, &mul_intrinsic, NULL },
+  { STR_LIT("mul"),    true, 2, { ValueKindString, ValueKindInt }, &mul_intrinsic, NULL },
+  { STR_LIT("div"),    true, 2, { ValueKindInt, ValueKindInt }, &div_intrinsic, NULL },
+  { STR_LIT("div"),    true, 2, { ValueKindFloat, ValueKindFloat }, &div_intrinsic, NULL },
+  { STR_LIT("mod"),    true, 2, { ValueKindInt, ValueKindInt }, mod_intrinsic, NULL },
+  { STR_LIT("mod"),    true, 2, { ValueKindFloat, ValueKindFloat }, &mod_intrinsic, NULL },
+  { STR_LIT("before"), true, 2, { ValueKindUnit, ValueKindList }, &after_intrinsic, NULL },
+  { STR_LIT("after"),  true, 2, { ValueKindList, ValueKindUnit }, &before_intrinsic, NULL },
   // Comparisons
   { STR_LIT("eq"), true, 2, { ValueKindUnit, ValueKindUnit }, &eq_intrinsic, NULL },
   { STR_LIT("ne"), true, 2, { ValueKindUnit, ValueKindUnit }, &ne_intrinsic, NULL },
