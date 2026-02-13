@@ -1466,8 +1466,8 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("div"),    true, 2, { ValueKindFloat, ValueKindFloat }, &div_intrinsic, NULL },
   { STR_LIT("mod"),    true, 2, { ValueKindInt, ValueKindInt }, mod_intrinsic, NULL },
   { STR_LIT("mod"),    true, 2, { ValueKindFloat, ValueKindFloat }, &mod_intrinsic, NULL },
-  { STR_LIT("before"), true, 2, { ValueKindUnit, ValueKindList }, &after_intrinsic, NULL },
-  { STR_LIT("after"),  true, 2, { ValueKindList, ValueKindUnit }, &before_intrinsic, NULL },
+  { STR_LIT("before"), true, 2, { ValueKindUnit, ValueKindList }, &before_intrinsic, NULL },
+  { STR_LIT("after"),  true, 2, { ValueKindList, ValueKindUnit }, &after_intrinsic, NULL },
   // Comparisons
   { STR_LIT("eq"), true, 2, { ValueKindUnit, ValueKindUnit }, &eq_intrinsic, NULL },
   { STR_LIT("ne"), true, 2, { ValueKindUnit, ValueKindUnit }, &ne_intrinsic, NULL },
