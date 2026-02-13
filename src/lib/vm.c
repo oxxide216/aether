@@ -864,6 +864,7 @@ void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics) {
   intrinsics_append(intrinsics, core_intrinsics, core_intrinsics_len, &vm->frames->arena);
   intrinsics_append(intrinsics, math_intrinsics, math_intrinsics_len, &vm->frames->arena);
   intrinsics_append(intrinsics, str_intrinsics, str_intrinsics_len, &vm->frames->arena);
+  intrinsics_append(intrinsics, random_intrinsics, random_intrinsics_len, &vm->frames->arena);
 #ifndef NOSYSTEM
   intrinsics_append(intrinsics, base_intrinsics, base_intrinsics_len, &vm->frames->arena);
   intrinsics_append(intrinsics, io_intrinsics, io_intrinsics_len, &vm->frames->arena);

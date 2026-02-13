@@ -14,12 +14,12 @@ Value *seed_intrinsic(Vm *vm, Value **args) {
 Value *gen_intrinsic(Vm *vm, Value **args) {
   (void) args;
 
-  return value_float(rand() / RAND_MAX, vm->current_frame);
+  return value_float((f64) rand() / RAND_MAX, vm->current_frame);
 }
 
 Intrinsic random_intrinsics[] = {
-  { STR_LIT("random/seed"), true, 1, { ValueKindString }, &seed_intrinsic, NULL },
-  { STR_LIT("random/gen"), true, 1, {}, &gen_intrinsic, NULL },
+  { STR_LIT("random/seed"), false, 1, { ValueKindString }, &seed_intrinsic, NULL },
+  { STR_LIT("random/gen"), true, 0, {}, &gen_intrinsic, NULL },
 };
 
 u32 random_intrinsics_len = ARRAY_LEN(random_intrinsics);
