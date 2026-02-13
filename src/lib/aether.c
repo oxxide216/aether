@@ -1,5 +1,7 @@
 #include <locale.h>
 #include <signal.h>
+#include <stdlib.h>
+#include <time.h>
 
 #include "aether/aether.h"
 #include "aether/deserializer.h"
@@ -29,8 +31,8 @@ void sigint_handler(i32 signal) {
 AetherCtx aether_init(i32 argc, char **argv, bool debug,
                       Intrinsics *intrinsics) {
   setlocale(LC_ALL, "");
-
   signal(SIGINT, sigint_handler);
+  srand(time(NULL));
 
   AetherCtx ctx = {0};
 

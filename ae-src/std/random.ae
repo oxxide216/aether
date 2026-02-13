@@ -1,0 +1,2 @@
+(let random/seed \seed -> import 'random/seed')
+(let random/gen \-> import 'random/gen')

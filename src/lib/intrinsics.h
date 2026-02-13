@@ -8,6 +8,7 @@
 MODULE(core);
 MODULE(math);
 MODULE(str);
+MODULE(random);
 #ifndef NOSYSTEM
 MODULE(base);
 MODULE(io);

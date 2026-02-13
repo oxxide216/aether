@@ -9,7 +9,7 @@ BUILD_FLAGS="${@:1}"
 LDFLAGS="-z execstack -lm"
 BIN_SRC="src/main.c"
 LIB_SRC="$(find src/lib -name "*.c")"
-STD_SRC="src/std/core.c src/std/math.c src/std/str.c"
+STD_SRC="src/std/core.c src/std/math.c src/std/str.c src/std/random.c"
 LIBS_SRC="$(find libs/lexgen/src/runtime -name "*.c") libs/lexgen/src/common/wstr.c"
 
 LIBSODIUM_VERSION="1.0.21"
