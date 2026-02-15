@@ -11,20 +11,20 @@
 #define META_FMT       STR_FMT":%u:%u: "
 #define META_ARG(meta) STR_ARG(*(meta).file_path), (meta).row + 1, (meta).col + 1
 
-#define PANIC(meta, text)                 \
-  do {                                    \
-    ERROR(META_FMT text, META_ARG(meta)); \
-    vm->state = ExecStateExit;            \
-    vm->exit_code = 1;                    \
-    return;                               \
+#define PANIC(meta, text)                   \
+  do {                                      \
+    PERROR(META_FMT, text, META_ARG(meta)); \
+    vm->state = ExecStateExit;              \
+    vm->exit_code = 1;                      \
+    return;                                 \
   } while (false)
 
-#define PANIC_ARGS(meta, text, ...)                    \
-  do {                                                 \
-    ERROR(META_FMT text, META_ARG(meta), __VA_ARGS__); \
-    vm->state = ExecStateExit;                         \
-    vm->exit_code = 1;                                 \
-    return;                                            \
+#define PANIC_ARGS(meta, text, ...)                      \
+  do {                                                   \
+    PERROR(META_FMT, text, META_ARG(meta), __VA_ARGS__); \
+    vm->state = ExecStateExit;                           \
+    vm->exit_code = 1;                                   \
+    return;                                              \
   } while (false)
 
 static void print_stack_dump(Values *stack, Arena *arena) {
