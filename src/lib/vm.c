@@ -450,7 +450,7 @@ void execute(Vm *vm, Instrs *instrs) {
       if (vm->state == ExecStateExit) {
         if (vm->exit_code != 0) {
           for (u32 j = vm->current_frame->calls_data.len; j > 0; --j) {
-            if (vm->trace_level++ <= vm->max_trace_level)
+            if (vm->trace_level++ < vm->max_trace_level)
               break;
 
             CallData *data = vm->current_frame->calls_data.items + j - 1;
@@ -460,7 +460,7 @@ void execute(Vm *vm, Instrs *instrs) {
                  STR_ARG(data->func_name));
           }
 
-          if (vm->trace_level++ <= vm->max_trace_level) {
+          if (vm->trace_level++ < vm->max_trace_level) {
             Str func_name = STR_LIT("<lambda>");
             u32 name_index = i - instr->as.func_call.args_instrs_len - 1;
             if (instrs->items[name_index].kind == InstrKindGetVar) {

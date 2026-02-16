@@ -536,10 +536,7 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
     memset(_pair, 0, sizeof(Dict));
 
     Value *key = value_string(STR_LIT("key"), vm->current_frame);
-    dict_set_value(vm->current_frame, _pair, key, NULL);
-
     Value *value = value_string(STR_LIT("value"), vm->current_frame);
-    dict_set_value(vm->current_frame, _pair, value, NULL);
 
     Value *pair = value_dict(_pair, vm->current_frame);
     DA_APPEND(vm->stack, pair);
@@ -547,8 +544,8 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
     for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
       DictValue *entry = collection->as.dict->items[i];
       while (entry) {
-        pair->as.dict->items[0]->key = entry->key;
-        pair->as.dict->items[1]->value = entry->value;
+        dict_set_value(vm->current_frame, _pair, key, entry->key);
+        dict_set_value(vm->current_frame, _pair, value, entry->value);
 
         execute_func(vm, func->as.func, NULL);
 
@@ -1134,6 +1131,10 @@ Value *make_env_intrinsic(Vm *vm, Value **args) {
   Intrinsics intrinsics = {0};
   Vm *new_vm = arena_alloc(&vm->current_frame->arena, sizeof(Vm));
   *new_vm = vm_create(cstr_cmd_args.len, cstr_cmd_args.items, &intrinsics);
+
+#ifdef NDEBUG
+  new_vm->max_trace_level = 0;
+#endif
 
   for (u32 i = 0; i < cstr_cmd_args.len; ++i)
     free(cstr_cmd_args.items[i]);
