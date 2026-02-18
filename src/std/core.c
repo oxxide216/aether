@@ -1132,10 +1132,6 @@ Value *make_env_intrinsic(Vm *vm, Value **args) {
   Vm *new_vm = arena_alloc(&vm->current_frame->arena, sizeof(Vm));
   *new_vm = vm_create(cstr_cmd_args.len, cstr_cmd_args.items, &intrinsics);
 
-#ifdef NDEBUG
-  new_vm->max_trace_level = 0;
-#endif
-
   for (u32 i = 0; i < cstr_cmd_args.len; ++i)
     free(cstr_cmd_args.items[i]);
   free(cstr_cmd_args.items);
