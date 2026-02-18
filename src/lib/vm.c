@@ -957,6 +957,8 @@ void reset_frame(StackFrame *frame) {
   for (u32 i = 0; i < frame->match_values.len; ++i)
     value_free(frame->match_values.items[i]);
   frame->match_values.len = 0;
+
+  frame->calls_data.len = 0;
 }
 
 void end_frame(Vm *vm) {
