@@ -1403,6 +1403,15 @@ Value *copy_intrinsic(Vm *vm, Value **args) {
 Value *exit_intrinsic(Vm *vm, Value **args) {
   Value *exit_code = args[0];
 
+  vm->max_trace_level = 0;
+  vm->exit_code = exit_code->as._int;
+  vm->state = ExecStateExit;
+  return value_unit(vm->current_frame);
+}
+
+Value *panic_intrinsic(Vm *vm, Value **args) {
+  Value *exit_code = args[0];
+
   vm->exit_code = exit_code->as._int;
   vm->state = ExecStateExit;
   return value_unit(vm->current_frame);
@@ -1536,6 +1545,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("atom"), true, 1, { ValueKindBytes }, &atom_intrinsic, NULL },
   { STR_LIT("copy"), true, 1, { ValueKindUnit }, &copy_intrinsic, NULL },
   { STR_LIT("exit"), false, 1, { ValueKindInt }, &exit_intrinsic, NULL },
+  { STR_LIT("panic"), false, 1, { ValueKindInt }, &panic_intrinsic, NULL },
 };
 
 u32 core_intrinsics_len = ARRAY_LEN(core_intrinsics);

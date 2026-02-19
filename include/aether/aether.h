@@ -14,14 +14,10 @@ typedef struct {
   u32          vm_index;
 } AetherCtx;
 
-AetherCtx  aether_init(i32 argc, char **argv, bool debug,
-                       Intrinsics *intrinsics);
+AetherCtx  aether_init(i32 argc, char **argv, Intrinsics *intrinsics);
 Value     *aether_eval(AetherCtx *ctx, Str code, Str file_path);
-Value     *aether_eval_bytecode(AetherCtx *ctx,
-                                u8 *buffer, u32 size);
-void       aether_eval_macros(AetherCtx *ctx,
-                              u8 *macros_buffer,
-                              u32 macros_len);
+Value     *aether_eval_bytecode(AetherCtx *ctx, u8 *buffer, u32 size);
+void       aether_eval_macros(AetherCtx *ctx, u8 *macros_buffer, u32 macros_len);
 void       aether_cleanup(AetherCtx *ctx);
 i32        aether_exit_code(AetherCtx *ctx);
 

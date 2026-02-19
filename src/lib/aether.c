@@ -28,23 +28,19 @@ void sigint_handler(i32 signal) {
   }
 }
 
-AetherCtx aether_init(i32 argc, char **argv, bool debug,
-                      Intrinsics *intrinsics) {
+AetherCtx aether_init(i32 argc, char **argv, Intrinsics *intrinsics) {
   setlocale(LC_ALL, "");
   signal(SIGINT, sigint_handler);
   srand(time(NULL));
 
   AetherCtx ctx = {0};
+  ctx.vm_index = vms.len;
 
   Intrinsics _intrinsics = {0};
   if (!intrinsics)
     intrinsics = &_intrinsics;
 
   Vm vm = vm_create(argc, argv, intrinsics);
-  if (!debug)
-    vm.max_trace_level = 0;
-
-  ctx.vm_index = vms.len;
   DA_APPEND(vms, vm);
 
   return ctx;

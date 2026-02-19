@@ -33,13 +33,7 @@ i32 main(i32 argc, char **argv) {
     exit(1);
   }
 
-#ifdef NDEBUG
-  bool debug = false;
-#else
-  bool debug = true;
-#endif
-
-  AetherCtx ctx = aether_init(argc, argv, debug, NULL);
+  AetherCtx ctx = aether_init(argc, argv, NULL);
 
   if (path->is_precompiled) {
     aether_eval_bytecode(&ctx, (u8 *) code.ptr, code.len);
