@@ -221,45 +221,91 @@ Value *gen_range_intrinsic(Vm *vm, Value **args) {
 
 Value *map_intrinsic(Vm *vm, Value **args) {
   Value *func = args[0];
-  Value *list = args[1];
+  Value *collection = args[1];
 
-  ListNode *new_list = NULL;
-  ListNode **new_list_next = NULL;
-  if (!list->is_atom) {
-    new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-    new_list_next = &new_list->next;
-  }
+  if (collection->kind == ValueKindList) {
+    ListNode *new_list = NULL;
+    ListNode **new_list_next = NULL;
+    if (!collection->is_atom) {
+      new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+      new_list_next = &new_list->next;
+    }
 
-  ListNode *node = list->as.list->next;
-  while (node) {
-    DA_APPEND(vm->stack, node->value);
+    ListNode *node = collection->as.list->next;
+    while (node) {
+      DA_APPEND(vm->stack, node->value);
 
-    // TODO: put real metadata here
-    execute_func(vm, func->as.func, NULL);
+      // TODO: put real metadata here
+      execute_func(vm, func->as.func, NULL);
 
-    if (vm->state == ExecStateExit)
-      break;
+      if (vm->state == ExecStateExit)
+        break;
 
-    Value *replacement = stack_last(vm);
+      Value *replacement = stack_last(vm);
 
-    if (list->is_atom) {
-      --node->value->refs_count;
-      node->value = replacement;
-    } else {
-      *new_list_next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
-      (*new_list_next)->value = replacement;
-      new_list_next = &(*new_list_next)->next;
+      if (collection->is_atom) {
+        --node->value->refs_count;
+        node->value = replacement;
+      } else {
+        *new_list_next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+        (*new_list_next)->value = replacement;
+        new_list_next = &(*new_list_next)->next;
+      }
+
+      vm->stack.len -= 2;
+      node = node->next;
     }
 
     *new_list_next = NULL;
 
-    vm->stack.len -= 2;
-    node = node->next;
+    if (collection->is_atom)
+      return collection;
+    return value_list(new_list, vm->current_frame);
+  } else if (collection->kind == ValueKindDict) {
+    ListNode *new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+    ListNode **new_list_next = &new_list->next;
+
+    Dict *_pair = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
+    memset(_pair, 0, sizeof(Dict));
+
+    Value *key = value_string(STR_LIT("key"), vm->current_frame);
+    Value *value = value_string(STR_LIT("value"), vm->current_frame);
+
+    Value *pair = value_dict(_pair, vm->current_frame);
+    DA_APPEND(vm->stack, pair);
+
+    for (u32 i = 0; i < DICT_HASH_TABLE_CAP; ++i) {
+      DictValue *entry = collection->as.dict->items[i];
+      while (entry) {
+        dict_set_value(vm->current_frame, _pair, key, entry->key);
+        dict_set_value(vm->current_frame, _pair, value, entry->value);
+
+        // TODO: put real metadata here
+        execute_func(vm, func->as.func, NULL);
+
+        if (vm->state == ExecStateExit)
+          break;
+
+        Value *replacement = stack_last(vm);
+
+        *new_list_next = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+        (*new_list_next)->value = replacement;
+        new_list_next = &(*new_list_next)->next;
+
+        --vm->stack.len;
+        entry = entry->next;
+      }
+    }
+
+    *pair->as.dict = (Dict) {0};
+    --vm->stack.len;
+
+    *new_list_next = NULL;
+
+    return value_list(new_list, vm->current_frame);
   }
 
-  if (list->is_atom)
-    return list;
-  return value_list(new_list, vm->current_frame);
+  return value_unit(vm->current_frame);
 }
 
 Value *filter_intrinsic(Vm *vm, Value **args) {
@@ -1386,6 +1432,7 @@ Intrinsic core_intrinsics[] = {
     &get_range_intrinsic, NULL },
   { STR_LIT("gen-range"), true, 2, { ValueKindInt, ValueKindInt }, &gen_range_intrinsic, NULL },
   { STR_LIT("map"), true, 2, { ValueKindFunc, ValueKindList }, &map_intrinsic, NULL },
+  { STR_LIT("map"), true, 2, { ValueKindFunc, ValueKindDict }, &map_intrinsic, NULL },
   { STR_LIT("filter"), true, 2, { ValueKindFunc, ValueKindList }, &filter_intrinsic, NULL },
   { STR_LIT("fold"), true, 3,
     { ValueKindFunc, ValueKindUnit, ValueKindList },
