@@ -391,15 +391,6 @@ void execute(Vm *vm, Instrs *instrs) {
                                       &instr->meta))
         return;
 
-      if (++vm->recursion_level >= MAX_RECURSION_LEVEL) {
-        ERROR(META_FMT "Infinite recursion detected\n",
-              META_ARG(instr->meta));
-        vm->state = ExecStateExit;
-        vm->exit_code = 1;
-
-        return;
-      }
-
       u32 deep = instr->as.func_call.args_len + 1;
       Value *func = vm->stack.items[vm->stack.len - deep];
 
@@ -444,6 +435,15 @@ void execute(Vm *vm, Instrs *instrs) {
 
         i = (u32) -1;
         break;
+      }
+
+      if (++vm->recursion_level >= MAX_RECURSION_LEVEL) {
+        ERROR(META_FMT "Infinite recursion detected\n",
+              META_ARG(instr->meta));
+        vm->state = ExecStateExit;
+        vm->exit_code = 1;
+
+        return;
       }
 
       execute_func(vm, func->as.func, &instr->meta);
