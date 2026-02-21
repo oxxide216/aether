@@ -44,9 +44,9 @@ static void serialize_instrs(Instrs *instrs, u8 **data, u32 *data_size,
   for (u32 i = 0; i < instrs->len; ++i) {
     Instr *instr = instrs->items + i;
 
-    reserve_space(sizeof(InstrKind), data, data_size, end);
-    *(InstrKind *) (*data + *end) = instr->kind;
-    *end += sizeof(InstrKind);
+    reserve_space(sizeof(u8), data, data_size, end);
+    *(u8 *) (*data + *end) = instr->kind;
+    *end += sizeof(u8);
 
     switch (instr->kind) {
     case InstrKindString: {
@@ -245,9 +245,9 @@ static void serialize_ast(Exprs *ast, u8 **data, u32 *data_size,
 static void serialize_ast_node(Expr *node, u8 **data, u32 *data_size,
                                u32 *end, FilePathOffsets *path_offsets,
                                Str *file_path, IndicesMap *map) {
-  reserve_space(sizeof(ExprKind), data, data_size, end);
-  *(ExprKind *) (*data + *end) = node->kind;
-  *end += sizeof(ExprKind);
+  reserve_space(sizeof(u8), data, data_size, end);
+  *(u8 *) (*data + *end) = node->kind;
+  *end += sizeof(u8);
 
   switch (node->kind) {
   case ExprKindString: {

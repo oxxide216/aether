@@ -35,8 +35,8 @@ static void deserialize_instrs(Instrs *instrs, u8 *data, u32 *end,
   for (u32 i = 0; i < instrs->len; ++i) {
     Instr instr = {0};
 
-    instr.kind = *(InstrKind *) (data + *end);
-    *end += sizeof(InstrKind);
+    instr.kind = *(u8 *) (data + *end);
+    *end += sizeof(u8);
 
     switch (instr.kind) {
     case InstrKindString: {
@@ -230,8 +230,8 @@ static Expr *deserialize_ast_node(u8 *data, u32 *end,
                                   Arena *arena) {
   Expr *node = arena_alloc(arena, sizeof(Expr));
 
-  node->kind = *(ExprKind *) (data + *end);
-  *end += sizeof(ExprKind);
+  node->kind = *(u8 *) (data + *end);
+  *end += sizeof(u8);
 
   switch (node->kind) {
   case ExprKindString: {
