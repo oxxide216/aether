@@ -517,6 +517,35 @@ Value *main_loop_intrinsic(Vm *vm, Value **args) {
   return value_unit(vm->current_frame);
 }
 
+Value *request_notify_permission_intrinsic(Vm *vm, Value **args) {
+  (void) args;
+
+  EM_ASM({
+    Notification.requestPermission();
+  });
+
+  return value_unit(vm->current_frame);
+}
+
+Value *notify_intrinsic(Vm *vm, Value **args) {
+  Value *title = args[0];
+  Value *text = args[1];
+
+  char *title_cstr = str_to_cstr(title->as.string.str);
+  char *text_cstr = str_to_cstr(text->as.string.str);
+
+  EM_ASM({
+    const title = UTF8ToString($0);
+    const text = UTF8ToString($1);
+    new Notification(title, { body: text });
+  }, title_cstr, text_cstr);
+
+  free(title_cstr);
+  free(text_cstr);
+
+  return value_unit(vm->current_frame);
+}
+
 Intrinsic web_intrinsics[] = {
   { STR_LIT("alert"), false, 1, { ValueKindString }, &alert_intrinsic, NULL },
   { STR_LIT("update-html"), false, 2, { ValueKindString, ValueKindString }, &update_html_intrinsic, NULL },
@@ -550,6 +579,7 @@ Intrinsic web_intrinsics[] = {
       ValueKindFunc, ValueKindFunc },
     &fetch_check_intrinsic, NULL },
   { STR_LIT("main-loop"), false, 2, { ValueKindInt, ValueKindFunc }, &main_loop_intrinsic, NULL },
-};
+  { STR_LIT("request-notify-permission"), false, 0, {}, &request_notify_permission_intrinsic, NULL },
+  { STR_LIT("notify"), false, 2, { ValueKindString, ValueKindString }, &notify_intrinsic, NULL },};
 
 u32 web_intrinsics_len = ARRAY_LEN(web_intrinsics);

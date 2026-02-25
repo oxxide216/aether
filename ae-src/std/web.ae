@@ -34,6 +34,8 @@
 (let fetch-check \method path body ok-callback fail-callback -> import 'fetch-check')
 
 (let main-loop \fps body -> import 'main-loop')
+(let request-notify-permission \-> import 'request-notify-permission')
+(let notify \title text -> import 'notify')
 
 (macro console-log \...messages ->
   (-console-log (join-any [messages] '')))
