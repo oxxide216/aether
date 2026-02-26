@@ -1,0 +1,7 @@
+(let create-ssl-server \port cert-path key-path -> import 'create-ssl-server')
+(let accept-ssl-connection \server port -> import 'accept-ssl-connection')
+(let close-ssl-client-connection \client -> import 'close-ssl-client-connection')
+(let close-ssl-server-connection \server -> import 'close-ssl-server-connection')
+(let send-ssl \receiver message -> import 'send-ssl')
+(let receive-size-ssl \receiver size timeout -> import 'receive-size-ssl')
+(let receive-ssl \receiver timeout -> import 'receive-ssl')
