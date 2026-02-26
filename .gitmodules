@@ -13,3 +13,6 @@
 [submodule "libs/blake2"]
 	path = libs/blake2
 	url = https://github.com/howjmay/BLAKE2
+[submodule "libs/tlse"]
+	path = libs/tlse
+	url = https://github.com/eduardsui/tlse

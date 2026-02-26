@@ -874,6 +874,9 @@ void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics) {
 #ifdef CRYPTO
   intrinsics_append(intrinsics, crypto_intrinsics, crypto_intrinsics_len, &vm->frames->arena);
 #endif
+#ifdef LIBTLS
+  intrinsics_append(intrinsics, tls_intrinsics, tls_intrinsics_len, &vm->frames->arena);
+#endif
 
   vm->intrinsics = *intrinsics;
   vm->args = args;

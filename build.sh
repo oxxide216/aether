@@ -49,6 +49,11 @@ if [ "$CRYPTO" != "" ]; then
   STD_SRC="$STD_SRC src/std/crypto.c"
 fi
 
+if [ "$TLS" != "" ]; then
+  CFLAGS="$CFLAGS -DLIBTLS -DTLS_AMALGAMATION -Ilibs/tlse"
+  STD_SRC="$STD_SRC src/std/tls/tls.c"
+fi
+
 cd libs/lexgen
 ./build.sh
 cd ../..

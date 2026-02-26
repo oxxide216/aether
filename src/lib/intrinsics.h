@@ -26,5 +26,8 @@ MODULE(web);
 #ifdef CRYPTO
 MODULE(crypto);
 #endif
+#ifdef LIBTLS
+MODULE(tls);
+#endif
 
 #endif // INTRINSICS_H
