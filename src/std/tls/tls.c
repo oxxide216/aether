@@ -1,5 +1,5 @@
+#include <netinet/tcp.h>
 #include <poll.h>
-
 
 #include "tlse-server.h"
 #include "aether/vm.h"
@@ -8,87 +8,59 @@
 #define DEFAULT_RECEIVE_BUFFER_SIZE 64
 
 extern Value *create_server_intrinsic(Vm *vm, Value **args);
-extern Value *accept_connection_intrinsic(Vm *vm, Value **args);
 
-static Da(SSL *) ssls = {0};
+Da(struct TLSContext *) ctxs = {0};
 
-static char *str_to_cstr(Str str) {
-  char *cstr = malloc(str.len + 1);
-  memcpy(cstr, str.ptr, str.len);
-  cstr[str.len] = '\0';
-
-  return cstr;
-}
-
-Value *create_ssl_server_intrinsic(Vm *vm, Value **args) {
+Value *create_tls_server_intrinsic(Vm *vm, Value **args) {
   Value *socket = create_server_intrinsic(vm, args);
-  Value *cert_path = args[1];
-  Value *key_path = args[2];
+  Value *cert = args[1];
+  Value *key = args[2];
 
   Dict *server_dict = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
+  memset(server_dict, 0, sizeof(Dict));
 
   Value *socket_key = value_string(STR_LIT("socket"), vm->current_frame);
   dict_set_value(vm->current_frame, server_dict, socket_key, socket);
 
-  Value *ssl_id_key = value_string(STR_LIT("ssl-id"), vm->current_frame);
+  Value *ctx_id_key = value_string(STR_LIT("ctx-id"), vm->current_frame);
   dict_set_value(vm->current_frame, server_dict,
-                 ssl_id_key, value_int(ssls.len, vm->current_frame));
+                 ctx_id_key, value_int(ctxs.len, vm->current_frame));
 
-  SSL *ssl = SSL_CTX_new(SSLv3_server_method());
-  DA_APPEND(ssls, ssl);
+  struct TLSContext *ctx = tls_create_context(1, TLS_V12);
+  DA_APPEND(ctxs, ctx);
 
-  char *cert_path_cstr = str_to_cstr(cert_path->as.string.str);
-  char *key_path_cstr = str_to_cstr(key_path->as.string.str);
-
-  SSL_CTX_use_certificate_file(ssl, cert_path_cstr, SSL_SERVER_RSA_CERT);
-  SSL_CTX_use_PrivateKey_file(ssl, key_path_cstr, SSL_SERVER_RSA_KEY);
-
-  free(cert_path_cstr);
-  free(key_path_cstr);
-
-  if (!SSL_CTX_check_private_key(ssl)) {
-    close(socket->as._int);
-    return value_unit(vm->current_frame);
-  }
+  tls_load_certificates(ctx, (u8 *) cert->as.string.str.ptr, cert->as.string.str.len);
+  tls_load_private_key(ctx, (u8 *) key->as.string.str.ptr, key->as.string.str.len);
 
   return value_dict(server_dict, vm->current_frame);
 }
 
-Value *accept_ssl_connection_intrinsic(Vm *vm, Value **args) {
-  Value *server = args[0];
-  Value *client_socket = accept_connection_intrinsic(vm, args);
+static void send_pending(i32 socket, struct TLSContext *ctx) {
+  u32 buffer_cap = 0;
+  u32 buffer_index = 0;
+  const u8 *buffer = tls_get_write_buffer(ctx, &buffer_cap);
 
-  Dict *client_dict = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
+  while (buffer && buffer_cap > 0) {
+    i32 result = send(socket, (char *) &buffer[buffer_index], buffer_cap, 0);
+    if (result <= 0)
+      break;
 
-  Value *socket_key = value_string(STR_LIT("socket"), vm->current_frame);
-  dict_set_value(vm->current_frame, client_dict, socket_key, client_socket);
-
-  Value *ssl_id_key = value_string(STR_LIT("ssl-id"), vm->current_frame);
-  dict_set_value(vm->current_frame, client_dict,
-                 ssl_id_key, value_int(ssls.len, vm->current_frame));
-
-  Value *server_ssl_id_key = value_string(STR_LIT("ssl-id"), vm->current_frame);
-  Value *server_ssl_id = dict_get_value(server->as.dict, server_ssl_id_key);
-
-  if (server_ssl_id->kind != ValueKindInt) {
-    close(client_socket->as._int);
-    return value_unit(vm->current_frame);
+    buffer_cap -= result;
+    buffer_index += result;
   }
 
-  SSL *ssl = SSL_new(ssls.items[server_ssl_id->as._int]);
-  DA_APPEND(ssls, ssl);
-
-  SSL_set_fd(ssl, client_socket->as._int);
-
-  if (!SSL_accept(ssl)) {
-    close(client_socket->as._int);
-    return value_unit(vm->current_frame);
-  }
-
-  return value_dict(client_dict, vm->current_frame);
+  tls_buffer_clear(ctx);
 }
 
-Value *close_ssl_client_connection_intrinsic(Vm *vm, Value **args) {
+static i32 verify_signature(struct TLSContext *ctx, struct TLSCertificate **cert_chain, i32 len) {
+  (void) ctx;
+  (void) cert_chain;
+  (void) len;
+
+  return no_error;
+}
+
+Value *close_tls_connection_intrinsic(Vm *vm, Value **args) {
   Value *client = args[0];
 
   Value *socket_key = value_string(STR_LIT("socket"), vm->current_frame);
@@ -97,102 +69,127 @@ Value *close_ssl_client_connection_intrinsic(Vm *vm, Value **args) {
   if (socket->kind != ValueKindInt)
     return value_unit(vm->current_frame);
 
-  Value *ssl_id_key = value_string(STR_LIT("ssl-id"), vm->current_frame);
-  Value *ssl_id = dict_get_value(client->as.dict, ssl_id_key);
+  Value *ctx_id_key = value_string(STR_LIT("ctx-id"), vm->current_frame);
+  Value *ctx_id = dict_get_value(client->as.dict, ctx_id_key);
 
-  if (ssl_id->kind != ValueKindInt)
+  if (ctx_id->kind != ValueKindInt)
     return value_unit(vm->current_frame);
 
+  tls_close_notify(ctxs.items[ctx_id->as._int]);
+  send_pending(socket->as._int, ctxs.items[ctx_id->as._int]);
+
   close(socket->as._int);
-  SSL_free(ssls.items[ssl_id->as._int]);
+
+  tls_destroy_context(ctxs.items[ctx_id->as._int]);
 
   return value_unit(vm->current_frame);
 }
 
-Value *close_ssl_server_connection_intrinsic(Vm *vm, Value **args) {
+Value *accept_tls_connection_intrinsic(Vm *vm, Value **args) {
   Value *server = args[0];
+  Value *port = args[1];
+
+  struct sockaddr_in address;
+  address.sin_family = AF_INET;
+  address.sin_addr.s_addr = INADDR_ANY;
+  address.sin_port = htons(port->as._int);
 
   Value *socket_key = value_string(STR_LIT("socket"), vm->current_frame);
-  Value *socket = dict_get_value(server->as.dict, socket_key);
+  Value *server_socket = dict_get_value(server->as.dict, socket_key);
 
-  if (socket->kind != ValueKindInt)
+  if (server_socket->kind != ValueKindInt)
     return value_unit(vm->current_frame);
 
-  Value *ssl_id_key = value_string(STR_LIT("ssl-id"), vm->current_frame);
-  Value *ssl_id = dict_get_value(server->as.dict, ssl_id_key);
+  Value *server_ctx_id_key = value_string(STR_LIT("ctx-id"), vm->current_frame);
+  Value *server_ctx_id = dict_get_value(server->as.dict, server_ctx_id_key);
 
-  if (ssl_id->kind != ValueKindInt)
+  if (server_ctx_id->kind != ValueKindInt)
     return value_unit(vm->current_frame);
 
-  close(socket->as._int);
-  SSL_CTX_free(ssls.items[ssl_id->as._int]);
+  socklen_t address_size = sizeof(address);
+  i32 client_socket = accept(server_socket->as._int,
+                             (struct sockaddr*) &address,
+                             &address_size);
+  if (client_socket < 0)
+    return value_unit(vm->current_frame);
 
-  return value_unit(vm->current_frame);
+  i32 enable = 1;
+  setsockopt(client_socket, SOL_TCP, TCP_NODELAY, &enable, sizeof(enable));
+
+  Dict *client_dict = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
+  memset(client_dict, 0, sizeof(Dict));
+
+  dict_set_value(vm->current_frame, client_dict, socket_key,
+                 value_int(client_socket, vm->current_frame));
+
+  Value *ctx_id_key = value_string(STR_LIT("ctx-id"), vm->current_frame);
+  dict_set_value(vm->current_frame, client_dict, ctx_id_key,
+                 value_int(ctxs.len, vm->current_frame));
+
+  struct TLSContext *ctx = tls_accept(ctxs.items[server_ctx_id->as._int]);
+  DA_APPEND(ctxs, ctx);
+
+  u8 buffer[64];
+  i32 buffer_len = 0;
+  while ((buffer_len = recv(client_socket, buffer, sizeof(buffer), 0)) > 0) {
+    if (tls_consume_stream(ctx, buffer, buffer_len, verify_signature) < 0) {
+      close(client_socket);
+      return value_unit(vm->current_frame);
+    }
+
+    send_pending(client_socket, ctx);
+
+    if (tls_established(ctx) == 1)
+      break;
+  }
+
+  return value_dict(client_dict, vm->current_frame);
 }
 
-Value *send_ssl_intrinsic(Vm *vm, Value **args) {
+Value *send_tls_intrinsic(Vm *vm, Value **args) {
   Value *receiver = args[0];
   Value *message = args[1];
 
-  Value *ssl_id_key = value_string(STR_LIT("ssl-id"), vm->current_frame);
-  Value *ssl_id = dict_get_value(receiver->as.dict, ssl_id_key);
+  Value *socket_key = value_string(STR_LIT("socket"), vm->current_frame);
+  Value *socket = dict_get_value(receiver->as.dict, socket_key);
 
-  if (ssl_id->kind != ValueKindInt)
+  Value *ctx_id_key = value_string(STR_LIT("ctx-id"), vm->current_frame);
+  Value *ctx_id = dict_get_value(receiver->as.dict, ctx_id_key);
+
+  if (ctx_id->kind != ValueKindInt)
     return value_unit(vm->current_frame);
 
   if (message->kind == ValueKindString)
-    SSL_write(ssls.items[ssl_id->as._int],
-              message->as.string.str.ptr,
+    tls_write(ctxs.items[ctx_id->as._int],
+              (u8 *) message->as.string.str.ptr,
               message->as.string.str.len);
   else if (message->kind == ValueKindBytes)
-    SSL_write(ssls.items[ssl_id->as._int],
-              message->as.bytes.ptr,
+    tls_write(ctxs.items[ctx_id->as._int],
+              (u8 *) message->as.bytes.ptr,
               message->as.bytes.len);
+
+  send_pending(socket->as._int, ctxs.items[ctx_id->as._int]);
 
   return value_unit(vm->current_frame);
 }
 
-Value *receive_size_ssl_intrinsic(Vm *vm, Value **args) {
-  Value *receiver = args[0];
-  Value *size = args[1];
-  Value *timeout = args[2];
-
-  Value *ssl_id_key = value_string(STR_LIT("ssl-id"), vm->current_frame);
-  Value *ssl_id = dict_get_value(receiver->as.dict, ssl_id_key);
-
-  if (ssl_id->kind != ValueKindInt)
-    return value_unit(vm->current_frame);
-
-  struct pollfd pfd;
-  pfd.fd = receiver->as._int;
-  pfd.events = POLLIN;
-
-  i32 result = poll(&pfd, 1, timeout->as._int);
-  if (result < 0 || pfd.revents == 0)
-    return value_unit(vm->current_frame);
-
-  Bytes buffer;
-  buffer.ptr = arena_alloc(&vm->current_frame->arena, size->as._int);
-  buffer.len = recv(receiver->as._int, buffer.ptr, size->as._int, 0);
-
-  return value_bytes(buffer, vm->current_frame);
-}
-
-Value *receive_ssl_intrinsic(Vm *vm, Value **args) {
+Value *receive_tls_intrinsic(Vm *vm, Value **args) {
   Value *receiver = args[0];
   Value *timeout = args[1];
 
-  Value *ssl_id_key = value_string(STR_LIT("ssl-id"), vm->current_frame);
-  Value *ssl_id = dict_get_value(receiver->as.dict, ssl_id_key);
+  Value *socket_key = value_string(STR_LIT("socket"), vm->current_frame);
+  Value *socket = dict_get_value(receiver->as.dict, socket_key);
 
-  if (ssl_id->kind != ValueKindInt)
+  Value *ctx_id_key = value_string(STR_LIT("ctx-id"), vm->current_frame);
+  Value *ctx_id = dict_get_value(receiver->as.dict, ctx_id_key);
+
+  if (ctx_id->kind != ValueKindInt)
     return value_unit(vm->current_frame);
 
-  u32 cap = DEFAULT_RECEIVE_BUFFER_SIZE;
-  Bytes buffer = { arena_alloc(&vm->current_frame->arena, cap), 0 };
+  u8 buffer[256];
 
   struct pollfd pfd = {0};
-  pfd.fd = receiver->as._int;
+  pfd.fd = socket->as._int;
   pfd.events = POLLIN;
 
   while (true) {
@@ -203,9 +200,30 @@ Value *receive_ssl_intrinsic(Vm *vm, Value **args) {
     if (pfd.revents == 0)
       break;
 
-    i32 len = SSL_read(ssls.items[ssl_id->as._int],
-                   buffer.ptr + buffer.len,
-                   cap - buffer.len);
+    i32 buffer_len = recv(socket->as._int, buffer, sizeof(buffer), 0);
+
+    if (buffer_len < 0)
+      return value_unit(vm->current_frame);
+
+    if (buffer_len == 0)
+      break;
+
+    result = tls_consume_stream(ctxs.items[ctx_id->as._int],
+                                buffer,
+                                buffer_len,
+                                verify_signature);
+
+    if (result < 0)
+      return value_unit(vm->current_frame);
+  }
+
+  u32 final_cap = DEFAULT_RECEIVE_BUFFER_SIZE;
+  Bytes final_buffer = { arena_alloc(&vm->current_frame->arena, final_cap), 0 };
+
+  while (true) {
+    i32 len = tls_read(ctxs.items[ctx_id->as._int],
+                       final_buffer.ptr + final_buffer.len,
+                       final_cap - final_buffer.len);
 
     if (len < 0)
       return value_unit(vm->current_frame);
@@ -213,48 +231,42 @@ Value *receive_ssl_intrinsic(Vm *vm, Value **args) {
     if (len == 0)
       break;
 
-    buffer.len += (u32) len;
+    final_buffer.len += (u32) len;
 
-    if (buffer.len == cap) {
-      u8 *prev_ptr = buffer.ptr;
+    if (final_buffer.len == final_cap) {
+      u8 *prev_ptr = final_buffer.ptr;
 
-      cap += DEFAULT_RECEIVE_BUFFER_SIZE;
-      buffer.ptr = arena_alloc(&vm->current_frame->arena, cap);
-      memcpy(buffer.ptr, prev_ptr, buffer.len);
+      final_cap += DEFAULT_RECEIVE_BUFFER_SIZE;
+      final_buffer.ptr = arena_alloc(&vm->current_frame->arena, final_cap);
+      memcpy(final_buffer.ptr, prev_ptr, final_buffer.len);
     }
   }
 
-  if (buffer.len == 0)
+  if (final_buffer.len == 0)
     return value_unit(vm->current_frame);
 
-  return value_bytes(buffer, vm->current_frame);
+  return value_bytes(final_buffer, vm->current_frame);
 }
 
 Intrinsic tls_intrinsics[] = {
-  { STR_LIT("create-ssl-server"), true, 1,
-    { ValueKindInt },
-    &create_ssl_server_intrinsic, NULL },
-  { STR_LIT("accept-ssl-connection"), true, 2,
+  { STR_LIT("create-tls-server"), true, 3,
+    { ValueKindInt, ValueKindString, ValueKindString },
+    &create_tls_server_intrinsic, NULL },
+  { STR_LIT("accept-tls-connection"), true, 2,
     { ValueKindDict, ValueKindInt },
-    &accept_ssl_connection_intrinsic, NULL },
-  { STR_LIT("close-ssl-client-connection"), false, 1,
+    &accept_tls_connection_intrinsic, NULL },
+  { STR_LIT("close-tls-connection"), false, 1,
     { ValueKindDict },
-    &close_ssl_client_connection_intrinsic, NULL },
-  { STR_LIT("close-ssl-server-connection"), false, 1,
-    { ValueKindDict },
-    &close_ssl_server_connection_intrinsic, NULL },
-  { STR_LIT("send-ssl"), false, 2,
+    &close_tls_connection_intrinsic, NULL },
+  { STR_LIT("send-tls"), false, 2,
     { ValueKindDict, ValueKindString },
-    &send_ssl_intrinsic, NULL },
-  { STR_LIT("send-ssl"), false, 2,
+    &send_tls_intrinsic, NULL },
+  { STR_LIT("send-tls"), false, 2,
     { ValueKindDict, ValueKindBytes },
-    &send_ssl_intrinsic, NULL },
-  { STR_LIT("receive-size-ssl"), true, 3,
-    { ValueKindDict, ValueKindInt, ValueKindInt },
-    &receive_size_ssl_intrinsic, NULL },
-  { STR_LIT("receive-ssl"), true, 2,
+    &send_tls_intrinsic, NULL },
+  { STR_LIT("receive-tls"), true, 2,
     { ValueKindDict, ValueKindInt },
-    &receive_ssl_intrinsic, NULL },
+    &receive_tls_intrinsic, NULL },
 };
 
 u32 tls_intrinsics_len = ARRAY_LEN(tls_intrinsics);
