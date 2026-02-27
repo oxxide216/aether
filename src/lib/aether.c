@@ -13,7 +13,10 @@ extern StringBuilder log_sb;
 #endif // NOSYSTEM
 // From common.c
 extern Arena intern_arena;
-
+#ifdef LIBTLS
+// From tls.c
+extern Da(void *) ctxs;
+#endif
 
 static Da(Vm) vms = {0};
 
@@ -122,6 +125,11 @@ void aether_cleanup(AetherCtx *ctx) {
 #endif
 
   arena_free(&intern_arena);
+
+#ifdef LIBTLS
+  if (ctxs.items)
+    free(ctxs.items);
+#endif
 
   for (u32 i = 0; i < ctx->irs.len; ++i)
     ir_free(ctx->irs.items[i]);
