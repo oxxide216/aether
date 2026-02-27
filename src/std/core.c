@@ -238,8 +238,10 @@ Value *map_intrinsic(Vm *vm, Value **args) {
       // TODO: put real metadata here
       execute_func(vm, func->as.func, NULL);
 
-      if (vm->state == ExecStateExit)
-        break;
+      if (vm->state == ExecStateExit) {
+        vm->stack.len -= 2;
+        return value_unit(vm->current_frame);
+      }
 
       Value *replacement = stack_last(vm);
 
@@ -283,8 +285,10 @@ Value *map_intrinsic(Vm *vm, Value **args) {
         // TODO: put real metadata here
         execute_func(vm, func->as.func, NULL);
 
-        if (vm->state == ExecStateExit)
-          break;
+        if (vm->state == ExecStateExit) {
+          vm->stack.len -= 2;
+          return value_unit(vm->current_frame);
+        }
 
         Value *replacement = stack_last(vm);
 
@@ -327,8 +331,10 @@ Value *filter_intrinsic(Vm *vm, Value **args) {
     // TODO: put real metadata here
     execute_func(vm, func->as.func, NULL);
 
-    if (vm->state == ExecStateExit)
-      break;
+    if (vm->state == ExecStateExit) {
+      vm->stack.len -= 2;
+      return value_unit(vm->current_frame);
+    }
 
     Value *is_ok = stack_last(vm);
 
@@ -377,8 +383,10 @@ Value *fold_intrinsic(Vm *vm, Value **args) {
     // TODO: put real metadata here
     execute_func(vm, func->as.func, NULL);
 
-    if (vm->state == ExecStateExit)
-      break;
+    if (vm->state == ExecStateExit) {
+      vm->stack.len -= 3;
+      return value_unit(vm->current_frame);
+    }
 
     accumulator = stack_last(vm);
 
@@ -455,6 +463,11 @@ Value *sort_intrinsic(Vm *vm, Value **args) {
         DA_APPEND(vm->stack, sorted[k - gaps[i]]);
         DA_APPEND(vm->stack, temp);
         execute_func(vm, func->as.func, NULL);
+
+        if (vm->state == ExecStateExit) {
+          vm->stack.len -= 3;
+          return value_unit(vm->current_frame);
+        }
 
         if (!value_to_bool(stack_last(vm))) {
           vm->stack.len -= 3;
