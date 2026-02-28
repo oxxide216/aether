@@ -400,8 +400,8 @@ void execute(Vm *vm, Instrs *instrs) {
         INFO("Stack dump:\n");
         print_stack_dump(&vm->stack, &vm->current_frame->arena);
 
-        ERROR(META_FMT "Value of type "STR_FMT" is not callable\n",
-              META_ARG(instr->meta), STR_ARG(kind));
+        PERROR(META_FMT, "Value of type "STR_FMT" is not callable\n",
+               META_ARG(instr->meta), STR_ARG(kind));
         vm->state = ExecStateExit;
         vm->exit_code = 1;
 
