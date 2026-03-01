@@ -70,7 +70,7 @@ ifdef TLS
 endif
 
 aether: $(OBJ) $(LIBS_OBJ)
-> $(CC) $(LDFLAGS) -o aether $(OBJ) $(LIBS_OBJ)
+> $(CC) -o aether $(OBJ) $(LIBS_OBJ) $(LDFLAGS)
 
 $(BUILD_DIR)/%.o: src/%.c
 > mkdir -p $(dir $@)
@@ -81,7 +81,7 @@ $(BUILD_DIR)/libs/%.o: libs/%.c
 > $(CC) $(CFLAGS) -c -o $@ $^
 
 wasm: $(WASM_OBJ) $(WASM_LIBS_OBJ)
-> $(EMCC) $(EMFLAGS) $(EMLDFLAGS) -o dest/aether.js $(WASM_OBJ) $(WASM_LIBS_OBJ)
+> $(EMCC) $(EMFLAGS) -o dest/aether.js $(WASM_OBJ) $(WASM_LIBS_OBJ) $(EMLDFLAGS)
 
 $(BUILD_DIR)/wasm/%.o: src/%.c
 > mkdir -p $(dir $@)
