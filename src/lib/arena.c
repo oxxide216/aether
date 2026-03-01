@@ -3,8 +3,14 @@
 #include "aether/arena.h"
 
 void *arena_alloc(Arena *arena, u32 size) {
-  Segment *segment = arena->segments;
-  Segment **segment_next = &arena->segments;
+  if (size > ARENA_MAX_IGNORED_SIZE) {
+    while (arena->beginning &&
+           arena->beginning->cap - arena->beginning->len <= ARENA_MAX_IGNORED_SIZE)
+    arena->beginning = arena->beginning->next;
+  }
+
+  Segment *segment = arena->beginning;
+  Segment **segment_next = &arena->beginning;
   while (segment) {
     if (segment->len + size <= segment->cap) {
       void *result = segment->space + segment->len;
@@ -41,6 +47,8 @@ void arena_reset(Arena *arena) {
 
     segment = segment->next;
   }
+
+  arena->beginning = arena->segments;
 }
 
 void arena_free(Arena *arena) {
@@ -52,4 +60,5 @@ void arena_free(Arena *arena) {
   }
 
   arena->segments = NULL;
+  arena->beginning = NULL;
 }
