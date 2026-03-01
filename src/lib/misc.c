@@ -246,6 +246,11 @@ static u32 value_str_len(Value *value, u32 level, bool kind, bool quote_string) 
     } else {
       f64 num = value->as._float;
 
+      if (num < 0.0) {
+        num *= -1.0;
+        len += 1;
+      }
+
       while (num >= 10.0) {
         num /= 10.0;
         len += 1;
@@ -408,7 +413,7 @@ void buffer_append_value(char *buffer, u32 *used, Value *value,
         len += 1;
       }
 
-      snprintf(buffer + *used, len + 1, "%ld", value->as._int);
+      snprintf(buffer + *used, len, "%ld", value->as._int);
       *used += len;
     }
   } break;
@@ -423,7 +428,7 @@ void buffer_append_value(char *buffer, u32 *used, Value *value,
 
       if (num < 0.0) {
         num *= -1.0;
-        len += 1.0;
+        len += 1;
       }
 
       while (num >= 10.0) {
@@ -438,7 +443,7 @@ void buffer_append_value(char *buffer, u32 *used, Value *value,
         len += 1;
       }
 
-      snprintf(buffer + *used, len + 1, "%f", value->as._float);
+      snprintf(buffer + *used, len, "%f", value->as._float);
       *used += len;
     }
   } break;
