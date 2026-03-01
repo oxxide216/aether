@@ -267,6 +267,12 @@ Value *is_whitespace_intrinsic(Vm *vm, Value **args) {
   return value_bool(is_whitespace, vm->current_frame);
 }
 
+Value *hash_intrinsic(Vm *vm, Value **args) {
+  Value *str = args[0];
+
+  return value_int(str_hash(str->as.string.str), vm->current_frame);
+}
+
 Intrinsic str_intrinsics[] = {
   { STR_LIT("str-insert"), true, 3,
     { ValueKindString, ValueKindInt, ValueKindString },
@@ -283,6 +289,7 @@ Intrinsic str_intrinsics[] = {
   { STR_LIT("is-number"), true, 1, { ValueKindString }, &is_number_intrinsic, NULL },
   { STR_LIT("is-alpha-number"), true, 1, { ValueKindString }, &is_alpha_number_intrinsic, NULL },
   { STR_LIT("is-whitespace"), true, 1, { ValueKindString }, &is_whitespace_intrinsic, NULL },
+  { STR_LIT("hash"), true, 1, { ValueKindString }, &hash_intrinsic, NULL },
 };
 
 u32 str_intrinsics_len = ARRAY_LEN(str_intrinsics);

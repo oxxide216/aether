@@ -2,7 +2,7 @@
 #include "aether/vm.h"
 #include "aether/misc.h"
 
-Value *hash_intrinsic(Vm *vm, Value **args) {
+Value *crypto_hash_intrinsic(Vm *vm, Value **args) {
   Value *message = args[0];
 
   Bytes result = {
@@ -18,7 +18,7 @@ Value *hash_intrinsic(Vm *vm, Value **args) {
 }
 
 Intrinsic crypto_intrinsics[] = {
-  { STR_LIT("crypto/hash"), true, 1, { ValueKindString }, &hash_intrinsic, NULL },
+  { STR_LIT("crypto/hash"), true, 1, { ValueKindString }, &crypto_hash_intrinsic, NULL },
 };
 
 u32 crypto_intrinsics_len = ARRAY_LEN(crypto_intrinsics);

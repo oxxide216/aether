@@ -8,6 +8,7 @@
 (let is-number \str -> import 'is-number')
 (let is-alpha-number \str -> import 'is-alpha-number')
 (let is-whitespace \str -> import 'is-whitespace')
+(let hash \str -> import 'hash')
 
 (let begins-with \str begin ->
   (if (< (len str) (len begin))
