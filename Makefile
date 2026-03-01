@@ -37,6 +37,10 @@ ifndef PREFIX
   PREFIX = /usr/local
 endif
 
+ifdef GDB
+  CFLAGS += -ggdb
+endif
+
 ifdef NDEBUG
   CFLAGS += -DNDEBUG
 endif
