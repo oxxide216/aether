@@ -401,7 +401,7 @@ void buffer_append_value(char *buffer, u32 *used, Value *value,
       *used += 3;
     } else {
       i64 num = value->as._int;
-      u32 len = 2;
+      u32 len = 1;
 
       if (num < 0) {
         num *= -1;
@@ -413,7 +413,7 @@ void buffer_append_value(char *buffer, u32 *used, Value *value,
         len += 1;
       }
 
-      snprintf(buffer + *used, len, "%ld", value->as._int);
+      snprintf(buffer + *used, len + 1, "%ld", value->as._int);
       *used += len;
     }
   } break;
@@ -424,7 +424,7 @@ void buffer_append_value(char *buffer, u32 *used, Value *value,
       *used += 5;
     } else {
       f64 num = value->as._float;
-      u32 len = 2;
+      u32 len = 1;
 
       if (num < 0.0) {
         num *= -1.0;
@@ -443,7 +443,7 @@ void buffer_append_value(char *buffer, u32 *used, Value *value,
         len += 1;
       }
 
-      snprintf(buffer + *used, len, "%f", value->as._float);
+      snprintf(buffer + *used, len + 1, "%f", value->as._float);
       *used += len;
     }
   } break;
