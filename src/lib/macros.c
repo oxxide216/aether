@@ -365,7 +365,7 @@ void expand_macros_block(Exprs *block, Macros *macros,
       block_append(&new_block, new_expr, arena);
     }
 
-    for (u32 j = i; j < new_block.len; ++j)
+    for (u32 j = inlined_exprs.len; j < new_block.len; ++j)
       DA_APPEND(inlined_exprs, inlined);
   }
 
