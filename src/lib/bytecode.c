@@ -281,6 +281,9 @@ bool value_eq(Value *a, Value *b) {
         if (!value_eq(entry_a->key, entry_b->key) ||
             !value_eq(entry_a->value, entry_b->value))
           return false;
+
+        entry_a = entry_a->next;
+        entry_b = entry_b->next;
       }
 
       if (entry_a != entry_b)
