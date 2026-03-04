@@ -632,6 +632,32 @@ Value *for_each_intrinsic(Vm *vm, Value **args) {
   return value_unit(vm->current_frame);
 }
 
+Value *reverse_intrinsic(Vm *vm, Value **args) {
+  Value *list = args[0];
+
+  ListNode *new_list = arena_alloc(&vm->current_frame->arena, sizeof(ListNode));
+  new_list->next = list_clone(list->as.list->next, vm->current_frame);
+
+  ListNode *node = new_list->next;
+  u32 len = 0;
+  while (node) {
+    node = node->next;
+    ++len;
+  }
+
+  node = new_list->next;
+  for (u32 i = 0; i < len / 2; ++i, node = node->next) {
+    ListNode *inner_node = new_list->next;
+    for (u32 j = 0; j < len - i - 1; ++j, inner_node = inner_node->next);
+
+    Value *temp = node->value;
+    node->value = inner_node->value;
+    inner_node->value = temp;
+  }
+
+  return value_list(new_list, vm->current_frame);
+}
+
 Value *to_str_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
@@ -1465,6 +1491,7 @@ Intrinsic core_intrinsics[] = {
   { STR_LIT("for-each"), false, 2, { ValueKindString, ValueKindFunc }, &for_each_intrinsic, NULL },
   { STR_LIT("for-each"), false, 2, { ValueKindBytes, ValueKindFunc }, &for_each_intrinsic, NULL },
   { STR_LIT("for-each"), false, 2, { ValueKindDict, ValueKindFunc }, &for_each_intrinsic, NULL },
+  { STR_LIT("reverse"), true, 1, { ValueKindList }, &reverse_intrinsic, NULL },
   // Conversions
   { STR_LIT("to-str"), true, 1, { ValueKindUnit }, &to_str_intrinsic, NULL },
   { STR_LIT("to-bytes"), true, 1, { ValueKindString }, &to_bytes_intrinsic, NULL },

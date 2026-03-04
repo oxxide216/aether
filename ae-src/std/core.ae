@@ -16,6 +16,7 @@
 (let zip \list-a list-b -> import 'zip')
 (let sort \func list -> import 'sort')
 (let for-each \collection func -> import 'for-each')
+(let reverse \list -> import 'reverse')
 
 ; Bytes
 (let add-byte-64 \bytes byte -> import 'add-byte-64')
