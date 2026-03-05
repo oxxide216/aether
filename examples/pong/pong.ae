@@ -79,9 +79,9 @@
   (set state::'right-pos-y' (+ state::'right-pos-y'
                                (* state::'right-move' quad-speed)))
   (if (< state::'right-pos-y' 0.0)
-    (set! state 'right-pos-y' 0.0)
+    (set state::'right-pos-y' 0.0)
    elif (> (+ state::'right-pos-y' quad-height) size::'height')
-    (set! state 'right-pos-y' (- size::'height' quad-height)))
+    (set state::'right-pos-y' (- size::'height' quad-height)))
 
   (set state::'circle-pos-x' (+ state::'circle-pos-x'
                                 (* state::'circle-move-x' circle-speed)))
