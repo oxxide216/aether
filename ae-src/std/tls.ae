@@ -1,4 +1,5 @@
 (let create-tls-server \port cert key -> import 'create-tls-server')
+(let create-tls-client \server-address port -> import 'create-tls-client')
 (let accept-tls-connection \server port -> import 'accept-tls-connection')
 (let close-tls-connection \client -> import 'close-tls-connection')
 (let send-tls \receiver message -> import 'send-tls')

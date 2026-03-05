@@ -5,9 +5,11 @@
 #include "aether/vm.h"
 #include "aether/misc.h"
 
-#define DEFAULT_RECEIVE_BUFFER_SIZE 64
+#define DEFAULT_RECEIVE_BUFFER_SIZE   64
+#define TLS_CLIENT_CONNECTION_TIMEOUT 1500
 
 extern Value *create_server_intrinsic(Vm *vm, Value **args);
+extern Value *create_client_intrinsic(Vm *vm, Value **args);
 
 Da(struct TLSContext *) ctxs = {0};
 
@@ -15,6 +17,9 @@ Value *create_tls_server_intrinsic(Vm *vm, Value **args) {
   Value *socket = create_server_intrinsic(vm, args);
   Value *cert = args[1];
   Value *key = args[2];
+
+  if (socket->kind != ValueKindInt)
+    return value_unit(vm->current_frame);
 
   Dict *server_dict = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
   memset(server_dict, 0, sizeof(Dict));
@@ -56,8 +61,73 @@ static i32 verify_signature(struct TLSContext *ctx, struct TLSCertificate **cert
   (void) ctx;
   (void) cert_chain;
   (void) len;
-
   return no_error;
+}
+
+Value *create_tls_client_intrinsic(Vm *vm, Value **args) {
+  Value *socket = create_client_intrinsic(vm, args);
+  Value *server_ip_address = args[0];
+
+  if (socket->kind != ValueKindInt)
+    return value_unit(vm->current_frame);
+
+  Dict *client_dict = arena_alloc(&vm->current_frame->arena, sizeof(Dict));
+  memset(client_dict, 0, sizeof(Dict));
+
+  Value *socket_key = value_string(STR_LIT("socket"), vm->current_frame);
+  dict_set_value(vm->current_frame, client_dict, socket_key, socket);
+
+  Value *ctx_id_key = value_string(STR_LIT("ctx-id"), vm->current_frame);
+  dict_set_value(vm->current_frame, client_dict,
+                 ctx_id_key, value_int(ctxs.len, vm->current_frame));
+
+  struct TLSContext *ctx = tls_create_context(0, TLS_V12);
+  DA_APPEND(ctxs, ctx);
+
+  char *server_ip_address_cstr = malloc(server_ip_address->as.string.str.len + 1);
+  memcpy(server_ip_address_cstr,
+         server_ip_address->as.string.str.ptr,
+         server_ip_address->as.string.str.len);
+  server_ip_address_cstr[server_ip_address->as.string.str.len] = '\0';
+
+  tls_sni_set(ctx, server_ip_address_cstr);
+  tls_client_connect(ctx);
+
+  free(server_ip_address_cstr);
+
+  send_pending(socket->as._int, ctx);
+
+  struct pollfd pfd = {0};
+  pfd.fd = socket->as._int;
+  pfd.events = POLLIN;
+
+  u8 buffer[64];
+  while (true) {
+    i32 result = poll(&pfd, 1, TLS_CLIENT_CONNECTION_TIMEOUT);
+
+    if (result < 0)
+      return value_unit(vm->current_frame);
+
+    if (pfd.revents == 0)
+      return value_unit(vm->current_frame);
+
+    i32 len = recv(socket->as._int, buffer, sizeof(buffer), 0);
+
+    if (len <= 0)
+      return value_unit(vm->current_frame);
+
+    if (tls_consume_stream(ctx, buffer, len, verify_signature) < 0) {
+      close(socket->as._int);
+      return value_unit(vm->current_frame);
+    }
+
+    send_pending(socket->as._int, ctx);
+
+    if (tls_established(ctx) == 1)
+      break;
+  }
+
+  return value_dict(client_dict, vm->current_frame);
 }
 
 Value *close_tls_connection_intrinsic(Vm *vm, Value **args) {
@@ -194,6 +264,7 @@ Value *receive_tls_intrinsic(Vm *vm, Value **args) {
 
   while (true) {
     i32 result = poll(&pfd, 1, timeout->as._int);
+
     if (result < 0)
       return value_unit(vm->current_frame);
 
@@ -252,6 +323,9 @@ Intrinsic tls_intrinsics[] = {
   { STR_LIT("create-tls-server"), true, 3,
     { ValueKindInt, ValueKindString, ValueKindString },
     &create_tls_server_intrinsic, NULL },
+  { STR_LIT("create-tls-client"), true, 2,
+    { ValueKindString, ValueKindInt },
+    &create_tls_client_intrinsic, NULL },
   { STR_LIT("accept-tls-connection"), true, 2,
     { ValueKindDict, ValueKindInt },
     &accept_tls_connection_intrinsic, NULL },
