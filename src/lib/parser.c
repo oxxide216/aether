@@ -617,6 +617,7 @@ static ExprIf parser_parse_if(Parser *parser) {
     last->else_body.len = 1;
     last->else_body.items = arena_alloc(parser->arena, sizeof(Expr *));
     last->else_body.items[0] = arena_alloc(parser->arena, sizeof(Expr));
+    last->else_body.items[0]->kind = ExprKindIdent;
     last->else_body.items[0]->as.ident.name_id = copy_str(STR_LIT("unit"));
     last->else_body.items[0]->meta.file_path = parser->file_path;
     last->else_body.items[0]->meta.row = first_token->row;
