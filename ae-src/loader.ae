@@ -56,7 +56,7 @@
   mode-eval-macros => (eval-macros env input-file-content)
   mode-compile-only =>
     (do
-      (let content (join [(to-str input-file-content) '(use \'core\')' '(use \'base\')\n'] '\n'))
+      (let content (join [(to-str input-file-content) '(use \'std/core\')' '(use \'std/base\')\n'] '\n'))
       (let compiled (compile env content input-path include-paths false))
 
       (let success (write-file output-path compiled::'compiled'))
