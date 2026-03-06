@@ -583,9 +583,10 @@ static ExprIf parser_parse_if(Parser *parser) {
 
   ExprIf *last = &result;
 
-  Token *next_token = parser_expect_token(parser, MASK(TT_CPAREN) |
-                                                  MASK(TT_ELIF) |
-                                                  MASK(TT_ELSE));
+  Token *first_token = parser_expect_token(parser, MASK(TT_CPAREN) |
+                                                   MASK(TT_ELIF) |
+                                                   MASK(TT_ELSE));
+  Token *next_token = first_token;
 
   while (next_token && next_token->id == TT_ELIF) {
     Expr *elif = arena_alloc(parser->arena, sizeof(Expr));
@@ -612,6 +613,14 @@ static ExprIf parser_parse_if(Parser *parser) {
     last->else_body = parser_parse_block(parser, MASK(TT_CPAREN));
 
     parser_expect_token(parser, MASK(TT_CPAREN));
+  } else {
+    last->else_body.len = 1;
+    last->else_body.items = arena_alloc(parser->arena, sizeof(Expr *));
+    last->else_body.items[0] = arena_alloc(parser->arena, sizeof(Expr));
+    last->else_body.items[0]->as.ident.name_id = copy_str(STR_LIT("unit"));
+    last->else_body.items[0]->meta.file_path = parser->file_path;
+    last->else_body.items[0]->meta.row = first_token->row;
+    last->else_body.items[0]->meta.col = first_token->col;
   }
 
   return result;
