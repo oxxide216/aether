@@ -265,7 +265,8 @@ static void rename_args_expr(Expr *expr, Args *prev_arg_names,
     rename_args_expr(expr->as.match.value, prev_arg_names, new_arg_names, arena);
 
     for (u32 i = 0; i < expr->as.match.branches.len; ++i) {
-      rename_args_expr(expr->as.match.branches.items[i].value, prev_arg_names, new_arg_names, arena);
+      if (expr->as.match.branches.items[i].value)
+        rename_args_expr(expr->as.match.branches.items[i].value, prev_arg_names, new_arg_names, arena);
       rename_args_expr(expr->as.match.branches.items[i].body, prev_arg_names, new_arg_names, arena);
     }
   } break;
