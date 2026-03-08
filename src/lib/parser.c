@@ -543,8 +543,12 @@ static ExprFunc parser_parse_lambda(Parser *parser) {
 static ExprMatch parser_parse_match(Parser *parser) {
   parser_next_token(parser);
 
+  Token *first_token = parser_peek_token(parser);
+
   ExprMatch result = {0};
   result.value = parser_parse_expr(parser, false);
+
+  bool found_unpack = false;
 
   Token *token;
   while ((token = parser_peek_token(parser)) && token->id != TT_CPAREN) {
@@ -555,6 +559,8 @@ static ExprMatch parser_parse_match(Parser *parser) {
 
       Branch branch = { NULL, body };
       DA_ARENA_APPEND(result.branches, branch, parser->arena);
+
+      found_unpack = true;
 
       break;
     }
@@ -568,6 +574,25 @@ static ExprMatch parser_parse_match(Parser *parser) {
   }
 
   parser_expect_token(parser, MASK(TT_CPAREN));
+
+  if (!found_unpack) {
+    Expr *body = arena_alloc(parser->arena, sizeof(Expr));
+    body->kind = ExprKindBlock;
+    body->as.block.len = 1;
+    body->as.block.items = arena_alloc(parser->arena, sizeof(Expr *));
+    body->as.block.items[0] = arena_alloc(parser->arena, sizeof(Expr));
+    body->as.block.items[0]->kind = ExprKindIdent;
+    body->as.block.items[0]->as.ident.name_id = copy_str(STR_LIT("unit"));
+    body->as.block.items[0]->meta.file_path = parser->file_path;
+    body->as.block.items[0]->meta.row = first_token->row;
+    body->as.block.items[0]->meta.col = first_token->col;
+    body->meta.file_path = parser->file_path;
+    body->meta.row = first_token->row;
+    body->meta.col = first_token->col;
+
+    Branch branch = { NULL, body };
+    DA_ARENA_APPEND(result.branches, branch, parser->arena);
+  }
 
   return result;
 }
