@@ -10,10 +10,10 @@
 Value *abs_intrinsic(Vm *vm, Value **args) {
   Value *value = args[0];
 
-  if (value->kind == ValueKindInt && value->as._int < 0)
-    return value_int(-value->as._int, vm->current_frame);
-  else if (value->kind == ValueKindFloat && value->as._float < 0.0)
-    return value_float(-value->as._float, vm->current_frame);
+  if (value->kind == ValueKindInt)
+    return value_int(value->as._int < 0 ? -value->as._int : value->as._int, vm->current_frame);
+  else if (value->kind == ValueKindFloat)
+    return value_float(value->as._float < 0.0 ? -value->as._float : value->as._float, vm->current_frame);
 
   return value_unit(vm->current_frame);
 }
