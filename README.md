@@ -28,7 +28,7 @@ Same code runs as:
 ## Dependencies
 
 - **C compiler**
-- **Bash**
+- **GNU Make**
 
 That's it!
 
@@ -39,8 +39,8 @@ That's it!
 ```shell
 git clone https://github.com/oxxide216/aether --recursive
 cd aether
-./build.sh
-./install.sh
+make
+sudo make install
 echo "(println 'Hello, World!')" > main.ae
 aether main.ae
 ```
@@ -52,8 +52,8 @@ aether main.ae
 #### Linux
 
 ```shell
-EMCC_PATH=[emcc] WASM=on ./build.sh
-WASM=on ./install.sh
+make wasm EMCC_PATH=[emcc]
+make wasm-install
 ```
 
 Where:
@@ -77,8 +77,8 @@ Then just start http server inside of [out] directory (you can write it in Aethe
 #### Linux
 
 ```shell
-GLASS=on ./build.sh
-./install.sh
+make GLASS=on
+sudo make install
 ```
 
 ## Examples
