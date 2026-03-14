@@ -66,8 +66,6 @@
     (if info
       (if info::'is-directory'
         (set items (get-directory-items name 0 term-size::'rows'))
-        (if (>= row (len items))
-          (set row (- (len items) 1)))
         (set prev-row -1)))
    elif (== key term/backspace)
     (set items (get-directory-items '..' 0 term-size::'rows'))
@@ -164,6 +162,7 @@
 (let is-running true)
 (\->
   (set term-size (term/get-size))
+
   (render-view)
   (set prev-row row)
   (if prompt
@@ -171,6 +170,9 @@
     (update-prompt)
    else
     (update-view))
+
+  (if (>= row (len items))
+    (set row (- (len items) 1)))
 
   (if is-running
     (<->)))
