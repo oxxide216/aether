@@ -38,7 +38,7 @@
 
 (let get-directory-items \path begin end ->
   (set-current-path path)
-  (sort (get-range (list-directory '.') begin end)))
+  (get-range (list-directory '.') begin end))
 
 (let get-file-content-lines \content begin end ->
   (get-range (split content '\n') begin end))
@@ -104,9 +104,9 @@
       (set prev-row -1)
       (set items (get-directory-items prompt-file 0 term-size::'rows'))
       (if (unit? (last prompt-history))
-        (set prompt-history (+ prompt-history buffer))
+        (set prompt-history (after prompt-history buffer))
        elif (!= buffer (last prompt-history))
-        (set prompt-history (+ prompt-history buffer))))
+        (set prompt-history (after prompt-history buffer))))
     (let term-size (term/get-size))
     (print (term/go-to 1 term-size::'rows')
            term/clear-line)
