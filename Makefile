@@ -23,7 +23,8 @@ MAIN_SRC = $(SRC) src/main.c
 WASM_SRC = $(SRC) src/emscripten-main.c src/std/web.c
 LIBS_SRC = $(wildcard libs/lexgen/src/runtime/*.c) libs/lexgen/src/common/wstr.c
 
-OBJ = $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(MAIN_SRC))
+OBJ = $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(SRC))
+MAIN_OBJ = $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(MAIN_SRC))
 LIBS_OBJ = $(patsubst %.c,$(BUILD_DIR)/%.o,$(LIBS_SRC))
 
 WASM_OBJ = $(patsubst src/%.c,$(BUILD_DIR)/wasm/%.o,$(WASM_SRC))
@@ -73,8 +74,8 @@ ifdef TLS
   SRC += src/std/tls/tls.c
 endif
 
-aether: $(OBJ) $(LIBS_OBJ)
-> $(CC) -o aether $(OBJ) $(LIBS_OBJ) $(LDFLAGS)
+aether: $(MAIN_OBJ) $(LIBS_OBJ)
+> $(CC) -o aether $(MAIN_OBJ) $(LIBS_OBJ) $(LDFLAGS)
 
 libaether.a: $(OBJ) $(LIBS_OBJ)
 > ar rcs libaether.a $(OBJ) $(LIBS_OBJ)
