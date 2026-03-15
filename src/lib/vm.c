@@ -45,8 +45,8 @@ static bool ensure_stack_len_is_enough(Vm *vm, u32 min_len, InstrMeta *meta) {
   if (vm->stack.len < min_len + vm->frame_begin) {
     INFO("Stack dump:\n");
     print_stack_dump(&vm->stack, &vm->current_frame->arena);
-    ERROR(META_FMT"Not enough values on the stack: expected %u, got %u\n",
-          META_ARG(*meta), min_len, vm->stack.len);
+    PERROR(META_FMT, "Not enough values on the stack: expected %u, got %u\n",
+           META_ARG(*meta), min_len, vm->stack.len);
     vm->exit_code = 1;
     return false;
   }
@@ -205,7 +205,7 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta) {
     Intrinsic *intrinsic = get_intrinsic(vm, intrinsic_name, func->args.len, args);
     if (!intrinsic) {
       if (meta)
-        ERROR(META_FMT"Intrinsic ("STR_FMT,
+        PERROR(META_FMT, "Intrinsic ("STR_FMT,
               META_ARG(*meta), STR_ARG(intrinsic_name));
       else
         ERROR("Intrinsic ("STR_FMT,
@@ -244,8 +244,8 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta) {
       Var *var = get_var_from(&vm->frames->vars, catched_var->name);
       if (!var) {
         if (meta)
-          ERROR(META_FMT"Symbol "STR_FMT" was not found\n",
-                META_ARG(*meta), STR_ARG(catched_var->name));
+          PERROR(META_FMT, "Symbol "STR_FMT" was not found\n",
+                 META_ARG(*meta), STR_ARG(catched_var->name));
         else
           ERROR("Symbol "STR_FMT" was not found\n",
                 STR_ARG(catched_var->name));
@@ -438,8 +438,8 @@ void execute(Vm *vm, Instrs *instrs) {
       }
 
       if (++vm->recursion_level >= MAX_RECURSION_LEVEL) {
-        ERROR(META_FMT "Infinite recursion detected\n",
-              META_ARG(instr->meta));
+        PERROR(META_FMT,  "Infinite recursion detected\n",
+               META_ARG(instr->meta));
         vm->state = ExecStateExit;
         vm->exit_code = 1;
 
@@ -601,7 +601,7 @@ void execute(Vm *vm, Instrs *instrs) {
           }
 
           if (!root) {
-            ERROR(META_FMT"Value of type ", META_ARG(instr->meta));
+            PERROR(META_FMT, "Value of type ", META_ARG(instr->meta));
             fprint_value(stderr, parent, true, &vm->current_frame->arena);
             fputs(" cannot be indexed with ", stderr);
             fprint_value(stderr, key, true, &vm->current_frame->arena);
