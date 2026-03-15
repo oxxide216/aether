@@ -37,8 +37,8 @@ Value *max_intrinsic(Vm *vm, Value **args) {
   Value *b = args[1];
 
   if (a->kind == ValueKindInt)
-    return value_float(a->as._int >= b->as._int ? a->as._int : b->as._int,
-                       vm->current_frame);
+    return value_int(a->as._int >= b->as._int ? a->as._int : b->as._int,
+                     vm->current_frame);
   else if (a->kind == ValueKindFloat)
     return value_float(a->as._float >= b->as._float ? a->as._float : b->as._float,
                        vm->current_frame);
