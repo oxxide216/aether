@@ -290,10 +290,9 @@ void execute_func(Vm *vm, FuncValue *func, InstrMeta *meta) {
         break;
 
       CallData *data = vm->current_frame->calls_data.items + j - 1;
-      INFO("Trace: "STR_FMT":%u:%u "STR_FMT"\n",
-           STR_ARG(*data->meta.file_path),
-           data->meta.row + 1, data->meta.col + 1,
-           STR_ARG(data->func_name));
+      PINFO(META_FMT, "Trace: "STR_FMT"\n",
+            META_ARG(data->meta),
+            STR_ARG(data->func_name));
     }
   }
 
@@ -454,10 +453,9 @@ void execute(Vm *vm, Instrs *instrs) {
               break;
 
             CallData *data = vm->current_frame->calls_data.items + j - 1;
-            INFO("Trace: "STR_FMT":%u:%u "STR_FMT"\n",
-                 STR_ARG(*data->meta.file_path),
-                 data->meta.row + 1, data->meta.col + 1,
-                 STR_ARG(data->func_name));
+            PINFO(META_FMT, "Trace: "STR_FMT"\n",
+                  META_ARG(data->meta),
+                  STR_ARG(data->func_name));
           }
 
           if (vm->trace_level++ < vm->max_trace_level) {
@@ -468,10 +466,9 @@ void execute(Vm *vm, Instrs *instrs) {
               func_name = get_str(name_id);
             }
 
-            INFO("Trace: "STR_FMT":%u:%u "STR_FMT"\n",
-                 STR_ARG(*instr->meta.file_path),
-                 instr->meta.row + 1, instr->meta.col + 1,
-                 STR_ARG(func_name));
+            PINFO(META_FMT, "Trace: "STR_FMT"\n",
+                  META_ARG(instr->meta),
+                  STR_ARG(func_name));
           }
         }
 
