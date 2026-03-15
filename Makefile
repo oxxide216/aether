@@ -76,6 +76,9 @@ endif
 aether: $(OBJ) $(LIBS_OBJ)
 > $(CC) -o aether $(OBJ) $(LIBS_OBJ) $(LDFLAGS)
 
+libaether.a: $(OBJ) $(LIBS_OBJ)
+> ar rcs libaether.a $(OBJ) $(LIBS_OBJ)
+
 $(BUILD_DIR)/%.o: src/%.c
 > mkdir -p $(dir $@)
 > $(CC) $(CFLAGS) -c -o $@ $^
