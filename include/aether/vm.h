@@ -120,8 +120,8 @@ Value *stack_last(Vm *vm);
 
 void intrinsics_append(Intrinsics *a, Intrinsic *b, u32 b_len, Arena *arena);
 
-Vm   vm_create(i32 argc, char **argv, Intrinsics *intrinsics);
-void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics);
+Vm   vm_create(i32 argc, char **argv, Intrinsics *intrinsics, bool add_default_intrinsics);
+void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics, bool add_default_intrinsics);
 void vm_stop(Vm *Vm);
 void vm_destroy(Vm *vm);
 

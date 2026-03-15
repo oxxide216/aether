@@ -814,7 +814,7 @@ void intrinsics_append(Intrinsics *a, Intrinsic *b, u32 b_len, Arena *arena) {
   }
 }
 
-Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
+Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics, bool add_default_intrinsics) {
   Vm vm = {0};
 
   vm.frames = malloc(sizeof(StackFrame));
@@ -844,36 +844,38 @@ Vm vm_create(i32 argc, char **argv, Intrinsics *intrinsics) {
 
   args_end->next = NULL;
 
-  vm_init(&vm, args, intrinsics);
+  vm_init(&vm, args, intrinsics, add_default_intrinsics);
 
   return vm;
 }
 
-void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics) {
-  intrinsics_append(intrinsics, core_intrinsics, core_intrinsics_len, &vm->frames->arena);
-  intrinsics_append(intrinsics, math_intrinsics, math_intrinsics_len, &vm->frames->arena);
-  intrinsics_append(intrinsics, str_intrinsics, str_intrinsics_len, &vm->frames->arena);
-  intrinsics_append(intrinsics, random_intrinsics, random_intrinsics_len, &vm->frames->arena);
+void vm_init(Vm *vm, ListNode *args, Intrinsics *intrinsics, bool add_default_intrinsics) {
+  if (add_default_intrinsics) {
+    intrinsics_append(intrinsics, core_intrinsics, core_intrinsics_len, &vm->frames->arena);
+    intrinsics_append(intrinsics, math_intrinsics, math_intrinsics_len, &vm->frames->arena);
+    intrinsics_append(intrinsics, str_intrinsics, str_intrinsics_len, &vm->frames->arena);
+    intrinsics_append(intrinsics, random_intrinsics, random_intrinsics_len, &vm->frames->arena);
 #ifndef NOSYSTEM
-  intrinsics_append(intrinsics, base_intrinsics, base_intrinsics_len, &vm->frames->arena);
-  intrinsics_append(intrinsics, io_intrinsics, io_intrinsics_len, &vm->frames->arena);
-  intrinsics_append(intrinsics, path_intrinsics, path_intrinsics_len, &vm->frames->arena);
-  intrinsics_append(intrinsics, net_intrinsics, net_intrinsics_len, &vm->frames->arena);
-  intrinsics_append(intrinsics, term_intrinsics, term_intrinsics_len, &vm->frames->arena);
-  intrinsics_append(intrinsics, system_intrinsics, system_intrinsics_len, &vm->frames->arena);
+    intrinsics_append(intrinsics, base_intrinsics, base_intrinsics_len, &vm->frames->arena);
+    intrinsics_append(intrinsics, io_intrinsics, io_intrinsics_len, &vm->frames->arena);
+    intrinsics_append(intrinsics, path_intrinsics, path_intrinsics_len, &vm->frames->arena);
+    intrinsics_append(intrinsics, net_intrinsics, net_intrinsics_len, &vm->frames->arena);
+    intrinsics_append(intrinsics, term_intrinsics, term_intrinsics_len, &vm->frames->arena);
+    intrinsics_append(intrinsics, system_intrinsics, system_intrinsics_len, &vm->frames->arena);
 #endif
 #ifdef GLASS
-  intrinsics_append(intrinsics, glass_intrinsics, glass_intrinsics_len, &vm->frames->arena);
+    intrinsics_append(intrinsics, glass_intrinsics, glass_intrinsics_len, &vm->frames->arena);
 #endif
 #ifdef EMSCRIPTEN
-  intrinsics_append(intrinsics, web_intrinsics, web_intrinsics_len, &vm->frames->arena);
+    intrinsics_append(intrinsics, web_intrinsics, web_intrinsics_len, &vm->frames->arena);
 #endif
 #ifdef CRYPTO
-  intrinsics_append(intrinsics, crypto_intrinsics, crypto_intrinsics_len, &vm->frames->arena);
+    intrinsics_append(intrinsics, crypto_intrinsics, crypto_intrinsics_len, &vm->frames->arena);
 #endif
 #ifdef LIBTLS
-  intrinsics_append(intrinsics, tls_intrinsics, tls_intrinsics_len, &vm->frames->arena);
+    intrinsics_append(intrinsics, tls_intrinsics, tls_intrinsics_len, &vm->frames->arena);
 #endif
+  }
 
   vm->intrinsics = *intrinsics;
   vm->args = args;

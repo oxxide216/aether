@@ -43,7 +43,7 @@ AetherCtx aether_init(i32 argc, char **argv, Intrinsics *intrinsics) {
   if (!intrinsics)
     intrinsics = &_intrinsics;
 
-  Vm vm = vm_create(argc, argv, intrinsics);
+  Vm vm = vm_create(argc, argv, intrinsics, true);
   DA_APPEND(vms, vm);
 
   return ctx;
