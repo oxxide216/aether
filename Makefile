@@ -89,7 +89,7 @@ $(BUILD_DIR)/libs/%.o: libs/%.c
 > $(CC) $(CFLAGS) -c -o $@ $^
 
 wasm: $(WASM_OBJ) $(WASM_LIBS_OBJ)
-> $(EMCC) $(EMFLAGS) -o dest/aether.js $(WASM_OBJ) $(WASM_LIBS_OBJ) $(EMLDFLAGS)
+> $(EMCC) $(EMFLAGS) -o $(BUILD_DIR)/aether.js $(WASM_OBJ) $(WASM_LIBS_OBJ) $(EMLDFLAGS)
 
 $(BUILD_DIR)/wasm/%.o: src/%.c
 > mkdir -p $(dir $@)
@@ -108,10 +108,11 @@ $(PREFIX)/include/aether: aether
 > cp -r ae-src/std $(PREFIX)/include/aether
 > ./aether -c $(PREFIX)/include/aether/loader.abc ae-src/loader.ae
 
-wasm-install: $(PREFIX)/include/aether dest/aether.js
+wasm-install: $(PREFIX)/include/aether $(BUILD_DIR)/aether.js
 > cp aether-web-setup $(PREFIX)/bin
 > rm -rf $(PREFIX)/include/aether/wasm
-> cp -r dest $(PREFIX)/include/aether/wasm
+> mkdir $(PREFIX)/include/aether/wasm
+> cp $(BUILD_DIR)/aether.js $(PREFIX)/include/aether/wasm
 > cp js-src/aether-web.js $(PREFIX)/include/aether/wasm
 
 uninstall:
