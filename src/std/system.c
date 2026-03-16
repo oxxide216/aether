@@ -24,12 +24,27 @@ Value *sleep_intrinsic(Vm *vm, Value **args) {
 
   return value_unit(vm->current_frame);
 }
+
+Value *get_env_intrinsic(Vm *vm, Value **args) {
+  Value *var = args[0];
+
+  char *var_cstring = malloc(var->as.string.str.len + 1);
+  memcpy(var_cstring, var->as.string.str.ptr, var->as.string.str.len);
+  var_cstring[var->as.string.str.len] = '\0';
+
+  char *value = getenv(var_cstring);
+
+  free(var_cstring);
+
+  return value_string(STR(value, strlen(value)), vm->current_frame);
+}
 #endif
 
 Intrinsic system_intrinsics[] = {
 #ifndef EMSCRIPTEN
   { STR_LIT("run-command"), true, 1, { ValueKindString }, &run_command_intrinsic, NULL },
   { STR_LIT("sleep"), false, 1, { ValueKindFloat }, &sleep_intrinsic, NULL },
+  { STR_LIT("get-env"), true, 1, { ValueKindString }, &get_env_intrinsic, NULL },
 #endif
 };
 

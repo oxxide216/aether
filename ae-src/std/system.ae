@@ -1,3 +1,4 @@
 (if (!= current-platform 'web')
   (let run-command \command -> import 'run-command')
-  (let sleep \seconds -> import 'sleep'))
+  (let sleep \seconds -> import 'sleep')
+  (let get-env \var -> import 'get-env'))
