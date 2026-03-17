@@ -3,6 +3,6 @@
 /libaether.a
 /test.abc
 /eval.abc
-grammar.h
+include/aether/grammar.h
 /dest/
 /example-dest/
