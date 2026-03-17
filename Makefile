@@ -2,18 +2,18 @@
 
 CC = cc
 EMCC = emcc
-CFLAGS += -Wall -Wextra -Iinclude -Ilibs -Ilibs/lexgen/include
-LDFLAGS += -lm
-EMCFLAGS += $(CFLAGS)
-EMLDFLAGS += $(LDFLAGS) \
-             -s EXPORTED_RUNTIME_METHODS=['cwrap','HEAPU8'] \
-             -s EXPORTED_FUNCTIONS=['_malloc','_free'] \
-             -s DEFAULT_LIBRARY_FUNCS_TO_INCLUDE='$$stringToNewUTF8' \
-             -s WASM=1 -s FULL_ES3=1 \
-              -s USE_WEBGL2=1 -s USE_GLFW=0 \
-             -s ENVIRONMENT=web -s SINGLE_FILE=1 \
-             -s FETCH=1
-EMFLAGS += -s MEMORY64
+override CFLAGS += -Wall -Wextra -Iinclude -Ilibs -Ilibs/lexgen/include
+override LDFLAGS += -lm
+override EMCFLAGS += $(CFLAGS)
+override EMLDFLAGS += $(LDFLAGS) \
+                      -s EXPORTED_RUNTIME_METHODS=['cwrap','HEAPU8'] \
+                      -s EXPORTED_FUNCTIONS=['_malloc','_free'] \
+                      -s DEFAULT_LIBRARY_FUNCS_TO_INCLUDE='$$stringToNewUTF8' \
+                      -s WASM=1 -s FULL_ES3=1 \
+                      -s USE_WEBGL2=1 -s USE_GLFW=0 \
+                      -s ENVIRONMENT=web -s SINGLE_FILE=1 \
+                      -s FETCH=1
+override EMFLAGS += -s MEMORY64
 BUILD_DIR = build
 
 SRC = $(wildcard src/lib/*.c) \
