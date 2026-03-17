@@ -70,10 +70,10 @@ ifdef TLS
   SRC += src/std/tls/tls.c
 endif
 
-aether: $(MAIN_OBJ) $(LIBS_OBJ) include/aether/grammar.h
+aether: $(MAIN_OBJ) $(LIBS_OBJ)
 > $(CC) -o aether $(MAIN_OBJ) $(LIBS_OBJ) $(LDFLAGS)
 
-libaether.a: $(OBJ) $(LIBS_OBJ) include/aether/grammar.h
+libaether.a: $(OBJ) $(LIBS_OBJ)
 > ar rcs libaether.a $(OBJ) $(LIBS_OBJ)
 
 $(BUILD_DIR)/%.o: src/%.c
@@ -84,7 +84,7 @@ $(BUILD_DIR)/libs/%.o: libs/%.c
 > mkdir -p $(dir $@)
 > $(CC) $(CFLAGS) -c -o $@ $^
 
-wasm: $(WASM_OBJ) $(WASM_LIBS_OBJ) include/aether/grammar.h
+wasm: $(WASM_OBJ) $(WASM_LIBS_OBJ)
 > $(EMCC) $(EMFLAGS) -o $(BUILD_DIR)/aether.js $(WASM_OBJ) $(WASM_LIBS_OBJ) $(EMLDFLAGS)
 
 include/aether/grammar.h: libs/lexgen/lexgen
@@ -93,13 +93,13 @@ include/aether/grammar.h: libs/lexgen/lexgen
 libs/lexgen/lexgen:
 > cd libs/lexgen && ./build.sh
 
-$(BUILD_DIR)/wasm/%.o: src/%.c
+$(BUILD_DIR)/wasm/%.o: src/%.c include/aether/grammar.h
 > mkdir -p $(dir $@)
-> $(EMCC) $(EMFLAGS) $(EMCFLAGS) -c -o $@ $^
+> $(EMCC) $(EMFLAGS) $(EMCFLAGS) -c -o $@ $<
 
-$(BUILD_DIR)/wasm/libs/%.o: libs/%.c
+$(BUILD_DIR)/wasm/libs/%.o: libs/%.c include/aether/grammar.h
 > mkdir -p $(dir $@)
-> $(EMCC) $(EMFLAGS) $(EMCFLAGS) -c -o $@ $^
+> $(EMCC) $(EMFLAGS) $(EMCFLAGS) -c -o $@ $<
 
 install: aether $(PREFIX)/include/aether
 > cp aether $(PREFIX)/bin
