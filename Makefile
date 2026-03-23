@@ -76,13 +76,13 @@ aether: $(MAIN_OBJ) $(LIBS_OBJ)
 libaether.a: $(OBJ) $(LIBS_OBJ)
 > ar rcs libaether.a $(OBJ) $(LIBS_OBJ)
 
-$(BUILD_DIR)/%.o: src/%.c
+$(BUILD_DIR)/%.o: src/%.c include/aether/grammar.h
 > mkdir -p $(dir $@)
-> $(CC) $(CFLAGS) -c -o $@ $^
+> $(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD_DIR)/libs/%.o: libs/%.c
+$(BUILD_DIR)/libs/%.o: libs/%.c include/aether/grammar.h
 > mkdir -p $(dir $@)
-> $(CC) $(CFLAGS) -c -o $@ $^
+> $(CC) $(CFLAGS) -c -o $@ $<
 
 wasm: $(WASM_OBJ) $(WASM_LIBS_OBJ)
 > $(EMCC) $(EMFLAGS) -o $(BUILD_DIR)/aether.js $(WASM_OBJ) $(WASM_LIBS_OBJ) $(EMLDFLAGS)
