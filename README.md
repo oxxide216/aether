@@ -53,7 +53,7 @@ aether main.ae
 
 ```shell
 make wasm EMCC_PATH=[emcc]
-make wasm-install
+sudo make wasm-install
 ```
 
 Where:
