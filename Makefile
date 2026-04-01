@@ -39,11 +39,11 @@ ifndef PREFIX
 endif
 
 ifdef NDEBUG
-  CFLAGS += -DNDEBUG
+  override CFLAGS += -DNDEBUG
 endif
 
 ifdef NOSYSTEM
-  CFLAGS += -DNOSYSTEM
+  override CFLAGS += -DNOSYSTEM
 else
   SRC += src/std/base.c src/std/io.c \
          src/std/net.c src/std/path.c \
@@ -51,8 +51,8 @@ else
 endif
 
 ifdef GLASS
-  CFLAGS += -DGLASS -Ilibs/winx/include -Ilibs/glass/include
-  LDFLAGS += -lX11 -lGL -lGLEW
+  override CFLAGS += -DGLASS -Ilibs/winx/include -Ilibs/glass/include
+  override LDFLAGS += -lX11 -lGL -lGLEW
   SRC += $(wildcard src/std/glass/*.c)
   LIBS_SRC += $(wildcard libs/glass/src/*.c) \
               $(wildcard libs/winx/src/*.c) \
@@ -60,13 +60,13 @@ ifdef GLASS
 endif
 
 ifdef CRYPTO
-  CFLAGS += -DCRYPTO -Ilibs/blake2/ref
+  override CFLAGS += -DCRYPTO -Ilibs/blake2/ref
   SRC += src/std/crypto.c
   LIBS_SRC += libs/blake2/ref/blake2b-ref.c
 endif
 
 ifdef TLS
-  CFLAGS += -DLIBTLS -DTLS_AMALGAMATION -Ilibs/tlse
+  override CFLAGS += -DLIBTLS -DTLS_AMALGAMATION -Ilibs/tlse
   SRC += src/std/tls/tls.c
 endif
 
